@@ -11,16 +11,13 @@
 # Environment variables:
 #   Create a .env file with the following variables:
 #   - DB_PASSWORD: Database password (for production)
-#   - GRAFANA_PASSWORD: Grafana admin password (for monitoring)
-
-version: '3.8'
 
 services:
   # Main application service
   app:
     build:
       context: .
-      dockerfile: Dockerfile.runtime
+      dockerfile: docker/Dockerfile.runtime
     container_name: claude-code-app
     ports:
       - "${PORT:-3001}:3001"
@@ -86,56 +83,7 @@ services:
     profiles:
       - production
 
-  # Prometheus monitoring (optional)
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: claude-code-prometheus
-    volumes:
-      - ./workspace/containers/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./workspace/containers/prometheus/data:/prometheus:rw
-    ports:
-      - "9090:9090"
-    restart: unless-stopped
-    networks:
-      - claude-network
-    profiles:
-      - monitoring
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
-
-  # Grafana dashboard (optional)
-  grafana:
-    image: grafana/grafana:latest
-    container_name: claude-code-grafana
-    volumes:
-      - ./workspace/containers/grafana:/var/lib/grafana:rw
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
-      - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_SERVER_ROOT_URL=http://localhost:3000
-    restart: unless-stopped
-    networks:
-      - claude-network
-    profiles:
-      - monitoring
-    depends_on:
-      - prometheus
-
 networks:
   claude-network:
     driver: bridge
     name: claude-code-network
-
-# Uncomment this section for volume persistence
-# volumes:
-#   postgres-data:
-#   prometheus-data:
-#   grafana-data:

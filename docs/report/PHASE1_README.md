@@ -14,7 +14,8 @@
 
 ```
 ai-claude-code-ui/
-├── Dockerfile.runtime                    # 容器镜像构建文件
+├── docker/
+│   └── Dockerfile.runtime                # 容器镜像构建文件
 ├── docker-compose.yml                    # Docker Compose 配置
 ├── server/
 │   ├── container-entrypoint.js          # 容器入口点脚本
@@ -36,7 +37,7 @@ ai-claude-code-ui/
 
 ## 1. 容器镜像（Dockerfile）
 
-### 文件：`Dockerfile.runtime`
+### 文件：`docker/Dockerfile.runtime`
 
 这是一个多阶段构建的 Dockerfile，用于创建 Claude Code 运行时容器镜像。
 
@@ -49,7 +50,7 @@ ai-claude-code-ui/
 
 **构建镜像：**
 ```bash
-docker build -f Dockerfile.runtime -t claude-code-runtime:latest .
+docker build -f docker/Dockerfile.runtime -t claude-code-runtime:latest .
 ```
 
 **测试镜像：**
@@ -192,13 +193,11 @@ const tier = await userDb.getContainerTier(userId);
 
 ### 文件：`docker-compose.yml`
 
-提供完整的容器编排配置，包括：
+提供容器编排配置，包括：
 
 - **app**: 主应用服务
 - **db**: PostgreSQL 数据库（可选）
-- **nginx**: 反向代理（可选）
-- **prometheus**: 监控指标收集（可选）
-- **grafana**: 监控可视化（可选）
+- **nginx**: 反向代理（可选，使用 `--profile production` 启动）
 
 **基础使用：**
 ```bash
@@ -212,9 +211,9 @@ docker-compose logs -f app
 docker-compose down
 ```
 
-**启用监控：**
+**启用生产环境（Nginx 反向代理）：**
 ```bash
-docker-compose --profile monitoring up -d
+docker-compose --profile production up -d
 ```
 
 ## 5. 验收标准
@@ -225,7 +224,7 @@ docker-compose --profile monitoring up -d
 
 - [ ] Docker 镜像构建成功
   ```bash
-  docker build -f Dockerfile.runtime -t claude-code-runtime:latest .
+  docker build -f docker/Dockerfile.runtime -t claude-code-runtime:latest .
   docker images | grep claude-code-runtime
   ```
 
