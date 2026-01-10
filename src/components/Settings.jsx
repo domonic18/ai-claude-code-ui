@@ -19,7 +19,7 @@ import AccountContent from './settings/AccountContent';
 import PermissionsContent from './settings/PermissionsContent';
 import McpServersContent from './settings/McpServersContent';
 
-function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
+function Settings({ isOpen, onClose, projects = [], initialTab = 'agents', autoRefreshInterval, setAutoRefreshInterval }) {
   const { isDarkMode, toggleDarkMode } = useTheme();
   const [allowedTools, setAllowedTools] = useState([]);
   const [disallowedTools, setDisallowedTools] = useState([]);
@@ -1083,6 +1083,39 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
             <option value="date">Recent Activity</option>
           </select>
         </div>
+      </div>
+    </div>
+
+    {/* Auto-Refresh Projects */}
+    <div className="space-y-4">
+      <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <div className="font-medium text-foreground">
+              Auto-Refresh Projects
+            </div>
+            <div className="text-sm text-muted-foreground">
+              Automatically check for new projects (useful for container mode)
+            </div>
+          </div>
+          <select
+            value={autoRefreshInterval}
+            onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
+            className="text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2 w-28"
+          >
+            <option value={0}>Disabled</option>
+            <option value={15}>15 seconds</option>
+            <option value={30}>30 seconds</option>
+            <option value={60}>1 minute</option>
+            <option value={120}>2 minutes</option>
+            <option value={300}>5 minutes</option>
+          </select>
+        </div>
+        {autoRefreshInterval > 0 && (
+          <div className="mt-3 text-xs text-muted-foreground">
+            Projects will auto-refresh every {autoRefreshInterval} seconds when no active session is running
+          </div>
+        )}
       </div>
     </div>
 

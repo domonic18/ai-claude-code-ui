@@ -89,6 +89,15 @@ const connectedClients = new Set();
 
 // Setup file system watcher for Claude projects folder using chokidar
 async function setupProjectsWatcher() {
+    // Check if container mode is enabled
+    const isContainerMode = process.env.CONTAINER_MODE === 'true' || process.env.CONTAINER_MODE === '1';
+
+    if (isContainerMode) {
+        console.log('[INFO] Container mode is enabled, skipping host projects watcher');
+        console.log('[INFO] Projects will be managed inside containers');
+        return;
+    }
+
     const chokidar = (await import('chokidar')).default;
     const claudeProjectsPath = path.join(os.homedir(), '.claude', 'projects');
 
@@ -164,6 +173,8 @@ async function setupProjectsWatcher() {
             })
             .on('ready', () => {
             });
+
+        console.log('[INFO] Host projects watcher started (non-container mode)');
 
     } catch (error) {
         console.error('[ERROR] Failed to setup projects watcher:', error);

@@ -63,6 +63,8 @@ function AppContent() {
   const [autoScrollToBottom, setAutoScrollToBottom] = useLocalStorage('autoScrollToBottom', true);
   const [sendByCtrlEnter, setSendByCtrlEnter] = useLocalStorage('sendByCtrlEnter', false);
   const [sidebarVisible, setSidebarVisible] = useLocalStorage('sidebarVisible', true);
+  // Auto-refresh projects interval (in seconds, 0 = disabled)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useLocalStorage('autoRefreshInterval', 30);
   // Session Protection System: Track sessions with active conversations to prevent
   // automatic project updates from interrupting ongoing chats. When a user sends
   // a message, the session is marked as "active" and project updates are paused
@@ -126,6 +128,31 @@ function AppContent() {
     // Fetch projects on component mount
     fetchProjects();
   }, []);
+
+  // Auto-refresh projects periodically (useful for container mode where file watching is disabled)
+  useEffect(() => {
+    // Disable auto-refresh if interval is 0 or negative
+    if (!autoRefreshInterval || autoRefreshInterval <= 0) {
+      return;
+    }
+
+    console.log(`[App] Auto-refresh enabled: checking for new projects every ${autoRefreshInterval} seconds`);
+
+    const intervalId = setInterval(() => {
+      // Only auto-refresh if there's no active session (to avoid interrupting conversations)
+      if (activeSessions.size === 0) {
+        console.log('[App] Auto-refreshing projects...');
+        fetchProjects();
+      } else {
+        console.log('[App] Skipping auto-refresh: active session detected');
+      }
+    }, autoRefreshInterval * 1000);
+
+    return () => {
+      clearInterval(intervalId);
+      console.log('[App] Auto-refresh stopped');
+    };
+  }, [autoRefreshInterval, activeSessions]);
 
   // Helper function to determine if an update is purely additive (new sessions/projects)
   // vs modifying existing selected items that would interfere with active conversations
@@ -939,6 +966,8 @@ function AppContent() {
         onClose={() => setShowSettings(false)}
         projects={projects}
         initialTab={settingsInitialTab}
+        autoRefreshInterval={autoRefreshInterval}
+        setAutoRefreshInterval={setAutoRefreshInterval}
       />
 
       {/* Version Upgrade Modal */}
