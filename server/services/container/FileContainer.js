@@ -485,3 +485,70 @@ export async function deleteFileInContainer(userId, filePath, options = {}) {
     throw new Error(`Failed to delete file in container: ${error.message}`);
   }
 }
+
+/**
+ * Get projects list from inside a container
+ * In container mode, projects are stored in /home/node/.claude/projects
+ * @param {number} userId - User ID
+ * @returns {Promise<Array>} - List of projects
+ */
+export async function getProjectsInContainer(userId) {
+  const claudeProjectsPath = '/home/node/.claude/projects';
+
+  console.log('[FileContainer] getProjectsInContainer - userId:', userId);
+
+  try {
+    // Get or create user container
+    const container = await containerManager.getOrCreateContainer(userId);
+    console.log('[FileContainer] Container:', container.id, container.name);
+
+    // List project directories in container
+    const { stream } = await containerManager.execInContainer(
+      userId,
+      `ls -1 "${claudeProjectsPath}" 2>/dev/null || echo ""`
+    );
+
+    // Collect output
+    return new Promise((resolve, reject) => {
+      let output = '';
+
+      stream.on('data', (chunk) => {
+        output += chunk.toString();
+      });
+
+      stream.on('error', (err) => {
+        console.error('[FileContainer] Error listing projects:', err);
+        // If projects directory doesn't exist, return empty array
+        resolve([]);
+      });
+
+      stream.on('end', () => {
+        try {
+          const projects = [];
+          const lines = output.trim().split('\n');
+
+          for (const line of lines) {
+            const projectName = line.trim();
+            if (!projectName || projectName === '') continue;
+
+            projects.push({
+              name: projectName,
+              path: projectName.replace(/-/g, '/'),
+              displayName: projectName,
+              isContainerProject: true
+            });
+          }
+
+          console.log('[FileContainer] Found projects in container:', projects.length);
+          resolve(projects);
+        } catch (parseError) {
+          console.error('[FileContainer] Error parsing projects:', parseError);
+          reject(new Error(`Failed to parse projects: ${parseError.message}`));
+        }
+      });
+    });
+  } catch (error) {
+    console.error('[FileContainer] Failed to get projects in container:', error);
+    throw new Error(`Failed to get projects in container: ${error.message}`);
+  }
+}

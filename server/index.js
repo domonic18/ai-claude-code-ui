@@ -81,6 +81,7 @@ import codexRoutes from './routes/codex.js';
 import { initializeDatabase } from './database/db.js';
 import { validateApiKey, authenticateToken, authenticateWebSocket } from './middleware/auth.js';
 import { getFileOperations, logContainerModeStatus } from './config/container-config.js';
+import { getProjectsInContainer } from './services/container/index.js';
 
 // File system watcher for projects folder
 let projectsWatcher = null;
@@ -371,9 +372,27 @@ app.post('/api/system/update', authenticateToken, async (req, res) => {
 
 app.get('/api/projects', authenticateToken, async (req, res) => {
     try {
-        const projects = await getProjects();
+        const userId = req.user.id;
+        console.log('[DEBUG] Get projects request - userId:', userId);
+
+        // Check if container mode is enabled
+        const fileOps = await getFileOperations(userId);
+        console.log('[DEBUG] File operations mode:', fileOps.isContainer ? 'CONTAINER' : 'HOST');
+
+        let projects;
+        if (fileOps.isContainer) {
+            // Container mode: get projects from container
+            console.log('[DEBUG] Using container mode for projects');
+            projects = await getProjectsInContainer(userId);
+        } else {
+            // Host mode: get projects from host filesystem
+            console.log('[DEBUG] Using host mode for projects');
+            projects = await getProjects();
+        }
+
         res.json(projects);
     } catch (error) {
+        console.error('[ERROR] Failed to get projects:', error);
         res.status(500).json({ error: error.message });
     }
 });

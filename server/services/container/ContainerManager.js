@@ -17,6 +17,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { containersDb } from '../../database/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -94,6 +95,11 @@ class ContainerManager {
 
     // Start cleanup interval
     this.startCleanupInterval();
+
+    // Load containers from database on startup
+    this.loadContainersFromDatabase().catch(err => {
+      console.warn('[ContainerManager] Failed to load containers from database:', err.message);
+    });
   }
 
   /**
@@ -103,6 +109,8 @@ class ContainerManager {
    * @returns {Promise<ContainerInfo>} Container information
    */
   async getOrCreateContainer(userId, userConfig = {}) {
+    const containerName = `claude-user-${userId}`;
+
     // Check cache for existing container
     if (this.containers.has(userId)) {
       const container = this.containers.get(userId);
@@ -111,11 +119,57 @@ class ContainerManager {
       if (status === 'running') {
         // Update last active time
         container.lastActive = new Date();
+
+        // Update in database
+        containersDb.updateContainerLastActive(container.id).catch(err => {
+          console.warn(`[ContainerManager] Failed to update last_active: ${err.message}`);
+        });
+
         return container;
       }
 
       // Container not running, remove from cache
       this.containers.delete(userId);
+    }
+
+    // Check if container exists in Docker (handles server restart scenario)
+    try {
+      const existingContainer = this.docker.getContainer(containerName);
+      const containerInfo = await existingContainer.inspect();
+
+      if (containerInfo.State.Running) {
+        // Container is running, cache and return it
+        console.log(`[ContainerManager] Found existing running container for user ${userId}: ${containerName}`);
+        const info = {
+          id: containerInfo.Id,
+          name: containerName,
+          userId,
+          status: 'running',
+          createdAt: new Date(containerInfo.Created),
+          lastActive: new Date()
+        };
+        this.containers.set(userId, info);
+
+        // Update last_active in database
+        containersDb.updateContainerLastActive(containerInfo.Id).catch(err => {
+          console.warn(`[ContainerManager] Failed to update last_active: ${err.message}`);
+        });
+
+        return info;
+      } else {
+        // Container exists but not running, remove it
+        console.log(`[ContainerManager] Removing stale container for user ${userId}: ${containerName}`);
+        await existingContainer.remove({ force: true }).catch(err => {
+          console.warn(`[ContainerManager] Failed to remove stale container: ${err.message}`);
+        });
+      }
+    } catch (err) {
+      // Container doesn't exist, proceed to create
+      if (err.statusCode === 404) {
+        console.log(`[ContainerManager] No existing container for user ${userId}, creating new one`);
+      } else {
+        console.warn(`[ContainerManager] Error checking existing container: ${err.message}`);
+      }
     }
 
     // Create new container
@@ -172,9 +226,68 @@ class ContainerManager {
 
       this.containers.set(userId, containerInfo);
 
+      // 7. Write to database
+      try {
+        containersDb.createContainer(userId, container.id, containerName);
+        console.log(`[ContainerManager] Container record saved to database: ${containerName}`);
+      } catch (dbErr) {
+        console.warn(`[ContainerManager] Failed to save container to database: ${dbErr.message}`);
+      }
+
       return containerInfo;
     } catch (error) {
       throw new Error(`Failed to create container for user ${userId}: ${error.message}${error.reason ? ' (' + error.reason + ')' : ''}`);
+    }
+  }
+
+  /**
+   * Load containers from database into memory cache
+   * Called on startup to restore container state from database
+   * @returns {Promise<void>}
+   */
+  async loadContainersFromDatabase() {
+    try {
+      console.log('[ContainerManager] Loading containers from database...');
+      const activeContainers = containersDb.listActiveContainers();
+
+      for (const dbContainer of activeContainers) {
+        const { user_id, container_id, container_name, created_at, last_active } = dbContainer;
+
+        // Verify container still exists in Docker
+        try {
+          const dockerContainer = this.docker.getContainer(container_id);
+          const containerInfo = await dockerContainer.inspect();
+
+          if (containerInfo.State.Running) {
+            // Container is running, restore to cache
+            this.containers.set(user_id, {
+              id: container_id,
+              name: container_name,
+              userId: user_id,
+              status: 'running',
+              createdAt: new Date(created_at),
+              lastActive: new Date(last_active)
+            });
+            console.log(`[ContainerManager] Restored container for user ${user_id}: ${container_name}`);
+          } else {
+            // Container not running, update database status
+            containersDb.updateContainerStatus(container_id, 'stopped');
+            console.log(`[ContainerManager] Container ${container_name} is stopped, status updated in database`);
+          }
+        } catch (dockerErr) {
+          // Container doesn't exist in Docker, remove from database
+          if (dockerErr.statusCode === 404) {
+            console.log(`[ContainerManager] Container ${container_name} not found in Docker, removing from database`);
+            containersDb.deleteContainer(container_id);
+          } else {
+            console.warn(`[ContainerManager] Error checking container ${container_name}: ${dockerErr.message}`);
+          }
+        }
+      }
+
+      console.log(`[ContainerManager] Loaded ${this.containers.size} containers from database`);
+    } catch (error) {
+      console.error('[ContainerManager] Failed to load containers from database:', error);
     }
   }
 
@@ -321,6 +434,14 @@ class ContainerManager {
 
       // Remove from cache
       this.containers.delete(userId);
+
+      // Remove from database
+      try {
+        containersDb.deleteContainer(containerInfo.id);
+        console.log(`[ContainerManager] Container record removed from database: ${containerInfo.name}`);
+      } catch (dbErr) {
+        console.warn(`[ContainerManager] Failed to remove container from database: ${dbErr.message}`);
+      }
 
       // Optionally remove volume
       if (removeVolume) {

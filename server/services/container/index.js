@@ -43,5 +43,6 @@ export {
   writeFileInContainer,
   getFileTreeInContainer,
   getFileStatsInContainer,
-  deleteFileInContainer
+  deleteFileInContainer,
+  getProjectsInContainer
 } from './FileContainer.js';
