@@ -75,6 +75,66 @@ const runMigrations = () => {
       db.exec('ALTER TABLE users ADD COLUMN has_completed_onboarding BOOLEAN DEFAULT 0');
     }
 
+    // Container support migrations
+    if (!columnNames.includes('container_tier')) {
+      console.log('Running migration: Adding container_tier column');
+      db.exec('ALTER TABLE users ADD COLUMN container_tier TEXT DEFAULT \'free\'');
+    }
+
+    if (!columnNames.includes('container_config')) {
+      console.log('Running migration: Adding container_config column');
+      db.exec('ALTER TABLE users ADD COLUMN container_config TEXT');
+    }
+
+    if (!columnNames.includes('resource_quota')) {
+      console.log('Running migration: Adding resource_quota column');
+      db.exec('ALTER TABLE users ADD COLUMN resource_quota TEXT');
+    }
+
+    // Create container-related tables if they don't exist
+    const userContainersTable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='user_containers'").get();
+    if (!userContainersTable) {
+      console.log('Running migration: Creating user_containers table');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS user_containers (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          container_id TEXT NOT NULL UNIQUE,
+          container_name TEXT NOT NULL,
+          status TEXT DEFAULT 'running',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          last_active DATETIME DEFAULT CURRENT_TIMESTAMP,
+          resource_usage TEXT,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_user_containers_user_id ON user_containers(user_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_user_containers_status ON user_containers(status)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_user_containers_last_active ON user_containers(last_active)');
+    }
+
+    const containerMetricsTable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='container_metrics'").get();
+    if (!containerMetricsTable) {
+      console.log('Running migration: Creating container_metrics table');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS container_metrics (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          container_id TEXT NOT NULL,
+          cpu_percent REAL,
+          memory_used INTEGER,
+          memory_limit INTEGER,
+          memory_percent REAL,
+          disk_used INTEGER,
+          network_rx INTEGER,
+          network_tx INTEGER,
+          recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (container_id) REFERENCES user_containers(container_id) ON DELETE CASCADE
+        )
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_container_metrics_container_id ON container_metrics(container_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_container_metrics_recorded_at ON container_metrics(recorded_at)');
+    }
+
     console.log('Database migrations completed successfully');
   } catch (error) {
     console.error('Error running migrations:', error.message);
@@ -187,6 +247,48 @@ const userDb = {
     try {
       const row = db.prepare('SELECT has_completed_onboarding FROM users WHERE id = ?').get(userId);
       return row?.has_completed_onboarding === 1;
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  // Container-related operations
+  updateContainerTier: (userId, tier) => {
+    try {
+      const stmt = db.prepare('UPDATE users SET container_tier = ? WHERE id = ?');
+      stmt.run(tier, userId);
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  getContainerTier: (userId) => {
+    try {
+      const row = db.prepare('SELECT container_tier FROM users WHERE id = ?').get(userId);
+      return row?.container_tier || 'free';
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  updateContainerConfig: (userId, config) => {
+    try {
+      const stmt = db.prepare('UPDATE users SET container_config = ? WHERE id = ?');
+      stmt.run(JSON.stringify(config), userId);
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  getContainerConfig: (userId) => {
+    try {
+      const row = db.prepare('SELECT container_config FROM users WHERE id = ?').get(userId);
+      if (!row?.container_config) return null;
+      try {
+        return JSON.parse(row.container_config);
+      } catch {
+        return null;
+      }
     } catch (err) {
       throw err;
     }
@@ -332,6 +434,148 @@ const credentialsDb = {
   }
 };
 
+// User containers database operations
+const containersDb = {
+  // Create a new container record
+  createContainer: (userId, containerId, containerName) => {
+    try {
+      const stmt = db.prepare('INSERT INTO user_containers (user_id, container_id, container_name, status) VALUES (?, ?, ?, ?)');
+      const result = stmt.run(userId, containerId, containerName, 'running');
+      return { id: result.lastInsertRowid, containerId, containerName };
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  // Get container by user ID
+  getContainerByUserId: (userId) => {
+    try {
+      const row = db.prepare('SELECT * FROM user_containers WHERE user_id = ? ORDER BY created_at DESC LIMIT 1').get(userId);
+      return row;
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  // Get container by container ID
+  getContainerById: (containerId) => {
+    try {
+      const row = db.prepare('SELECT * FROM user_containers WHERE container_id = ?').get(containerId);
+      return row;
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  // Update container status
+  updateContainerStatus: (containerId, status) => {
+    try {
+      const stmt = db.prepare('UPDATE user_containers SET status = ?, last_active = CURRENT_TIMESTAMP WHERE container_id = ?');
+      const result = stmt.run(status, containerId);
+      return result.changes > 0;
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  // Update container last active time
+  updateContainerLastActive: (containerId) => {
+    try {
+      db.prepare('UPDATE user_containers SET last_active = CURRENT_TIMESTAMP WHERE container_id = ?').run(containerId);
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  // Update container resource usage
+  updateContainerResourceUsage: (containerId, resourceUsage) => {
+    try {
+      const stmt = db.prepare('UPDATE user_containers SET resource_usage = ? WHERE container_id = ?');
+      stmt.run(JSON.stringify(resourceUsage), containerId);
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  // Delete container record
+  deleteContainer: (containerId) => {
+    try {
+      const stmt = db.prepare('DELETE FROM user_containers WHERE container_id = ?');
+      const result = stmt.run(containerId);
+      return result.changes > 0;
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  // List all active containers
+  listActiveContainers: () => {
+    try {
+      const rows = db.prepare('SELECT * FROM user_containers WHERE status = ? ORDER BY last_active DESC').all('running');
+      return rows;
+    } catch (err) {
+      throw err;
+    }
+  }
+};
+
+// Container metrics database operations
+const containerMetricsDb = {
+  // Record container metrics
+  recordMetrics: (containerId, metrics) => {
+    try {
+      const stmt = db.prepare(`
+        INSERT INTO container_metrics (container_id, cpu_percent, memory_used, memory_limit, memory_percent, disk_used, network_rx, network_tx)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      const result = stmt.run(
+        containerId,
+        metrics.cpu_percent,
+        metrics.memory_used,
+        metrics.memory_limit,
+        metrics.memory_percent,
+        metrics.disk_used,
+        metrics.network_rx,
+        metrics.network_tx
+      );
+      return { id: result.lastInsertRowid };
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  // Get recent metrics for a container
+  getRecentMetrics: (containerId, limit = 100) => {
+    try {
+      const rows = db.prepare('SELECT * FROM container_metrics WHERE container_id = ? ORDER BY recorded_at DESC LIMIT ?').all(containerId, limit);
+      return rows;
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  // Get latest metrics for a container
+  getLatestMetrics: (containerId) => {
+    try {
+      const row = db.prepare('SELECT * FROM container_metrics WHERE container_id = ? ORDER BY recorded_at DESC LIMIT 1').get(containerId);
+      return row;
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  // Delete old metrics (cleanup)
+  deleteOldMetrics: (daysToKeep = 7) => {
+    try {
+      const stmt = db.prepare('DELETE FROM container_metrics WHERE recorded_at < datetime("now", "-" || ? || " days")');
+      const result = stmt.run(daysToKeep);
+      return result.changes;
+    } catch (err) {
+      throw err;
+    }
+  }
+};
+
 // Backward compatibility - keep old names pointing to new system
 const githubTokensDb = {
   createGithubToken: (userId, tokenName, githubToken, description = null) => {
@@ -357,5 +601,7 @@ export {
   userDb,
   apiKeysDb,
   credentialsDb,
+  containersDb,
+  containerMetricsDb,
   githubTokensDb // Backward compatibility
 };
