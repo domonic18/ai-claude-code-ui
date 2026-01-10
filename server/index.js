@@ -45,6 +45,10 @@ try {
 }
 
 console.log('PORT from env:', process.env.PORT);
+console.log('DATABASE_PATH from env:', process.env.DATABASE_PATH);
+
+// Log container mode status after .env is loaded
+logContainerModeStatus();
 
 import express from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
@@ -76,6 +80,7 @@ import userRoutes from './routes/user.js';
 import codexRoutes from './routes/codex.js';
 import { initializeDatabase } from './database/db.js';
 import { validateApiKey, authenticateToken, authenticateWebSocket } from './middleware/auth.js';
+import { getFileOperations, logContainerModeStatus } from './config/container-config.js';
 
 // File system watcher for projects folder
 let projectsWatcher = null;
@@ -526,6 +531,7 @@ app.get('/api/projects/:projectName/file', authenticateToken, async (req, res) =
     try {
         const { projectName } = req.params;
         const { filePath } = req.query;
+        const userId = req.user.id;
 
         console.log('[DEBUG] File read request:', projectName, filePath);
 
@@ -539,17 +545,34 @@ app.get('/api/projects/:projectName/file', authenticateToken, async (req, res) =
             return res.status(404).json({ error: 'Project not found' });
         }
 
-        // Handle both absolute and relative paths
-        const resolved = path.isAbsolute(filePath)
-            ? path.resolve(filePath)
-            : path.resolve(projectRoot, filePath);
-        const normalizedRoot = path.resolve(projectRoot) + path.sep;
-        if (!resolved.startsWith(normalizedRoot)) {
-            return res.status(403).json({ error: 'Path must be under project root' });
-        }
+        // Get file operations based on container mode
+        const fileOps = await getFileOperations(userId);
 
-        const content = await fsPromises.readFile(resolved, 'utf8');
-        res.json({ content, path: resolved });
+        if (fileOps.isContainer) {
+            // Container mode: Read file from container
+            try {
+                const result = await fileOps.readFile(filePath, {
+                    projectPath: projectRoot
+                });
+                res.json({ content: result.content, path: filePath });
+            } catch (error) {
+                console.error('Error reading file from container:', error);
+                res.status(404).json({ error: 'File not found' });
+            }
+        } else {
+            // Host mode: Use traditional file system access
+            // Handle both absolute and relative paths
+            const resolved = path.isAbsolute(filePath)
+                ? path.resolve(filePath)
+                : path.resolve(projectRoot, filePath);
+            const normalizedRoot = path.resolve(projectRoot) + path.sep;
+            if (!resolved.startsWith(normalizedRoot)) {
+                return res.status(403).json({ error: 'Path must be under project root' });
+            }
+
+            const content = await fsPromises.readFile(resolved, 'utf8');
+            res.json({ content, path: resolved });
+        }
     } catch (error) {
         console.error('Error reading file:', error);
         if (error.code === 'ENOENT') {
@@ -621,6 +644,7 @@ app.put('/api/projects/:projectName/file', authenticateToken, async (req, res) =
     try {
         const { projectName } = req.params;
         const { filePath, content } = req.body;
+        const userId = req.user.id;
 
         console.log('[DEBUG] File save request:', projectName, filePath);
 
@@ -638,23 +662,44 @@ app.put('/api/projects/:projectName/file', authenticateToken, async (req, res) =
             return res.status(404).json({ error: 'Project not found' });
         }
 
-        // Handle both absolute and relative paths
-        const resolved = path.isAbsolute(filePath)
-            ? path.resolve(filePath)
-            : path.resolve(projectRoot, filePath);
-        const normalizedRoot = path.resolve(projectRoot) + path.sep;
-        if (!resolved.startsWith(normalizedRoot)) {
-            return res.status(403).json({ error: 'Path must be under project root' });
+        // Get file operations based on container mode
+        const fileOps = await getFileOperations(userId);
+
+        if (fileOps.isContainer) {
+            // Container mode: Write file to container
+            try {
+                await fileOps.writeFile(filePath, content, {
+                    projectPath: projectRoot
+                });
+                res.json({
+                    success: true,
+                    path: filePath,
+                    message: 'File saved successfully'
+                });
+            } catch (error) {
+                console.error('Error writing file to container:', error);
+                res.status(500).json({ error: error.message });
+            }
+        } else {
+            // Host mode: Use traditional file system access
+            // Handle both absolute and relative paths
+            const resolved = path.isAbsolute(filePath)
+                ? path.resolve(filePath)
+                : path.resolve(projectRoot, filePath);
+            const normalizedRoot = path.resolve(projectRoot) + path.sep;
+            if (!resolved.startsWith(normalizedRoot)) {
+                return res.status(403).json({ error: 'Path must be under project root' });
+            }
+
+            // Write the new content
+            await fsPromises.writeFile(resolved, content, 'utf8');
+
+            res.json({
+                success: true,
+                path: resolved,
+                message: 'File saved successfully'
+            });
         }
-
-        // Write the new content
-        await fsPromises.writeFile(resolved, content, 'utf8');
-
-        res.json({
-            success: true,
-            path: resolved,
-            message: 'File saved successfully'
-        });
     } catch (error) {
         console.error('Error saving file:', error);
         if (error.code === 'ENOENT') {
@@ -669,8 +714,8 @@ app.put('/api/projects/:projectName/file', authenticateToken, async (req, res) =
 
 app.get('/api/projects/:projectName/files', authenticateToken, async (req, res) => {
     try {
-
-        // Using fsPromises from import
+        const userId = req.user.id;
+        console.log('[DEBUG] Get files request - userId:', userId, 'projectName:', req.params.projectName);
 
         // Use extractProjectDirectory to get the actual project path
         let actualPath;
@@ -682,16 +727,33 @@ app.get('/api/projects/:projectName/files', authenticateToken, async (req, res) 
             actualPath = req.params.projectName.replace(/-/g, '/');
         }
 
-        // Check if path exists
-        try {
-            await fsPromises.access(actualPath);
-        } catch (e) {
-            return res.status(404).json({ error: `Project path not found: ${actualPath}` });
-        }
+        // Get file operations based on container mode
+        const fileOps = await getFileOperations(userId);
+        console.log('[DEBUG] File operations mode:', fileOps.isContainer ? 'CONTAINER' : 'HOST');
 
-        const files = await getFileTree(actualPath, 10, 0, true);
-        const hiddenFiles = files.filter(f => f.name.startsWith('.'));
-        res.json(files);
+        if (fileOps.isContainer) {
+            // Container mode: Get file tree from container
+            console.log('[DEBUG] Using container mode for user', userId, 'path:', actualPath);
+            const files = await fileOps.getFileTree('.', {
+                projectPath: actualPath,
+                maxDepth: 10,
+                showHidden: true
+            });
+            console.log('[DEBUG] Container returned', files.length, 'items');
+            res.json(files);
+        } else {
+            // Host mode: Use traditional file system access
+            console.log('[DEBUG] Using host mode for path:', actualPath);
+            try {
+                await fsPromises.access(actualPath);
+            } catch (e) {
+                return res.status(404).json({ error: `Project path not found: ${actualPath}` });
+            }
+
+            const files = await getFileTree(actualPath, 10, 0, true);
+            console.log('[DEBUG] Host returned', files.length, 'items');
+            res.json(files);
+        }
     } catch (error) {
         console.error('[ERROR] File tree error:', error.message);
         res.status(500).json({ error: error.message });

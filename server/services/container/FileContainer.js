@@ -258,6 +258,8 @@ export async function getFileTreeInContainer(userId, dirPath = '.', options = {}
     projectPath = ''
   } = options;
 
+  console.log('[FileContainer] getFileTreeInContainer - userId:', userId, 'dirPath:', dirPath, 'projectPath:', projectPath);
+
   // Validate path
   const { safePath, error } = validatePath(dirPath);
   if (error) {
@@ -266,7 +268,9 @@ export async function getFileTreeInContainer(userId, dirPath = '.', options = {}
 
   try {
     // Get or create user container
+    console.log('[FileContainer] Getting or creating container for user', userId);
     const container = await containerManager.getOrCreateContainer(userId);
+    console.log('[FileContainer] Container:', container.id, container.name);
 
     // Build container path
     let containerPath = '/workspace';
