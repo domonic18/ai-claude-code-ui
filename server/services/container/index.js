@@ -34,3 +34,14 @@ export {
   getPtySessionBuffer,
   cleanupIdlePtySessions
 } from './PtyContainer.js';
+
+// Re-export file operation functions from FileContainer
+export {
+  validatePath,
+  hostPathToContainerPath,
+  readFileInContainer,
+  writeFileInContainer,
+  getFileTreeInContainer,
+  getFileStatsInContainer,
+  deleteFileInContainer
+} from './FileContainer.js';
