@@ -22,6 +22,18 @@ import { CLAUDE_MODELS } from '../shared/modelConstants.js';
 const activeSessions = new Map();
 
 /**
+ * Gets custom API configuration from environment variables
+ * @returns {Object} Custom API configuration (baseURL, apiKey, model)
+ */
+function getCustomApiConfig() {
+  return {
+    baseURL: process.env.ANTHROPIC_BASE_URL,
+    apiKey: process.env.ANTHROPIC_API_KEY,
+    model: process.env.ANTHROPIC_MODEL
+  };
+}
+
+/**
  * Maps CLI options to SDK-compatible options format
  * @param {Object} options - CLI options
  * @returns {Object} SDK-compatible options
@@ -76,10 +88,30 @@ function mapCliOptionsToSDK(options = {}) {
     }
   }
 
-  // Map model (default to sonnet)
-  // Valid models: sonnet, opus, haiku, opusplan, sonnet[1m]
-  sdkOptions.model = options.model || CLAUDE_MODELS.DEFAULT;
-  console.log(`Using model: ${sdkOptions.model}`);
+  // Apply custom API configuration from environment variables
+  const customConfig = getCustomApiConfig();
+
+  // Map model (default to sonnet, or custom model from env)
+  // Valid models: sonnet, opus, haiku, opusplan, sonnet[1m], or custom models
+  if (customConfig.model) {
+    sdkOptions.model = customConfig.model;
+    console.log(`Using custom model from environment: ${sdkOptions.model}`);
+  } else {
+    sdkOptions.model = options.model || CLAUDE_MODELS.DEFAULT;
+    console.log(`Using model: ${sdkOptions.model}`);
+  }
+
+  // Apply custom API base URL if specified
+  if (customConfig.baseURL) {
+    sdkOptions.baseURL = customConfig.baseURL;
+    console.log(`Using custom API endpoint: ${sdkOptions.baseURL}`);
+  }
+
+  // Apply custom API key if specified
+  if (customConfig.apiKey) {
+    sdkOptions.apiKey = customConfig.apiKey;
+    console.log(`Using custom API key from environment`);
+  }
 
   // Map system prompt configuration
   sdkOptions.systemPrompt = {

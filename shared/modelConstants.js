@@ -9,6 +9,12 @@
  * Note: Claude uses two different formats:
  * - SDK format ('sonnet', 'opus') - used by the UI and claude-sdk.js
  * - API format ('claude-sonnet-4.5') - used by slash commands for display
+ *
+ * Custom Model Support:
+ * - Set ANTHROPIC_MODEL environment variable to use a custom model
+ * - Set ANTHROPIC_BASE_URL to use a custom API endpoint
+ * - Set ANTHROPIC_API_KEY to use a custom API key
+ * - Example: ANTHROPIC_MODEL=glm-4.7 (for 智谱 GLM)
  */
 export const CLAUDE_MODELS = {
   // Models in SDK format (what the actual SDK accepts)
@@ -17,7 +23,8 @@ export const CLAUDE_MODELS = {
     { value: 'opus', label: 'Opus' },
     { value: 'haiku', label: 'Haiku' },
     { value: 'opusplan', label: 'Opus Plan' },
-    { value: 'sonnet[1m]', label: 'Sonnet [1M]' }
+    { value: 'sonnet[1m]', label: 'Sonnet [1M]' },
+    { value: 'custom', label: 'Custom (from ANTHROPIC_MODEL env var)' }
   ],
 
   DEFAULT: 'sonnet'
