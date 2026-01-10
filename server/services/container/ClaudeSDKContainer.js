@@ -14,6 +14,7 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import containerManager from './ContainerManager.js';
 import { v4 as uuidv4 } from 'uuid';
+import path from 'path';
 
 // Session tracking for containerized queries
 const containerSessions = new Map();
@@ -31,6 +32,8 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
     sessionId = uuidv4(),
     cwd,
     userTier = 'free',
+    isContainerProject = false,
+    projectPath = '',
     ...sdkOptions
   } = options;
 
@@ -40,11 +43,24 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
       tier: userTier
     });
 
-    // 2. Build SDK options
+    // 2. Build SDK options with correct working directory
+    // For container projects, use /home/node/.claude/projects/{projectPath}
+    // For workspace files, use /workspace/{path}
+    let workingDir;
+    if (isContainerProject && projectPath) {
+      // Container project: use the projects directory
+      workingDir = `/home/node/.claude/projects/${projectPath}`;
+    } else if (cwd) {
+      // Workspace files: extract basename and use /workspace
+      workingDir = `/workspace/${path.basename(cwd)}`;
+    } else {
+      workingDir = '/workspace';
+    }
+
     const mappedOptions = {
       ...sdkOptions,
       sessionId,
-      cwd: cwd ? `/workspace/${path.basename(cwd)}` : '/workspace'
+      cwd: workingDir
     };
 
     // 3. Create session info

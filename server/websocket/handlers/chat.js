@@ -8,9 +8,11 @@
  */
 
 import { queryClaudeSDK, abortClaudeSDKSession, isClaudeSDKSessionActive, getActiveClaudeSDKSessions } from '../../services/claude/index.js';
+import { queryClaudeSDKInContainer, abortClaudeSDKSessionInContainer, isClaudeSDKSessionActiveInContainer } from '../../services/container/ClaudeSDKContainer.js';
 import { spawnCursor, abortCursorSession, isCursorSessionActive, getActiveCursorSessions } from '../../services/cursor/index.js';
 import { queryCodex, abortCodexSession, isCodexSessionActive, getActiveCodexSessions } from '../../services/openai/index.js';
 import { WebSocketWriter } from '../writer.js';
+import { isContainerModeEnabled } from '../../config/container-config.js';
 
 /**
  * Handle chat WebSocket connections
@@ -35,8 +37,24 @@ export function handleChatConnection(ws, connectedClients) {
                 console.log('📁 Project:', data.options?.projectPath || 'Unknown');
                 console.log('🔄 Session:', data.options?.sessionId ? 'Resume' : 'New');
 
-                // Use Claude Agents SDK
-                await queryClaudeSDK(data.command, data.options, writer);
+                // Check if container mode is enabled
+                if (isContainerModeEnabled()) {
+                    console.log('[DEBUG] Using container mode for Claude SDK');
+                    // For container mode, use queryClaudeSDKInContainer
+                    // Convert projectPath (e.g., "my/workspace") back to project name (e.g., "my-workspace")
+                    const originalProjectName = data.options?.projectPath?.replace(/\//g, '-') || '';
+                    const containerOptions = {
+                        ...data.options,
+                        userId: ws.user.id,
+                        isContainerProject: true,
+                        projectPath: originalProjectName,
+                        // Don't set cwd here - let SDK function determine it based on isContainerProject
+                    };
+                    await queryClaudeSDKInContainer(data.command, containerOptions, writer);
+                } else {
+                    // Use Claude Agents SDK (host mode)
+                    await queryClaudeSDK(data.command, data.options, writer);
+                }
             } else if (data.type === 'cursor-command') {
                 console.log('[DEBUG] Cursor message:', data.command || '[Continue/Resume]');
                 console.log('📁 Project:', data.options?.cwd || 'Unknown');
@@ -67,8 +85,12 @@ export function handleChatConnection(ws, connectedClients) {
                 } else if (provider === 'codex') {
                     success = abortCodexSession(data.sessionId);
                 } else {
-                    // Use Claude Agents SDK
-                    success = await abortClaudeSDKSession(data.sessionId);
+                    // Check if container mode is enabled for Claude SDK
+                    if (isContainerModeEnabled()) {
+                        success = abortClaudeSDKSessionInContainer(data.sessionId);
+                    } else {
+                        success = await abortClaudeSDKSession(data.sessionId);
+                    }
                 }
 
                 writer.send({
@@ -97,8 +119,12 @@ export function handleChatConnection(ws, connectedClients) {
                 } else if (provider === 'codex') {
                     isActive = isCodexSessionActive(sessionId);
                 } else {
-                    // Use Claude Agents SDK
-                    isActive = isClaudeSDKSessionActive(sessionId);
+                    // Check if container mode is enabled for Claude SDK
+                    if (isContainerModeEnabled()) {
+                        isActive = isClaudeSDKSessionActiveInContainer(sessionId);
+                    } else {
+                        isActive = isClaudeSDKSessionActive(sessionId);
+                    }
                 }
 
                 writer.send({

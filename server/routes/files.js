@@ -40,19 +40,15 @@ router.get('/:projectName/file', async (req, res) => {
       return res.status(400).json({ error: 'Invalid file path' });
     }
 
-    const projectRoot = await extractProjectDirectory(projectName).catch(() => null);
-    if (!projectRoot) {
-      return res.status(404).json({ error: 'Project not found' });
-    }
-
     // Get file operations based on container mode
     const fileOps = await getFileOperations(userId);
 
     if (fileOps.isContainer) {
-      // Container mode: Read file from container
+      // Container mode: Read file from container using projectName directly
       try {
         const result = await fileOps.readFile(filePath, {
-          projectPath: projectRoot
+          projectPath: projectName,
+          isContainerProject: true
         });
         res.json({ content: result.content, path: filePath });
       } catch (error) {
@@ -60,6 +56,11 @@ router.get('/:projectName/file', async (req, res) => {
         res.status(404).json({ error: 'File not found' });
       }
     } else {
+      // Host mode: Get the actual project path
+      const projectRoot = await extractProjectDirectory(projectName).catch(() => null);
+      if (!projectRoot) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
       // Host mode: Use traditional file system access
       // Handle both absolute and relative paths
       const resolved = path.isAbsolute(filePath)
@@ -106,19 +107,15 @@ router.put('/:projectName/file', async (req, res) => {
       return res.status(400).json({ error: 'Content is required' });
     }
 
-    const projectRoot = await extractProjectDirectory(projectName).catch(() => null);
-    if (!projectRoot) {
-      return res.status(404).json({ error: 'Project not found' });
-    }
-
     // Get file operations based on container mode
     const fileOps = await getFileOperations(userId);
 
     if (fileOps.isContainer) {
-      // Container mode: Write file to container
+      // Container mode: Write file to container using projectName directly
       try {
         await fileOps.writeFile(filePath, content, {
-          projectPath: projectRoot
+          projectPath: projectName,
+          isContainerProject: true
         });
         res.json({
           success: true,
@@ -130,6 +127,11 @@ router.put('/:projectName/file', async (req, res) => {
         res.status(500).json({ error: error.message });
       }
     } else {
+      // Host mode: Get the actual project path
+      const projectRoot = await extractProjectDirectory(projectName).catch(() => null);
+      if (!projectRoot) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
       // Host mode: Use traditional file system access
       // Handle both absolute and relative paths
       const resolved = path.isAbsolute(filePath)
@@ -168,33 +170,36 @@ router.put('/:projectName/file', async (req, res) => {
 router.get('/:projectName/files', async (req, res) => {
   try {
     const userId = req.user.id;
-    console.log('[DEBUG] Get files request - userId:', userId, 'projectName:', req.params.projectName);
-
-    // Use extractProjectDirectory to get the actual project path
-    let actualPath;
-    try {
-      actualPath = await extractProjectDirectory(req.params.projectName);
-    } catch (error) {
-      console.error('Error extracting project directory:', error);
-      // Fallback to simple dash replacement
-      actualPath = req.params.projectName.replace(/-/g, '/');
-    }
+    const projectName = req.params.projectName;
+    console.log('[DEBUG] Get files request - userId:', userId, 'projectName:', projectName);
 
     // Get file operations based on container mode
     const fileOps = await getFileOperations(userId);
     console.log('[DEBUG] File operations mode:', fileOps.isContainer ? 'CONTAINER' : 'HOST');
 
     if (fileOps.isContainer) {
-      // Container mode: Get file tree from container
-      console.log('[DEBUG] Using container mode for user', userId, 'path:', actualPath);
+      // Container mode: Use project name as-is (actual directory name in container)
+      // The project name is the real directory name (e.g., "my-workspace"), not decoded
+      console.log('[DEBUG] Using container mode for user', userId, 'projectName:', projectName);
       const files = await fileOps.getFileTree('.', {
-        projectPath: actualPath,
+        projectPath: projectName,
+        isContainerProject: true,
         maxDepth: 10,
         showHidden: true
       });
       console.log('[DEBUG] Container returned', files.length, 'items');
       res.json(files);
     } else {
+      // Host mode: Use extractProjectDirectory to get the actual project path
+      let actualPath;
+      try {
+        actualPath = await extractProjectDirectory(projectName);
+      } catch (error) {
+        console.error('Error extracting project directory:', error);
+        // Fallback to simple dash replacement
+        actualPath = projectName.replace(/-/g, '/');
+      }
+
       // Host mode: Use traditional file system access
       console.log('[DEBUG] Using host mode for path:', actualPath);
       try {
