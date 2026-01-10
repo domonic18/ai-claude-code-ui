@@ -114,8 +114,8 @@ function createHealthServer() {
  */
 function checkClaudeAvailability() {
   try {
-    // Try to check if claude command exists
-    const result = spawnSync('command', ['-v', 'claude'], { stdio: 'ignore' });
+    // Try to check if claude command exists using 'which'
+    const result = spawnSync('which', ['claude'], { stdio: 'ignore' });
     return result.status === 0;
   } catch (error) {
     // If command check fails, assume not available
