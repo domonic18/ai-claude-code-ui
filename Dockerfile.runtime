@@ -1,0 +1,89 @@
+# Claude Code Runtime Container Image
+# This image provides the runtime environment for Claude Code in containerized deployments
+#
+# Build: docker build -f Dockerfile.runtime -t claude-code-runtime:latest .
+# Run:   docker run -d --name claude-runtime claude-code-runtime:latest
+
+# Multi-stage build for optimized image size
+FROM node:20-slim AS builder
+
+# Configure apt to use Aliyun mirrors (replace default Debian mirrors)
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
+    sed -i 's|security.debian.org/debian-security|mirrors.aliyun.com/debian-security|g' /etc/apt/sources.list.d/debian.sources
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production && \
+    npm cache clean --force
+
+# Final runtime image
+FROM node:20-slim
+
+# Configure apt to use Aliyun mirrors (replace default Debian mirrors)
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
+    sed -i 's|security.debian.org/debian-security|mirrors.aliyun.com/debian-security|g' /etc/apt/sources.list.d/debian.sources
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    wget \
+    bash \
+    jq \
+    python3 \
+    python3-pip \
+    vim-tiny \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Claude Code CLI globally
+# Note: This will install from npm registry.
+# For production, consider using a specific version or private registry.
+RUN npm install -g @anthropic-ai/claude-code 2>/dev/null || \
+    npm install -g claude-code 2>/dev/null || \
+    echo "Claude Code CLI installation skipped - will be installed from source"
+
+# Set working directory for application files
+WORKDIR /app
+
+# Copy installed node_modules from builder stage
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app/package*.json ./
+
+# Copy application files
+COPY --chown=node:node server ./server
+COPY --chown=node:node shared ./shared
+
+# Create workspace and config directories (node user already exists in base image)
+RUN mkdir -p /workspace /app /home/node/.claude/projects && \
+    chown -R node:node /workspace /home/node/.claude /app
+
+# Switch to non-root user
+USER node
+
+# Set working directory
+WORKDIR /workspace
+
+# Set environment variables
+ENV NODE_ENV=production \
+    CLAUDE_CONFIG_DIR=/home/node/.claude
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD node -e "require('http').get('http://localhost:3001/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || \
+    command -v claude >/dev/null 2>&1 || exit 1
+
+# Expose health check port
+EXPOSE 3001
+
+# Container entrypoint - keeps container running and provides health check
+CMD ["node", "/app/server/container-entrypoint.js"]
