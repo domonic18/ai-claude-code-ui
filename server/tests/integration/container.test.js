@@ -4,7 +4,7 @@
  * Basic tests for container management functionality.
  */
 
-import containerManager from '../services/container/index.js';
+import containerManager from '../../services/container/index.js';
 
 const testUserId = 999999; // Use a test user ID
 
