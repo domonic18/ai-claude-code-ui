@@ -5,7 +5,7 @@ import path from 'path';
 import { promises as fs } from 'fs';
 import { extractProjectDirectory } from '../services/project/index.js';
 import { queryClaudeSDK } from '../services/claude/index.js';
-import { spawnCursor } from '../cursor-cli.js';
+import { spawnCursor } from '../services/cursor/index.js';
 
 const router = express.Router();
 const execAsync = promisify(exec);

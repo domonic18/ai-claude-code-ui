@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import { userDb, apiKeysDb, githubTokensDb } from '../database/db.js';
 import { addProjectManually } from '../services/project/index.js';
 import { queryClaudeSDK } from '../services/claude/index.js';
-import { spawnCursor } from '../cursor-cli.js';
+import { spawnCursor } from '../services/cursor/index.js';
 import { queryCodex } from '../services/openai/index.js';
 import { Octokit } from '@octokit/rest';
 import { CLAUDE_MODELS, CURSOR_MODELS, CODEX_MODELS } from '../../shared/modelConstants.js';

@@ -11,6 +11,9 @@ export * from './container/index.js';
 // Claude services
 export * from './claude/index.js';
 
+// Cursor services
+export * from './cursor/index.js';
+
 // OpenAI services
 export * from './openai/index.js';
 
