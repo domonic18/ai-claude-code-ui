@@ -5,8 +5,8 @@
  */
 
 export {
-  queryOpenAI,
-  abortOpenAISession,
-  isOpenAISessionActive,
-  getActiveOpenAISessions
+  queryCodex,
+  abortCodexSession,
+  isCodexSessionActive,
+  getActiveCodexSessions
 } from './OpenAICodex.js';
