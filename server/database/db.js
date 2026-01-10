@@ -23,12 +23,21 @@ const c = {
 };
 
 // Use DATABASE_PATH environment variable if set, otherwise use default location
-const DB_PATH = process.env.DATABASE_PATH || path.join(__dirname, 'auth.db');
 const INIT_SQL_PATH = path.join(__dirname, 'init.sql');
+
+// Helper function to get database path
+function getDatabasePath() {
+  let dbPath = process.env.DATABASE_PATH || path.join(__dirname, 'auth.db');
+  // Convert relative path to absolute from project root
+  if (!path.isAbsolute(dbPath)) {
+    dbPath = path.resolve(process.cwd(), dbPath);
+  }
+  return dbPath;
+}
 
 // Ensure database directory exists if custom path is provided
 if (process.env.DATABASE_PATH) {
-  const dbDir = path.dirname(DB_PATH);
+  const dbDir = path.dirname(getDatabasePath());
   try {
     if (!fs.existsSync(dbDir)) {
       fs.mkdirSync(dbDir, { recursive: true });
@@ -41,14 +50,14 @@ if (process.env.DATABASE_PATH) {
 }
 
 // Create database connection
-const db = new Database(DB_PATH);
+const db = new Database(getDatabasePath());
 
 // Show app installation path prominently
 const appInstallPath = path.join(__dirname, '../..');
 console.log('');
 console.log(c.dim('═'.repeat(60)));
 console.log(`${c.info('[INFO]')} App Installation: ${c.bright(appInstallPath)}`);
-console.log(`${c.info('[INFO]')} Database: ${c.dim(path.relative(appInstallPath, DB_PATH))}`);
+console.log(`${c.info('[INFO]')} Database: ${c.dim(path.relative(appInstallPath, getDatabasePath()))}`);
 if (process.env.DATABASE_PATH) {
   console.log(`       ${c.dim('(Using custom DATABASE_PATH from environment)')}`);
 }
