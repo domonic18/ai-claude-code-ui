@@ -491,8 +491,9 @@ const containersDb = {
   updateContainerLastActive: (containerId) => {
     try {
       db.prepare('UPDATE user_containers SET last_active = CURRENT_TIMESTAMP WHERE container_id = ?').run(containerId);
+      return Promise.resolve();
     } catch (err) {
-      throw err;
+      return Promise.reject(err);
     }
   },
 

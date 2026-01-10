@@ -104,6 +104,7 @@ class ContainerManager {
 
   /**
    * Get or create a container for the user
+   * Uses database as the single source of truth for container ownership
    * @param {number} userId - User ID
    * @param {object} userConfig - User configuration
    * @returns {Promise<ContainerInfo>} Container information
@@ -111,7 +112,10 @@ class ContainerManager {
   async getOrCreateContainer(userId, userConfig = {}) {
     const containerName = `claude-user-${userId}`;
 
-    // Check cache for existing container
+    // Step 1: Check database for existing container record
+    const dbRecord = containersDb.getContainerByUserId(userId);
+
+    // Step 2: Check memory cache for quick access
     if (this.containers.has(userId)) {
       const container = this.containers.get(userId);
       const status = await this.getContainerStatus(container.id);
@@ -119,12 +123,9 @@ class ContainerManager {
       if (status === 'running') {
         // Update last active time
         container.lastActive = new Date();
-
-        // Update in database
         containersDb.updateContainerLastActive(container.id).catch(err => {
           console.warn(`[ContainerManager] Failed to update last_active: ${err.message}`);
         });
-
         return container;
       }
 
@@ -132,47 +133,68 @@ class ContainerManager {
       this.containers.delete(userId);
     }
 
-    // Check if container exists in Docker (handles server restart scenario)
+    // Step 3: Verify container state from database record
+    if (dbRecord) {
+      try {
+        const existingContainer = this.docker.getContainer(dbRecord.container_id);
+        const containerInfo = await existingContainer.inspect();
+
+        if (containerInfo.State.Running) {
+          // Container is running, cache and return it
+          console.log(`[ContainerManager] Found running container from database for user ${userId}: ${dbRecord.container_name}`);
+          const info = {
+            id: containerInfo.Id,
+            name: dbRecord.container_name,
+            userId,
+            status: 'running',
+            createdAt: new Date(containerInfo.Created),
+            lastActive: new Date(dbRecord.last_active)
+          };
+          this.containers.set(userId, info);
+
+          // Update last_active in database
+          containersDb.updateContainerLastActive(containerInfo.Id).catch(err => {
+            console.warn(`[ContainerManager] Failed to update last_active: ${err.message}`);
+          });
+
+          return info;
+        } else {
+          // Container exists but not running, remove it from Docker and database
+          console.log(`[ContainerManager] Removing stale container for user ${userId}: ${dbRecord.container_name}`);
+          await existingContainer.remove({ force: true }).catch(err => {
+            console.warn(`[ContainerManager] Failed to remove stale container: ${err.message}`);
+          });
+          containersDb.deleteContainer(dbRecord.container_id);
+        }
+      } catch (dockerErr) {
+        if (dockerErr.statusCode === 404) {
+          // Container doesn't exist in Docker, remove from database
+          console.log(`[ContainerManager] Container ${dbRecord.container_name} not found in Docker, cleaning database`);
+          containersDb.deleteContainer(dbRecord.container_id);
+        } else {
+          console.warn(`[ContainerManager] Error checking container ${dbRecord.container_name}: ${dockerErr.message}`);
+        }
+      }
+    }
+
+    // Step 4: Check if container name is already in use (data inconsistency case)
     try {
       const existingContainer = this.docker.getContainer(containerName);
       const containerInfo = await existingContainer.inspect();
 
-      if (containerInfo.State.Running) {
-        // Container is running, cache and return it
-        console.log(`[ContainerManager] Found existing running container for user ${userId}: ${containerName}`);
-        const info = {
-          id: containerInfo.Id,
-          name: containerName,
-          userId,
-          status: 'running',
-          createdAt: new Date(containerInfo.Created),
-          lastActive: new Date()
-        };
-        this.containers.set(userId, info);
-
-        // Update last_active in database
-        containersDb.updateContainerLastActive(containerInfo.Id).catch(err => {
-          console.warn(`[ContainerManager] Failed to update last_active: ${err.message}`);
-        });
-
-        return info;
-      } else {
-        // Container exists but not running, remove it
-        console.log(`[ContainerManager] Removing stale container for user ${userId}: ${containerName}`);
-        await existingContainer.remove({ force: true }).catch(err => {
-          console.warn(`[ContainerManager] Failed to remove stale container: ${err.message}`);
-        });
-      }
+      // Container exists in Docker but not in database - data inconsistency
+      console.warn(`[ContainerManager] Found orphaned container ${containerName} in Docker, cleaning up`);
+      await existingContainer.remove({ force: true }).catch(err => {
+        console.warn(`[ContainerManager] Failed to remove orphaned container: ${err.message}`);
+      });
     } catch (err) {
-      // Container doesn't exist, proceed to create
-      if (err.statusCode === 404) {
-        console.log(`[ContainerManager] No existing container for user ${userId}, creating new one`);
-      } else {
-        console.warn(`[ContainerManager] Error checking existing container: ${err.message}`);
+      // Container doesn't exist, which is expected
+      if (err.statusCode !== 404) {
+        console.warn(`[ContainerManager] Error checking for orphaned container: ${err.message}`);
       }
     }
 
-    // Create new container
+    // Step 5: Create new container
     return await this.createContainer(userId, userConfig);
   }
 
@@ -621,6 +643,62 @@ class ContainerManager {
    */
   getContainerByUserId(userId) {
     return this.containers.get(userId);
+  }
+
+  /**
+   * Clean up orphaned containers that exist in Docker but not in database
+   * This helps resolve data inconsistencies
+   * @returns {Promise<number>} Number of orphaned containers cleaned up
+   */
+  async cleanupOrphanedContainers() {
+    let cleanedCount = 0;
+
+    try {
+      // List all containers with our label
+      const containers = await this.docker.listContainers({
+        all: true,
+        filters: {
+          label: ['com.claude-code.managed=true']
+        }
+      });
+
+      for (const containerInfo of containers) {
+        const containerId = containerInfo.Id;
+        const containerName = containerInfo.Names[0].replace(/^\//, ''); // Remove leading slash
+
+        // Check if this container is in our database
+        const dbRecord = containersDb.getContainerById(containerId);
+
+        if (!dbRecord) {
+          // Container exists in Docker but not in database - it's orphaned
+          console.warn(`[ContainerManager] Found orphaned container: ${containerName} (${containerId}), cleaning up`);
+
+          try {
+            const container = this.docker.getContainer(containerId);
+
+            // Stop and remove the container
+            if (containerInfo.State === 'running') {
+              await container.stop({ t: 5 });
+            }
+            await container.remove();
+
+            cleanedCount++;
+            console.log(`[ContainerManager] Cleaned up orphaned container: ${containerName}`);
+          } catch (cleanupErr) {
+            console.error(`[ContainerManager] Failed to clean up orphaned container ${containerName}: ${cleanupErr.message}`);
+          }
+        }
+      }
+
+      if (cleanedCount > 0) {
+        console.log(`[ContainerManager] Cleaned up ${cleanedCount} orphaned container(s)`);
+      }
+
+      return cleanedCount;
+    } catch (error) {
+      console.error('[ContainerManager] Error during orphaned container cleanup:', error.message);
+      return cleanedCount;
+    }
   }
 }
 
