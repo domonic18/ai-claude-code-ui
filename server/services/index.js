@@ -1,21 +1,21 @@
 /**
- * Services Index
+ * 服务索引
  *
- * Central export point for all services.
- * Provides convenient imports from a single location.
+ * 所有服务的中央导出点。
+ * 从单个位置提供便捷的导入。
  */
 
-// Container services
+// 容器服务
 export * from './container/index.js';
 
-// Claude services
+// Claude 服务
 export * from './claude/index.js';
 
-// Cursor services
+// Cursor 服务
 export * from './cursor/index.js';
 
-// OpenAI services
+// OpenAI 服务
 export * from './openai/index.js';
 
-// Project services
+// 项目服务
 export * from './project/index.js';

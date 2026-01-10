@@ -1,7 +1,7 @@
 /**
- * WebSocket Handlers Index
+ * WebSocket 处理器索引
  *
- * Exports all WebSocket handler functions for easy importing.
+ * 导出所有 WebSocket 处理器函数以便于导入。
  *
  * @module websocket/handlers
  */

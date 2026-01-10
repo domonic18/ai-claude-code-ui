@@ -8,7 +8,7 @@ import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// ANSI color codes for terminal output
+// 终端输出的 ANSI 颜色代码
 const colors = {
     reset: '\x1b[0m',
     bright: '\x1b[1m',
@@ -22,44 +22,44 @@ const c = {
     dim: (text) => `${colors.dim}${text}${colors.reset}`,
 };
 
-// Use DATABASE_PATH environment variable if set, otherwise use default location
+// 如果设置了 DATABASE_PATH 环境变量则使用，否则使用默认位置
 const INIT_SQL_PATH = path.join(__dirname, 'init.sql');
 
-// Helper function to get database path
+// 获取数据库路径的辅助函数
 function getDatabasePath() {
   let dbPath = process.env.DATABASE_PATH || path.join(__dirname, 'auth.db');
-  // Convert relative path to absolute from project root
+  // 将相对路径从项目根目录转换为绝对路径
   if (!path.isAbsolute(dbPath)) {
     dbPath = path.resolve(process.cwd(), dbPath);
   }
   return dbPath;
 }
 
-// Ensure database directory exists if custom path is provided
+// 如果提供了自定义路径，确保数据库目录存在
 if (process.env.DATABASE_PATH) {
   const dbDir = path.dirname(getDatabasePath());
   try {
     if (!fs.existsSync(dbDir)) {
       fs.mkdirSync(dbDir, { recursive: true });
-      console.log(`Created database directory: ${dbDir}`);
+      console.log(`已创建数据库目录: ${dbDir}`);
     }
   } catch (error) {
-    console.error(`Failed to create database directory ${dbDir}:`, error.message);
+    console.error(`创建数据库目录失败 ${dbDir}:`, error.message);
     throw error;
   }
 }
 
-// Create database connection
+// 创建数据库连接
 const db = new Database(getDatabasePath());
 
-// Show app installation path prominently
+// 显式显示应用安装路径
 const appInstallPath = path.join(__dirname, '../..');
 console.log('');
 console.log(c.dim('═'.repeat(60)));
-console.log(`${c.info('[INFO]')} App Installation: ${c.bright(appInstallPath)}`);
-console.log(`${c.info('[INFO]')} Database: ${c.dim(path.relative(appInstallPath, getDatabasePath()))}`);
+console.log(`${c.info('[INFO]')} 应用安装位置: ${c.bright(appInstallPath)}`);
+console.log(`${c.info('[INFO]')} 数据库: ${c.dim(path.relative(appInstallPath, getDatabasePath()))}`);
 if (process.env.DATABASE_PATH) {
-  console.log(`       ${c.dim('(Using custom DATABASE_PATH from environment)')}`);
+  console.log(`       ${c.dim('(使用环境变量中的自定义 DATABASE_PATH)')}`);
 }
 console.log(c.dim('═'.repeat(60)));
 console.log('');
@@ -70,40 +70,40 @@ const runMigrations = () => {
     const columnNames = tableInfo.map(col => col.name);
 
     if (!columnNames.includes('git_name')) {
-      console.log('Running migration: Adding git_name column');
+      console.log('运行迁移: 添加 git_name 列');
       db.exec('ALTER TABLE users ADD COLUMN git_name TEXT');
     }
 
     if (!columnNames.includes('git_email')) {
-      console.log('Running migration: Adding git_email column');
+      console.log('运行迁移: 添加 git_email 列');
       db.exec('ALTER TABLE users ADD COLUMN git_email TEXT');
     }
 
     if (!columnNames.includes('has_completed_onboarding')) {
-      console.log('Running migration: Adding has_completed_onboarding column');
+      console.log('运行迁移: 添加 has_completed_onboarding 列');
       db.exec('ALTER TABLE users ADD COLUMN has_completed_onboarding BOOLEAN DEFAULT 0');
     }
 
-    // Container support migrations
+    // 容器支持迁移
     if (!columnNames.includes('container_tier')) {
-      console.log('Running migration: Adding container_tier column');
+      console.log('运行迁移: 添加 container_tier 列');
       db.exec('ALTER TABLE users ADD COLUMN container_tier TEXT DEFAULT \'free\'');
     }
 
     if (!columnNames.includes('container_config')) {
-      console.log('Running migration: Adding container_config column');
+      console.log('运行迁移: 添加 container_config 列');
       db.exec('ALTER TABLE users ADD COLUMN container_config TEXT');
     }
 
     if (!columnNames.includes('resource_quota')) {
-      console.log('Running migration: Adding resource_quota column');
+      console.log('运行迁移: 添加 resource_quota 列');
       db.exec('ALTER TABLE users ADD COLUMN resource_quota TEXT');
     }
 
-    // Create container-related tables if they don't exist
+    // 如果容器相关表不存在则创建
     const userContainersTable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='user_containers'").get();
     if (!userContainersTable) {
-      console.log('Running migration: Creating user_containers table');
+      console.log('运行迁移: 创建 user_containers 表');
       db.exec(`
         CREATE TABLE IF NOT EXISTS user_containers (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -124,7 +124,7 @@ const runMigrations = () => {
 
     const containerMetricsTable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='container_metrics'").get();
     if (!containerMetricsTable) {
-      console.log('Running migration: Creating container_metrics table');
+      console.log('运行迁移: 创建 container_metrics 表');
       db.exec(`
         CREATE TABLE IF NOT EXISTS container_metrics (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -144,29 +144,29 @@ const runMigrations = () => {
       db.exec('CREATE INDEX IF NOT EXISTS idx_container_metrics_recorded_at ON container_metrics(recorded_at)');
     }
 
-    console.log('Database migrations completed successfully');
+    console.log('数据库迁移成功完成');
   } catch (error) {
-    console.error('Error running migrations:', error.message);
+    console.error('运行迁移错误:', error.message);
     throw error;
   }
 };
 
-// Initialize database with schema
+// 使用数据库架构初始化数据库
 const initializeDatabase = async () => {
   try {
     const initSQL = fs.readFileSync(INIT_SQL_PATH, 'utf8');
     db.exec(initSQL);
-    console.log('Database initialized successfully');
+    console.log('数据库初始化成功');
     runMigrations();
   } catch (error) {
-    console.error('Error initializing database:', error.message);
+    console.error('初始化数据库错误:', error.message);
     throw error;
   }
 };
 
-// User database operations
+// 用户数据库操作
 const userDb = {
-  // Check if any users exist
+  // 检查是否存在任何用户
   hasUsers: () => {
     try {
       const row = db.prepare('SELECT COUNT(*) as count FROM users').get();
@@ -176,7 +176,7 @@ const userDb = {
     }
   },
 
-  // Create a new user
+  // 创建新用户
   createUser: (username, passwordHash) => {
     try {
       const stmt = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)');
@@ -187,7 +187,7 @@ const userDb = {
     }
   },
 
-  // Get user by username
+  // 根据用户名获取用户
   getUserByUsername: (username) => {
     try {
       const row = db.prepare('SELECT * FROM users WHERE username = ? AND is_active = 1').get(username);
@@ -197,7 +197,7 @@ const userDb = {
     }
   },
 
-  // Update last login time
+  // 更新最后登录时间
   updateLastLogin: (userId) => {
     try {
       db.prepare('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?').run(userId);
@@ -206,7 +206,7 @@ const userDb = {
     }
   },
 
-  // Get user by ID
+  // 根据 ID 获取用户
   getUserById: (userId) => {
     try {
       const row = db.prepare('SELECT id, username, created_at, last_login FROM users WHERE id = ? AND is_active = 1').get(userId);
@@ -261,7 +261,7 @@ const userDb = {
     }
   },
 
-  // Container-related operations
+  // 容器相关操作
   updateContainerTier: (userId, tier) => {
     try {
       const stmt = db.prepare('UPDATE users SET container_tier = ? WHERE id = ?');
@@ -304,14 +304,14 @@ const userDb = {
   }
 };
 
-// API Keys database operations
+// API 密钥数据库操作
 const apiKeysDb = {
-  // Generate a new API key
+  // 生成新的 API 密钥
   generateApiKey: () => {
     return 'ck_' + crypto.randomBytes(32).toString('hex');
   },
 
-  // Create a new API key
+  // 创建新的 API 密钥
   createApiKey: (userId, keyName) => {
     try {
       const apiKey = apiKeysDb.generateApiKey();
@@ -323,7 +323,7 @@ const apiKeysDb = {
     }
   },
 
-  // Get all API keys for a user
+  // 获取用户的所有 API 密钥
   getApiKeys: (userId) => {
     try {
       const rows = db.prepare('SELECT id, key_name, api_key, created_at, last_used, is_active FROM api_keys WHERE user_id = ? ORDER BY created_at DESC').all(userId);
@@ -333,7 +333,7 @@ const apiKeysDb = {
     }
   },
 
-  // Validate API key and get user
+  // 验证 API 密钥并获取用户
   validateApiKey: (apiKey) => {
     try {
       const row = db.prepare(`
@@ -344,7 +344,7 @@ const apiKeysDb = {
       `).get(apiKey);
 
       if (row) {
-        // Update last_used timestamp
+        // 更新 last_used 时间戳
         db.prepare('UPDATE api_keys SET last_used = CURRENT_TIMESTAMP WHERE id = ?').run(row.api_key_id);
       }
 
@@ -354,7 +354,7 @@ const apiKeysDb = {
     }
   },
 
-  // Delete an API key
+  // 删除 API 密钥
   deleteApiKey: (userId, apiKeyId) => {
     try {
       const stmt = db.prepare('DELETE FROM api_keys WHERE id = ? AND user_id = ?');
@@ -365,7 +365,7 @@ const apiKeysDb = {
     }
   },
 
-  // Toggle API key active status
+  // 切换 API 密钥激活状态
   toggleApiKey: (userId, apiKeyId, isActive) => {
     try {
       const stmt = db.prepare('UPDATE api_keys SET is_active = ? WHERE id = ? AND user_id = ?');
@@ -377,9 +377,9 @@ const apiKeysDb = {
   }
 };
 
-// User credentials database operations (for GitHub tokens, GitLab tokens, etc.)
+// 用户凭证数据库操作（用于 GitHub 令牌、GitLab 令牌等）
 const credentialsDb = {
-  // Create a new credential
+  // 创建新凭证
   createCredential: (userId, credentialName, credentialType, credentialValue, description = null) => {
     try {
       const stmt = db.prepare('INSERT INTO user_credentials (user_id, credential_name, credential_type, credential_value, description) VALUES (?, ?, ?, ?, ?)');
@@ -390,7 +390,7 @@ const credentialsDb = {
     }
   },
 
-  // Get all credentials for a user, optionally filtered by type
+  // 获取用户的所有凭证，可选择按类型过滤
   getCredentials: (userId, credentialType = null) => {
     try {
       let query = 'SELECT id, credential_name, credential_type, description, created_at, is_active FROM user_credentials WHERE user_id = ?';
@@ -410,7 +410,7 @@ const credentialsDb = {
     }
   },
 
-  // Get active credential value for a user by type (returns most recent active)
+  // 按类型获取用户的激活凭证值（返回最近的激活凭证）
   getActiveCredential: (userId, credentialType) => {
     try {
       const row = db.prepare('SELECT credential_value FROM user_credentials WHERE user_id = ? AND credential_type = ? AND is_active = 1 ORDER BY created_at DESC LIMIT 1').get(userId, credentialType);
@@ -420,7 +420,7 @@ const credentialsDb = {
     }
   },
 
-  // Delete a credential
+  // 删除凭证
   deleteCredential: (userId, credentialId) => {
     try {
       const stmt = db.prepare('DELETE FROM user_credentials WHERE id = ? AND user_id = ?');
@@ -431,7 +431,7 @@ const credentialsDb = {
     }
   },
 
-  // Toggle credential active status
+  // 切换凭证激活状态
   toggleCredential: (userId, credentialId, isActive) => {
     try {
       const stmt = db.prepare('UPDATE user_credentials SET is_active = ? WHERE id = ? AND user_id = ?');
@@ -443,9 +443,9 @@ const credentialsDb = {
   }
 };
 
-// User containers database operations
+// 用户容器数据库操作
 const containersDb = {
-  // Create a new container record
+  // 创建新容器记录
   createContainer: (userId, containerId, containerName) => {
     try {
       const stmt = db.prepare('INSERT INTO user_containers (user_id, container_id, container_name, status) VALUES (?, ?, ?, ?)');
@@ -456,7 +456,7 @@ const containersDb = {
     }
   },
 
-  // Get container by user ID
+  // 根据用户 ID 获取容器
   getContainerByUserId: (userId) => {
     try {
       const row = db.prepare('SELECT * FROM user_containers WHERE user_id = ? ORDER BY created_at DESC LIMIT 1').get(userId);
@@ -466,7 +466,7 @@ const containersDb = {
     }
   },
 
-  // Get container by container ID
+  // 根据容器 ID 获取容器
   getContainerById: (containerId) => {
     try {
       const row = db.prepare('SELECT * FROM user_containers WHERE container_id = ?').get(containerId);
@@ -476,7 +476,7 @@ const containersDb = {
     }
   },
 
-  // Update container status
+  // 更新容器状态
   updateContainerStatus: (containerId, status) => {
     try {
       const stmt = db.prepare('UPDATE user_containers SET status = ?, last_active = CURRENT_TIMESTAMP WHERE container_id = ?');
@@ -487,7 +487,7 @@ const containersDb = {
     }
   },
 
-  // Update container last active time
+  // 更新容器最后活跃时间
   updateContainerLastActive: (containerId) => {
     try {
       db.prepare('UPDATE user_containers SET last_active = CURRENT_TIMESTAMP WHERE container_id = ?').run(containerId);
@@ -497,7 +497,7 @@ const containersDb = {
     }
   },
 
-  // Update container resource usage
+  // 更新容器资源使用情况
   updateContainerResourceUsage: (containerId, resourceUsage) => {
     try {
       const stmt = db.prepare('UPDATE user_containers SET resource_usage = ? WHERE container_id = ?');
@@ -507,7 +507,7 @@ const containersDb = {
     }
   },
 
-  // Delete container record
+  // 删除容器记录
   deleteContainer: (containerId) => {
     try {
       const stmt = db.prepare('DELETE FROM user_containers WHERE container_id = ?');
@@ -518,7 +518,7 @@ const containersDb = {
     }
   },
 
-  // List all active containers
+  // 列出所有活跃容器
   listActiveContainers: () => {
     try {
       const rows = db.prepare('SELECT * FROM user_containers WHERE status = ? ORDER BY last_active DESC').all('running');
@@ -529,9 +529,9 @@ const containersDb = {
   }
 };
 
-// Container metrics database operations
+// 容器指标数据库操作
 const containerMetricsDb = {
-  // Record container metrics
+  // 记录容器指标
   recordMetrics: (containerId, metrics) => {
     try {
       const stmt = db.prepare(`
@@ -554,7 +554,7 @@ const containerMetricsDb = {
     }
   },
 
-  // Get recent metrics for a container
+  // 获取容器的最近指标
   getRecentMetrics: (containerId, limit = 100) => {
     try {
       const rows = db.prepare('SELECT * FROM container_metrics WHERE container_id = ? ORDER BY recorded_at DESC LIMIT ?').all(containerId, limit);
@@ -564,7 +564,7 @@ const containerMetricsDb = {
     }
   },
 
-  // Get latest metrics for a container
+  // 获取容器的最新指标
   getLatestMetrics: (containerId) => {
     try {
       const row = db.prepare('SELECT * FROM container_metrics WHERE container_id = ? ORDER BY recorded_at DESC LIMIT 1').get(containerId);
@@ -574,7 +574,7 @@ const containerMetricsDb = {
     }
   },
 
-  // Delete old metrics (cleanup)
+  // 删除旧指标（清理）
   deleteOldMetrics: (daysToKeep = 7) => {
     try {
       const stmt = db.prepare('DELETE FROM container_metrics WHERE recorded_at < datetime("now", "-" || ? || " days")');
@@ -586,7 +586,7 @@ const containerMetricsDb = {
   }
 };
 
-// Backward compatibility - keep old names pointing to new system
+// 向后兼容 - 保留旧名称指向新系统
 const githubTokensDb = {
   createGithubToken: (userId, tokenName, githubToken, description = null) => {
     return credentialsDb.createCredential(userId, tokenName, 'github_token', githubToken, description);
@@ -613,5 +613,5 @@ export {
   credentialsDb,
   containersDb,
   containerMetricsDb,
-  githubTokensDb // Backward compatibility
+  githubTokensDb // 向后兼容
 };

@@ -203,24 +203,24 @@ async function checkCodexCredentials() {
     const content = await fs.readFile(authPath, 'utf8');
     const auth = JSON.parse(content);
 
-    // Tokens are nested under 'tokens' key
+    // 令牌嵌套在 'tokens' 键下
     const tokens = auth.tokens || {};
 
-    // Check for valid tokens (id_token or access_token)
+    // 检查有效令牌（id_token 或 access_token）
     if (tokens.id_token || tokens.access_token) {
-      // Try to extract email from id_token JWT payload
+      // 尝试从 id_token JWT 负载中提取电子邮件
       let email = 'Authenticated';
       if (tokens.id_token) {
         try {
-          // JWT is base64url encoded: header.payload.signature
+          // JWT 是 base64url 编码的：header.payload.signature
           const parts = tokens.id_token.split('.');
           if (parts.length >= 2) {
-            // Decode the payload (second part)
+            // 解码负载（第二部分）
             const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
             email = payload.email || payload.user || 'Authenticated';
           }
         } catch {
-          // If JWT decoding fails, use fallback
+          // 如果 JWT 解码失败，使用回退
           email = 'Authenticated';
         }
       }
@@ -231,7 +231,7 @@ async function checkCodexCredentials() {
       };
     }
 
-    // Also check for OPENAI_API_KEY as fallback auth method
+    // 同时检查 OPENAI_API_KEY 作为回退身份验证方法
     if (auth.OPENAI_API_KEY) {
       return {
         authenticated: true,

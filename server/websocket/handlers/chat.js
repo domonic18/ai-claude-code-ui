@@ -1,8 +1,8 @@
 /**
- * Chat WebSocket Handler
+ * 聊天 WebSocket 处理器
  *
- * Handles WebSocket connections for chat interactions with AI providers.
- * Routes messages to Claude, Cursor, or Codex based on message type.
+ * 处理与 AI 提供商聊天交互的 WebSocket 连接。
+ * 根据消息类型将消息路由到 Claude、Cursor 或 Codex。
  *
  * @module websocket/handlers/chat
  */
@@ -15,17 +15,17 @@ import { WebSocketWriter } from '../writer.js';
 import { isContainerModeEnabled } from '../../config/container-config.js';
 
 /**
- * Handle chat WebSocket connections
- * @param {WebSocket} ws - The WebSocket connection
- * @param {Set} connectedClients - Set of connected clients for project updates
+ * 处理聊天 WebSocket 连接
+ * @param {WebSocket} ws - WebSocket 连接
+ * @param {Set} connectedClients - 已连接客户端集合，用于项目更新
  */
 export function handleChatConnection(ws, connectedClients) {
     console.log('[INFO] Chat WebSocket connected');
 
-    // Add to connected clients for project updates
+    // 添加到已连接客户端集合，用于项目更新
     connectedClients.add(ws);
 
-    // Wrap WebSocket with writer for consistent interface with SSEStreamWriter
+    // 使用 WebSocketWriter 包装 WebSocket，以获得与 SSEStreamWriter 一致的接口
     const writer = new WebSocketWriter(ws);
 
     ws.on('message', async (message) => {
@@ -37,22 +37,22 @@ export function handleChatConnection(ws, connectedClients) {
                 console.log('📁 Project:', data.options?.projectPath || 'Unknown');
                 console.log('🔄 Session:', data.options?.sessionId ? 'Resume' : 'New');
 
-                // Check if container mode is enabled
+                // 检查是否启用容器模式
                 if (isContainerModeEnabled()) {
                     console.log('[DEBUG] Using container mode for Claude SDK');
-                    // For container mode, use queryClaudeSDKInContainer
-                    // Convert projectPath (e.g., "my/workspace") back to project name (e.g., "my-workspace")
+                    // 容器模式：使用 queryClaudeSDKInContainer
+                    // 将 projectPath（例如 "my/workspace"）转换回项目名（例如 "my-workspace"）
                     const originalProjectName = data.options?.projectPath?.replace(/\//g, '-') || '';
                     const containerOptions = {
                         ...data.options,
                         userId: ws.user.id,
                         isContainerProject: true,
                         projectPath: originalProjectName,
-                        // Don't set cwd here - let SDK function determine it based on isContainerProject
+                        // 不要在这里设置 cwd - 让 SDK 函数根据 isContainerProject 确定
                     };
                     await queryClaudeSDKInContainer(data.command, containerOptions, writer);
                 } else {
-                    // Use Claude Agents SDK (host mode)
+                    // 使用 Claude Agents SDK（宿主机模式）
                     await queryClaudeSDK(data.command, data.options, writer);
                 }
             } else if (data.type === 'cursor-command') {
@@ -68,7 +68,7 @@ export function handleChatConnection(ws, connectedClients) {
                 console.log('🤖 Model:', data.options?.model || 'default');
                 await queryCodex(data.command, data.options, writer);
             } else if (data.type === 'cursor-resume') {
-                // Backward compatibility: treat as cursor-command with resume and no prompt
+                // 向后兼容：作为带恢复标志且无提示的 cursor-command 处理
                 console.log('[DEBUG] Cursor resume session (compat):', data.sessionId);
                 await spawnCursor('', {
                     sessionId: data.sessionId,
@@ -85,7 +85,7 @@ export function handleChatConnection(ws, connectedClients) {
                 } else if (provider === 'codex') {
                     success = abortCodexSession(data.sessionId);
                 } else {
-                    // Check if container mode is enabled for Claude SDK
+                    // 检查 Claude SDK 是否启用容器模式
                     if (isContainerModeEnabled()) {
                         success = abortClaudeSDKSessionInContainer(data.sessionId);
                     } else {
@@ -109,7 +109,7 @@ export function handleChatConnection(ws, connectedClients) {
                     success
                 });
             } else if (data.type === 'check-session-status') {
-                // Check if a specific session is currently processing
+                // 检查特定会话是否正在处理中
                 const provider = data.provider || 'claude';
                 const sessionId = data.sessionId;
                 let isActive;
@@ -119,7 +119,7 @@ export function handleChatConnection(ws, connectedClients) {
                 } else if (provider === 'codex') {
                     isActive = isCodexSessionActive(sessionId);
                 } else {
-                    // Check if container mode is enabled for Claude SDK
+                    // 检查 Claude SDK 是否启用容器模式
                     if (isContainerModeEnabled()) {
                         isActive = isClaudeSDKSessionActiveInContainer(sessionId);
                     } else {
@@ -134,7 +134,7 @@ export function handleChatConnection(ws, connectedClients) {
                     isProcessing: isActive
                 });
             } else if (data.type === 'get-active-sessions') {
-                // Get all currently active sessions
+                // 获取所有当前活动会话
                 const activeSessions = {
                     claude: getActiveClaudeSDKSessions(),
                     cursor: getActiveCursorSessions(),
@@ -156,7 +156,7 @@ export function handleChatConnection(ws, connectedClients) {
 
     ws.on('close', () => {
         console.log('🔌 Chat client disconnected');
-        // Remove from connected clients
+        // 从已连接客户端集合中移除
         connectedClients.delete(ws);
     });
 }

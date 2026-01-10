@@ -1,18 +1,18 @@
 /**
- * Container Services Index
+ * 容器服务索引
  *
- * Exports all container-related services for easy importing.
+ * 导出所有容器相关服务以便于导入。
  */
 
-// Container Manager class - import directly
+// 容器管理器类 - 直接导入
 export { ContainerManager } from './ContainerManager.js';
 
-// Default export for backward compatibility
+// 用于向后兼容的默认导出
 import { ContainerManager as _CM } from './ContainerManager.js';
 const _instance = new _CM();
 export default _instance;
 
-// Re-export commonly used functions from ClaudeSDKContainer
+// 从 ClaudeSDKContainer 重新导出常用函数
 export {
   queryClaudeSDKInContainer,
   abortClaudeSDKSessionInContainer,
@@ -21,7 +21,7 @@ export {
   getContainerSessionInfo
 } from './ClaudeSDKContainer.js';
 
-// Re-export commonly used functions from PtyContainer
+// 从 PtyContainer 重新导出常用函数
 export {
   createPtyInContainer,
   sendInputToPty,
@@ -35,7 +35,7 @@ export {
   cleanupIdlePtySessions
 } from './PtyContainer.js';
 
-// Re-export file operation functions from FileContainer
+// 从 FileContainer 重新导出文件操作函数
 export {
   validatePath,
   hostPathToContainerPath,

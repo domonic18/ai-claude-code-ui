@@ -1,9 +1,9 @@
 /**
- * Shell WebSocket Handler
+ * Shell WebSocket 处理器
  *
- * Handles WebSocket connections for shell/terminal interactions.
- * Manages PTY (pseudo-terminal) sessions with caching and support
- * for different providers (Claude, Cursor, plain shell).
+ * 处理用于 shell/终端交互的 WebSocket 连接。
+ * 管理 PTY（伪终端）会话，支持缓存和
+ * 不同的提供商（Claude、Cursor、普通 shell）。
  *
  * @module websocket/handlers/shell
  */
@@ -12,13 +12,13 @@ import os from 'os';
 import pty from 'node-pty';
 import { WebSocket } from 'ws';
 
-// PTY session timeout configuration
-const PTY_SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+// PTY 会话超时配置
+const PTY_SESSION_TIMEOUT = 30 * 60 * 1000; // 30 分钟
 
 /**
- * Handle shell WebSocket connections
- * @param {WebSocket} ws - The WebSocket connection
- * @param {Map} ptySessionsMap - Map for managing PTY sessions
+ * 处理 shell WebSocket 连接
+ * @param {WebSocket} ws - WebSocket 连接
+ * @param {Map} ptySessionsMap - 用于管理 PTY 会话的映射
  */
 export function handleShellConnection(ws, ptySessionsMap) {
     console.log('🐚 Shell client connected');
@@ -38,20 +38,20 @@ export function handleShellConnection(ws, ptySessionsMap) {
                 const initialCommand = data.initialCommand;
                 const isPlainShell = data.isPlainShell || (!!initialCommand && !hasSession) || provider === 'plain-shell';
 
-                // Login commands (Claude/Cursor auth) should never reuse cached sessions
+                // 登录命令（Claude/Cursor 身份验证）不应重用缓存的会话
                 const isLoginCommand = initialCommand && (
                     initialCommand.includes('setup-token') ||
                     initialCommand.includes('cursor-agent login') ||
                     initialCommand.includes('auth login')
                 );
 
-                // Include command hash in session key so different commands get separate sessions
+                // 在会话键中包含命令哈希，以便不同的命令获得单独的会话
                 const commandSuffix = isPlainShell && initialCommand
                     ? `_cmd_${Buffer.from(initialCommand).toString('base64').slice(0, 16)}`
                     : '';
                 ptySessionKey = `${projectPath}_${sessionId || 'default'}${commandSuffix}`;
 
-                // Kill any existing login session before starting fresh
+                // 在启动新会话之前，终止任何现有的登录会话
                 if (isLoginCommand) {
                     const oldSession = ptySessionsMap.get(ptySessionKey);
                     if (oldSession) {
@@ -113,17 +113,17 @@ export function handleShellConnection(ws, ptySessionsMap) {
                 }));
 
                 try {
-                    // Prepare the shell command adapted to the platform and provider
+                    // 准备适应平台和提供商的 shell 命令
                     let shellCommand;
                     if (isPlainShell) {
-                        // Plain shell mode - just run the initial command in the project directory
+                        // 普通 shell 模式 - 仅在项目目录中运行初始命令
                         if (os.platform() === 'win32') {
                             shellCommand = `Set-Location -Path "${projectPath}"; ${initialCommand}`;
                         } else {
                             shellCommand = `cd "${projectPath}" && ${initialCommand}`;
                         }
                     } else if (provider === 'cursor') {
-                        // Use cursor-agent command
+                        // 使用 cursor-agent 命令
                         if (os.platform() === 'win32') {
                             if (hasSession && sessionId) {
                                 shellCommand = `Set-Location -Path "${projectPath}"; cursor-agent --resume="${sessionId}"`;
@@ -138,11 +138,11 @@ export function handleShellConnection(ws, ptySessionsMap) {
                             }
                         }
                     } else {
-                        // Use claude command (default) or initialCommand if provided
+                        // 使用 claude 命令（默认）或提供的 initialCommand
                         const command = initialCommand || 'claude';
                         if (os.platform() === 'win32') {
                             if (hasSession && sessionId) {
-                                // Try to resume session, but with fallback to new session if it fails
+                                // 尝试恢复会话，如果失败则回退到新会话
                                 shellCommand = `Set-Location -Path "${projectPath}"; claude --resume ${sessionId}; if ($LASTEXITCODE -ne 0) { claude }`;
                             } else {
                                 shellCommand = `Set-Location -Path "${projectPath}"; ${command}`;
@@ -158,11 +158,11 @@ export function handleShellConnection(ws, ptySessionsMap) {
 
                     console.log('🔧 Executing shell command:', shellCommand);
 
-                    // Use appropriate shell based on platform
+                    // 根据平台使用适当的 shell
                     const shell = os.platform() === 'win32' ? 'powershell.exe' : 'bash';
                     const shellArgs = os.platform() === 'win32' ? ['-Command', shellCommand] : ['-c', shellCommand];
 
-                    // Use terminal dimensions from client if provided, otherwise use defaults
+                    // 使用客户端提供的终端尺寸（如果提供），否则使用默认值
                     const termCols = data.cols || 80;
                     const termRows = data.rows || 24;
                     console.log('📐 Using terminal dimensions:', termCols, 'x', termRows);
@@ -177,7 +177,7 @@ export function handleShellConnection(ws, ptySessionsMap) {
                             TERM: 'xterm-256color',
                             COLORTERM: 'truecolor',
                             FORCE_COLOR: '3',
-                            // Override browser opening commands to echo URL for detection
+                            // 覆盖浏览器打开命令以回显 URL 进行检测
                             BROWSER: os.platform() === 'win32' ? 'echo "OPEN_URL:"' : 'echo "OPEN_URL:"'
                         }
                     });
@@ -193,7 +193,7 @@ export function handleShellConnection(ws, ptySessionsMap) {
                         sessionId
                     });
 
-                    // Handle data output
+                    // 处理数据输出
                     shellProcess.onData((data) => {
                         const session = ptySessionsMap.get(ptySessionKey);
                         if (!session) return;
@@ -208,15 +208,15 @@ export function handleShellConnection(ws, ptySessionsMap) {
                         if (session.ws && session.ws.readyState === WebSocket.OPEN) {
                             let outputData = data;
 
-                            // Check for various URL opening patterns
+                            // 检查各种 URL 打开模式
                             const patterns = [
-                                // Direct browser opening commands
+                                // 直接浏览器打开命令
                                 /(?:xdg-open|open|start)\s+(https?:\/\/[^\s\x1b\x07]+)/g,
-                                // BROWSER environment variable override
+                                // BROWSER 环境变量覆盖
                                 /OPEN_URL:\s*(https?:\/\/[^\s\x1b\x07]+)/g,
-                                // Git and other tools opening URLs
+                                // Git 和其他工具打开 URL
                                 /Opening\s+(https?:\/\/[^\s\x1b\x07]+)/gi,
-                                // General URL patterns that might be opened
+                                // 可能被打开的常规 URL 模式
                                 /Visit:\s*(https?:\/\/[^\s\x1b\x07]+)/gi,
                                 /View at:\s*(https?:\/\/[^\s\x1b\x07]+)/gi,
                                 /Browse to:\s*(https?:\/\/[^\s\x1b\x07]+)/gi
@@ -228,20 +228,20 @@ export function handleShellConnection(ws, ptySessionsMap) {
                                     const url = match[1];
                                     console.log('[DEBUG] Detected URL for opening:', url);
 
-                                    // Send URL opening message to client
+                                    // 向客户端发送 URL 打开消息
                                     session.ws.send(JSON.stringify({
                                         type: 'url_open',
                                         url: url
                                     }));
 
-                                    // Replace the OPEN_URL pattern with a user-friendly message
+                                    // 将 OPEN_URL 模式替换为用户友好的消息
                                     if (pattern.source.includes('OPEN_URL')) {
                                         outputData = outputData.replace(match[0], `[INFO] Opening in browser: ${url}`);
                                     }
                                 }
                             });
 
-                            // Send regular output
+                            // 发送常规输出
                             session.ws.send(JSON.stringify({
                                 type: 'output',
                                 data: outputData
@@ -249,7 +249,7 @@ export function handleShellConnection(ws, ptySessionsMap) {
                         }
                     });
 
-                    // Handle process exit
+                    // 处理进程退出
                     shellProcess.onExit((exitCode) => {
                         console.log('🔚 Shell process exited with code:', exitCode.exitCode, 'signal:', exitCode.signal);
                         const session = ptySessionsMap.get(ptySessionKey);
@@ -275,7 +275,7 @@ export function handleShellConnection(ws, ptySessionsMap) {
                 }
 
             } else if (data.type === 'input') {
-                // Send input to shell process
+                // 向 shell 进程发送输入
                 if (shellProcess && shellProcess.write) {
                     try {
                         shellProcess.write(data.data);
@@ -286,7 +286,7 @@ export function handleShellConnection(ws, ptySessionsMap) {
                     console.warn('No active shell process to send input to');
                 }
             } else if (data.type === 'resize') {
-                // Handle terminal resize
+                // 处理终端调整大小
                 if (shellProcess && shellProcess.resize) {
                     console.log('Terminal resize requested:', data.cols, 'x', data.rows);
                     shellProcess.resize(data.cols, data.rows);

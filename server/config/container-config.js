@@ -1,20 +1,19 @@
 /**
- * Container Mode Configuration
+ * 容器模式配置
  *
- * Controls whether file operations are performed through Docker containers
- * or directly on the host system.
+ * 控制文件操作是通过 Docker 容器执行还是直接在主机系统上执行。
  */
 
 /**
- * Check if container mode is enabled via environment variable
- * @returns {boolean} - True if container mode is enabled
+ * 检查是否通过环境变量启用了容器模式
+ * @returns {boolean} - 如果启用了容器模式则返回 true
  */
 export function isContainerModeEnabled() {
   return process.env.CONTAINER_MODE === 'true' || process.env.CONTAINER_MODE === '1';
 }
 
 /**
- * Log container mode status (call this after .env is loaded)
+ * 记录容器模式状态（在加载 .env 后调用此函数）
  */
 export function logContainerModeStatus() {
   if (isContainerModeEnabled()) {
@@ -28,13 +27,13 @@ export function logContainerModeStatus() {
 }
 
 /**
- * Get the file operations implementation based on container mode
- * @param {number} userId - User ID for container operations
- * @returns {object} - File operations module
+ * 根据容器模式获取文件操作实现
+ * @param {number} userId - 用于容器操作的用户 ID
+ * @returns {object} - 文件操作模块
  */
 export async function getFileOperations(userId) {
   if (isContainerModeEnabled()) {
-    // Use containerized file operations
+    // 使用容器化文件操作
     const {
       readFileInContainer,
       writeFileInContainer,
@@ -54,7 +53,7 @@ export async function getFileOperations(userId) {
       isContainer: true
     };
   } else {
-    // Use host file system
+    // 使用主机文件系统
     const { promises: fs } = await import('fs');
     const path = await import('path');
 
@@ -83,12 +82,12 @@ export async function getFileOperations(userId) {
           const entries = await fs.readdir(dirPath, { withFileTypes: true });
 
           for (const entry of entries) {
-            // Skip hidden files if not requested
+            // 如果未请求，跳过隐藏文件
             if (!showHidden && entry.name.startsWith('.')) {
               continue;
             }
 
-            // Skip heavy build directories
+            // 跳过繁重的构建目录
             if (entry.name === 'node_modules' ||
                 entry.name === 'dist' ||
                 entry.name === 'build') {
@@ -107,7 +106,7 @@ export async function getFileOperations(userId) {
             });
           }
 
-          // Sort: directories first, then alphabetically
+          // 排序：目录优先，然后按字母顺序
           items.sort((a, b) => {
             if (a.type !== b.type) {
               return a.type === 'directory' ? -1 : 1;
@@ -151,7 +150,7 @@ export async function getFileOperations(userId) {
       },
 
       validatePath: (filePath) => {
-        // Basic validation for host system
+        // 主机系统的基本验证
         if (!filePath || typeof filePath !== 'string') {
           return { safePath: '', error: 'Invalid file path' };
         }

@@ -15,19 +15,18 @@ import { CLAUDE_MODELS, CURSOR_MODELS, CODEX_MODELS } from '../../shared/modelCo
 const router = express.Router();
 
 /**
- * Middleware to authenticate agent API requests.
+ * 用于验证代理 API 请求的中间件。
  *
- * Supports two authentication modes:
- * 1. Platform mode (VITE_IS_PLATFORM=true): For managed/hosted deployments where
- *    authentication is handled by an external proxy. Requests are trusted and
- *    the default user context is used.
+ * 支持两种身份验证模式：
+ * 1. 平台模式（VITE_IS_PLATFORM=true）：用于托管/托管部署，其中
+ *    身份验证由外部代理处理。请求受信任并使用默认用户上下文。
  *
- * 2. API key mode (default): For self-hosted deployments where users authenticate
- *    via API keys created in the UI. Keys are validated against the local database.
+ * 2. API 密钥模式（默认）：用于自托管部署，用户通过
+ *    在 UI 中创建的 API 密钥进行身份验证。密钥根据本地数据库进行验证。
  */
 const validateExternalApiKey = (req, res, next) => {
-  // Platform mode: Authentication is handled externally (e.g., by a proxy layer).
-  // Trust the request and use the default user context.
+  // 平台模式：身份验证由外部处理（例如，由代理层）。
+  // 信任请求并使用默认用户上下文。
   if (process.env.VITE_IS_PLATFORM === 'true') {
     try {
       const user = userDb.getFirstUser();
@@ -42,7 +41,7 @@ const validateExternalApiKey = (req, res, next) => {
     }
   }
 
-  // Self-hosted mode: Validate API key from header or query parameter
+  // 自托管模式：验证来自标头或查询参数的 API 密钥
   const apiKey = req.headers['x-api-key'] || req.query.apiKey;
 
   if (!apiKey) {
@@ -60,9 +59,9 @@ const validateExternalApiKey = (req, res, next) => {
 };
 
 /**
- * Get the remote URL of a git repository
- * @param {string} repoPath - Path to the git repository
- * @returns {Promise<string>} - Remote URL of the repository
+ * 获取 git 仓库的远程 URL
+ * @param {string} repoPath - git 仓库的路径
+ * @returns {Promise<string>} - 仓库的远程 URL
  */
 async function getGitRemoteUrl(repoPath) {
   return new Promise((resolve, reject) => {
@@ -97,9 +96,9 @@ async function getGitRemoteUrl(repoPath) {
 }
 
 /**
- * Normalize GitHub URLs for comparison
+ * 规范化 GitHub URL 以进行比较
  * @param {string} url - GitHub URL
- * @returns {string} - Normalized URL
+ * @returns {string} - 规范化的 URL
  */
 function normalizeGitHubUrl(url) {
   // Remove .git suffix
@@ -112,9 +111,9 @@ function normalizeGitHubUrl(url) {
 }
 
 /**
- * Parse GitHub URL to extract owner and repo
- * @param {string} url - GitHub URL (HTTPS or SSH)
- * @returns {{owner: string, repo: string}} - Parsed owner and repo
+ * 解析 GitHub URL 以提取所有者和仓库
+ * @param {string} url - GitHub URL（HTTPS 或 SSH）
+ * @returns {{owner: string, repo: string}} - 解析的所有者和仓库
  */
 function parseGitHubUrl(url) {
   // Handle HTTPS URLs: https://github.com/owner/repo or https://github.com/owner/repo.git
@@ -130,9 +129,9 @@ function parseGitHubUrl(url) {
 }
 
 /**
- * Auto-generate a branch name from a message
- * @param {string} message - The agent message
- * @returns {string} - Generated branch name
+ * 从消息自动生成分支名称
+ * @param {string} message - 代理消息
+ * @returns {string} - 生成的分支名称
  */
 function autogenerateBranchName(message) {
   // Convert to lowercase, replace spaces/special chars with hyphens
@@ -179,9 +178,9 @@ function autogenerateBranchName(message) {
 }
 
 /**
- * Validate a Git branch name
- * @param {string} branchName - Branch name to validate
- * @returns {{valid: boolean, error?: string}} - Validation result
+ * 验证 Git 分支名称
+ * @param {string} branchName - 要验证的分支名称
+ * @returns {{valid: boolean, error?: string}} - 验证结果
  */
 function validateBranchName(branchName) {
   if (!branchName || branchName.trim() === '') {
@@ -217,10 +216,10 @@ function validateBranchName(branchName) {
 }
 
 /**
- * Get recent commit messages from a repository
- * @param {string} projectPath - Path to the git repository
- * @param {number} limit - Number of commits to retrieve (default: 5)
- * @returns {Promise<string[]>} - Array of commit messages
+ * 从仓库获取最近的提交消息
+ * @param {string} projectPath - git 仓库的路径
+ * @param {number} limit - 要检索的提交数量（默认：5）
+ * @returns {Promise<string[]>} - 提交消息数组
  */
 async function getCommitMessages(projectPath, limit = 5) {
   return new Promise((resolve, reject) => {
@@ -256,12 +255,12 @@ async function getCommitMessages(projectPath, limit = 5) {
 }
 
 /**
- * Create a new branch on GitHub using the API
- * @param {Octokit} octokit - Octokit instance
- * @param {string} owner - Repository owner
- * @param {string} repo - Repository name
- * @param {string} branchName - Name of the new branch
- * @param {string} baseBranch - Base branch to branch from (default: 'main')
+ * 使用 API 在 GitHub 上创建新分支
+ * @param {Octokit} octokit - Octokit 实例
+ * @param {string} owner - 仓库所有者
+ * @param {string} repo - 仓库名称
+ * @param {string} branchName - 新分支的名称
+ * @param {string} baseBranch - 要分支的基础分支（默认：'main'）
  * @returns {Promise<void>}
  */
 async function createGitHubBranch(octokit, owner, repo, branchName, baseBranch = 'main') {
@@ -294,15 +293,15 @@ async function createGitHubBranch(octokit, owner, repo, branchName, baseBranch =
 }
 
 /**
- * Create a pull request on GitHub
- * @param {Octokit} octokit - Octokit instance
- * @param {string} owner - Repository owner
- * @param {string} repo - Repository name
- * @param {string} branchName - Head branch name
- * @param {string} title - PR title
- * @param {string} body - PR body/description
- * @param {string} baseBranch - Base branch (default: 'main')
- * @returns {Promise<{number: number, url: string}>} - PR number and URL
+ * 在 GitHub 上创建拉取请求
+ * @param {Octokit} octokit - Octokit 实例
+ * @param {string} owner - 仓库所有者
+ * @param {string} repo - 仓库名称
+ * @param {string} branchName - 头部分支名称
+ * @param {string} title - PR 标题
+ * @param {string} body - PR 正文/描述
+ * @param {string} baseBranch - 基础分支（默认：'main'）
+ * @returns {Promise<{number: number, url: string}>} - PR 编号和 URL
  */
 async function createGitHubPR(octokit, owner, repo, branchName, title, body, baseBranch = 'main') {
   const { data: pr } = await octokit.pulls.create({
@@ -323,11 +322,11 @@ async function createGitHubPR(octokit, owner, repo, branchName, title, body, bas
 }
 
 /**
- * Clone a GitHub repository to a directory
- * @param {string} githubUrl - GitHub repository URL
- * @param {string} githubToken - Optional GitHub token for private repos
- * @param {string} projectPath - Path for cloning the repository
- * @returns {Promise<string>} - Path to the cloned repository
+ * 将 GitHub 仓库克隆到目录
+ * @param {string} githubUrl - GitHub 仓库 URL
+ * @param {string} githubToken - 可选的 GitHub 令牌，用于私有仓库
+ * @param {string} projectPath - 克隆仓库的路径
+ * @returns {Promise<string>} - 克隆仓库的路径
  */
 async function cloneGitHubRepo(githubUrl, githubToken = null, projectPath) {
   return new Promise(async (resolve, reject) => {
@@ -412,9 +411,9 @@ async function cloneGitHubRepo(githubUrl, githubToken = null, projectPath) {
 }
 
 /**
- * Clean up a temporary project directory and its Claude session
- * @param {string} projectPath - Path to the project directory
- * @param {string} sessionId - Session ID to clean up
+ * 清理临时项目目录及其 Claude 会话
+ * @param {string} projectPath - 项目目录的路径
+ * @param {string} sessionId - 要清理的会话 ID
  */
 async function cleanupProject(projectPath, sessionId = null) {
   try {
@@ -445,7 +444,7 @@ async function cleanupProject(projectPath, sessionId = null) {
 }
 
 /**
- * SSE Stream Writer - Adapts SDK/CLI output to Server-Sent Events
+ * SSE 流写入器 - 将 SDK/CLI 输出适配到服务器发送事件
  */
 class SSEStreamWriter {
   constructor(res) {
@@ -480,7 +479,7 @@ class SSEStreamWriter {
 }
 
 /**
- * Non-streaming response collector
+ * 非流式响应收集器
  */
 class ResponseCollector {
   constructor() {
@@ -524,7 +523,7 @@ class ResponseCollector {
   }
 
   /**
-   * Get filtered assistant messages only
+   * 仅获取过滤后的助手消息
    */
   getAssistantMessages() {
     const assistantMessages = [];
@@ -553,7 +552,7 @@ class ResponseCollector {
   }
 
   /**
-   * Calculate total tokens from all messages
+   * 计算所有消息的总令牌数
    */
   getTotalTokens() {
     let totalInput = 0;
@@ -597,7 +596,7 @@ class ResponseCollector {
 }
 
 // ===============================
-// External API Endpoint
+// 外部 API 端点
 // ===============================
 
 /**

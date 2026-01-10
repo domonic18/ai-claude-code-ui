@@ -1,13 +1,13 @@
 /**
- * Container Entrypoint Script
+ * 容器入口脚本
  *
- * This script serves as the entry point for the Claude Code runtime container.
- * It provides:
- * - Health check HTTP server
- * - Container initialization
- * - Graceful shutdown handling
+ * 此脚本作为 Claude Code 运行时容器的入口点。
+ * 它提供：
+ * - 健康检查 HTTP 服务器
+ * - 容器初始化
+ * - 优雅关闭处理
  *
- * Usage: node container-entrypoint.js
+ * 用法: node container-entrypoint.js
  */
 
 import http from 'http';
@@ -15,7 +15,7 @@ import fs from 'fs';
 import path from 'path';
 import { spawnSync } from 'child_process';
 
-// Configuration
+// 配置
 const HOME = process.env.HOME || '/home/node';
 const CLAUDE_DIR = process.env.CLAUDE_CONFIG_DIR || path.join(HOME, '.claude');
 const PROJECTS_DIR = path.join(CLAUDE_DIR, 'projects');
@@ -33,10 +33,10 @@ const containerInfo = {
 };
 
 /**
- * Initialize container environment
+ * 初始化容器环境
  */
 function initializeContainer() {
-  // Ensure necessary directories exist
+  // 确保必要的目录存在
   [CLAUDE_DIR, PROJECTS_DIR].forEach(dir => {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
@@ -49,11 +49,11 @@ function initializeContainer() {
 }
 
 /**
- * Create health check server
+ * 创建健康检查服务器
  */
 function createHealthServer() {
   const server = http.createServer((req, res) => {
-    // Add CORS headers
+    // 添加 CORS 头
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -66,8 +66,8 @@ function createHealthServer() {
     }
 
     if (req.url === '/health') {
-      // Health check endpoint
-      const isHealthy = true; // Container is healthy if this server is running
+      // 健康检查端点
+      const isHealthy = true; // 如果此服务器正在运行，则容器健康
 
       res.writeHead(isHealthy ? 200 : 503);
       res.end(JSON.stringify({
@@ -77,7 +77,7 @@ function createHealthServer() {
         ...containerInfo
       }));
     } else if (req.url === '/info') {
-      // Container info endpoint
+      // 容器信息端点
       res.writeHead(200);
       res.end(JSON.stringify({
         ...containerInfo,
@@ -91,8 +91,8 @@ function createHealthServer() {
         }
       }));
     } else if (req.url === '/ready') {
-      // Readiness check endpoint
-      // Check if Claude CLI is available (optional)
+      // 就绪检查端点
+      // 检查 Claude CLI 是否可用（可选）
       const claudeAvailable = checkClaudeAvailability();
 
       res.writeHead(claudeAvailable ? 200 : 503);
@@ -110,21 +110,21 @@ function createHealthServer() {
 }
 
 /**
- * Check if Claude CLI is available
+ * 检查 Claude CLI 是否可用
  */
 function checkClaudeAvailability() {
   try {
-    // Try to check if claude command exists using 'which'
+    // 尝试使用 'which' 检查 claude 命令是否存在
     const result = spawnSync('which', ['claude'], { stdio: 'ignore' });
     return result.status === 0;
   } catch (error) {
-    // If command check fails, assume not available
+    // 如果命令检查失败，假设不可用
     return false;
   }
 }
 
 /**
- * Setup signal handlers for graceful shutdown
+ * 设置信号处理程序以实现优雅关闭
  */
 function setupSignalHandlers(server) {
   const shutdown = (signal) => {
@@ -135,7 +135,7 @@ function setupSignalHandlers(server) {
       process.exit(0);
     });
 
-    // Force shutdown after 10 seconds
+    // 10 秒后强制关闭
     setTimeout(() => {
       console.error('[SHUTDOWN] Forced shutdown after timeout');
       process.exit(1);
@@ -145,20 +145,20 @@ function setupSignalHandlers(server) {
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
 
-  // Handle uncaught exceptions
+  // 处理未捕获的异常
   process.on('uncaughtException', (error) => {
     console.error('[ERROR] Uncaught exception:', error);
     shutdown('UNCAUGHT_EXCEPTION');
   });
 
-  // Handle unhandled promise rejections
+  // 处理未处理的 Promise 拒绝
   process.on('unhandledRejection', (reason, promise) => {
     console.error('[ERROR] Unhandled rejection at:', promise, 'reason:', reason);
   });
 }
 
 /**
- * Main entry point
+ * 主入口点
  */
 function main() {
   console.log('═══════════════════════════════════════════════════════════');
@@ -166,11 +166,11 @@ function main() {
   console.log('═══════════════════════════════════════════════════════════');
   console.log('');
 
-  // Initialize container
+  // 初始化容器
   initializeContainer();
   console.log('');
 
-  // Create and start health check server
+  // 创建并启动健康检查服务器
   const server = createHealthServer();
   server.listen(HEALTH_PORT, () => {
     console.log(`[HEALTH] Health check server listening on port ${HEALTH_PORT}`);
@@ -181,7 +181,7 @@ function main() {
     console.log('');
   });
 
-  // Setup signal handlers
+  // 设置信号处理程序
   setupSignalHandlers(server);
 
   console.log('[READY] Container is running. Press Ctrl+C to stop.');
@@ -189,5 +189,5 @@ function main() {
   console.log('');
 }
 
-// Start the container
+// 启动容器
 main();

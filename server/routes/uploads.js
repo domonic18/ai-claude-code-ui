@@ -1,12 +1,12 @@
 /**
- * Upload Routes
+ * 上传路由
  *
- * Handles file upload endpoints including audio transcription
- * and image uploads.
+ * 处理文件上传端点，包括音频转录
+ * 和图片上传。
  *
- * Routes:
- * - POST /api/transcribe - Transcribe audio to text
- * - POST /api/projects/:projectName/upload-images - Upload images
+ * 路由：
+ * - POST /api/transcribe - 将音频转录为文本
+ * - POST /api/projects/:projectName/upload-images - 上传图片
  */
 
 import express from 'express';
@@ -17,14 +17,14 @@ const router = express.Router();
 
 /**
  * POST /api/transcribe
- * Transcribe audio file to text using OpenAI Whisper API
+ * 使用 OpenAI Whisper API 将音频文件转录为文本
  */
 router.post('/transcribe', async (req, res) => {
   try {
     const multer = (await import('multer')).default;
     const upload = multer({ storage: multer.memoryStorage() });
 
-    // Handle multipart form data
+    // 处理多部分表单数据
     upload.single('audio')(req, res, async (err) => {
       if (err) {
         return res.status(400).json({ error: 'Failed to process audio file' });
@@ -42,7 +42,7 @@ router.post('/transcribe', async (req, res) => {
       }
 
       try {
-        // Create form data for OpenAI
+        // 为 OpenAI 创建表单数据
         const FormData = (await import('form-data')).default;
         const formData = new FormData();
         formData.append('file', req.file.buffer, {
@@ -53,7 +53,7 @@ router.post('/transcribe', async (req, res) => {
         formData.append('response_format', 'json');
         formData.append('language', 'en');
 
-        // Make request to OpenAI
+        // 向 OpenAI 发出请求
         const fetch = (await import('node-fetch')).default;
         const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
           method: 'POST',
@@ -72,20 +72,20 @@ router.post('/transcribe', async (req, res) => {
         const data = await response.json();
         let transcribedText = data.text || '';
 
-        // Check if enhancement mode is enabled
+        // 检查是否启用了增强模式
         const mode = req.body.mode || 'default';
 
-        // If no transcribed text, return empty
+        // 如果没有转录文本，返回空
         if (!transcribedText) {
           return res.json({ text: '' });
         }
 
-        // If default mode, return transcribed text without enhancement
+        // 如果是默认模式，返回未增强的转录文本
         if (mode === 'default') {
           return res.json({ text: transcribedText });
         }
 
-        // Handle different enhancement modes
+        // 处理不同的增强模式
         try {
           const OpenAI = (await import('openai')).default;
           const openai = new OpenAI({ apiKey });
@@ -115,7 +115,7 @@ Enhanced prompt:`;
             case 'instructions':
             case 'architect':
               systemMessage = 'You are a helpful assistant that formats ideas into clear, actionable instructions for AI agents.';
-              temperature = 0.5; // Lower temperature for more controlled output
+              temperature = 0.5; // 降低温度以获得更受控的输出
               prompt = `Transform the following idea into clear, well-structured instructions that an AI agent can easily understand and execute.
 
 IMPORTANT RULES:
@@ -133,11 +133,11 @@ Agent instructions:`;
               break;
 
             default:
-              // No enhancement needed
+              // 无需增强
               break;
           }
 
-          // Only make GPT call if we have a prompt
+          // 仅在有提示时调用 GPT
           if (prompt) {
             const completion = await openai.chat.completions.create({
               model: 'gpt-4o-mini',
@@ -154,7 +154,7 @@ Agent instructions:`;
 
         } catch (gptError) {
           console.error('GPT processing error:', gptError);
-          // Fall back to original transcription if GPT fails
+          // 如果 GPT 失败，回退到原始转录
         }
 
         res.json({ text: transcribedText });
@@ -172,7 +172,7 @@ Agent instructions:`;
 
 /**
  * POST /api/projects/:projectName/upload-images
- * Upload image files and return them as base64 data URLs
+ * 上传图片文件并将其作为 base64 数据 URL 返回
  */
 router.post('/:projectName/upload-images', async (req, res) => {
   try {
@@ -181,7 +181,7 @@ router.post('/:projectName/upload-images', async (req, res) => {
     const fs = (await import('fs')).promises;
     const os = (await import('os')).default;
 
-    // Configure multer for image uploads
+    // 为图片上传配置 multer
     const storage = multer.diskStorage({
       destination: async (req, file, cb) => {
         const uploadDir = path.join(os.tmpdir(), 'claude-ui-uploads', String(req.user.id));
@@ -213,7 +213,7 @@ router.post('/:projectName/upload-images', async (req, res) => {
       }
     });
 
-    // Handle multipart form data
+    // 处理多部分表单数据
     upload.array('images', 5)(req, res, async (err) => {
       if (err) {
         return res.status(400).json({ error: err.message });
@@ -224,15 +224,15 @@ router.post('/:projectName/upload-images', async (req, res) => {
       }
 
       try {
-        // Process uploaded images
+        // 处理上传的图片
         const processedImages = await Promise.all(
           req.files.map(async (file) => {
-            // Read file and convert to base64
+            // 读取文件并转换为 base64
             const buffer = await fs.readFile(file.path);
             const base64 = buffer.toString('base64');
             const mimeType = file.mimetype;
 
-            // Clean up temp file immediately
+            // 立即清理临时文件
             await fs.unlink(file.path);
 
             return {
@@ -247,7 +247,7 @@ router.post('/:projectName/upload-images', async (req, res) => {
         res.json({ images: processedImages });
       } catch (error) {
         console.error('Error processing images:', error);
-        // Clean up any remaining files
+        // 清理剩余的文件
         await Promise.all(req.files.map(f => fs.unlink(f.path).catch(() => { })));
         res.status(500).json({ error: 'Failed to process images' });
       }

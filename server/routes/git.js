@@ -10,18 +10,18 @@ import { spawnCursor } from '../services/cursor/index.js';
 const router = express.Router();
 const execAsync = promisify(exec);
 
-// Helper function to get the actual project path from the encoded project name
+// 辅助函数：从编码的项目名称中获取实际项目路径
 async function getActualProjectPath(projectName) {
   try {
     return await extractProjectDirectory(projectName);
   } catch (error) {
     console.error(`Error extracting project directory for ${projectName}:`, error);
-    // Fallback to the old method
+    // 回退到旧方法
     return projectName.replace(/-/g, '/');
   }
 }
 
-// Helper function to strip git diff headers
+// 辅助函数：去除 git diff 头部信息
 function stripDiffHeaders(diff) {
   if (!diff) return '';
 
@@ -30,7 +30,7 @@ function stripDiffHeaders(diff) {
   let startIncluding = false;
 
   for (const line of lines) {
-    // Skip all header lines including diff --git, index, file mode, and --- / +++ file paths
+    // 跳过所有头部行，包括 diff --git、index、文件模式和 --- / +++ 文件路径
     if (line.startsWith('diff --git') ||
         line.startsWith('index ') ||
         line.startsWith('new file mode') ||
@@ -40,7 +40,7 @@ function stripDiffHeaders(diff) {
       continue;
     }
 
-    // Start including lines from @@ hunk headers onwards
+    // 从 @@ hunk 头部开始包含行
     if (line.startsWith('@@') || startIncluding) {
       startIncluding = true;
       filteredLines.push(line);
@@ -50,22 +50,22 @@ function stripDiffHeaders(diff) {
   return filteredLines.join('\n');
 }
 
-// Helper function to validate git repository
+// 辅助函数：验证 git 仓库
 async function validateGitRepository(projectPath) {
   try {
-    // Check if directory exists
+    // 检查目录是否存在
     await fs.access(projectPath);
   } catch {
     throw new Error(`Project path not found: ${projectPath}`);
   }
 
   try {
-    // Use --show-toplevel to get the root of the git repository
+    // 使用 --show-toplevel 获取 git 仓库的根目录
     const { stdout: gitRoot } = await execAsync('git rev-parse --show-toplevel', { cwd: projectPath });
     const normalizedGitRoot = path.resolve(gitRoot.trim());
     const normalizedProjectPath = path.resolve(projectPath);
-    
-    // Ensure the git root matches our project path (prevent using parent git repos)
+
+    // 确保 git 根目录与我们的项目路径匹配（防止使用父级 git 仓库）
     if (normalizedGitRoot !== normalizedProjectPath) {
       throw new Error(`Project directory is not a git repository. This directory is inside a git repository at ${normalizedGitRoot}, but git operations should be run from the repository root.`);
     }
@@ -77,7 +77,7 @@ async function validateGitRepository(projectPath) {
   }
 }
 
-// Get git status for a project
+// 获取项目的 git 状态
 router.get('/status', async (req, res) => {
   const { project } = req.query;
 
@@ -88,17 +88,17 @@ router.get('/status', async (req, res) => {
   try {
     const projectPath = await getActualProjectPath(project);
 
-    // Validate git repository
+    // 验证 git 仓库
     await validateGitRepository(projectPath);
 
-    // Get current branch - handle case where there are no commits yet
+    // 获取当前分支 - 处理还没有提交的情况
     let branch = 'main';
     let hasCommits = true;
     try {
       const { stdout: branchOutput } = await execAsync('git rev-parse --abbrev-ref HEAD', { cwd: projectPath });
       branch = branchOutput.trim();
     } catch (error) {
-      // No HEAD exists - repository has no commits yet
+      // HEAD 不存在 - 仓库还没有提交
       if (error.message.includes('unknown revision') || error.message.includes('ambiguous argument')) {
         hasCommits = false;
         branch = 'main';
@@ -107,7 +107,7 @@ router.get('/status', async (req, res) => {
       }
     }
 
-    // Get git status
+    // 获取 git 状态
     const { stdout: statusOutput } = await execAsync('git status --porcelain', { cwd: projectPath });
 
     const modified = [];
@@ -153,7 +153,7 @@ router.get('/status', async (req, res) => {
   }
 });
 
-// Get diff for a specific file
+// 获取特定文件的 diff
 router.get('/diff', async (req, res) => {
   const { project, file } = req.query;
   
@@ -163,23 +163,23 @@ router.get('/diff', async (req, res) => {
 
   try {
     const projectPath = await getActualProjectPath(project);
-    
-    // Validate git repository
+
+    // 验证 git 仓库
     await validateGitRepository(projectPath);
-    
-    // Check if file is untracked or deleted
+
+    // 检查文件是否未跟踪或已删除
     const { stdout: statusOutput } = await execAsync(`git status --porcelain "${file}"`, { cwd: projectPath });
     const isUntracked = statusOutput.startsWith('??');
     const isDeleted = statusOutput.trim().startsWith('D ') || statusOutput.trim().startsWith(' D');
 
     let diff;
     if (isUntracked) {
-      // For untracked files, show the entire file content as additions
+      // 对于未跟踪的文件，将整个文件内容显示为添加
       const filePath = path.join(projectPath, file);
       const stats = await fs.stat(filePath);
 
       if (stats.isDirectory()) {
-        // For directories, show a simple message
+        // 对于目录，显示简单消息
         diff = `Directory: ${file}\n(Cannot show diff for directories)`;
       } else {
         const fileContent = await fs.readFile(filePath, 'utf-8');
@@ -188,21 +188,21 @@ router.get('/diff', async (req, res) => {
                lines.map(line => `+${line}`).join('\n');
       }
     } else if (isDeleted) {
-      // For deleted files, show the entire file content from HEAD as deletions
+      // 对于已删除的文件，将 HEAD 中的整个文件内容显示为删除
       const { stdout: fileContent } = await execAsync(`git show HEAD:"${file}"`, { cwd: projectPath });
       const lines = fileContent.split('\n');
       diff = `--- a/${file}\n+++ /dev/null\n@@ -1,${lines.length} +0,0 @@\n` +
              lines.map(line => `-${line}`).join('\n');
     } else {
-      // Get diff for tracked files
-      // First check for unstaged changes (working tree vs index)
+      // 获取已跟踪文件的 diff
+      // 首先检查未暂存的更改（工作树 vs 索引）
       const { stdout: unstagedDiff } = await execAsync(`git diff -- "${file}"`, { cwd: projectPath });
 
       if (unstagedDiff) {
-        // Show unstaged changes if they exist
+        // 如果存在未暂存的更改，则显示
         diff = stripDiffHeaders(unstagedDiff);
       } else {
-        // If no unstaged changes, check for staged changes (index vs HEAD)
+        // 如果没有未暂存的更改，则检查已暂存的更改（索引 vs HEAD）
         const { stdout: stagedDiff } = await execAsync(`git diff --cached -- "${file}"`, { cwd: projectPath });
         diff = stripDiffHeaders(stagedDiff) || '';
       }
@@ -215,7 +215,7 @@ router.get('/diff', async (req, res) => {
   }
 });
 
-// Get file content with diff information for CodeEditor
+// 获取文件内容和 diff 信息，用于 CodeEditor
 router.get('/file-with-diff', async (req, res) => {
   const { project, file } = req.query;
 
@@ -226,10 +226,10 @@ router.get('/file-with-diff', async (req, res) => {
   try {
     const projectPath = await getActualProjectPath(project);
 
-    // Validate git repository
+    // 验证 git 仓库
     await validateGitRepository(projectPath);
 
-    // Check file status
+    // 检查文件状态
     const { stdout: statusOutput } = await execAsync(`git status --porcelain "${file}"`, { cwd: projectPath });
     const isUntracked = statusOutput.startsWith('??');
     const isDeleted = statusOutput.trim().startsWith('D ') || statusOutput.trim().startsWith(' D');
@@ -238,29 +238,29 @@ router.get('/file-with-diff', async (req, res) => {
     let oldContent = '';
 
     if (isDeleted) {
-      // For deleted files, get content from HEAD
+      // 对于已删除的文件，从 HEAD 获取内容
       const { stdout: headContent } = await execAsync(`git show HEAD:"${file}"`, { cwd: projectPath });
       oldContent = headContent;
-      currentContent = headContent; // Show the deleted content in editor
+      currentContent = headContent; // 在编辑器中显示已删除的内容
     } else {
-      // Get current file content
+      // 获取当前文件内容
       const filePath = path.join(projectPath, file);
       const stats = await fs.stat(filePath);
 
       if (stats.isDirectory()) {
-        // Cannot show content for directories
+        // 无法显示目录的内容
         return res.status(400).json({ error: 'Cannot show diff for directories' });
       }
 
       currentContent = await fs.readFile(filePath, 'utf-8');
 
       if (!isUntracked) {
-        // Get the old content from HEAD for tracked files
+        // 从 HEAD 获取已跟踪文件的旧内容
         try {
           const { stdout: headContent } = await execAsync(`git show HEAD:"${file}"`, { cwd: projectPath });
           oldContent = headContent;
         } catch (error) {
-          // File might be newly added to git (staged but not committed)
+          // 文件可能是新添加到 git 的（已暂存但未提交）
           oldContent = '';
         }
       }
@@ -278,7 +278,7 @@ router.get('/file-with-diff', async (req, res) => {
   }
 });
 
-// Create initial commit
+// 创建初始提交
 router.post('/initial-commit', async (req, res) => {
   const { project } = req.body;
 
@@ -289,28 +289,28 @@ router.post('/initial-commit', async (req, res) => {
   try {
     const projectPath = await getActualProjectPath(project);
 
-    // Validate git repository
+    // 验证 git 仓库
     await validateGitRepository(projectPath);
 
-    // Check if there are already commits
+    // 检查是否已经有提交
     try {
       await execAsync('git rev-parse HEAD', { cwd: projectPath });
       return res.status(400).json({ error: 'Repository already has commits. Use regular commit instead.' });
     } catch (error) {
-      // No HEAD - this is good, we can create initial commit
+      // 没有 HEAD - 这很好，我们可以创建初始提交
     }
 
-    // Add all files
+    // 添加所有文件
     await execAsync('git add .', { cwd: projectPath });
 
-    // Create initial commit
+    // 创建初始提交
     const { stdout } = await execAsync('git commit -m "Initial commit"', { cwd: projectPath });
 
     res.json({ success: true, output: stdout, message: 'Initial commit created successfully' });
   } catch (error) {
     console.error('Git initial commit error:', error);
 
-    // Handle the case where there's nothing to commit
+    // 处理没有任何内容可提交的情况
     if (error.message.includes('nothing to commit')) {
       return res.status(400).json({
         error: 'Nothing to commit',
@@ -322,7 +322,7 @@ router.post('/initial-commit', async (req, res) => {
   }
 });
 
-// Commit changes
+// 提交更改
 router.post('/commit', async (req, res) => {
   const { project, message, files } = req.body;
   
@@ -332,16 +332,16 @@ router.post('/commit', async (req, res) => {
 
   try {
     const projectPath = await getActualProjectPath(project);
-    
-    // Validate git repository
+
+    // 验证 git 仓库
     await validateGitRepository(projectPath);
-    
-    // Stage selected files
+
+    // 暂存选定的文件
     for (const file of files) {
       await execAsync(`git add "${file}"`, { cwd: projectPath });
     }
-    
-    // Commit with message
+
+    // 提交并附带消息
     const { stdout } = await execAsync(`git commit -m "${message.replace(/"/g, '\\"')}"`, { cwd: projectPath });
     
     res.json({ success: true, output: stdout });
@@ -351,7 +351,7 @@ router.post('/commit', async (req, res) => {
   }
 });
 
-// Get list of branches
+// 获取分支列表
 router.get('/branches', async (req, res) => {
   const { project } = req.query;
   
@@ -361,30 +361,30 @@ router.get('/branches', async (req, res) => {
 
   try {
     const projectPath = await getActualProjectPath(project);
-    
-    // Validate git repository
+
+    // 验证 git 仓库
     await validateGitRepository(projectPath);
-    
-    // Get all branches
+
+    // 获取所有分支
     const { stdout } = await execAsync('git branch -a', { cwd: projectPath });
-    
-    // Parse branches
+
+    // 解析分支
     const branches = stdout
       .split('\n')
       .map(branch => branch.trim())
-      .filter(branch => branch && !branch.includes('->')) // Remove empty lines and HEAD pointer
+      .filter(branch => branch && !branch.includes('->')) // 移除空行和 HEAD 指针
       .map(branch => {
-        // Remove asterisk from current branch
+        // 移除当前分支的星号
         if (branch.startsWith('* ')) {
           return branch.substring(2);
         }
-        // Remove remotes/ prefix
+        // 移除 remotes/ 前缀
         if (branch.startsWith('remotes/origin/')) {
           return branch.substring(15);
         }
         return branch;
       })
-      .filter((branch, index, self) => self.indexOf(branch) === index); // Remove duplicates
+      .filter((branch, index, self) => self.indexOf(branch) === index); // 移除重复项
     
     res.json({ branches });
   } catch (error) {
@@ -393,7 +393,7 @@ router.get('/branches', async (req, res) => {
   }
 });
 
-// Checkout branch
+// 切换分支
 router.post('/checkout', async (req, res) => {
   const { project, branch } = req.body;
   
@@ -403,8 +403,8 @@ router.post('/checkout', async (req, res) => {
 
   try {
     const projectPath = await getActualProjectPath(project);
-    
-    // Checkout the branch
+
+    // 切换分支
     const { stdout } = await execAsync(`git checkout "${branch}"`, { cwd: projectPath });
     
     res.json({ success: true, output: stdout });
@@ -414,7 +414,7 @@ router.post('/checkout', async (req, res) => {
   }
 });
 
-// Create new branch
+// 创建新分支
 router.post('/create-branch', async (req, res) => {
   const { project, branch } = req.body;
   
@@ -424,8 +424,8 @@ router.post('/create-branch', async (req, res) => {
 
   try {
     const projectPath = await getActualProjectPath(project);
-    
-    // Create and checkout new branch
+
+    // 创建并切换到新分支
     const { stdout } = await execAsync(`git checkout -b "${branch}"`, { cwd: projectPath });
     
     res.json({ success: true, output: stdout });
@@ -435,7 +435,7 @@ router.post('/create-branch', async (req, res) => {
   }
 });
 
-// Get recent commits
+// 获取最近的提交
 router.get('/commits', async (req, res) => {
   const { project, limit = 10 } = req.query;
   
@@ -445,8 +445,8 @@ router.get('/commits', async (req, res) => {
 
   try {
     const projectPath = await getActualProjectPath(project);
-    
-    // Get commit log with stats
+
+    // 获取带有统计信息的提交日志
     const { stdout } = await execAsync(
       `git log --pretty=format:'%H|%an|%ae|%ad|%s' --date=relative -n ${limit}`,
       { cwd: projectPath }
@@ -465,15 +465,15 @@ router.get('/commits', async (req, res) => {
           message: messageParts.join('|')
         };
       });
-    
-    // Get stats for each commit
+
+    // 获取每个提交的统计信息
     for (const commit of commits) {
       try {
         const { stdout: stats } = await execAsync(
           `git show --stat --format='' ${commit.hash}`,
           { cwd: projectPath }
         );
-        commit.stats = stats.trim().split('\n').pop(); // Get the summary line
+        commit.stats = stats.trim().split('\n').pop(); // 获取摘要行
       } catch (error) {
         commit.stats = '';
       }
@@ -486,7 +486,7 @@ router.get('/commits', async (req, res) => {
   }
 });
 
-// Get diff for a specific commit
+// 获取特定提交的 diff
 router.get('/commit-diff', async (req, res) => {
   const { project, commit } = req.query;
   
@@ -496,8 +496,8 @@ router.get('/commit-diff', async (req, res) => {
 
   try {
     const projectPath = await getActualProjectPath(project);
-    
-    // Get diff for the commit
+
+    // 获取提交的 diff
     const { stdout } = await execAsync(
       `git show ${commit}`,
       { cwd: projectPath }
@@ -510,7 +510,7 @@ router.get('/commit-diff', async (req, res) => {
   }
 });
 
-// Generate commit message based on staged changes using AI
+// 使用 AI 根据暂存的更改生成提交消息
 router.post('/generate-commit-message', async (req, res) => {
   const { project, files, provider = 'claude' } = req.body;
 
@@ -518,7 +518,7 @@ router.post('/generate-commit-message', async (req, res) => {
     return res.status(400).json({ error: 'Project name and files are required' });
   }
 
-  // Validate provider
+  // 验证提供者
   if (!['claude', 'cursor'].includes(provider)) {
     return res.status(400).json({ error: 'provider must be "claude" or "cursor"' });
   }
@@ -526,7 +526,7 @@ router.post('/generate-commit-message', async (req, res) => {
   try {
     const projectPath = await getActualProjectPath(project);
 
-    // Get diff for selected files
+    // 获取选定文件的 diff
     let diffContext = '';
     for (const file of files) {
       try {
@@ -542,9 +542,9 @@ router.post('/generate-commit-message', async (req, res) => {
       }
     }
 
-    // If no diff found, might be untracked files
+    // 如果没有找到 diff，可能是未跟踪的文件
     if (!diffContext.trim()) {
-      // Try to get content of untracked files
+      // 尝试获取未跟踪文件的内容
       for (const file of files) {
         try {
           const filePath = path.join(projectPath, file);
@@ -562,7 +562,7 @@ router.post('/generate-commit-message', async (req, res) => {
       }
     }
 
-    // Generate commit message using AI
+    // 使用 AI 生成提交消息
     const message = await generateCommitMessageWithAI(files, diffContext, provider, projectPath);
 
     res.json({ message });
@@ -573,15 +573,15 @@ router.post('/generate-commit-message', async (req, res) => {
 });
 
 /**
- * Generates a commit message using AI (Claude SDK or Cursor CLI)
- * @param {Array<string>} files - List of changed files
- * @param {string} diffContext - Git diff content
- * @param {string} provider - 'claude' or 'cursor'
- * @param {string} projectPath - Project directory path
- * @returns {Promise<string>} Generated commit message
+ * 使用 AI（Claude SDK 或 Cursor CLI）生成提交消息
+ * @param {Array<string>} files - 已更改文件的列表
+ * @param {string} diffContext - Git diff 内容
+ * @param {string} provider - 'claude' 或 'cursor'
+ * @param {string} projectPath - 项目目录路径
+ * @returns {Promise<string>} 生成的提交消息
  */
 async function generateCommitMessageWithAI(files, diffContext, provider, projectPath) {
-  // Create the prompt
+  // 创建提示
   const prompt = `Generate a conventional commit message for these changes.
 
 REQUIREMENTS:
@@ -602,7 +602,7 @@ ${diffContext.substring(0, 4000)}
 Generate the commit message:`;
 
   try {
-    // Create a simple writer that collects the response
+    // 创建一个简单的写入器来收集响应
     let responseText = '';
     const writer = {
       send: (data) => {
@@ -610,13 +610,13 @@ Generate the commit message:`;
           const parsed = typeof data === 'string' ? JSON.parse(data) : data;
           console.log('🔍 Writer received message type:', parsed.type);
 
-          // Handle different message formats from Claude SDK and Cursor CLI
-          // Claude SDK sends: {type: 'claude-response', data: {message: {content: [...]}}}
+          // 处理来自 Claude SDK 和 Cursor CLI 的不同消息格式
+          // Claude SDK 发送: {type: 'claude-response', data: {message: {content: [...]}}}
           if (parsed.type === 'claude-response' && parsed.data) {
             const message = parsed.data.message || parsed.data;
             console.log('📦 Claude response message:', JSON.stringify(message, null, 2).substring(0, 500));
             if (message.content && Array.isArray(message.content)) {
-              // Extract text from content array
+              // 从内容数组中提取文本
               for (const item of message.content) {
                 if (item.type === 'text' && item.text) {
                   console.log('✅ Extracted text chunk:', item.text.substring(0, 100));
@@ -625,28 +625,28 @@ Generate the commit message:`;
               }
             }
           }
-          // Cursor CLI sends: {type: 'cursor-output', output: '...'}
+          // Cursor CLI 发送: {type: 'cursor-output', output: '...'}
           else if (parsed.type === 'cursor-output' && parsed.output) {
             console.log('✅ Cursor output:', parsed.output.substring(0, 100));
             responseText += parsed.output;
           }
-          // Also handle direct text messages
+          // 同时处理直接文本消息
           else if (parsed.type === 'text' && parsed.text) {
             console.log('✅ Direct text:', parsed.text.substring(0, 100));
             responseText += parsed.text;
           }
         } catch (e) {
-          // Ignore parse errors
+          // 忽略解析错误
           console.error('Error parsing writer data:', e);
         }
       },
-      setSessionId: () => {}, // No-op for this use case
+      setSessionId: () => {}, // 此用例的无操作
     };
 
     console.log('🚀 Calling AI agent with provider:', provider);
     console.log('📝 Prompt length:', prompt.length);
 
-    // Call the appropriate agent
+    // 调用相应的代理
     if (provider === 'claude') {
       await queryClaudeSDK(prompt, {
         cwd: projectPath,
@@ -663,22 +663,22 @@ Generate the commit message:`;
     console.log('📊 Total response text collected:', responseText.length, 'characters');
     console.log('📄 Response preview:', responseText.substring(0, 200));
 
-    // Clean up the response
+    // 清理响应
     const cleanedMessage = cleanCommitMessage(responseText);
     console.log('🧹 Cleaned message:', cleanedMessage.substring(0, 200));
 
     return cleanedMessage || 'chore: update files';
   } catch (error) {
     console.error('Error generating commit message with AI:', error);
-    // Fallback to simple message
+    // 回退到简单消息
     return `chore: update ${files.length} file${files.length !== 1 ? 's' : ''}`;
   }
 }
 
 /**
- * Cleans the AI-generated commit message by removing markdown, code blocks, and extra formatting
- * @param {string} text - Raw AI response
- * @returns {string} Clean commit message
+ * 清理 AI 生成的提交消息，删除 markdown、代码块和额外格式
+ * @param {string} text - 原始 AI 响应
+ * @returns {string} 清理后的提交消息
  */
 function cleanCommitMessage(text) {
   if (!text || !text.trim()) {
@@ -687,22 +687,22 @@ function cleanCommitMessage(text) {
 
   let cleaned = text.trim();
 
-  // Remove markdown code blocks
+  // 删除 markdown 代码块
   cleaned = cleaned.replace(/```[a-z]*\n/g, '');
   cleaned = cleaned.replace(/```/g, '');
 
-  // Remove markdown headers
+  // 删除 markdown 标题
   cleaned = cleaned.replace(/^#+\s*/gm, '');
 
-  // Remove leading/trailing quotes
+  // 删除前导/尾随引号
   cleaned = cleaned.replace(/^["']|["']$/g, '');
 
-  // If there are multiple lines, take everything (subject + body)
-  // Just clean up extra blank lines
+  // 如果有多行，则取所有内容（主题 + 正文）
+  // 只需清理多余的空行
   cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
 
-  // Remove any explanatory text before the actual commit message
-  // Look for conventional commit pattern and start from there
+  // 删除实际提交消息之前的任何解释性文本
+  // 查找约定提交模式并从那里开始
   const conventionalCommitMatch = cleaned.match(/(feat|fix|docs|style|refactor|perf|test|build|ci|chore)(\(.+?\))?:.+/s);
   if (conventionalCommitMatch) {
     cleaned = cleaned.substring(cleaned.indexOf(conventionalCommitMatch[0]));
@@ -711,7 +711,7 @@ function cleanCommitMessage(text) {
   return cleaned.trim();
 }
 
-// Get remote status (ahead/behind commits with smart remote detection)
+// 获取远程状态（使用智能远程检测的提前/落后提交）
 router.get('/remote-status', async (req, res) => {
   const { project } = req.query;
   
@@ -723,19 +723,19 @@ router.get('/remote-status', async (req, res) => {
     const projectPath = await getActualProjectPath(project);
     await validateGitRepository(projectPath);
 
-    // Get current branch
+    // 获取当前分支
     const { stdout: currentBranch } = await execAsync('git rev-parse --abbrev-ref HEAD', { cwd: projectPath });
     const branch = currentBranch.trim();
 
-    // Check if there's a remote tracking branch (smart detection)
+    // 检查是否存在远程跟踪分支（智能检测）
     let trackingBranch;
     let remoteName;
     try {
       const { stdout } = await execAsync(`git rev-parse --abbrev-ref ${branch}@{upstream}`, { cwd: projectPath });
       trackingBranch = stdout.trim();
-      remoteName = trackingBranch.split('/')[0]; // Extract remote name (e.g., "origin/main" -> "origin")
+      remoteName = trackingBranch.split('/')[0]; // 提取远程名称（例如，"origin/main" -> "origin"）
     } catch (error) {
-      // No upstream branch configured - but check if we have remotes
+      // 未配置上游分支 - 但检查我们是否有远程
       let hasRemote = false;
       let remoteName = null;
       try {
@@ -746,9 +746,9 @@ router.get('/remote-status', async (req, res) => {
           remoteName = remotes.includes('origin') ? 'origin' : remotes[0];
         }
       } catch (remoteError) {
-        // No remotes configured
+        // 未配置远程
       }
-      
+
       return res.json({ 
         hasRemote,
         hasUpstream: false,
@@ -758,7 +758,7 @@ router.get('/remote-status', async (req, res) => {
       });
     }
 
-    // Get ahead/behind counts
+    // 获取提前/落后计数
     const { stdout: countOutput } = await execAsync(
       `git rev-list --count --left-right ${trackingBranch}...HEAD`,
       { cwd: projectPath }
@@ -782,7 +782,7 @@ router.get('/remote-status', async (req, res) => {
   }
 });
 
-// Fetch from remote (using smart remote detection)
+// 从远程获取（使用智能远程检测）
 router.post('/fetch', async (req, res) => {
   const { project } = req.body;
   
@@ -794,16 +794,16 @@ router.post('/fetch', async (req, res) => {
     const projectPath = await getActualProjectPath(project);
     await validateGitRepository(projectPath);
 
-    // Get current branch and its upstream remote
+    // 获取当前分支及其上游远程
     const { stdout: currentBranch } = await execAsync('git rev-parse --abbrev-ref HEAD', { cwd: projectPath });
     const branch = currentBranch.trim();
 
-    let remoteName = 'origin'; // fallback
+    let remoteName = 'origin'; // 回退
     try {
       const { stdout } = await execAsync(`git rev-parse --abbrev-ref ${branch}@{upstream}`, { cwd: projectPath });
-      remoteName = stdout.trim().split('/')[0]; // Extract remote name
+      remoteName = stdout.trim().split('/')[0]; // 提取远程名称
     } catch (error) {
-      // No upstream, try to fetch from origin anyway
+      // 没有上游，尝试从 origin 获取
       console.log('No upstream configured, using origin as fallback');
     }
 
@@ -823,7 +823,7 @@ router.post('/fetch', async (req, res) => {
   }
 });
 
-// Pull from remote (fetch + merge using smart remote detection)
+// 从远程拉取（fetch + merge，使用智能远程检测）
 router.post('/pull', async (req, res) => {
   const { project } = req.body;
   
@@ -835,19 +835,19 @@ router.post('/pull', async (req, res) => {
     const projectPath = await getActualProjectPath(project);
     await validateGitRepository(projectPath);
 
-    // Get current branch and its upstream remote
+    // 获取当前分支及其上游远程
     const { stdout: currentBranch } = await execAsync('git rev-parse --abbrev-ref HEAD', { cwd: projectPath });
     const branch = currentBranch.trim();
 
-    let remoteName = 'origin'; // fallback
-    let remoteBranch = branch; // fallback
+    let remoteName = 'origin'; // 回退
+    let remoteBranch = branch; // 回退
     try {
       const { stdout } = await execAsync(`git rev-parse --abbrev-ref ${branch}@{upstream}`, { cwd: projectPath });
       const tracking = stdout.trim();
-      remoteName = tracking.split('/')[0]; // Extract remote name
-      remoteBranch = tracking.split('/').slice(1).join('/'); // Extract branch name
+      remoteName = tracking.split('/')[0]; // 提取远程名称
+      remoteBranch = tracking.split('/').slice(1).join('/'); // 提取分支名称
     } catch (error) {
-      // No upstream, use fallback
+      // 没有上游，使用回退
       console.log('No upstream configured, using origin/branch as fallback');
     }
 
@@ -861,8 +861,8 @@ router.post('/pull', async (req, res) => {
     });
   } catch (error) {
     console.error('Git pull error:', error);
-    
-    // Enhanced error handling for common pull scenarios
+
+    // 针对常见拉取场景的增强错误处理
     let errorMessage = 'Pull failed';
     let details = error.message;
     
@@ -890,7 +890,7 @@ router.post('/pull', async (req, res) => {
   }
 });
 
-// Push commits to remote repository
+// 推送提交到远程仓库
 router.post('/push', async (req, res) => {
   const { project } = req.body;
   
@@ -902,19 +902,19 @@ router.post('/push', async (req, res) => {
     const projectPath = await getActualProjectPath(project);
     await validateGitRepository(projectPath);
 
-    // Get current branch and its upstream remote
+    // 获取当前分支及其上游远程
     const { stdout: currentBranch } = await execAsync('git rev-parse --abbrev-ref HEAD', { cwd: projectPath });
     const branch = currentBranch.trim();
 
-    let remoteName = 'origin'; // fallback
-    let remoteBranch = branch; // fallback
+    let remoteName = 'origin'; // 回退
+    let remoteBranch = branch; // 回退
     try {
       const { stdout } = await execAsync(`git rev-parse --abbrev-ref ${branch}@{upstream}`, { cwd: projectPath });
       const tracking = stdout.trim();
-      remoteName = tracking.split('/')[0]; // Extract remote name
-      remoteBranch = tracking.split('/').slice(1).join('/'); // Extract branch name
+      remoteName = tracking.split('/')[0]; // 提取远程名称
+      remoteBranch = tracking.split('/').slice(1).join('/'); // 提取分支名称
     } catch (error) {
-      // No upstream, use fallback
+      // 没有上游，使用回退
       console.log('No upstream configured, using origin/branch as fallback');
     }
 
@@ -928,8 +928,8 @@ router.post('/push', async (req, res) => {
     });
   } catch (error) {
     console.error('Git push error:', error);
-    
-    // Enhanced error handling for common push scenarios
+
+    // 针对常见推送场景的增强错误处理
     let errorMessage = 'Push failed';
     let details = error.message;
     
@@ -960,7 +960,7 @@ router.post('/push', async (req, res) => {
   }
 });
 
-// Publish branch to remote (set upstream and push)
+// 发布分支到远程（设置上游并推送）
 router.post('/publish', async (req, res) => {
   const { project, branch } = req.body;
   
@@ -972,34 +972,34 @@ router.post('/publish', async (req, res) => {
     const projectPath = await getActualProjectPath(project);
     await validateGitRepository(projectPath);
 
-    // Get current branch to verify it matches the requested branch
+    // 获取当前分支以验证它是否与请求的分支匹配
     const { stdout: currentBranch } = await execAsync('git rev-parse --abbrev-ref HEAD', { cwd: projectPath });
     const currentBranchName = currentBranch.trim();
-    
+
     if (currentBranchName !== branch) {
-      return res.status(400).json({ 
-        error: `Branch mismatch. Current branch is ${currentBranchName}, but trying to publish ${branch}` 
+      return res.status(400).json({
+        error: `Branch mismatch. Current branch is ${currentBranchName}, but trying to publish ${branch}`
       });
     }
 
-    // Check if remote exists
+    // 检查远程是否存在
     let remoteName = 'origin';
     try {
       const { stdout } = await execAsync('git remote', { cwd: projectPath });
       const remotes = stdout.trim().split('\n').filter(r => r.trim());
       if (remotes.length === 0) {
-        return res.status(400).json({ 
-          error: 'No remote repository configured. Add a remote with: git remote add origin <url>' 
+        return res.status(400).json({
+          error: 'No remote repository configured. Add a remote with: git remote add origin <url>'
         });
       }
       remoteName = remotes.includes('origin') ? 'origin' : remotes[0];
     } catch (error) {
-      return res.status(400).json({ 
-        error: 'No remote repository configured. Add a remote with: git remote add origin <url>' 
+      return res.status(400).json({
+        error: 'No remote repository configured. Add a remote with: git remote add origin <url>'
       });
     }
 
-    // Publish the branch (set upstream and push)
+    // 发布分支（设置上游并推送）
     const { stdout } = await execAsync(`git push --set-upstream ${remoteName} ${branch}`, { cwd: projectPath });
     
     res.json({ 
@@ -1010,8 +1010,8 @@ router.post('/publish', async (req, res) => {
     });
   } catch (error) {
     console.error('Git publish error:', error);
-    
-    // Enhanced error handling for common publish scenarios
+
+    // 针对常见发布场景的增强错误处理
     let errorMessage = 'Publish failed';
     let details = error.message;
     
@@ -1036,7 +1036,7 @@ router.post('/publish', async (req, res) => {
   }
 });
 
-// Discard changes for a specific file
+// 丢弃特定文件的更改
 router.post('/discard', async (req, res) => {
   const { project, file } = req.body;
   
@@ -1048,7 +1048,7 @@ router.post('/discard', async (req, res) => {
     const projectPath = await getActualProjectPath(project);
     await validateGitRepository(projectPath);
 
-    // Check file status to determine correct discard command
+    // 检查文件状态以确定正确的丢弃命令
     const { stdout: statusOutput } = await execAsync(`git status --porcelain "${file}"`, { cwd: projectPath });
     
     if (!statusOutput.trim()) {
@@ -1058,7 +1058,7 @@ router.post('/discard', async (req, res) => {
     const status = statusOutput.substring(0, 2);
 
     if (status === '??') {
-      // Untracked file or directory - delete it
+      // 未跟踪的文件或目录 - 删除它
       const filePath = path.join(projectPath, file);
       const stats = await fs.stat(filePath);
 
@@ -1068,10 +1068,10 @@ router.post('/discard', async (req, res) => {
         await fs.unlink(filePath);
       }
     } else if (status.includes('M') || status.includes('D')) {
-      // Modified or deleted file - restore from HEAD
+      // 已修改或已删除的文件 - 从 HEAD 恢复
       await execAsync(`git restore "${file}"`, { cwd: projectPath });
     } else if (status.includes('A')) {
-      // Added file - unstage it
+      // 已添加的文件 - 取消暂存
       await execAsync(`git reset HEAD "${file}"`, { cwd: projectPath });
     }
     
@@ -1082,7 +1082,7 @@ router.post('/discard', async (req, res) => {
   }
 });
 
-// Delete untracked file
+// 删除未跟踪的文件
 router.post('/delete-untracked', async (req, res) => {
   const { project, file } = req.body;
   
@@ -1094,7 +1094,7 @@ router.post('/delete-untracked', async (req, res) => {
     const projectPath = await getActualProjectPath(project);
     await validateGitRepository(projectPath);
 
-    // Check if file is actually untracked
+    // 检查文件是否确实未跟踪
     const { stdout: statusOutput } = await execAsync(`git status --porcelain "${file}"`, { cwd: projectPath });
     
     if (!statusOutput.trim()) {
@@ -1102,17 +1102,17 @@ router.post('/delete-untracked', async (req, res) => {
     }
 
     const status = statusOutput.substring(0, 2);
-    
+
     if (status !== '??') {
       return res.status(400).json({ error: 'File is not untracked. Use discard for tracked files.' });
     }
 
-    // Delete the untracked file or directory
+    // 删除未跟踪的文件或目录
     const filePath = path.join(projectPath, file);
     const stats = await fs.stat(filePath);
 
     if (stats.isDirectory()) {
-      // Use rm with recursive option for directories
+      // 使用带有递归选项的 rm 删除目录
       await fs.rm(filePath, { recursive: true, force: true });
       res.json({ success: true, message: `Untracked directory ${file} deleted successfully` });
     } else {

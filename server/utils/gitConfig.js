@@ -4,7 +4,7 @@ import { promisify } from 'util';
 const execAsync = promisify(exec);
 
 /**
- * Read git configuration from system's global git config
+ * 从系统的全局 git 配置读取 git 配置
  * @returns {Promise<{git_name: string|null, git_email: string|null}>}
  */
 export async function getSystemGitConfig() {

@@ -1,7 +1,7 @@
 /**
- * Project Services Index
+ * 项目服务索引
  *
- * Exports all project related services for easy importing.
+ * 导出所有项目相关的服务以便于导入。
  */
 
 export {

@@ -1,7 +1,7 @@
 /**
- * Express Configuration Module
+ * Express 配置模块
  *
- * Configures Express app with middleware, routes, and static file serving.
+ * 使用中间件、路由和静态文件服务配置 Express 应用。
  *
  * @module config/express-config
  */
@@ -11,7 +11,7 @@ import cors from 'cors';
 import path from 'path';
 import mime from 'mime-types';
 
-// Route imports
+// 路由导入
 import gitRoutes from '../routes/git.js';
 import authRoutes from '../routes/auth.js';
 import mcpRoutes from '../routes/mcp.js';
@@ -30,26 +30,26 @@ import sessionsRoutes from '../routes/sessions.js';
 import uploadsRoutes from '../routes/uploads.js';
 import systemRoutes from '../routes/system.js';
 
-// Middleware imports
+// 中间件导入
 import { validateApiKey, authenticateToken } from '../middleware/auth.js';
 
 /**
- * Configure Express application with middleware and routes
- * @param {express.Application} app - The Express application to configure
- * @param {WebSocketServer} wss - The WebSocket server (attached to app.locals)
+ * 使用中间件和路由配置 Express 应用
+ * @param {express.Application} app - 要配置的 Express 应用
+ * @param {WebSocketServer} wss - WebSocket 服务器（附加到 app.locals）
  */
 export function configureExpress(app, wss) {
-    // Make WebSocket server available to routes
+    // 使 WebSocket 服务器对路由可用
     app.locals.wss = wss;
 
-    // CORS middleware
+    // CORS 中间件
     app.use(cors());
 
-    // JSON body parser with custom type checking
+    // 带有自定义类型检查的 JSON 主体解析器
     app.use(express.json({
         limit: '50mb',
         type: (req) => {
-            // Skip multipart/form-data requests (for file uploads like images)
+            // 跳过 multipart/form-data 请求（用于文件上传，如图像）
             const contentType = req.headers['content-type'] || '';
             if (contentType.includes('multipart/form-data')) {
                 return false;
@@ -58,10 +58,10 @@ export function configureExpress(app, wss) {
         }
     }));
 
-    // URL-encoded parser
+    // URL 编码解析器
     app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-    // Public health check endpoint (no authentication required)
+    // 公共健康检查端点（无需身份验证）
     app.get('/health', (req, res) => {
         res.json({
             status: 'ok',
@@ -69,13 +69,13 @@ export function configureExpress(app, wss) {
         });
     });
 
-    // Optional API key validation (if configured)
+    // 可选的 API 密钥验证（如果已配置）
     app.use('/api', validateApiKey);
 
-    // ===== Public Routes =====
+    // ===== 公共路由 =====
     app.use('/api/auth', authRoutes);
 
-    // ===== Protected Routes =====
+    // ===== 受保护的路由 =====
     app.use('/api/projects', authenticateToken, projectsRoutes);
     app.use('/api/git', authenticateToken, gitRoutes);
     app.use('/api/mcp', authenticateToken, mcpRoutes);
@@ -89,59 +89,59 @@ export function configureExpress(app, wss) {
     app.use('/api/codex', authenticateToken, codexRoutes);
     app.use('/api/system', authenticateToken, systemRoutes);
 
-    // ===== Special Routes =====
-    // Agent API Routes (uses API key authentication, not token auth)
+    // ===== 特殊路由 =====
+    // Agent API 路由（使用 API 密钥身份验证，不是令牌身份验证）
     app.use('/api/agent', agentRoutes);
 
-    // File API Routes (protected)
+    // 文件 API 路由（受保护）
     app.use('/api/projects', authenticateToken, filesRoutes);
 
-    // Session API Routes (protected)
+    // 会话 API 路由（受保护）
     app.use('/api/projects', authenticateToken, sessionsRoutes);
 
-    // Upload API Routes (protected)
+    // 上传 API 路由（受保护）
     app.use('/api', authenticateToken, uploadsRoutes);
 
-    // ===== Static Files =====
-    // Serve public files (like api-docs.html)
+    // ===== 静态文件 =====
+    // 提供公共文件（如 api-docs.html）
     app.use(express.static(path.join(process.cwd(), 'server', '../public')));
 
-    // Static files served after API routes
-    // Add cache control: HTML files should not be cached, but assets can be cached
+    // 在 API 路由之后提供静态文件
+    // 添加缓存控制：HTML 文件不应被缓存，但资产可以被缓存
     app.use(express.static(path.join(process.cwd(), 'server', '../dist'), {
         setHeaders: (res, filePath) => {
             if (filePath.endsWith('.html')) {
-                // Prevent HTML caching to avoid service worker issues after builds
+                // 防止 HTML 缓存以避免构建后的 Service Worker 问题
                 res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
                 res.setHeader('Pragma', 'no-cache');
                 res.setHeader('Expires', '0');
             } else if (filePath.match(/\.(js|css|woff2?|ttf|eot|svg|png|jpg|jpeg|gif|ico)$/)) {
-                // Cache static assets for 1 year (they have hashed names)
+                // 缓存静态资产 1 年（它们具有哈希名称）
                 res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
             }
         }
     }));
 
-    // ===== SPA Fallback =====
-    // Serve React app for all other routes (excluding static files)
+    // ===== SPA 回退 =====
+    // 为所有其他路由提供 React 应用（不包括静态文件）
     app.get('*', (req, res) => {
-        // Skip requests for static assets (files with extensions)
+        // 跳过静态资产的请求（带有扩展名的文件）
         if (path.extname(req.path)) {
             return res.status(404).send('Not found');
         }
 
-        // Only serve index.html for HTML routes, not for static assets
+        // 仅对 HTML 路由提供 index.html，不对静态资产提供
         const indexPath = path.join(process.cwd(), 'server', '../dist/index.html');
 
-        // Check if dist/index.html exists (production build available)
+        // 检查 dist/index.html 是否存在（生产构建可用）
         if (require('fs').existsSync(indexPath)) {
-            // Set no-cache headers for HTML to prevent service worker issues
+            // 为 HTML 设置无缓存头以防止 Service Worker 问题
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
             res.setHeader('Pragma', 'no-cache');
             res.setHeader('Expires', '0');
             res.sendFile(indexPath);
         } else {
-            // In development, redirect to Vite dev server only if dist doesn't exist
+            // 在开发环境中，仅当 dist 不存在时重定向到 Vite 开发服务器
             res.redirect(`http://localhost:${process.env.VITE_PORT || 5173}`);
         }
     });

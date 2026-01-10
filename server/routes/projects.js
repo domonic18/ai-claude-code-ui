@@ -10,10 +10,10 @@ import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Configure allowed workspace root (defaults to user's home directory)
+// 配置允许的工作空间根目录（默认为用户主目录）
 const WORKSPACES_ROOT = process.env.WORKSPACES_ROOT || os.homedir();
 
-// System-critical paths that should never be used as workspace directories
+// 不应作为工作空间目录的系统关键路径
 const FORBIDDEN_PATHS = [
   '/',
   '/etc',
@@ -34,16 +34,16 @@ const FORBIDDEN_PATHS = [
 ];
 
 /**
- * Validates that a path is safe for workspace operations
- * @param {string} requestedPath - The path to validate
+ * 验证路径对工作空间操作是否安全
+ * @param {string} requestedPath - 要验证的路径
  * @returns {Promise<{valid: boolean, resolvedPath?: string, error?: string}>}
  */
 async function validateWorkspacePath(requestedPath) {
   try {
-    // Resolve to absolute path
+    // 解析为绝对路径
     let absolutePath = path.resolve(requestedPath);
 
-    // Check if path is a forbidden system directory
+    // 检查路径是否为禁止的系统目录
     const normalizedPath = path.normalize(absolutePath);
     if (FORBIDDEN_PATHS.includes(normalizedPath) || normalizedPath === '/') {
       return {
@@ -52,16 +52,16 @@ async function validateWorkspacePath(requestedPath) {
       };
     }
 
-    // Additional check for paths starting with forbidden directories
+    // 对以禁止目录开头的路径进行额外检查
     for (const forbidden of FORBIDDEN_PATHS) {
       if (normalizedPath === forbidden ||
           normalizedPath.startsWith(forbidden + path.sep)) {
-        // Exception: /var/tmp and similar user-accessible paths might be allowed
-        // but /var itself and most /var subdirectories should be blocked
+        // 例外：/var/tmp 和类似用户可访问的路径可能被允许
+        // 但 /var 本身和大多数 /var 子目录应该被阻止
         if (forbidden === '/var' &&
             (normalizedPath.startsWith('/var/tmp') ||
              normalizedPath.startsWith('/var/folders'))) {
-          continue; // Allow these specific cases
+          continue; // 允许这些特定情况
         }
 
         return {
@@ -71,25 +71,25 @@ async function validateWorkspacePath(requestedPath) {
       }
     }
 
-    // Try to resolve the real path (following symlinks)
+    // 尝试解析真实路径（跟随符号链接）
     let realPath;
     try {
-      // Check if path exists to resolve real path
+      // 检查路径是否存在以解析真实路径
       await fs.access(absolutePath);
       realPath = await fs.realpath(absolutePath);
     } catch (error) {
       if (error.code === 'ENOENT') {
-        // Path doesn't exist yet - check parent directory
+        // 路径尚不存在 - 检查父目录
         let parentPath = path.dirname(absolutePath);
         try {
           const parentRealPath = await fs.realpath(parentPath);
 
-          // Reconstruct the full path with real parent
+          // 使用真实父目录重建完整路径
           realPath = path.join(parentRealPath, path.basename(absolutePath));
         } catch (parentError) {
           if (parentError.code === 'ENOENT') {
-            // Parent doesn't exist either - use the absolute path as-is
-            // We'll validate it's within allowed root
+            // 父目录也不存在 - 使用绝对路径原样
+            // 我们将验证它在允许的根目录内
             realPath = absolutePath;
           } else {
             throw parentError;
@@ -100,10 +100,10 @@ async function validateWorkspacePath(requestedPath) {
       }
     }
 
-    // Resolve the workspace root to its real path
+    // 将工作空间根目录解析为其真实路径
     const resolvedWorkspaceRoot = await fs.realpath(WORKSPACES_ROOT);
 
-    // Ensure the resolved path is contained within the allowed workspace root
+    // 确保解析的路径包含在允许的工作空间根目录内
     if (!realPath.startsWith(resolvedWorkspaceRoot + path.sep) &&
         realPath !== resolvedWorkspaceRoot) {
       return {
@@ -112,13 +112,13 @@ async function validateWorkspacePath(requestedPath) {
       };
     }
 
-    // Additional symlink check for existing paths
+    // 对现有路径进行额外的符号链接检查
     try {
       await fs.access(absolutePath);
       const stats = await fs.lstat(absolutePath);
 
       if (stats.isSymbolicLink()) {
-        // Verify symlink target is also within allowed root
+        // 验证符号链接目标也在允许的根目录内
         const linkTarget = await fs.readlink(absolutePath);
         const resolvedTarget = path.resolve(path.dirname(absolutePath), linkTarget);
         const realTarget = await fs.realpath(resolvedTarget);
@@ -135,7 +135,7 @@ async function validateWorkspacePath(requestedPath) {
       if (error.code !== 'ENOENT') {
         throw error;
       }
-      // Path doesn't exist - that's fine for new workspace creation
+      // 路径不存在 - 这对于新工作空间创建来说没问题
     }
 
     return {
@@ -153,25 +153,25 @@ async function validateWorkspacePath(requestedPath) {
 
 /**
  * GET /api/projects
- * Get list of all projects
- * Supports both container mode and host mode
+ * 获取所有项目列表
+ * 支持容器模式和主机模式
  */
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     console.log('[DEBUG] Get projects request - userId:', userId);
 
-    // Check if container mode is enabled
+    // 检查是否启用容器模式
     const fileOps = await getFileOperations(userId);
     console.log('[DEBUG] File operations mode:', fileOps.isContainer ? 'CONTAINER' : 'HOST');
 
     let projects;
     if (fileOps.isContainer) {
-      // Container mode: get projects from container
+      // 容器模式：从容器获取项目
       console.log('[DEBUG] Using container mode for projects');
       projects = await getProjectsInContainer(userId);
     } else {
-      // Host mode: get projects from host filesystem
+      // 主机模式：从主机文件系统获取项目
       console.log('[DEBUG] Using host mode for projects');
       projects = await getProjects();
     }
@@ -185,7 +185,7 @@ router.get('/', authenticateToken, async (req, res) => {
 
 /**
  * PUT /api/projects/:projectName/rename
- * Rename a project's display name
+ * 重命名项目的显示名称
  */
 router.put('/:projectName/rename', authenticateToken, async (req, res) => {
   try {
@@ -199,7 +199,7 @@ router.put('/:projectName/rename', authenticateToken, async (req, res) => {
 
 /**
  * DELETE /api/projects/:projectName
- * Delete a project (only if empty)
+ * 删除项目（仅当为空时）
  */
 router.delete('/:projectName', authenticateToken, async (req, res) => {
   try {
@@ -213,7 +213,7 @@ router.delete('/:projectName', authenticateToken, async (req, res) => {
 
 /**
  * POST /api/projects/create
- * Create a new project by adding a path manually
+ * 通过手动添加路径来创建新项目
  */
 router.post('/create', authenticateToken, async (req, res) => {
   try {
@@ -232,21 +232,21 @@ router.post('/create', authenticateToken, async (req, res) => {
 });
 
 /**
- * Create a new workspace
+ * 创建新工作空间
  * POST /api/projects/create-workspace
  *
- * Body:
+ * 请求体：
  * - workspaceType: 'existing' | 'new'
- * - path: string (workspace path)
- * - githubUrl?: string (optional, for new workspaces)
- * - githubTokenId?: number (optional, ID of stored token)
- * - newGithubToken?: string (optional, one-time token)
+ * - path: string（工作空间路径）
+ * - githubUrl?: string（可选，用于新工作空间）
+ * - githubTokenId?: number（可选，存储的令牌 ID）
+ * - newGithubToken?: string（可选，一次性令牌）
  */
 router.post('/create-workspace', async (req, res) => {
   try {
     const { workspaceType, path: workspacePath, githubUrl, githubTokenId, newGithubToken } = req.body;
 
-    // Validate required fields
+    // 验证必填字段
     if (!workspaceType || !workspacePath) {
       return res.status(400).json({ error: 'workspaceType and path are required' });
     }
@@ -255,7 +255,7 @@ router.post('/create-workspace', async (req, res) => {
       return res.status(400).json({ error: 'workspaceType must be "existing" or "new"' });
     }
 
-    // Validate path safety before any operations
+    // 在任何操作之前验证路径安全性
     const validation = await validateWorkspacePath(workspacePath);
     if (!validation.valid) {
       return res.status(400).json({
@@ -266,9 +266,9 @@ router.post('/create-workspace', async (req, res) => {
 
     const absolutePath = validation.resolvedPath;
 
-    // Handle existing workspace
+    // 处理现有工作空间
     if (workspaceType === 'existing') {
-      // Check if the path exists
+      // 检查路径是否存在
       try {
         await fs.access(absolutePath);
         const stats = await fs.stat(absolutePath);
@@ -283,7 +283,7 @@ router.post('/create-workspace', async (req, res) => {
         throw error;
       }
 
-      // Add the existing workspace to the project list
+      // 将现有工作空间添加到项目列表
       const project = await addProjectManually(absolutePath);
 
       return res.json({
@@ -293,9 +293,9 @@ router.post('/create-workspace', async (req, res) => {
       });
     }
 
-    // Handle new workspace creation
+    // 处理新工作空间创建
     if (workspaceType === 'new') {
-      // Check if path already exists
+      // 检查路径是否已存在
       try {
         await fs.access(absolutePath);
         return res.status(400).json({
@@ -305,22 +305,22 @@ router.post('/create-workspace', async (req, res) => {
         if (error.code !== 'ENOENT') {
           throw error;
         }
-        // Path doesn't exist - good, we can create it
+        // 路径不存在 - 很好，我们可以创建它
       }
 
-      // Create the directory
+      // 创建目录
       await fs.mkdir(absolutePath, { recursive: true });
 
-      // If GitHub URL is provided, clone the repository
+      // 如果提供了 GitHub URL，则克隆仓库
       if (githubUrl) {
         let githubToken = null;
 
-        // Get GitHub token if needed
+        // 如果需要，获取 GitHub 令牌
         if (githubTokenId) {
-          // Fetch token from database
+          // 从数据库获取令牌
           const token = await getGithubTokenById(githubTokenId, req.user.id);
           if (!token) {
-            // Clean up created directory
+            // 清理已创建的目录
             await fs.rm(absolutePath, { recursive: true, force: true });
             return res.status(404).json({ error: 'GitHub token not found' });
           }
@@ -329,22 +329,22 @@ router.post('/create-workspace', async (req, res) => {
           githubToken = newGithubToken;
         }
 
-        // Clone the repository
+        // 克隆仓库
         try {
           await cloneGitHubRepository(githubUrl, absolutePath, githubToken);
         } catch (error) {
-          // Clean up created directory on failure
+          // 失败时清理已创建的目录
           try {
             await fs.rm(absolutePath, { recursive: true, force: true });
           } catch (cleanupError) {
             console.error('Failed to clean up directory after clone failure:', cleanupError);
-            // Continue to throw original error
+            // 继续抛出原始错误
           }
           throw new Error(`Failed to clone repository: ${error.message}`);
         }
       }
 
-      // Add the new workspace to the project list
+      // 将新工作空间添加到项目列表
       const project = await addProjectManually(absolutePath);
 
       return res.json({
@@ -366,7 +366,7 @@ router.post('/create-workspace', async (req, res) => {
 });
 
 /**
- * Helper function to get GitHub token from database
+ * 从数据库获取 GitHub 令牌的辅助函数
  */
 async function getGithubTokenById(tokenId, userId) {
   const { getDatabase } = await import('../database/db.js');
@@ -377,7 +377,7 @@ async function getGithubTokenById(tokenId, userId) {
     [tokenId, userId, 'github_token']
   );
 
-  // Return in the expected format (github_token field for compatibility)
+  // 以预期格式返回（为了兼容性使用 github_token 字段）
   if (credential) {
     return {
       ...credential,
@@ -389,17 +389,17 @@ async function getGithubTokenById(tokenId, userId) {
 }
 
 /**
- * Helper function to clone a GitHub repository
+ * 克隆 GitHub 仓库的辅助函数
  */
 function cloneGitHubRepository(githubUrl, destinationPath, githubToken = null) {
   return new Promise((resolve, reject) => {
-    // Parse GitHub URL and inject token if provided
+    // 解析 GitHub URL 并在提供时注入令牌
     let cloneUrl = githubUrl;
 
     if (githubToken) {
       try {
         const url = new URL(githubUrl);
-        // Format: https://TOKEN@github.com/user/repo.git
+        // 格式：https://TOKEN@github.com/user/repo.git
         url.username = githubToken;
         url.password = '';
         cloneUrl = url.toString();
@@ -412,7 +412,7 @@ function cloneGitHubRepository(githubUrl, destinationPath, githubToken = null) {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: {
         ...process.env,
-        GIT_TERMINAL_PROMPT: '0' // Disable git password prompts
+        GIT_TERMINAL_PROMPT: '0' // 禁用 git 密码提示
       }
     });
 
@@ -431,7 +431,7 @@ function cloneGitHubRepository(githubUrl, destinationPath, githubToken = null) {
       if (code === 0) {
         resolve({ stdout, stderr });
       } else {
-        // Parse git error messages to provide helpful feedback
+        // 解析 git 错误消息以提供有用的反馈
         let errorMessage = 'Git clone failed';
 
         if (stderr.includes('Authentication failed') || stderr.includes('could not read Username')) {

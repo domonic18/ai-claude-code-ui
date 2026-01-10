@@ -1,14 +1,14 @@
 /**
- * Session Management Routes
+ * 会话管理路由
  *
- * Handles session-related API endpoints for managing
- * chat sessions, messages, and token usage.
+ * 处理会话相关的 API 端点，用于管理
+ * 聊天会话、消息和令牌使用情况。
  *
- * Routes:
- * - GET /api/projects/:projectName/sessions - List project sessions
- * - GET /api/projects/:projectName/sessions/:sessionId/messages - Get session messages
- * - DELETE /api/projects/:projectName/sessions/:sessionId - Delete session
- * - GET /api/projects/:projectName/sessions/:sessionId/token-usage - Get token usage
+ * 路由：
+ * - GET /api/projects/:projectName/sessions - 列出项目会话
+ * - GET /api/projects/:projectName/sessions/:sessionId/messages - 获取会话消息
+ * - DELETE /api/projects/:projectName/sessions/:sessionId - 删除会话
+ * - GET /api/projects/:projectName/sessions/:sessionId/token-usage - 获取令牌使用情况
  */
 
 import express from 'express';
@@ -22,7 +22,7 @@ const router = express.Router();
 
 /**
  * GET /api/projects/:projectName/sessions
- * Get list of sessions for a project
+ * 获取项目的会话列表
  */
 router.get('/:projectName/sessions', async (req, res) => {
   try {
@@ -36,25 +36,25 @@ router.get('/:projectName/sessions', async (req, res) => {
 
 /**
  * GET /api/projects/:projectName/sessions/:sessionId/messages
- * Get messages for a specific session
+ * 获取特定会话的消息
  */
 router.get('/:projectName/sessions/:sessionId/messages', async (req, res) => {
   try {
     const { projectName, sessionId } = req.params;
     const { limit, offset } = req.query;
 
-    // Parse limit and offset if provided
+    // 如果提供了限制和偏移量，则解析它们
     const parsedLimit = limit ? parseInt(limit, 10) : null;
     const parsedOffset = offset ? parseInt(offset, 10) : 0;
 
     const result = await getSessionMessages(projectName, sessionId, parsedLimit, parsedOffset);
 
-    // Handle both old and new response formats
+    // 处理旧和新两种响应格式
     if (Array.isArray(result)) {
-      // Backward compatibility: no pagination parameters were provided
+      // 向后兼容：未提供分页参数
       res.json({ messages: result });
     } else {
-      // New format with pagination info
+      // 带分页信息的新格式
       res.json(result);
     }
   } catch (error) {
@@ -64,7 +64,7 @@ router.get('/:projectName/sessions/:sessionId/messages', async (req, res) => {
 
 /**
  * DELETE /api/projects/:projectName/sessions/:sessionId
- * Delete a specific session
+ * 删除特定会话
  */
 router.delete('/:projectName/sessions/:sessionId', async (req, res) => {
   try {
@@ -81,7 +81,7 @@ router.delete('/:projectName/sessions/:sessionId', async (req, res) => {
 
 /**
  * GET /api/projects/:projectName/sessions/:sessionId/token-usage
- * Get token usage for a specific session
+ * 获取特定会话的令牌使用情况
  */
 router.get('/:projectName/sessions/:sessionId/token-usage', async (req, res) => {
   try {
@@ -89,13 +89,13 @@ router.get('/:projectName/sessions/:sessionId/token-usage', async (req, res) => 
     const { provider = 'claude' } = req.query;
     const homeDir = os.homedir();
 
-    // Allow only safe characters in sessionId
+    // 只允许 sessionId 中包含安全字符
     const safeSessionId = String(sessionId).replace(/[^a-zA-Z0-9._-]/g, '');
     if (!safeSessionId) {
       return res.status(400).json({ error: 'Invalid sessionId' });
     }
 
-    // Handle Cursor sessions - they use SQLite and don't have token usage info
+    // 处理 Cursor 会话 - 它们使用 SQLite，没有令牌使用信息
     if (provider === 'cursor') {
       return res.json({
         used: 0,
@@ -106,11 +106,11 @@ router.get('/:projectName/sessions/:sessionId/token-usage', async (req, res) => 
       });
     }
 
-    // Handle Codex sessions
+    // 处理 Codex 会话
     if (provider === 'codex') {
       const codexSessionsDir = path.join(homeDir, '.codex', 'sessions');
 
-      // Find the session file by searching for the session ID
+      // 通过搜索会话 ID 来查找会话文件
       const findSessionFile = async (dir) => {
         try {
           const entries = await fsPromises.readdir(dir, { withFileTypes: true });
@@ -124,7 +124,7 @@ router.get('/:projectName/sessions/:sessionId/token-usage', async (req, res) => 
             }
           }
         } catch (error) {
-          // Skip directories we can't read
+          // 跳过我们无法读取的目录
         }
         return null;
       };
@@ -135,34 +135,34 @@ router.get('/:projectName/sessions/:sessionId/token-usage', async (req, res) => 
         return res.status(404).json({ error: 'Codex session file not found', sessionId: safeSessionId });
       }
 
-      // Read session file to count tokens
+      // 读取会话文件以计算令牌
       const sessionContent = await fsPromises.readFile(sessionFilePath, 'utf8');
       const lines = sessionContent.split('\n').filter(line => line.trim());
       const messageCount = lines.length;
 
-      // Rough estimation: average 100 tokens per message
+      // 粗略估算：平均每条消息 100 个令牌
       const estimatedTokens = messageCount * 100;
 
       return res.json({
         used: estimatedTokens,
-        total: 200000, // Default Codex limit
+        total: 200000, // Codex 默认限制
         breakdown: { input: estimatedTokens, cacheCreation: 0, cacheRead: 0 },
         estimated: true
       });
     }
 
-    // Handle Claude sessions
+    // 处理 Claude 会话
     const claudeProjectsPath = path.join(homeDir, '.claude', 'projects');
     const projectPath = projectName.replace(/-/g, '/');
 
     try {
-      // Try to find the session file
+      // 尝试查找会话文件
       const sessionsDir = path.join(claudeProjectsPath, projectPath, 'sessions');
       const sessionFilePath = path.join(sessionsDir, `${safeSessionId}.jsonl`);
 
       await fsPromises.access(sessionFilePath);
 
-      // Read the session file
+      // 读取会话文件
       const sessionContent = await fsPromises.readFile(sessionFilePath, 'utf8');
       const lines = sessionContent.split('\n').filter(line => line.trim());
 
@@ -182,7 +182,7 @@ router.get('/:projectName/sessions/:sessionId/token-usage', async (req, res) => 
             if (usage.output_tokens) totalTokens += usage.output_tokens;
           }
         } catch (parseError) {
-          // Skip malformed lines
+          // 跳过格式错误的行
         }
       }
 
@@ -190,7 +190,7 @@ router.get('/:projectName/sessions/:sessionId/token-usage', async (req, res) => 
 
       res.json({
         used: totalTokens,
-        total: 200000, // Default Claude limit
+        total: 200000, // Claude 默认限制
         breakdown: {
           input: inputTokens,
           cacheCreation: cacheCreationTokens,

@@ -1,14 +1,14 @@
 /**
- * Claude SDK Container Integration
+ * Claude SDK 容器集成
  *
- * Containerized version of Claude SDK integration.
- * Executes Claude commands inside user-isolated Docker containers.
+ * Claude SDK 集成的容器化版本。
+ * 在用户隔离的 Docker 容器内执行 Claude 命令。
  *
- * Key features:
- * - Container-isolated execution
- * - Session management with abort capability
- * - Streaming output handling
- * - WebSocket message streaming
+ * 主要特性：
+ * - 容器隔离执行
+ * - 支持中止的会话管理
+ * - 流式输出处理
+ * - WebSocket 消息流式传输
  */
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
@@ -16,15 +16,15 @@ import containerManager from './ContainerManager.js';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 
-// Session tracking for containerized queries
+// 容器化查询的会话跟踪
 const containerSessions = new Map();
 
 /**
- * Execute Claude SDK query inside a user container
- * @param {string} command - User command
- * @param {object} options - Execution options
- * @param {object} writer - WebSocket writer for streaming
- * @returns {Promise<string>} Session ID
+ * 在用户容器内执行 Claude SDK 查询
+ * @param {string} command - 用户命令
+ * @param {object} options - 执行选项
+ * @param {object} writer - 用于流式传输的 WebSocket 写入器
+ * @returns {Promise<string>} 会话 ID
  */
 export async function queryClaudeSDKInContainer(command, options = {}, writer) {
   const {
@@ -38,20 +38,20 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
   } = options;
 
   try {
-    // 1. Get or create user container
+    // 1. 获取或创建用户容器
     const container = await containerManager.getOrCreateContainer(userId, {
       tier: userTier
     });
 
-    // 2. Build SDK options with correct working directory
-    // For container projects, use /home/node/.claude/projects/{projectPath}
-    // For workspace files, use /workspace/{path}
+    // 2. 使用正确的工作目录构建 SDK 选项
+    // 对于容器项目，使用 /home/node/.claude/projects/{projectPath}
+    // 对于工作空间文件，使用 /workspace/{path}
     let workingDir;
     if (isContainerProject && projectPath) {
-      // Container project: use the projects directory
+      // 容器项目：使用项目目录
       workingDir = `/home/node/.claude/projects/${projectPath}`;
     } else if (cwd) {
-      // Workspace files: extract basename and use /workspace
+      // 工作空间文件：提取基本名称并使用 /workspace
       workingDir = `/workspace/${path.basename(cwd)}`;
     } else {
       workingDir = '/workspace';
@@ -63,7 +63,7 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
       cwd: workingDir
     };
 
-    // 3. Create session info
+    // 3. 创建会话信息
     const sessionInfo = {
       userId,
       sessionId,
@@ -76,7 +76,7 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
 
     containerSessions.set(sessionId, sessionInfo);
 
-    // 4. Send initial message
+    // 4. 发送初始消息
     if (writer) {
       writer.send({
         type: 'session_start',
@@ -86,7 +86,7 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
       });
     }
 
-    // 5. Execute in container via node script
+    // 5. 通过 node 脚本在容器中执行
     const execResult = await executeSDKInContainer(
       container.id,
       command,
@@ -95,14 +95,14 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
       sessionId
     );
 
-    // 6. Update session status
+    // 6. 更新会话状态
     sessionInfo.status = 'completed';
     sessionInfo.endTime = Date.now();
 
     return sessionId;
 
   } catch (error) {
-    // Update session status on error
+    // 出错时更新会话状态
     if (sessionId && containerSessions.has(sessionId)) {
       const session = containerSessions.get(sessionId);
       session.status = 'error';
@@ -123,20 +123,20 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
 }
 
 /**
- * Execute SDK query inside container
- * @param {string} containerId - Container ID
- * @param {string} command - Command to execute
- * @param {object} options - SDK options
- * @param {object} writer - WebSocket writer
- * @param {string} sessionId - Session ID
- * @returns {Promise<object>} Execution result
+ * 在容器内执行 SDK 查询
+ * @param {string} containerId - 容器 ID
+ * @param {string} command - 要执行的命令
+ * @param {object} options - SDK 选项
+ * @param {object} writer - WebSocket 写入器
+ * @param {string} sessionId - 会话 ID
+ * @returns {Promise<object>} 执行结果
  */
 async function executeSDKInContainer(containerId, command, options, writer, sessionId) {
   try {
-    // Build Node.js script to run SDK inside container
+    // 构建 Node.js 脚本以在容器内运行 SDK
     const sdkScript = buildSDKScript(command, options);
 
-    // Execute in container
+    // 在容器中执行
     const { stream } = await containerManager.execInContainer(
       options.userId,
       sdkScript,
@@ -150,7 +150,7 @@ async function executeSDKInContainer(containerId, command, options, writer, sess
       }
     );
 
-    // Collect output
+    // 收集输出
     const chunks = [];
     let errorOutput = '';
 
@@ -159,10 +159,10 @@ async function executeSDKInContainer(containerId, command, options, writer, sess
         const output = chunk.toString();
         chunks.push(output);
 
-        // Send to WebSocket if available
+        // 如果可用，发送到 WebSocket
         if (writer && writer.readyState === 1) {
           try {
-            // Try to parse as JSON for structured output
+            // 尝试解析为 JSON 以获得结构化输出
             const jsonData = tryParseJSON(output);
             if (jsonData && jsonData.type) {
               writer.send(jsonData);
@@ -174,7 +174,7 @@ async function executeSDKInContainer(containerId, command, options, writer, sess
               });
             }
           } catch (e) {
-            // Send as plain text
+            // 作为纯文本发送
             writer.send({
               type: 'output',
               sessionId,
@@ -200,15 +200,15 @@ async function executeSDKInContainer(containerId, command, options, writer, sess
     });
 
   } catch (error) {
-    throw new Error(`Failed to execute SDK in container: ${error.message}`);
+    throw new Error(`在容器中执行 SDK 失败：${error.message}`);
   }
 }
 
 /**
- * Build Node.js script to execute SDK query
- * @param {string} command - Command to execute
- * @param {object} options - SDK options
- * @returns {string} Node.js script
+ * 构建 Node.js 脚本以执行 SDK 查询
+ * @param {string} command - 要执行的命令
+ * @param {object} options - SDK 选项
+ * @returns {string} Node.js 脚本
  */
 function buildSDKScript(command, options) {
   const sdkOptions = JSON.stringify(options);
@@ -221,7 +221,7 @@ function buildSDKScript(command, options) {
       const options = ${sdkOptions};
       const result = await query('${command.replace(/'/g, "\\'")}', options);
 
-      // Stream output
+      // 流式输出
       for await (const chunk of result) {
         if (chunk.content) {
           console.log(JSON.stringify({
@@ -250,9 +250,9 @@ function buildSDKScript(command, options) {
 }
 
 /**
- * Abort a containerized SDK session
- * @param {string} sessionId - Session ID
- * @returns {boolean} True if session was aborted
+ * 中止容器化 SDK 会话
+ * @param {string} sessionId - 会话 ID
+ * @returns {boolean} 如果会话已中止则返回 true
  */
 export function abortClaudeSDKSessionInContainer(sessionId) {
   const session = containerSessions.get(sessionId);
@@ -264,17 +264,17 @@ export function abortClaudeSDKSessionInContainer(sessionId) {
   session.status = 'aborted';
   session.endTime = Date.now();
 
-  // Note: Actual abort would require killing the exec process
-  // This is a simplified implementation
+  // 注意：实际中止需要终止 exec 进程
+  // 这是一个简化的实现
   containerSessions.delete(sessionId);
 
   return true;
 }
 
 /**
- * Check if a containerized SDK session is active
- * @param {string} sessionId - Session ID
- * @returns {boolean} True if session is active
+ * 检查容器化 SDK 会话是否活动
+ * @param {string} sessionId - 会话 ID
+ * @returns {boolean} 如果会话活动则返回 true
  */
 export function isClaudeSDKSessionActiveInContainer(sessionId) {
   const session = containerSessions.get(sessionId);
@@ -282,8 +282,8 @@ export function isClaudeSDKSessionActiveInContainer(sessionId) {
 }
 
 /**
- * Get active containerized SDK sessions
- * @returns {Array} Array of active session info
+ * 获取活动的容器化 SDK 会话
+ * @returns {Array} 活动会话信息数组
  */
 export function getActiveClaudeSDKSessionsInContainer() {
   return Array.from(containerSessions.values())
@@ -291,18 +291,18 @@ export function getActiveClaudeSDKSessionsInContainer() {
 }
 
 /**
- * Get session info
- * @param {string} sessionId - Session ID
- * @returns {object|undefined} Session info
+ * 获取会话信息
+ * @param {string} sessionId - 会话 ID
+ * @returns {object|undefined} 会话信息
  */
 export function getContainerSessionInfo(sessionId) {
   return containerSessions.get(sessionId);
 }
 
 /**
- * Try to parse JSON, return null if invalid
- * @param {string} str - String to parse
- * @returns {object|null} Parsed object or null
+ * 尝试解析 JSON，如果无效则返回 null
+ * @param {string} str - 要解析的字符串
+ * @returns {object|null} 解析的对象或 null
  */
 function tryParseJSON(str) {
   try {
@@ -312,7 +312,7 @@ function tryParseJSON(str) {
   }
 }
 
-// Re-export non-containerized functions for backward compatibility
+// 重新导出非容器化函数以保持向后兼容
 export {
   abortClaudeSDKSessionInContainer as abortClaudeSDKSession,
   isClaudeSDKSessionActiveInContainer as isClaudeSDKSessionActive,

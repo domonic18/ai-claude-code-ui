@@ -1,28 +1,28 @@
 /**
- * File Container Operations
+ * 文件容器操作
  *
- * Containerized file operations for user-isolated file access.
- * All file operations are executed inside user containers for security.
+ * 用于用户隔离文件访问的容器化文件操作。
+ * 所有文件操作都在用户容器内执行以确保安全性。
  *
- * Key features:
- * - Container-isolated file read/write
- * - File tree traversal
- * - Path security validation
- * - Binary file support
+ * 主要功能：
+ * - 容器隔离的文件读写
+ * - 文件树遍历
+ * - 路径安全验证
+ * - 二进制文件支持
  */
 
 import containerManager from './ContainerManager.js';
 
-// Maximum file size for read operations (10MB)
+// 读取操作的最大文件大小（10MB）
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-// Maximum depth for file tree traversal
+// 文件树遍历的最大深度
 const MAX_TREE_DEPTH = 10;
 
 /**
- * Execute a command in container and wait for completion
- * @param {number} userId - User ID
- * @param {string} command - Command to execute
+ * 在容器内执行命令并等待完成
+ * @param {number} userId - 用户 ID
+ * @param {string} command - 要执行的命令
  * @returns {Promise<{stdout: string, stderr: string, exitCode: number}>}
  */
 async function execCommand(userId, command) {
@@ -41,13 +41,13 @@ async function execCommand(userId, command) {
     });
 
     stream.on('end', () => {
-      // Remove ANSI escape sequences and control characters
-      // This regex matches common terminal escape sequences like \x1b[...m
+      // 移除 ANSI 转义序列和控制字符
+      // 此正则表达式匹配常见的终端转义序列，如 \x1b[...m
       const cleanedStdout = stdout
-        .replace(/\x1b\[[0-9;]*m/g, '')           // Remove color codes
-        .replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')    // Remove other escape sequences
-        .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '')   // Remove control characters (except \n, \r, \t)
-        .replace(/[\r\n]+/g, '\n')                   // Normalize line endings
+        .replace(/\x1b\[[0-9;]*m/g, '')           // 移除颜色代码
+        .replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')    // 移除其他转义序列
+        .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '')   // 移除控制字符（除 \n, \r, \t 外）
+        .replace(/[\r\n]+/g, '\n')                   // 规范化换行符
         .trim();
 
       resolve({ stdout: cleanedStdout, stderr, exitCode: 0 });
@@ -56,8 +56,8 @@ async function execCommand(userId, command) {
 }
 
 /**
- * Validate and sanitize file path for container operations
- * @param {string} filePath - File path to validate
+ * 验证和清理容器操作的文件路径
+ * @param {string} filePath - 要验证的文件路径
  * @returns {object} - { safePath: string, error: string|null }
  */
 export function validatePath(filePath) {
@@ -65,20 +65,20 @@ export function validatePath(filePath) {
     return { safePath: '', error: 'Invalid file path' };
   }
 
-  // Remove any null bytes
+  // 移除所有空字节
   const cleanPath = filePath.replace(/\0/g, '');
 
-  // Check for path traversal attempts
+  // 检查路径遍历尝试
   if (cleanPath.includes('..')) {
     return { safePath: '', error: 'Path traversal detected' };
   }
 
-  // Check for absolute paths (should be relative to /workspace)
+  // 检查绝对路径（应该是相对于 /workspace 的路径）
   if (cleanPath.startsWith('/')) {
     return { safePath: '', error: 'Absolute paths not allowed' };
   }
 
-  // Check for shell command injection
+  // 检查 shell 命令注入
   const dangerousChars = [';', '&', '|', '$', '`', '\n', '\r'];
   for (const char of dangerousChars) {
     if (cleanPath.includes(char)) {
@@ -90,39 +90,39 @@ export function validatePath(filePath) {
 }
 
 /**
- * Convert host path to container path
- * @param {string} hostPath - Path on host system
- * @returns {string} - Path inside container
+ * 将主机路径转换为容器路径
+ * @param {string} hostPath - 主机系统上的路径
+ * @returns {string} - 容器内的路径
  */
 export function hostPathToContainerPath(hostPath) {
-  // Extract the relative path from the project root
-  // Project roots are mounted at /workspace in the container
+  // 从项目根目录提取相对路径
+  // 项目根目录在容器中挂载到 /workspace
   return hostPath.replace(/^.*:/, '/workspace');
 }
 
 /**
- * Read file content from inside a container
- * @param {number} userId - User ID
- * @param {string} filePath - Path to the file (relative to project root)
- * @param {object} options - Options
- * @returns {Promise<{content: string, path: string}>} - File content and resolved path
+ * 从容器内读取文件内容
+ * @param {number} userId - 用户 ID
+ * @param {string} filePath - 文件路径（相对于项目根目录）
+ * @param {object} options - 选项
+ * @returns {Promise<{content: string, path: string}>} - 文件内容和解析的路径
  */
 export async function readFileInContainer(userId, filePath, options = {}) {
   const { encoding = 'utf8', projectPath = '', isContainerProject = false } = options;
 
-  // Validate path
+  // 验证路径
   const { safePath, error } = validatePath(filePath);
   if (error) {
     throw new Error(`Path validation failed: ${error}`);
   }
 
   try {
-    // Get or create user container
+    // 获取或创建用户容器
     const container = await containerManager.getOrCreateContainer(userId);
 
-    // Build container path
-    // For container projects, use /home/node/.claude/projects
-    // For workspace files, use /workspace
+    // 构建容器路径
+    // 对于容器项目，使用 /home/node/.claude/projects
+    // 对于工作区文件，使用 /workspace
     let containerPath = isContainerProject
       ? `/home/node/.claude/projects/${projectPath}`
       : '/workspace';
@@ -132,24 +132,24 @@ export async function readFileInContainer(userId, filePath, options = {}) {
     }
     containerPath = `${containerPath}/${safePath}`;
 
-    // Execute cat command to read file
+    // 执行 cat 命令读取文件
     const { stream } = await containerManager.execInContainer(
       userId,
       `cat "${containerPath}"`
     );
 
-    // Collect output
+    // 收集输出
     let content = '';
     let errorOutput = '';
 
     return new Promise((resolve, reject) => {
       stream.on('data', (chunk) => {
         const output = chunk.toString();
-        // Check for error messages first
+        // 首先检查错误消息
         if (output.includes('No such file') || output.includes('cannot access')) {
           errorOutput += output;
         } else {
-          // Append content and trim any extra whitespace/newlines at end
+          // 追加内容并修剪末尾多余的空白/换行符
           content += output;
         }
       });
@@ -162,7 +162,7 @@ export async function readFileInContainer(userId, filePath, options = {}) {
         if (errorOutput) {
           reject(new Error(`File not found: ${filePath}`));
         } else {
-          // Trim trailing whitespace but preserve internal formatting
+          // 修剪末尾空白但保留内部格式
           const trimmedContent = content.replace(/\s+$/, '');
           resolve({ content: trimmedContent, path: containerPath });
         }
@@ -174,35 +174,35 @@ export async function readFileInContainer(userId, filePath, options = {}) {
 }
 
 /**
- * Write file content inside a container
- * @param {number} userId - User ID
- * @param {string} filePath - Path to the file (relative to project root)
- * @param {string} content - File content to write
- * @param {object} options - Options
+ * 在容器内写入文件内容
+ * @param {number} userId - 用户 ID
+ * @param {string} filePath - 文件路径（相对于项目根目录）
+ * @param {string} content - 要写入的文件内容
+ * @param {object} options - 选项
  * @returns {Promise<{success: boolean, path: string}>}
  */
 export async function writeFileInContainer(userId, filePath, content, options = {}) {
   const { encoding = 'utf8', projectPath = '', isContainerProject = false } = options;
 
-  // Validate path
+  // 验证路径
   const { safePath, error } = validatePath(filePath);
   if (error) {
     throw new Error(`Path validation failed: ${error}`);
   }
 
-  // Check content size
+  // 检查内容大小
   const contentSize = Buffer.byteLength(content, encoding);
   if (contentSize > MAX_FILE_SIZE) {
     throw new Error(`File too large: ${contentSize} bytes (max ${MAX_FILE_SIZE})`);
   }
 
   try {
-    // Get or create user container
+    // 获取或创建用户容器
     const container = await containerManager.getOrCreateContainer(userId);
 
-    // Build container path
-    // For container projects, use /home/node/.claude/projects
-    // For workspace files, use /workspace
+    // 构建容器路径
+    // 对于容器项目，使用 /home/node/.claude/projects
+    // 对于工作区文件，使用 /workspace
     let containerPath = isContainerProject
       ? `/home/node/.claude/projects/${projectPath}`
       : '/workspace';
@@ -212,7 +212,7 @@ export async function writeFileInContainer(userId, filePath, content, options = 
     }
     containerPath = `${containerPath}/${safePath}`;
 
-    // Create directory if it doesn't exist (wait for completion)
+    // 如果目录不存在则创建（等待完成）
     const dirPath = containerPath.substring(0, containerPath.lastIndexOf('/'));
     const projectsBasePath = '/home/node/.claude/projects';
     if (dirPath && dirPath !== '/workspace' && dirPath !== projectsBasePath) {
@@ -227,8 +227,8 @@ export async function writeFileInContainer(userId, filePath, content, options = 
       });
     }
 
-    // Write content using cat with heredoc (simplest approach)
-    // Use base64 to safely handle special characters
+    // 使用 cat 和 heredoc 写入内容（最简单的方法）
+    // 使用 base64 安全处理特殊字符
     const base64Content = Buffer.from(content, encoding).toString('base64');
 
     const { stream } = await containerManager.execInContainer(
@@ -236,7 +236,7 @@ export async function writeFileInContainer(userId, filePath, content, options = 
       `printf '%s' "$(echo '${base64Content}' | base64 -d)" > "${containerPath}"`
     );
 
-    // Wait for write to complete
+    // 等待写入完成
     return new Promise((resolve, reject) => {
       let errorOutput = '';
       let resolved = false;
@@ -279,9 +279,9 @@ export async function writeFileInContainer(userId, filePath, content, options = 
         }
       });
 
-      // Add timeout - shell commands should complete quickly
+      // 添加超时 - shell 命令应该快速完成
       timeoutId = setTimeout(() => {
-        // Assume success after timeout if no error received
+        // 超时后如果未收到错误则假定成功
         doResolve({ success: true, path: containerPath });
       }, 3000);
     });
@@ -291,11 +291,11 @@ export async function writeFileInContainer(userId, filePath, content, options = 
 }
 
 /**
- * Get file tree from inside a container
- * @param {number} userId - User ID
- * @param {string} dirPath - Directory path (relative to project root)
- * @param {object} options - Options
- * @returns {Promise<Array>} - File tree structure
+ * 从容器内获取文件树
+ * @param {number} userId - 用户 ID
+ * @param {string} dirPath - 目录路径（相对于项目根目录）
+ * @param {object} options - 选项
+ * @returns {Promise<Array>} - 文件树结构
  */
 export async function getFileTreeInContainer(userId, dirPath = '.', options = {}) {
   const {
@@ -303,26 +303,26 @@ export async function getFileTreeInContainer(userId, dirPath = '.', options = {}
     currentDepth = 0,
     showHidden = false,
     projectPath = '',
-    isContainerProject = false  // New option to identify container projects
+    isContainerProject = false  // 用于识别容器项目的新选项
   } = options;
 
   console.log('[FileContainer] getFileTreeInContainer - userId:', userId, 'dirPath:', dirPath, 'projectPath:', projectPath, 'isContainerProject:', isContainerProject);
 
-  // Validate path
+  // 验证路径
   const { safePath, error } = validatePath(dirPath);
   if (error) {
     throw new Error(`Path validation failed: ${error}`);
   }
 
   try {
-    // Get or create user container
+    // 获取或创建用户容器
     console.log('[FileContainer] Getting or creating container for user', userId);
     const container = await containerManager.getOrCreateContainer(userId);
     console.log('[FileContainer] Container:', container.id, container.name);
 
-    // Build container path
-    // For container projects, use /home/node/.claude/projects
-    // For workspace files, use /workspace
+    // 构建容器路径
+    // 对于容器项目，使用 /home/node/.claude/projects
+    // 对于工作区文件，使用 /workspace
     let containerPath = isContainerProject
       ? `/home/node/.claude/projects/${projectPath}`
       : '/workspace';
@@ -332,8 +332,8 @@ export async function getFileTreeInContainer(userId, dirPath = '.', options = {}
     }
     containerPath = `${containerPath}/${safePath}`;
 
-    // Use find command to get file listing
-    // -type f: files only, -maxdepth: limit depth
+    // 使用 find 命令获取文件列表
+    // -type f: 仅文件，-maxdepth: 限制深度
     const hiddenFlag = showHidden ? '' : '-not -path "*/.*"';
 
     const { stream } = await containerManager.execInContainer(
@@ -341,7 +341,7 @@ export async function getFileTreeInContainer(userId, dirPath = '.', options = {}
       `cd "${containerPath}" && find . -maxdepth 1 ${hiddenFlag} -printf "%P|%y|%s|%T@\\n"`
     );
 
-    // Collect and parse output
+    // 收集和解析输出
     return new Promise((resolve, reject) => {
       let output = '';
 
@@ -369,22 +369,22 @@ export async function getFileTreeInContainer(userId, dirPath = '.', options = {}
 
             const [name, type, size, mtime] = parts;
 
-            // Skip heavy build directories
+            // 跳过繁重的构建目录
             if (name === 'node_modules' || name === 'dist' || name === 'build') {
               continue;
             }
 
-            // Parse and validate values
+            // 解析和验证值
             const parsedSize = parseInt(size, 10);
             const parsedMtime = parseFloat(mtime);
 
-            // Skip if values are invalid
+            // 如果值无效则跳过
             if (isNaN(parsedSize) || isNaN(parsedMtime)) {
               console.warn('[FileContainer] Skipping line with invalid values:', JSON.stringify(line));
               continue;
             }
 
-            // Create date object and validate
+            // 创建日期对象并验证
             const dateObj = new Date(parsedMtime * 1000);
             if (isNaN(dateObj.getTime())) {
               console.warn('[FileContainer] Skipping line with invalid date:', JSON.stringify(line));
@@ -399,16 +399,16 @@ export async function getFileTreeInContainer(userId, dirPath = '.', options = {}
               modified: dateObj.toISOString()
             };
 
-            // Recursively get subdirectories
+            // 递归获取子目录
             if (item.type === 'directory' && currentDepth < maxDepth) {
-              // Note: We don't recursively call here to avoid too many exec calls
-              // This can be enhanced later
+              // 注意：我们在这里不递归调用以避免过多的 exec 调用
+              // 这可以在以后增强
             }
 
             items.push(item);
           }
 
-          // Sort: directories first, then alphabetically
+          // 排序：目录优先，然后按字母顺序
           items.sort((a, b) => {
             if (a.type !== b.type) {
               return a.type === 'directory' ? -1 : 1;
@@ -428,33 +428,33 @@ export async function getFileTreeInContainer(userId, dirPath = '.', options = {}
 }
 
 /**
- * Get file stats from inside a container
- * @param {number} userId - User ID
- * @param {string} filePath - Path to the file
- * @param {object} options - Options
- * @returns {Promise<object>} - File stats
+ * 从容器内获取文件统计信息
+ * @param {number} userId - 用户 ID
+ * @param {string} filePath - 文件路径
+ * @param {object} options - 选项
+ * @returns {Promise<object>} - 文件统计信息
  */
 export async function getFileStatsInContainer(userId, filePath, options = {}) {
   const { projectPath = '' } = options;
 
-  // Validate path
+  // 验证路径
   const { safePath, error } = validatePath(filePath);
   if (error) {
     throw new Error(`Path validation failed: ${error}`);
   }
 
   try {
-    // Get or create user container
+    // 获取或创建用户容器
     const container = await containerManager.getOrCreateContainer(userId);
 
-    // Build container path
+    // 构建容器路径
     let containerPath = '/workspace';
     if (projectPath) {
       containerPath = hostPathToContainerPath(projectPath);
     }
     containerPath = `${containerPath}/${safePath}`;
 
-    // Use stat command to get file info
+    // 使用 stat 命令获取文件信息
     const { stream } = await containerManager.execInContainer(
       userId,
       `stat -c "%F|%s|%Y|%A" "${containerPath}"`
@@ -492,33 +492,33 @@ export async function getFileStatsInContainer(userId, filePath, options = {}) {
 }
 
 /**
- * Delete file from inside a container
- * @param {number} userId - User ID
- * @param {string} filePath - Path to the file
- * @param {object} options - Options
+ * 从容器内删除文件
+ * @param {number} userId - 用户 ID
+ * @param {string} filePath - 文件路径
+ * @param {object} options - 选项
  * @returns {Promise<{success: boolean}>}
  */
 export async function deleteFileInContainer(userId, filePath, options = {}) {
   const { projectPath = '' } = options;
 
-  // Validate path
+  // 验证路径
   const { safePath, error } = validatePath(filePath);
   if (error) {
     throw new Error(`Path validation failed: ${error}`);
   }
 
   try {
-    // Get or create user container
+    // 获取或创建用户容器
     const container = await containerManager.getOrCreateContainer(userId);
 
-    // Build container path
+    // 构建容器路径
     let containerPath = '/workspace';
     if (projectPath) {
       containerPath = hostPathToContainerPath(projectPath);
     }
     containerPath = `${containerPath}/${safePath}`;
 
-    // Remove file or directory
+    // 删除文件或目录
     const { stream } = await containerManager.execInContainer(
       userId,
       `rm -rf "${containerPath}"`
@@ -552,7 +552,7 @@ export async function deleteFileInContainer(userId, filePath, options = {}) {
         doResolve({ success: true });
       });
 
-      // Add timeout - rm commands should complete quickly
+      // 添加超时 - rm 命令应该快速完成
       timeoutId = setTimeout(() => {
         doResolve({ success: true });
       }, 2000);
@@ -563,11 +563,11 @@ export async function deleteFileInContainer(userId, filePath, options = {}) {
 }
 
 /**
- * Get projects list from inside a container
- * In container mode, projects are stored in /home/node/.claude/projects
- * Automatically creates a default workspace if user has no projects
- * @param {number} userId - User ID
- * @returns {Promise<Array>} - List of projects
+ * 从容器内获取项目列表
+ * 在容器模式下，项目存储在 /home/node/.claude/projects
+ * 如果用户没有项目，自动创建默认工作区
+ * @param {number} userId - 用户 ID
+ * @returns {Promise<Array>} - 项目列表
  */
 export async function getProjectsInContainer(userId) {
   const claudeProjectsPath = '/home/node/.claude/projects';
@@ -576,21 +576,21 @@ export async function getProjectsInContainer(userId) {
   console.log('[FileContainer] getProjectsInContainer - userId:', userId);
 
   try {
-    // Get or create user container
+    // 获取或创建用户容器
     const container = await containerManager.getOrCreateContainer(userId);
     console.log('[FileContainer] Container:', container.id, container.name);
 
-    // Ensure projects directory exists
+    // 确保项目目录存在
     await execCommand(userId, `mkdir -p "${claudeProjectsPath}"`);
 
-    // List project directories in container
-    // Use find command instead of ls to avoid color codes and control characters
+    // 列出容器中的项目目录
+    // 使用 find 命令而不是 ls 以避免颜色代码和控制字符
     const { stream } = await containerManager.execInContainer(
       userId,
       `find "${claudeProjectsPath}" -mindepth 1 -maxdepth 1 -type d -printf "%f\\n" 2>/dev/null || echo ""`
     );
 
-    // Collect output
+    // 收集输出
     const projects = await new Promise((resolve, reject) => {
       let output = '';
 
@@ -600,7 +600,7 @@ export async function getProjectsInContainer(userId) {
 
       stream.on('error', (err) => {
         console.error('[FileContainer] Error listing projects:', err);
-        // If projects directory doesn't exist, return empty array
+        // 如果项目目录不存在，返回空数组
         resolve([]);
       });
 
@@ -616,24 +616,24 @@ export async function getProjectsInContainer(userId) {
             let projectName = line.trim();
             console.log('[FileContainer] Processing line:', JSON.stringify(line), 'trimmed:', JSON.stringify(projectName));
 
-            // Clean control characters from project name
+            // 从项目名称中清理控制字符
             projectName = projectName
-              .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '')   // Remove control characters
-              .replace(/[\r\n]/g, '')                      // Remove line breaks
+              .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '')   // 移除控制字符
+              .replace(/[\r\n]/g, '')                      // 移除换行符
               .trim();
 
             if (!projectName || projectName === '') continue;
 
-            // For container projects, the fullPath is the actual directory name in the container
-            // Do NOT decode dashes to slashes - the directory name is literal
-            // The 'path' field uses decoded version for URL compatibility, but 'fullPath' must match actual directory
+            // 对于容器项目，fullPath 是容器中的实际目录名
+            // 不要将破折号解码为斜杠 - 目录名是字面值
+            // 'path' 字段使用解码版本以实现 URL 兼容性，但 'fullPath' 必须与实际目录匹配
             const decodedPath = projectName.replace(/-/g, '/');
 
             projectList.push({
               name: projectName,
               path: decodedPath,
               displayName: projectName,
-              fullPath: projectName,  // Use actual directory name, not decoded path
+              fullPath: projectName,  // 使用实际目录名，而不是解码路径
               isContainerProject: true,
               sessions: [],
               sessionMeta: { hasMore: false, total: 0 },
@@ -652,19 +652,19 @@ export async function getProjectsInContainer(userId) {
       });
     });
 
-    // If user has no projects, create a default workspace
+    // 如果用户没有项目，创建默认工作区
     if (projects.length === 0) {
       console.log('[FileContainer] No projects found for user, creating default workspace');
 
       try {
-        // Create default project directory
+        // 创建默认项目目录
         const projectPath = `${claudeProjectsPath}/${defaultProjectName}`;
         await execCommand(userId, `mkdir -p "${projectPath}"`);
 
-        // Initialize as a git repository
+        // 初始化为 git 仓库
         await execCommand(userId, `cd "${projectPath}" && git init`);
 
-        // Create a README file
+        // 创建 README 文件
         const readmeContent = `# My Workspace
 
 Welcome to your Claude Code workspace! This is your default project where you can start coding.
@@ -688,7 +688,7 @@ Happy coding!
           `cat > "${projectPath}/README.md" << 'EOF'\n${readmeContent}\nEOF`
         );
 
-        // Create .gitignore
+        // 创建 .gitignore
         const gitignoreContent = `# Dependencies
 node_modules/
 
@@ -713,7 +713,7 @@ npm-debug.log*
           `cat > "${projectPath}/.gitignore" << 'EOF'\n${gitignoreContent}\nEOF`
         );
 
-        // Create package.json for Node.js projects
+        // 为 Node.js 项目创建 package.json
         const packageJson = {
           name: 'my-workspace',
           version: '1.0.0',
@@ -732,7 +732,7 @@ npm-debug.log*
 
         console.log('[FileContainer] Default workspace created successfully');
 
-        // Return the newly created default project
+        // 返回新创建的默认项目
         projects.push({
           name: defaultProjectName,
           path: defaultProjectName,
@@ -746,7 +746,7 @@ npm-debug.log*
         });
       } catch (createError) {
         console.error('[FileContainer] Failed to create default workspace:', createError);
-        // Return empty list if creation fails
+        // 如果创建失败则返回空列表
         return [];
       }
     }

@@ -95,7 +95,7 @@ router.delete('/sessions/:sessionId', async (req, res) => {
   }
 });
 
-// MCP Server Management Routes
+// MCP 服务器管理路由
 
 router.get('/mcp/cli/list', async (req, res) => {
   try {
@@ -137,7 +137,7 @@ router.post('/mcp/cli/add', async (req, res) => {
       return res.status(400).json({ error: 'name and command are required' });
     }
 
-    // Build: codex mcp add <name> [-e KEY=VAL]... -- <command> [args...]
+    // 构建: codex mcp add <name> [-e KEY=VAL]... -- <command> [args...]
     let cliArgs = ['mcp', 'add', name];
 
     Object.entries(env).forEach(([key, value]) => {
@@ -258,7 +258,7 @@ router.get('/mcp/config/read', async (req, res) => {
       const fileContent = await fs.readFile(configPath, 'utf8');
       configData = TOML.parse(fileContent);
     } catch (error) {
-      // Config file doesn't exist
+      // 配置文件不存在
     }
 
     if (!configData) {

@@ -1,16 +1,16 @@
 import jwt from 'jsonwebtoken';
 import { userDb } from '../database/db.js';
 
-// Get JWT secret from environment or use default (for development)
+// 从环境变量获取 JWT 密钥或使用默认值（用于开发）
 const JWT_SECRET = process.env.JWT_SECRET || 'claude-ui-dev-secret-change-in-production';
 
-// Optional API key middleware
+// 可选的 API 密钥中间件
 const validateApiKey = (req, res, next) => {
-  // Skip API key validation if not configured
+  // 如果未配置，则跳过 API 密钥验证
   if (!process.env.API_KEY) {
     return next();
   }
-  
+
   const apiKey = req.headers['x-api-key'];
   if (apiKey !== process.env.API_KEY) {
     return res.status(401).json({ error: 'Invalid API key' });
@@ -18,9 +18,9 @@ const validateApiKey = (req, res, next) => {
   next();
 };
 
-// JWT authentication middleware
+// JWT 认证中间件
 const authenticateToken = async (req, res, next) => {
-  // Platform mode:  use single database user
+  // 平台模式：使用单个数据库用户
   if (process.env.VITE_IS_PLATFORM === 'true') {
     try {
       const user = userDb.getFirstUser();
@@ -35,7 +35,7 @@ const authenticateToken = async (req, res, next) => {
     }
   }
 
-  // Normal OSS JWT validation
+  // 正常的 OSS JWT 验证
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
@@ -46,7 +46,7 @@ const authenticateToken = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
 
-    // Verify user still exists and is active
+    // 验证用户仍然存在且处于活动状态
     const user = userDb.getUserById(decoded.userId);
     if (!user) {
       return res.status(401).json({ error: 'Invalid token. User not found.' });
@@ -60,21 +60,21 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
-// Generate JWT token (never expires)
+// 生成 JWT 令牌（永不过期）
 const generateToken = (user) => {
   return jwt.sign(
-    { 
-      userId: user.id, 
-      username: user.username 
+    {
+      userId: user.id,
+      username: user.username
     },
     JWT_SECRET
-    // No expiration - token lasts forever
+    // 无过期时间 - 令牌永久有效
   );
 };
 
-// WebSocket authentication function
+// WebSocket 认证函数
 const authenticateWebSocket = (token) => {
-  // Platform mode: bypass token validation, return first user
+  // 平台模式：绕过令牌验证，返回第一个用户
   if (process.env.VITE_IS_PLATFORM === 'true') {
     try {
       const user = userDb.getFirstUser();
@@ -88,7 +88,7 @@ const authenticateWebSocket = (token) => {
     }
   }
 
-  // Normal OSS JWT validation
+  // 正常的 OSS JWT 验证
   if (!token) {
     return null;
   }

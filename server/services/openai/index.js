@@ -1,7 +1,7 @@
 /**
- * OpenAI Services Index
+ * OpenAI 服务索引
  *
- * Exports all OpenAI related services for easy importing.
+ * 导出所有 OpenAI 相关的服务以便于导入。
  */
 
 export {

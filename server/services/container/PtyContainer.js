@@ -1,31 +1,31 @@
 /**
- * PTY Container Integration
+ * PTY 容器集成
  *
- * Containerized version of PTY (pseudo-terminal) handling.
- * Creates terminal sessions inside user-isolated Docker containers.
+ * PTY（伪终端）处理的容器化版本。
+ * 在用户隔离的 Docker 容器内创建终端会话。
  *
- * Key features:
- * - Container-isolated PTY sessions
- * - Session management with cleanup
- * - WebSocket communication
- * - Terminal buffer management
+ * 主要功能：
+ * - 容器隔离的 PTY 会话
+ * - 会话管理和清理
+ * - WebSocket 通信
+ * - 终端缓冲区管理
  */
 
 import containerManager from './ContainerManager.js';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 
-// PTY session storage: sessionId -> sessionInfo
+// PTY 会话存储：sessionId -> sessionInfo
 const ptySessions = new Map();
 
-// Active PTY streams: sessionId -> stream
+// 活动 PTY 流：sessionId -> stream
 const ptyStreams = new Map();
 
 /**
- * Create a PTY session inside a user container
- * @param {object} ws - WebSocket connection
- * @param {object} options - PTY options
- * @returns {Promise<object>} Session information
+ * 在用户容器内创建 PTY 会话
+ * @param {object} ws - WebSocket 连接
+ * @param {object} options - PTY 选项
+ * @returns {Promise<object>} 会话信息
  */
 export async function createPtyInContainer(ws, options) {
   const {
@@ -39,12 +39,12 @@ export async function createPtyInContainer(ws, options) {
   } = options;
 
   try {
-    // 1. Get or create user container
+    // 1. 获取或创建用户容器
     const container = await containerManager.getOrCreateContainer(userId, {
       tier: userTier
     });
 
-    // 2. Check if session already exists
+    // 2. 检查会话是否已存在
     if (ptySessions.has(sessionId)) {
       const existingSession = ptySessions.get(sessionId);
       if (existingSession.status === 'active') {
@@ -52,10 +52,10 @@ export async function createPtyInContainer(ws, options) {
       }
     }
 
-    // 3. Build shell command
+    // 3. 构建外壳命令
     const shellCommand = buildShellCommand(projectPath, initialCommand);
 
-    // 4. Create exec with TTY
+    // 4. 使用 TTY 创建 exec
     const exec = await containerManager.docker.getContainer(container.id).exec({
       Cmd: ['/bin/bash', '-c', shellCommand],
       AttachStdin: true,
@@ -72,10 +72,10 @@ export async function createPtyInContainer(ws, options) {
       ]
     });
 
-    // 5. Start exec stream
+    // 5. 启动 exec 流
     const stream = await exec.start({ Detach: false, Tty: true });
 
-    // 6. Create session info
+    // 6. 创建会话信息
     const sessionInfo = {
       sessionId,
       userId,
@@ -91,14 +91,14 @@ export async function createPtyInContainer(ws, options) {
       lastActive: new Date()
     };
 
-    // 7. Store session and stream
+    // 7. 存储会话和流
     ptySessions.set(sessionId, sessionInfo);
     ptyStreams.set(sessionId, { stream, exec, ws });
 
-    // 8. Setup stream handlers
+    // 8. 设置流处理器
     setupStreamHandlers(sessionId, stream, ws);
 
-    // 9. Send session started message
+    // 9. 发送会话启动消息
     if (ws.readyState === 1) {
       ws.send(JSON.stringify({
         type: 'session_started',
@@ -111,7 +111,7 @@ export async function createPtyInContainer(ws, options) {
     return sessionInfo;
 
   } catch (error) {
-    // Send error to client
+    // 向客户端发送错误
     if (ws.readyState === 1) {
       ws.send(JSON.stringify({
         type: 'error',
@@ -125,50 +125,50 @@ export async function createPtyInContainer(ws, options) {
 }
 
 /**
- * Build shell command for container execution
- * @param {string} projectPath - Project path (optional)
- * @param {string} initialCommand - Initial command to run
- * @returns {string} Complete shell command
+ * 构建用于容器执行的外壳命令
+ * @param {string} projectPath - 项目路径（可选）
+ * @param {string} initialCommand - 要运行的初始命令
+ * @returns {string} 完整的外壳命令
  */
 function buildShellCommand(projectPath, initialCommand) {
   let command = '';
 
-  // Change to project directory if specified
+  // 如果指定了项目路径，则更改到项目目录
   if (projectPath) {
     const workspaceProjectPath = projectPath.replace(/^.*:/, '/workspace');
     command += `cd "${workspaceProjectPath}" && `;
   }
 
-  // Run initial command or default shell
+  // 运行初始命令或默认外壳
   command += initialCommand || 'bash';
 
   return command;
 }
 
 /**
- * Setup stream handlers for PTY session
- * @param {string} sessionId - Session ID
- * @param {object} stream - Docker exec stream
- * @param {object} ws - WebSocket connection
+ * 为 PTY 会话设置流处理器
+ * @param {string} sessionId - 会话 ID
+ * @param {object} stream - Docker exec 流
+ * @param {object} ws - WebSocket 连接
  */
 function setupStreamHandlers(sessionId, stream, ws) {
-  // Handle output from container
+  // 处理来自容器的输出
   stream.on('data', (data) => {
     const output = data.toString();
 
-    // Update session info
+    // 更新会话信息
     const session = ptySessions.get(sessionId);
     if (session) {
       session.lastActive = new Date();
 
-      // Add to buffer
+      // 添加到缓冲区
       if (session.buffer.length >= session.bufferSize) {
         session.buffer.shift();
       }
       session.buffer.push(output);
     }
 
-    // Send to WebSocket
+    // 发送到 WebSocket
     if (ws.readyState === 1) {
       ws.send(JSON.stringify({
         type: 'output',
@@ -178,7 +178,7 @@ function setupStreamHandlers(sessionId, stream, ws) {
     }
   });
 
-  // Handle stream errors
+  // 处理流错误
   stream.on('error', (error) => {
     console.error(`PTY stream error for session ${sessionId}:`, error.message);
 
@@ -190,7 +190,7 @@ function setupStreamHandlers(sessionId, stream, ws) {
       }));
     }
 
-    // Mark session as error
+    // 将会话标记为错误
     const session = ptySessions.get(sessionId);
     if (session) {
       session.status = 'error';
@@ -198,7 +198,7 @@ function setupStreamHandlers(sessionId, stream, ws) {
     }
   });
 
-  // Handle stream end
+  // 处理流结束
   stream.on('end', () => {
     console.log(`PTY stream ended for session ${sessionId}`);
 
@@ -209,7 +209,7 @@ function setupStreamHandlers(sessionId, stream, ws) {
       }));
     }
 
-    // Mark session as ended
+    // 将会话标记为已结束
     const session = ptySessions.get(sessionId);
     if (session) {
       session.status = 'ended';
@@ -217,17 +217,17 @@ function setupStreamHandlers(sessionId, stream, ws) {
     }
   });
 
-  // Handle WebSocket close
+  // 处理 WebSocket 关闭
   ws.on('close', () => {
     cleanupPtySession(sessionId);
   });
 }
 
 /**
- * Send input to container PTY
- * @param {string} sessionId - Session ID
- * @param {string} input - Input to send
- * @returns {Promise<boolean>} True if successful
+ * 向容器 PTY 发送输入
+ * @param {string} sessionId - 会话 ID
+ * @param {string} input - 要发送的输入
+ * @returns {Promise<boolean>} 如果成功则为 true
  */
 export async function sendInputToPty(sessionId, input) {
   const sessionData = ptyStreams.get(sessionId);
@@ -247,11 +247,11 @@ export async function sendInputToPty(sessionId, input) {
 }
 
 /**
- * Resize PTY session
- * @param {string} sessionId - Session ID
- * @param {number} cols - New columns
- * @param {number} rows - New rows
- * @returns {Promise<boolean>} True if successful
+ * 调整 PTY 会话大小
+ * @param {string} sessionId - 会话 ID
+ * @param {number} cols - 新列数
+ * @param {number} rows - 新行数
+ * @returns {Promise<boolean>} 如果成功则为 true
  */
 export async function resizePty(sessionId, cols, rows) {
   const session = ptySessions.get(sessionId);
@@ -266,13 +266,13 @@ export async function resizePty(sessionId, cols, rows) {
   }
 
   try {
-    // Update session info
+    // 更新会话信息
     session.cols = cols;
     session.rows = rows;
 
-    // Note: Dockerode doesn't support resizing exec after creation
-    // This would need to be implemented with a new approach
-    // For now, we just update the stored dimensions
+    // 注意：Dockerode 不支持在创建后调整 exec 大小
+    // 这需要使用新方法实现
+    // 目前，我们只是更新存储的维度
 
     return true;
   } catch (error) {
@@ -281,18 +281,18 @@ export async function resizePty(sessionId, cols, rows) {
 }
 
 /**
- * End PTY session
- * @param {string} sessionId - Session ID
- * @returns {Promise<boolean>} True if successful
+ * 结束 PTY 会话
+ * @param {string} sessionId - 会话 ID
+ * @returns {Promise<boolean>} 如果成功则为 true
  */
 export async function endPtySession(sessionId) {
   return cleanupPtySession(sessionId);
 }
 
 /**
- * Cleanup PTY session
- * @param {string} sessionId - Session ID
- * @returns {Promise<boolean>} True if cleaned up
+ * 清理 PTY 会话
+ * @param {string} sessionId - 会话 ID
+ * @returns {Promise<boolean>} 如果已清理则为 true
  */
 async function cleanupPtySession(sessionId) {
   const sessionData = ptyStreams.get(sessionId);
@@ -302,7 +302,7 @@ async function cleanupPtySession(sessionId) {
     const { stream, exec } = sessionData;
 
     try {
-      // Close stream
+      // 关闭流
       if (stream && !stream.destroyed) {
         stream.destroy();
       }
@@ -310,16 +310,16 @@ async function cleanupPtySession(sessionId) {
       console.error(`Error closing stream for session ${sessionId}:`, error.message);
     }
 
-    // Remove from streams map
+    // 从流映射中移除
     ptyStreams.delete(sessionId);
   }
 
   if (session) {
-    // Mark session as ended
+    // 将会话标记为已结束
     session.status = 'ended';
     session.endedAt = new Date();
 
-    // Remove from sessions map
+    // 从会话映射中移除
     ptySessions.delete(sessionId);
   }
 
@@ -327,17 +327,17 @@ async function cleanupPtySession(sessionId) {
 }
 
 /**
- * Get PTY session info
- * @param {string} sessionId - Session ID
- * @returns {object|undefined} Session info
+ * 获取 PTY 会话信息
+ * @param {string} sessionId - 会话 ID
+ * @returns {object|undefined} 会话信息
  */
 export function getPtySessionInfo(sessionId) {
   return ptySessions.get(sessionId);
 }
 
 /**
- * Get all active PTY sessions
- * @returns {Array} Array of active sessions
+ * 获取所有活动的 PTY 会话
+ * @returns {Array} 活动会话数组
  */
 export function getActivePtySessions() {
   return Array.from(ptySessions.values())
@@ -345,9 +345,9 @@ export function getActivePtySessions() {
 }
 
 /**
- * Get PTY sessions by user ID
- * @param {number} userId - User ID
- * @returns {Array} Array of user's sessions
+ * 按用户 ID 获取 PTY 会话
+ * @param {number} userId - 用户 ID
+ * @returns {Array} 用户会话数组
  */
 export function getPtySessionsByUserId(userId) {
   return Array.from(ptySessions.values())
@@ -355,9 +355,9 @@ export function getPtySessionsByUserId(userId) {
 }
 
 /**
- * End all PTY sessions for a user
- * @param {number} userId - User ID
- * @returns {Promise<number>} Number of sessions ended
+ * 结束用户的所有 PTY 会话
+ * @param {number} userId - 用户 ID
+ * @returns {Promise<number>} 已结束会话数
  */
 export async function endAllPtySessionsForUser(userId) {
   const sessions = getPtySessionsByUserId(userId);
@@ -376,9 +376,9 @@ export async function endAllPtySessionsForUser(userId) {
 }
 
 /**
- * Get session buffer
- * @param {string} sessionId - Session ID
- * @returns {string} Buffer content
+ * 获取会话缓冲区
+ * @param {string} sessionId - 会话 ID
+ * @returns {string} 缓冲区内容
  */
 export function getPtySessionBuffer(sessionId) {
   const session = ptySessions.get(sessionId);
@@ -391,9 +391,9 @@ export function getPtySessionBuffer(sessionId) {
 }
 
 /**
- * Cleanup idle PTY sessions
- * @param {number} idleTime - Idle time in milliseconds (default: 1 hour)
- * @returns {number} Number of sessions cleaned up
+ * 清理空闲的 PTY 会话
+ * @param {number} idleTime - 空闲时间（毫秒）（默认：1 小时）
+ * @returns {number} 已清理会话数
  */
 export function cleanupIdlePtySessions(idleTime = 60 * 60 * 1000) {
   const now = Date.now();
@@ -411,10 +411,10 @@ export function cleanupIdlePtySessions(idleTime = 60 * 60 * 1000) {
   return cleanedCount;
 }
 
-// Start periodic cleanup
+// 开始定期清理
 setInterval(() => {
   const count = cleanupIdlePtySessions();
   if (count > 0) {
     console.log(`Cleaned up ${count} idle PTY sessions`);
   }
-}, 30 * 60 * 1000); // Every 30 minutes
+}, 30 * 60 * 1000); // 每 30 分钟

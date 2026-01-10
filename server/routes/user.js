@@ -13,11 +13,11 @@ router.get('/git-config', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     let gitConfig = userDb.getGitConfig(userId);
 
-    // If database is empty, try to get from system git config
+    // 如果数据库为空，尝试从系统 git 配置获取
     if (!gitConfig || (!gitConfig.git_name && !gitConfig.git_email)) {
       const systemConfig = await getSystemGitConfig();
 
-      // If system has values, save them to database for this user
+      // 如果系统有值，则将其保存到数据库中供此用户使用
       if (systemConfig.git_name || systemConfig.git_email) {
         userDb.updateGitConfig(userId, systemConfig.git_name, systemConfig.git_email);
         gitConfig = systemConfig;
@@ -36,7 +36,7 @@ router.get('/git-config', authenticateToken, async (req, res) => {
   }
 });
 
-// Apply git config globally via git config --global
+// 通过 git config --global 全局应用 git 配置
 router.post('/git-config', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -46,7 +46,7 @@ router.post('/git-config', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Git name and email are required' });
     }
 
-    // Validate email format
+    // 验证电子邮件格式
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(gitEmail)) {
       return res.status(400).json({ error: 'Invalid email format' });

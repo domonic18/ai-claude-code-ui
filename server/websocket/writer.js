@@ -1,49 +1,49 @@
 /**
- * WebSocket Writer Module
+ * WebSocket 写入器模块
  *
- * Provides a WebSocket wrapper class that matches the SSEStreamWriter
- * interface for consistent data streaming across different transport types.
+ * 提供一个 WebSocket 包装类，匹配 SSEStreamWriter
+ * 接口，以便在不同传输类型间实现一致的数据流传输。
  *
  * @module websocket/writer
  */
 
 /**
- * WebSocket Writer - Wrapper for WebSocket to match SSEStreamWriter interface
- * Used by AI providers to send streaming responses
+ * WebSocket 写入器 - WebSocket 的包装器，用于匹配 SSEStreamWriter 接口
+ * 由 AI 提供商用于发送流式响应
  */
 export class WebSocketWriter {
     /**
-     * Create a new WebSocket writer
-     * @param {WebSocket} ws - The WebSocket connection to wrap
+     * 创建新的 WebSocket 写入器
+     * @param {WebSocket} ws - 要包装的 WebSocket 连接
      */
     constructor(ws) {
         this.ws = ws;
         this.sessionId = null;
-        this.isWebSocketWriter = true;  // Marker for transport detection
+        this.isWebSocketWriter = true;  // 传输检测标记
     }
 
     /**
-     * Send data through the WebSocket
-     * @param {Object} data - The data object to send (will be JSON stringified)
+     * 通过 WebSocket 发送数据
+     * @param {Object} data - 要发送的数据对象（将被 JSON 序列化）
      */
     send(data) {
         if (this.ws.readyState === 1) { // WebSocket.OPEN
-            // Providers send raw objects, we stringify for WebSocket
+            // 提供商发送原始对象，我们将其序列化为 WebSocket 格式
             this.ws.send(JSON.stringify(data));
         }
     }
 
     /**
-     * Set the session ID for this writer
-     * @param {string} sessionId - The session identifier
+     * 设置此写入器的会话 ID
+     * @param {string} sessionId - 会话标识符
      */
     setSessionId(sessionId) {
         this.sessionId = sessionId;
     }
 
     /**
-     * Get the current session ID
-     * @returns {string|null} The session ID or null if not set
+     * 获取当前会话 ID
+     * @returns {string|null} 会话 ID，如果未设置则返回 null
      */
     getSessionId() {
         return this.sessionId;

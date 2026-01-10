@@ -1,11 +1,11 @@
 /**
- * System Routes
+ * 系统路由
  *
- * Handles system-level endpoints such as application updates,
- * health checks, and maintenance operations.
+ * 处理系统级别的端点，例如应用程序更新、
+ * 健康检查和维护操作。
  *
- * Routes:
- * - POST /api/system/update - Update the application via git
+ * 路由：
+ * - POST /api/system/update - 通过 git 更新应用程序
  *
  * @module routes/system
  */
@@ -19,19 +19,19 @@ const router = express.Router();
 
 /**
  * POST /api/system/update
- * Update the application by running git commands and npm install
+ * 通过运行 git 命令和 npm install 来更新应用程序
  *
- * This endpoint executes: git checkout main && git pull && npm install
- * Requires authentication.
+ * 此端点执行：git checkout main && git pull && npm install
+ * 需要身份验证。
  */
 router.post('/update', authenticateToken, async (req, res) => {
     try {
-        // Get the project root directory (parent of server directory)
+        // 获取项目根目录（server 目录的父目录）
         const projectRoot = path.join(__dirname, '..');
 
         console.log('Starting system update from directory:', projectRoot);
 
-        // Run the update command
+        // 运行更新命令
         const updateCommand = 'git checkout main && git pull && npm install';
 
         const child = spawn('sh', ['-c', updateCommand], {

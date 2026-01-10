@@ -1,8 +1,7 @@
 /**
- * Environment Configuration Module
+ * 环境配置模块
  *
- * Handles environment variable loading, ANSI color definitions,
- * and container mode status logging.
+ * 处理环境变量加载、ANSI 颜色定义和容器模式状态记录。
  *
  * @module config/environment
  */
@@ -17,7 +16,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 /**
- * ANSI color codes for terminal output
+ * 用于终端输出的 ANSI 颜色代码
  */
 export const colors = {
     reset: '\x1b[0m',
@@ -30,7 +29,7 @@ export const colors = {
 };
 
 /**
- * Colored console output utilities
+ * 彩色控制台输出工具
  */
 export const c = {
     info: (text) => `${colors.cyan}${text}${colors.reset}`,
@@ -42,8 +41,8 @@ export const c = {
 };
 
 /**
- * Load environment variables from .env file
- * Sets environment variables if they don't already exist
+ * 从 .env 文件加载环境变量
+ * 如果环境变量尚不存在，则设置它们
  */
 export function loadEnvironment() {
     try {
@@ -62,10 +61,10 @@ export function loadEnvironment() {
         console.log('No .env file found or error reading it:', e.message);
     }
 
-    // Debug logging
+    // 调试日志记录
     console.log('PORT from env:', process.env.PORT);
     console.log('DATABASE_PATH from env:', process.env.DATABASE_PATH);
 
-    // Log container mode status
+    // 记录容器模式状态
     logContainerModeStatus();
 }

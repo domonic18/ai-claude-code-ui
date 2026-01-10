@@ -10,7 +10,7 @@ import { CURSOR_MODELS } from '../../shared/modelConstants.js';
 
 const router = express.Router();
 
-// GET /api/cursor/config - Read Cursor CLI configuration
+// GET /api/cursor/config - 读取 Cursor CLI 配置
 router.get('/config', async (req, res) => {
   try {
     const configPath = path.join(os.homedir(), '.cursor', 'cli-config.json');
@@ -25,10 +25,10 @@ router.get('/config', async (req, res) => {
         path: configPath
       });
     } catch (error) {
-      // Config doesn't exist or is invalid
+      // 配置不存在或无效
       console.log('Cursor config not found or invalid:', error.message);
-      
-      // Return default config
+
+      // 返回默认配置
       res.json({
         success: true,
         config: {
@@ -54,13 +54,13 @@ router.get('/config', async (req, res) => {
   }
 });
 
-// POST /api/cursor/config - Update Cursor CLI configuration
+// POST /api/cursor/config - 更新 Cursor CLI 配置
 router.post('/config', async (req, res) => {
   try {
     const { permissions, model } = req.body;
     const configPath = path.join(os.homedir(), '.cursor', 'cli-config.json');
     
-    // Read existing config or create default
+    // 读取现有配置或创建默认配置
     let config = {
       version: 1,
       editor: {
@@ -78,29 +78,29 @@ router.post('/config', async (req, res) => {
       const existing = await fs.readFile(configPath, 'utf8');
       config = JSON.parse(existing);
     } catch (error) {
-      // Config doesn't exist, use defaults
+      // 配置不存在，使用默认值
       console.log('Creating new Cursor config');
     }
-    
-    // Update permissions if provided
+
+    // 如果提供了权限，则更新
     if (permissions) {
       config.permissions = {
         allow: permissions.allow || [],
         deny: permissions.deny || []
       };
     }
-    
-    // Update model if provided
+
+    // 如果提供了模型，则更新
     if (model) {
       config.model = model;
       config.hasChangedDefaultModel = true;
     }
-    
-    // Ensure directory exists
+
+    // 确保目录存在
     const configDir = path.dirname(configPath);
     await fs.mkdir(configDir, { recursive: true });
-    
-    // Write updated config
+
+    // 写入更新后的配置
     await fs.writeFile(configPath, JSON.stringify(config, null, 2));
     
     res.json({
@@ -117,7 +117,7 @@ router.post('/config', async (req, res) => {
   }
 });
 
-// GET /api/cursor/mcp - Read Cursor MCP servers configuration
+// GET /api/cursor/mcp - 读取 Cursor MCP 服务器配置
 router.get('/mcp', async (req, res) => {
   try {
     const mcpPath = path.join(os.homedir(), '.cursor', 'mcp.json');
@@ -126,7 +126,7 @@ router.get('/mcp', async (req, res) => {
       const mcpContent = await fs.readFile(mcpPath, 'utf8');
       const mcpConfig = JSON.parse(mcpContent);
       
-      // Convert to UI-friendly format
+      // 转换为 UI 友好格式
       const servers = [];
       if (mcpConfig.mcpServers && typeof mcpConfig.mcpServers === 'object') {
         for (const [name, config] of Object.entries(mcpConfig.mcpServers)) {
@@ -138,8 +138,8 @@ router.get('/mcp', async (req, res) => {
             config: {},
             raw: config
           };
-          
-          // Determine transport type and extract config
+
+          // 确定传输类型并提取配置
           if (config.command) {
             server.type = 'stdio';
             server.config.command = config.command;
@@ -161,7 +161,7 @@ router.get('/mcp', async (req, res) => {
         path: mcpPath
       });
     } catch (error) {
-      // MCP config doesn't exist
+      // MCP 配置不存在
       console.log('Cursor MCP config not found:', error.message);
       res.json({
         success: true,
@@ -178,15 +178,15 @@ router.get('/mcp', async (req, res) => {
   }
 });
 
-// POST /api/cursor/mcp/add - Add MCP server to Cursor configuration
+// POST /api/cursor/mcp/add - 添加 MCP 服务器到 Cursor 配置
 router.post('/mcp/add', async (req, res) => {
   try {
     const { name, type = 'stdio', command, args = [], url, headers = {}, env = {} } = req.body;
     const mcpPath = path.join(os.homedir(), '.cursor', 'mcp.json');
-    
+
     console.log(`➕ Adding MCP server to Cursor config: ${name}`);
-    
-    // Read existing config or create new
+
+    // 读取现有配置或创建新配置
     let mcpConfig = { mcpServers: {} };
     
     try {
@@ -198,8 +198,8 @@ router.post('/mcp/add', async (req, res) => {
     } catch (error) {
       console.log('Creating new Cursor MCP config');
     }
-    
-    // Build server config based on type
+
+    // 根据类型构建服务器配置
     let serverConfig = {};
     
     if (type === 'stdio') {
@@ -215,15 +215,15 @@ router.post('/mcp/add', async (req, res) => {
         headers: headers
       };
     }
-    
-    // Add server to config
+
+    // 将服务器添加到配置
     mcpConfig.mcpServers[name] = serverConfig;
-    
-    // Ensure directory exists
+
+    // 确保目录存在
     const mcpDir = path.dirname(mcpPath);
     await fs.mkdir(mcpDir, { recursive: true });
-    
-    // Write updated config
+
+    // 写入更新后的配置
     await fs.writeFile(mcpPath, JSON.stringify(mcpConfig, null, 2));
     
     res.json({
@@ -240,15 +240,15 @@ router.post('/mcp/add', async (req, res) => {
   }
 });
 
-// DELETE /api/cursor/mcp/:name - Remove MCP server from Cursor configuration
+// DELETE /api/cursor/mcp/:name - 从 Cursor 配置中删除 MCP 服务器
 router.delete('/mcp/:name', async (req, res) => {
   try {
     const { name } = req.params;
     const mcpPath = path.join(os.homedir(), '.cursor', 'mcp.json');
-    
+
     console.log(`🗑️ Removing MCP server from Cursor config: ${name}`);
-    
-    // Read existing config
+
+    // 读取现有配置
     let mcpConfig = { mcpServers: {} };
     
     try {
@@ -259,18 +259,18 @@ router.delete('/mcp/:name', async (req, res) => {
         error: 'Cursor MCP configuration not found' 
       });
     }
-    
-    // Check if server exists
+
+    // 检查服务器是否存在
     if (!mcpConfig.mcpServers || !mcpConfig.mcpServers[name]) {
       return res.status(404).json({ 
         error: `MCP server "${name}" not found in Cursor configuration` 
       });
     }
-    
-    // Remove server from config
+
+    // 从配置中删除服务器
     delete mcpConfig.mcpServers[name];
-    
-    // Write updated config
+
+    // 写入更新后的配置
     await fs.writeFile(mcpPath, JSON.stringify(mcpConfig, null, 2));
     
     res.json({
@@ -287,15 +287,15 @@ router.delete('/mcp/:name', async (req, res) => {
   }
 });
 
-// POST /api/cursor/mcp/add-json - Add MCP server using JSON format
+// POST /api/cursor/mcp/add-json - 使用 JSON 格式添加 MCP 服务器
 router.post('/mcp/add-json', async (req, res) => {
   try {
     const { name, jsonConfig } = req.body;
     const mcpPath = path.join(os.homedir(), '.cursor', 'mcp.json');
-    
+
     console.log(`➕ Adding MCP server to Cursor config via JSON: ${name}`);
-    
-    // Validate and parse JSON config
+
+    // 验证并解析 JSON 配置
     let parsedConfig;
     try {
       parsedConfig = typeof jsonConfig === 'string' ? JSON.parse(jsonConfig) : jsonConfig;
@@ -305,8 +305,8 @@ router.post('/mcp/add-json', async (req, res) => {
         details: parseError.message 
       });
     }
-    
-    // Read existing config or create new
+
+    // 读取现有配置或创建新配置
     let mcpConfig = { mcpServers: {} };
     
     try {
@@ -318,15 +318,15 @@ router.post('/mcp/add-json', async (req, res) => {
     } catch (error) {
       console.log('Creating new Cursor MCP config');
     }
-    
-    // Add server to config
+
+    // 将服务器添加到配置
     mcpConfig.mcpServers[name] = parsedConfig;
-    
-    // Ensure directory exists
+
+    // 确保目录存在
     const mcpDir = path.dirname(mcpPath);
     await fs.mkdir(mcpDir, { recursive: true });
-    
-    // Write updated config
+
+    // 写入更新后的配置
     await fs.writeFile(mcpPath, JSON.stringify(mcpConfig, null, 2));
     
     res.json({
@@ -343,21 +343,21 @@ router.post('/mcp/add-json', async (req, res) => {
   }
 });
 
-// GET /api/cursor/sessions - Get Cursor sessions from SQLite database
+// GET /api/cursor/sessions - 从 SQLite 数据库获取 Cursor 会话
 router.get('/sessions', async (req, res) => {
   try {
     const { projectPath } = req.query;
-    
-    // Calculate cwdID hash for the project path (Cursor uses MD5 hash)
+
+    // 计算项目路径的 cwdID 哈希（Cursor 使用 MD5 哈希）
     const cwdId = crypto.createHash('md5').update(projectPath || process.cwd()).digest('hex');
     const cursorChatsPath = path.join(os.homedir(), '.cursor', 'chats', cwdId);
-    
-    
-    // Check if the directory exists
+
+
+    // 检查目录是否存在
     try {
       await fs.access(cursorChatsPath);
     } catch (error) {
-      // No sessions for this project
+      // 此项目没有会话
       return res.json({ 
         success: true, 
         sessions: [],
@@ -365,8 +365,8 @@ router.get('/sessions', async (req, res) => {
         path: cursorChatsPath
       });
     }
-    
-    // List all session directories
+
+    // 列出所有会话目录
     const sessionDirs = await fs.readdir(cursorChatsPath);
     const sessions = [];
     
@@ -374,25 +374,25 @@ router.get('/sessions', async (req, res) => {
       const sessionPath = path.join(cursorChatsPath, sessionId);
       const storeDbPath = path.join(sessionPath, 'store.db');
       let dbStatMtimeMs = null;
-      
+
       try {
-        // Check if store.db exists
+        // 检查 store.db 是否存在
         await fs.access(storeDbPath);
-        
-        // Capture store.db mtime as a reliable fallback timestamp (last activity)
+
+        // 捕获 store.db 的 mtime 作为可靠的回退时间戳（最后活动时间）
         try {
           const stat = await fs.stat(storeDbPath);
           dbStatMtimeMs = stat.mtimeMs;
         } catch (_) {}
 
-        // Open SQLite database
+        // 打开 SQLite 数据库
         const db = await open({
           filename: storeDbPath,
           driver: sqlite3.Database,
           mode: sqlite3.OPEN_READONLY
         });
-        
-        // Get metadata from meta table
+
+        // 从 meta 表获取元数据
         const metaRows = await db.all(`
           SELECT key, value FROM meta
         `);
@@ -406,20 +406,20 @@ router.get('/sessions', async (req, res) => {
           lastMessage: null,
           messageCount: 0
         };
-        
-        // Parse meta table entries
+
+        // 解析 meta 表条目
         for (const row of metaRows) {
           if (row.value) {
             try {
-              // Try to decode as hex-encoded JSON
+              // 尝试解码为十六进制编码的 JSON
               const hexMatch = row.value.toString().match(/^[0-9a-fA-F]+$/);
               if (hexMatch) {
                 const jsonStr = Buffer.from(row.value, 'hex').toString('utf8');
                 const data = JSON.parse(jsonStr);
-                
+
                 if (row.key === 'agent') {
                   sessionData.name = data.name || sessionData.name;
-                  // Normalize createdAt to ISO string in milliseconds
+                  // 将 createdAt 标准化为毫秒级的 ISO 字符串
                   let createdAt = data.createdAt;
                   if (typeof createdAt === 'number') {
                     if (createdAt < 1e12) {
@@ -444,7 +444,7 @@ router.get('/sessions', async (req, res) => {
                   sessionData.latestRootBlobId = data.latestRootBlobId;
                 }
               } else {
-                // If not hex, use raw value for simple keys
+                // 如果不是十六进制，则对简单键使用原始值
                 if (row.key === 'name') {
                   sessionData.name = row.value.toString();
                 }
@@ -454,8 +454,8 @@ router.get('/sessions', async (req, res) => {
             }
           }
         }
-        
-        // Get message count from JSON blobs only (actual messages, not DAG structure)
+
+        // 仅从 JSON blob 获取消息计数（实际消息，而非 DAG 结构）
         try {
           const blobCount = await db.get(`
             SELECT COUNT(*) as count 
@@ -463,21 +463,21 @@ router.get('/sessions', async (req, res) => {
             WHERE substr(data, 1, 1) = X'7B'
           `);
           sessionData.messageCount = blobCount.count;
-          
-          // Get the most recent JSON blob for preview (actual message, not DAG structure)
+
+          // 获取最新的 JSON blob 用于预览（实际消息，而非 DAG 结构）
           const lastBlob = await db.get(`
             SELECT data FROM blobs 
             WHERE substr(data, 1, 1) = X'7B'
             ORDER BY rowid DESC 
             LIMIT 1
           `);
-          
+
           if (lastBlob && lastBlob.data) {
             try {
-              // Try to extract readable preview from blob (may contain binary with embedded JSON)
+              // 尝试从 blob 中提取可读预览（可能包含嵌入式 JSON 的二进制数据）
               const raw = lastBlob.data.toString('utf8');
               let preview = '';
-              // Attempt direct JSON parse
+              // 尝试直接解析 JSON
               try {
                 const parsed = JSON.parse(raw);
                 if (parsed?.content) {
@@ -490,7 +490,7 @@ router.get('/sessions', async (req, res) => {
                 }
               } catch (_) {}
               if (!preview) {
-                // Strip non-printable and try to find JSON chunk
+                // 去除不可打印字符并尝试查找 JSON 块
                 const cleaned = raw.replace(/[^\x09\x0A\x0D\x20-\x7E]/g, '');
                 const s = cleaned;
                 const start = s.indexOf('{');
@@ -524,10 +524,10 @@ router.get('/sessions', async (req, res) => {
         } catch (e) {
           console.log('Could not read blobs:', e.message);
         }
-        
+
         await db.close();
 
-        // Finalize createdAt: use parsed meta value when valid, else fall back to store.db mtime
+        // 完成 createdAt：当有效时使用解析的 meta 值，否则回退到 store.db 的 mtime
         if (!sessionData.createdAt) {
           if (dbStatMtimeMs && Number.isFinite(dbStatMtimeMs)) {
             sessionData.createdAt = new Date(dbStatMtimeMs).toISOString();
@@ -540,8 +540,8 @@ router.get('/sessions', async (req, res) => {
         console.log(`Could not read session ${sessionId}:`, error.message);
       }
     }
-    
-    // Fallback: ensure createdAt is a valid ISO string (use session directory mtime as last resort)
+
+    // 回退：确保 createdAt 是有效的 ISO 字符串（使用会话目录的 mtime 作为最后手段）
     for (const s of sessions) {
       if (!s.createdAt) {
         try {
@@ -553,7 +553,7 @@ router.get('/sessions', async (req, res) => {
         }
       }
     }
-    // Sort sessions by creation date (newest first)
+    // 按创建日期排序会话（最新的在前）
     sessions.sort((a, b) => {
       if (!a.createdAt) return 1;
       if (!b.createdAt) return -1;
@@ -576,51 +576,51 @@ router.get('/sessions', async (req, res) => {
   }
 });
 
-// GET /api/cursor/sessions/:sessionId - Get specific Cursor session from SQLite
+// GET /api/cursor/sessions/:sessionId - 从 SQLite 获取特定 Cursor 会话
 router.get('/sessions/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params;
     const { projectPath } = req.query;
-    
-    // Calculate cwdID hash for the project path
+
+    // 计算项目路径的 cwdID 哈希
     const cwdId = crypto.createHash('md5').update(projectPath || process.cwd()).digest('hex');
     const storeDbPath = path.join(os.homedir(), '.cursor', 'chats', cwdId, sessionId, 'store.db');
-    
-    
-    // Open SQLite database
+
+
+    // 打开 SQLite 数据库
     const db = await open({
       filename: storeDbPath,
       driver: sqlite3.Database,
       mode: sqlite3.OPEN_READONLY
     });
-    
-    // Get all blobs to build the DAG structure
+
+    // 获取所有 blob 以构建 DAG 结构
     const allBlobs = await db.all(`
       SELECT rowid, id, data FROM blobs
     `);
-    
-    // Build the DAG structure from parent-child relationships
+
+    // 从父子关系构建 DAG 结构
     const blobMap = new Map(); // id -> blob data
     const parentRefs = new Map(); // blob id -> [parent blob ids]
     const childRefs = new Map(); // blob id -> [child blob ids]
-    const jsonBlobs = []; // Clean JSON messages
+    const jsonBlobs = []; // 纯净的 JSON 消息
     
     for (const blob of allBlobs) {
       blobMap.set(blob.id, blob);
-      
-      // Check if this is a JSON blob (actual message) or protobuf (DAG structure)
-      if (blob.data && blob.data[0] === 0x7B) { // Starts with '{' - JSON blob
+
+      // 检查这是 JSON blob（实际消息）还是 protobuf（DAG 结构）
+      if (blob.data && blob.data[0] === 0x7B) { // 以 '{' 开头 - JSON blob
         try {
           const parsed = JSON.parse(blob.data.toString('utf8'));
           jsonBlobs.push({ ...blob, parsed });
         } catch (e) {
           console.log('Failed to parse JSON blob:', blob.rowid);
         }
-      } else if (blob.data) { // Protobuf blob - extract parent references
+      } else if (blob.data) { // Protobuf blob - 提取父引用
         const parents = [];
         let i = 0;
-        
-        // Scan for parent references (0x0A 0x20 followed by 32-byte hash)
+
+        // 扫描父引用（0x0A 0x20 后跟 32 字节哈希）
         while (i < blob.data.length - 33) {
           if (blob.data[i] === 0x0A && blob.data[i+1] === 0x20) {
             const parentHash = blob.data.slice(i+2, i+34).toString('hex');
@@ -632,10 +632,10 @@ router.get('/sessions/:sessionId', async (req, res) => {
             i++;
           }
         }
-        
+
         if (parents.length > 0) {
           parentRefs.set(blob.id, parents);
-          // Update child references
+          // 更新子引用
           for (const parentId of parents) {
             if (!childRefs.has(parentId)) {
               childRefs.set(parentId, []);
@@ -645,49 +645,49 @@ router.get('/sessions/:sessionId', async (req, res) => {
         }
       }
     }
-    
-    // Perform topological sort to get chronological order
+
+    // 执行拓扑排序以获得时间顺序
     const visited = new Set();
     const sorted = [];
-    
-    // DFS-based topological sort
+
+    // 基于深度优先搜索的拓扑排序
     function visit(nodeId) {
       if (visited.has(nodeId)) return;
       visited.add(nodeId);
-      
-      // Visit all parents first (dependencies)
+
+      // 首先访问所有父节点（依赖项）
       const parents = parentRefs.get(nodeId) || [];
       for (const parentId of parents) {
         visit(parentId);
       }
-      
-      // Add this node after all its parents
+
+      // 在所有父节点之后添加此节点
       const blob = blobMap.get(nodeId);
       if (blob) {
         sorted.push(blob);
       }
     }
-    
-    // Start with nodes that have no parents (roots)
+
+    // 从没有父节点的节点开始（根节点）
     for (const blob of allBlobs) {
       if (!parentRefs.has(blob.id)) {
         visit(blob.id);
       }
     }
-    
-    // Visit any remaining nodes (disconnected components)
+
+    // 访问任何剩余的节点（断开连接的组件）
     for (const blob of allBlobs) {
       visit(blob.id);
     }
-    
-    // Now extract JSON messages in the order they appear in the sorted DAG
+
+    // 现在按照它们在排序后的 DAG 中出现的顺序提取 JSON 消息
     const messageOrder = new Map(); // JSON blob id -> order index
     let orderIndex = 0;
     
     for (const blob of sorted) {
-      // Check if this blob references any JSON messages
+      // 检查此 blob 是否引用任何 JSON 消息
       if (blob.data && blob.data[0] !== 0x7B) { // Protobuf blob
-        // Look for JSON blob references
+        // 查找 JSON blob 引用
         for (const jsonBlob of jsonBlobs) {
           try {
             const jsonIdBytes = Buffer.from(jsonBlob.id, 'hex');
@@ -697,39 +697,39 @@ router.get('/sessions/:sessionId', async (req, res) => {
               }
             }
           } catch (e) {
-            // Skip if can't convert ID
+            // 如果无法转换 ID 则跳过
           }
         }
       }
     }
-    
-    // Sort JSON blobs by their appearance order in the DAG
+
+    // 按照它们在 DAG 中的出现顺序对 JSON blob 进行排序
     const sortedJsonBlobs = jsonBlobs.sort((a, b) => {
       const orderA = messageOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER;
       const orderB = messageOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER;
       if (orderA !== orderB) return orderA - orderB;
-      // Fallback to rowid if not in order map
+      // 如果不在顺序映射中，则回退到 rowid
       return a.rowid - b.rowid;
     });
-    
-    // Use sorted JSON blobs
+
+    // 使用排序后的 JSON blob
     const blobs = sortedJsonBlobs.map((blob, idx) => ({
       ...blob,
       sequence_num: idx + 1,
       original_rowid: blob.rowid
     }));
-    
-    // Get metadata from meta table
+
+    // 从 meta 表获取元数据
     const metaRows = await db.all(`
       SELECT key, value FROM meta
     `);
-    
-    // Parse metadata
+
+    // 解析元数据
     let metadata = {};
     for (const row of metaRows) {
       if (row.value) {
         try {
-          // Try to decode as hex-encoded JSON
+          // 尝试解码为十六进制编码的 JSON
           const hexMatch = row.value.toString().match(/^[0-9a-fA-F]+$/);
           if (hexMatch) {
             const jsonStr = Buffer.from(row.value, 'hex').toString('utf8');
@@ -742,20 +742,20 @@ router.get('/sessions/:sessionId', async (req, res) => {
         }
       }
     }
-    
-    // Extract messages from sorted JSON blobs
+
+    // 从排序后的 JSON blob 中提取消息
     const messages = [];
     for (const blob of blobs) {
       try {
-        // We already parsed JSON blobs earlier
+        // 我们之前已经解析了 JSON blob
         const parsed = blob.parsed;
-        
+
         if (parsed) {
-          // Filter out ONLY system messages at the server level
-          // Check both direct role and nested message.role
+          // 仅在服务器级别过滤系统消息
+          // 检查直接角色和嵌套的 message.role
           const role = parsed?.role || parsed?.message?.role;
           if (role === 'system') {
-            continue; // Skip only system messages
+            continue; // 仅跳过系统消息
           }
           messages.push({ 
             id: blob.id, 
@@ -765,7 +765,7 @@ router.get('/sessions/:sessionId', async (req, res) => {
           });
         }
       } catch (e) {
-        // Skip blobs that cause errors
+        // 跳过导致错误的 blob
         console.log(`Skipping blob ${blob.id}: ${e.message}`);
       }
     }

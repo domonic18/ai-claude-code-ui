@@ -1,30 +1,30 @@
 /**
- * OpenAI Codex SDK Integration
+ * OpenAI Codex SDK 集成
  * =============================
  *
- * This module provides integration with the OpenAI Codex SDK for non-interactive
- * chat sessions. It mirrors the pattern used in claude-sdk.js for consistency.
+ * 此模块提供与 OpenAI Codex SDK 的集成，用于非交互式聊天会话。
+ * 它镜像了 claude-sdk.js 中使用的模式以保持一致性。
  *
- * ## Usage
+ * ## 用法
  *
- * - queryCodex(command, options, ws) - Execute a prompt with streaming via WebSocket
- * - abortCodexSession(sessionId) - Cancel an active session
- * - isCodexSessionActive(sessionId) - Check if a session is running
- * - getActiveCodexSessions() - List all active sessions
+ * - queryCodex(command, options, ws) - 通过 WebSocket 流式执行提示
+ * - abortCodexSession(sessionId) - 取消活动会话
+ * - isCodexSessionActive(sessionId) - 检查会话是否正在运行
+ * - getActiveCodexSessions() - 列出所有活动会话
  */
 
 import { Codex } from '@openai/codex-sdk';
 
-// Track active sessions
+// 跟踪活动会话
 const activeCodexSessions = new Map();
 
 /**
- * Transform Codex SDK event to WebSocket message format
- * @param {object} event - SDK event
- * @returns {object} - Transformed event for WebSocket
+ * 将 Codex SDK 事件转换为 WebSocket 消息格式
+ * @param {object} event - SDK 事件
+ * @returns {object} - 为 WebSocket 转换的事件
  */
 function transformCodexEvent(event) {
-  // Map SDK event types to a consistent format
+  // 将 SDK 事件类型映射为一致的格式
   switch (event.type) {
     case 'item.started':
     case 'item.updated':
@@ -34,7 +34,7 @@ function transformCodexEvent(event) {
         return { type: event.type, item: null };
       }
 
-      // Transform based on item type
+      // 基于项目类型进行转换
       switch (item.type) {
         case 'agent_message':
           return {
@@ -157,8 +157,8 @@ function transformCodexEvent(event) {
 }
 
 /**
- * Map permission mode to Codex SDK options
- * @param {string} permissionMode - 'default', 'acceptEdits', or 'bypassPermissions'
+ * 将权限模式映射为 Codex SDK 选项
+ * @param {string} permissionMode - 'default'、'acceptEdits' 或 'bypassPermissions'
  * @returns {object} - { sandboxMode, approvalPolicy }
  */
 function mapPermissionModeToCodexOptions(permissionMode) {
@@ -183,10 +183,10 @@ function mapPermissionModeToCodexOptions(permissionMode) {
 }
 
 /**
- * Execute a Codex query with streaming
- * @param {string} command - The prompt to send
- * @param {object} options - Options including cwd, sessionId, model, permissionMode
- * @param {WebSocket|object} ws - WebSocket connection or response writer
+ * 使用流式执行 Codex 查询
+ * @param {string} command - 要发送的提示
+ * @param {object} options - 选项，包括 cwd、sessionId、model、permissionMode
+ * @param {WebSocket|object} ws - WebSocket 连接或响应 writer
  */
 export async function queryCodex(command, options = {}, ws) {
   const {
@@ -205,10 +205,10 @@ export async function queryCodex(command, options = {}, ws) {
   let currentSessionId = sessionId;
 
   try {
-    // Initialize Codex SDK
+    // 初始化 Codex SDK
     codex = new Codex();
 
-    // Thread options with sandbox and approval settings
+    // 线程选项，包含沙箱和批准设置
     const threadOptions = {
       workingDirectory,
       skipGitRepoCheck: true,
@@ -217,17 +217,17 @@ export async function queryCodex(command, options = {}, ws) {
       model
     };
 
-    // Start or resume thread
+    // 启动或恢复线程
     if (sessionId) {
       thread = codex.resumeThread(sessionId, threadOptions);
     } else {
       thread = codex.startThread(threadOptions);
     }
 
-    // Get the thread ID
+    // 获取线程 ID
     currentSessionId = thread.id || sessionId || `codex-${Date.now()}`;
 
-    // Track the session
+    // 跟踪会话
     activeCodexSessions.set(currentSessionId, {
       thread,
       codex,
@@ -235,18 +235,18 @@ export async function queryCodex(command, options = {}, ws) {
       startedAt: new Date().toISOString()
     });
 
-    // Send session created event
+    // 发送会话创建事件
     sendMessage(ws, {
       type: 'session-created',
       sessionId: currentSessionId,
       provider: 'codex'
     });
 
-    // Execute with streaming
+    // 使用流式执行
     const streamedTurn = await thread.runStreamed(command);
 
     for await (const event of streamedTurn.events) {
-      // Check if session was aborted
+      // 检查会话是否已中止
       const session = activeCodexSessions.get(currentSessionId);
       if (!session || session.status === 'aborted') {
         break;
@@ -264,20 +264,20 @@ export async function queryCodex(command, options = {}, ws) {
         sessionId: currentSessionId
       });
 
-      // Extract and send token usage if available (normalized to match Claude format)
+      // 提取并发送 token 使用情况（如果可用，标准化以匹配 Claude 格式）
       if (event.type === 'turn.completed' && event.usage) {
         const totalTokens = (event.usage.input_tokens || 0) + (event.usage.output_tokens || 0);
         sendMessage(ws, {
           type: 'token-budget',
           data: {
             used: totalTokens,
-            total: 200000 // Default context window for Codex models
+            total: 200000 // Codex 模型的默认上下文窗口
           }
         });
       }
     }
 
-    // Send completion event
+    // 发送完成事件
     sendMessage(ws, {
       type: 'codex-complete',
       sessionId: currentSessionId,
@@ -294,7 +294,7 @@ export async function queryCodex(command, options = {}, ws) {
     });
 
   } finally {
-    // Update session status
+    // 更新会话状态
     if (currentSessionId) {
       const session = activeCodexSessions.get(currentSessionId);
       if (session) {
@@ -305,9 +305,9 @@ export async function queryCodex(command, options = {}, ws) {
 }
 
 /**
- * Abort an active Codex session
- * @param {string} sessionId - Session ID to abort
- * @returns {boolean} - Whether abort was successful
+ * 中止活动的 Codex 会话
+ * @param {string} sessionId - 要中止的会话 ID
+ * @returns {boolean} - 中止是否成功
  */
 export function abortCodexSession(sessionId) {
   const session = activeCodexSessions.get(sessionId);
@@ -318,16 +318,16 @@ export function abortCodexSession(sessionId) {
 
   session.status = 'aborted';
 
-  // The SDK doesn't have a direct abort method, but marking status
-  // will cause the streaming loop to exit
+  // SDK 没有直接的中止方法，但标记状态
+  // 将导致流式循环退出
 
   return true;
 }
 
 /**
- * Check if a session is active
- * @param {string} sessionId - Session ID to check
- * @returns {boolean} - Whether session is active
+ * 检查会话是否活动
+ * @param {string} sessionId - 要检查的会话 ID
+ * @returns {boolean} - 会话是否活动
  */
 export function isCodexSessionActive(sessionId) {
   const session = activeCodexSessions.get(sessionId);
@@ -335,8 +335,8 @@ export function isCodexSessionActive(sessionId) {
 }
 
 /**
- * Get all active sessions
- * @returns {Array} - Array of active session info
+ * 获取所有活动会话
+ * @returns {Array} - 活动会话信息数组
  */
 export function getActiveCodexSessions() {
   const sessions = [];
@@ -355,17 +355,17 @@ export function getActiveCodexSessions() {
 }
 
 /**
- * Helper to send message via WebSocket or writer
- * @param {WebSocket|object} ws - WebSocket or response writer
- * @param {object} data - Data to send
+ * 通过 WebSocket 或 writer 发送消息的辅助函数
+ * @param {WebSocket|object} ws - WebSocket 或响应 writer
+ * @param {object} data - 要发送的数据
  */
 function sendMessage(ws, data) {
   try {
     if (ws.isSSEStreamWriter || ws.isWebSocketWriter) {
-      // Writer handles stringification (SSEStreamWriter or WebSocketWriter)
+      // Writer 处理字符串化（SSEStreamWriter 或 WebSocketWriter）
       ws.send(data);
     } else if (typeof ws.send === 'function') {
-      // Raw WebSocket - stringify here
+      // 原始 WebSocket - 在此处字符串化
       ws.send(JSON.stringify(data));
     }
   } catch (error) {
@@ -373,10 +373,10 @@ function sendMessage(ws, data) {
   }
 }
 
-// Clean up old completed sessions periodically
+// 定期清理旧的已完成会话
 setInterval(() => {
   const now = Date.now();
-  const maxAge = 30 * 60 * 1000; // 30 minutes
+  const maxAge = 30 * 60 * 1000; // 30 分钟
 
   for (const [id, session] of activeCodexSessions.entries()) {
     if (session.status !== 'running') {
@@ -386,4 +386,4 @@ setInterval(() => {
       }
     }
   }
-}, 5 * 60 * 1000); // Every 5 minutes
+}, 5 * 60 * 1000); // 每 5 分钟

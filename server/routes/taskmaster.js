@@ -1,11 +1,11 @@
 /**
- * TASKMASTER API ROUTES
+ * TASKMASTER API 路由
  * ====================
- * 
- * This module provides API endpoints for TaskMaster integration including:
- * - .taskmaster folder detection in project directories
- * - MCP server configuration detection
- * - TaskMaster state and metadata management
+ *
+ * 本模块提供 TaskMaster 集成的 API 端点，包括：
+ * - 项目目录中的 .taskmaster 文件夹检测
+ * - MCP 服务器配置检测
+ * - TaskMaster 状态和元数据管理
  */
 
 import express from 'express';
@@ -26,42 +26,42 @@ const __dirname = dirname(__filename);
 const router = express.Router();
 
 /**
- * Check if TaskMaster CLI is installed globally
- * @returns {Promise<Object>} Installation status result
+ * 检查 TaskMaster CLI 是否已全局安装
+ * @returns {Promise<Object>} 安装状态结果
  */
 async function checkTaskMasterInstallation() {
     return new Promise((resolve) => {
-        // Check if task-master command is available
-        const child = spawn('which', ['task-master'], { 
+        // 检查 task-master 命令是否可用
+        const child = spawn('which', ['task-master'], {
             stdio: ['ignore', 'pipe', 'pipe'],
-            shell: true 
+            shell: true
         });
-        
+
         let output = '';
         let errorOutput = '';
-        
+
         child.stdout.on('data', (data) => {
             output += data.toString();
         });
-        
+
         child.stderr.on('data', (data) => {
             errorOutput += data.toString();
         });
-        
+
         child.on('close', (code) => {
             if (code === 0 && output.trim()) {
-                // TaskMaster is installed, get version
-                const versionChild = spawn('task-master', ['--version'], { 
+                // TaskMaster 已安装，获取版本
+                const versionChild = spawn('task-master', ['--version'], {
                     stdio: ['ignore', 'pipe', 'pipe'],
-                    shell: true 
+                    shell: true
                 });
-                
+
                 let versionOutput = '';
-                
+
                 versionChild.stdout.on('data', (data) => {
                     versionOutput += data.toString();
                 });
-                
+
                 versionChild.on('close', (versionCode) => {
                     resolve({
                         isInstalled: true,
@@ -70,7 +70,7 @@ async function checkTaskMasterInstallation() {
                         reason: null
                     });
                 });
-                
+
                 versionChild.on('error', () => {
                     resolve({
                         isInstalled: true,
@@ -88,7 +88,7 @@ async function checkTaskMasterInstallation() {
                 });
             }
         });
-        
+
         child.on('error', (error) => {
             resolve({
                 isInstalled: false,
@@ -101,15 +101,15 @@ async function checkTaskMasterInstallation() {
 }
 
 /**
- * Detect .taskmaster folder presence in a given project directory
- * @param {string} projectPath - Absolute path to project directory
- * @returns {Promise<Object>} Detection result with status and metadata
+ * 检测给定项目目录中是否存在 .taskmaster 文件夹
+ * @param {string} projectPath - 项目目录的绝对路径
+ * @returns {Promise<Object>} 包含状态和元数据的检测结果
  */
 async function detectTaskMasterFolder(projectPath) {
     try {
         const taskMasterPath = path.join(projectPath, '.taskmaster');
-        
-        // Check if .taskmaster directory exists
+
+        // 检查 .taskmaster 目录是否存在
         try {
             const stats = await fsPromises.stat(taskMasterPath);
             if (!stats.isDirectory()) {
@@ -128,12 +128,12 @@ async function detectTaskMasterFolder(projectPath) {
             throw error;
         }
 
-        // Check for key TaskMaster files
+        // 检查关键的 TaskMaster 文件
         const keyFiles = [
             'tasks/tasks.json',
             'config.json'
         ];
-        
+
         const fileStatus = {};
         let hasEssentialFiles = true;
 
@@ -150,21 +150,21 @@ async function detectTaskMasterFolder(projectPath) {
             }
         }
 
-        // Parse tasks.json if it exists for metadata
+        // 如果 tasks.json 存在，则解析它以获取元数据
         let taskMetadata = null;
         if (fileStatus['tasks/tasks.json']) {
             try {
                 const tasksPath = path.join(taskMasterPath, 'tasks/tasks.json');
                 const tasksContent = await fsPromises.readFile(tasksPath, 'utf8');
                 const tasksData = JSON.parse(tasksContent);
-                
-                // Handle both tagged and legacy formats
+
+                // 处理带标签和传统格式
                 let tasks = [];
                 if (tasksData.tasks) {
-                    // Legacy format
+                    // 传统格式
                     tasks = tasksData.tasks;
                 } else {
-                    // Tagged format - get tasks from all tags
+                    // 带标签格式 - 从所有标签中获取任务
                     Object.values(tasksData).forEach(tagData => {
                         if (tagData.tasks) {
                             tasks = tasks.concat(tagData.tasks);
@@ -172,12 +172,12 @@ async function detectTaskMasterFolder(projectPath) {
                     });
                 }
 
-                // Calculate task statistics
+                // 计算任务统计信息
                 const stats = tasks.reduce((acc, task) => {
                     acc.total++;
                     acc[task.status] = (acc[task.status] || 0) + 1;
-                    
-                    // Count subtasks
+
+                    // 计算子任务
                     if (task.subtasks) {
                         task.subtasks.forEach(subtask => {
                             acc.subtotalTasks++;
@@ -185,14 +185,14 @@ async function detectTaskMasterFolder(projectPath) {
                             acc.subtasks[subtask.status] = (acc.subtasks[subtask.status] || 0) + 1;
                         });
                     }
-                    
+
                     return acc;
-                }, { 
-                    total: 0, 
+                }, {
+                    total: 0,
                     subtotalTasks: 0,
-                    pending: 0, 
-                    'in-progress': 0, 
-                    done: 0, 
+                    pending: 0,
+                    'in-progress': 0,
+                    done: 0,
                     review: 0,
                     deferred: 0,
                     cancelled: 0,
@@ -232,21 +232,21 @@ async function detectTaskMasterFolder(projectPath) {
     }
 }
 
-// MCP detection is now handled by the centralized utility
+// MCP 检测现在由集中式工具处理
 
-// API Routes
+// API 路由
 
 /**
  * GET /api/taskmaster/installation-status
- * Check if TaskMaster CLI is installed on the system
+ * 检查系统上是否已安装 TaskMaster CLI
  */
 router.get('/installation-status', async (req, res) => {
     try {
         const installationStatus = await checkTaskMasterInstallation();
-        
-        // Also check for MCP server configuration
+
+        // 同时检查 MCP 服务器配置
         const mcpStatus = await detectTaskMasterMCPServer();
-        
+
         res.json({
             success: true,
             installation: installationStatus,
@@ -273,13 +273,13 @@ router.get('/installation-status', async (req, res) => {
 
 /**
  * GET /api/taskmaster/detect/:projectName
- * Detect TaskMaster configuration for a specific project
+ * 检测特定项目的 TaskMaster 配置
  */
 router.get('/detect/:projectName', async (req, res) => {
     try {
         const { projectName } = req.params;
-        
-        // Use the existing extractProjectDirectory function to get actual project path
+
+        // 使用现有的 extractProjectDirectory 函数获取实际项目路径
         let projectPath;
         try {
             projectPath = await extractProjectDirectory(projectName);
@@ -291,8 +291,8 @@ router.get('/detect/:projectName', async (req, res) => {
                 message: error.message
             });
         }
-        
-        // Verify the project path exists
+
+        // 验证项目路径是否存在
         try {
             await fsPromises.access(projectPath, fs.constants.R_OK);
         } catch (error) {
@@ -304,13 +304,13 @@ router.get('/detect/:projectName', async (req, res) => {
             });
         }
 
-        // Run detection in parallel
+        // 并行运行检测
         const [taskMasterResult, mcpResult] = await Promise.all([
             detectTaskMasterFolder(projectPath),
             detectTaskMasterMCPServer()
         ]);
 
-        // Determine overall status
+        // 确定总体状态
         let status = 'not-configured';
         if (taskMasterResult.hasTaskmaster && taskMasterResult.hasEssentialFiles) {
             if (mcpResult.hasMCPServer && mcpResult.isConfigured) {
@@ -344,19 +344,19 @@ router.get('/detect/:projectName', async (req, res) => {
 
 /**
  * GET /api/taskmaster/detect-all
- * Detect TaskMaster configuration for all known projects
- * This endpoint works with the existing projects system
+ * 检测所有已知项目的 TaskMaster 配置
+ * 此端点与现有的项目系统一起工作
  */
 router.get('/detect-all', async (req, res) => {
     try {
-        // Import getProjects from the projects module
+        // 从项目模块导入 getProjects
         const { getProjects } = await import('../projects.js');
         const projects = await getProjects();
 
-        // Run detection for all projects in parallel
+        // 并行运行所有项目的检测
         const detectionPromises = projects.map(async (project) => {
             try {
-                // Use the project's fullPath if available, otherwise extract the directory
+                // 如果可用，使用项目的 fullPath，否则提取目录
                 let projectPath;
                 if (project.fullPath) {
                     projectPath = project.fullPath;
@@ -367,13 +367,13 @@ router.get('/detect-all', async (req, res) => {
                         throw new Error(`Failed to extract project directory: ${error.message}`);
                     }
                 }
-                
+
                 const [taskMasterResult, mcpResult] = await Promise.all([
                     detectTaskMasterFolder(projectPath),
                     detectTaskMasterMCPServer()
                 ]);
 
-                // Determine status
+                // 确定状态
                 let status = 'not-configured';
                 if (taskMasterResult.hasTaskmaster && taskMasterResult.hasEssentialFiles) {
                     if (mcpResult.hasMCPServer && mcpResult.isConfigured) {
@@ -429,21 +429,21 @@ router.get('/detect-all', async (req, res) => {
 
 /**
  * POST /api/taskmaster/initialize/:projectName
- * Initialize TaskMaster in a project (placeholder for future CLI integration)
+ * 在项目中初始化 TaskMaster（未来 CLI 集成的占位符）
  */
 router.post('/initialize/:projectName', async (req, res) => {
     try {
         const { projectName } = req.params;
-        const { rules } = req.body; // Optional rule profiles
-        
-        // This will be implemented in a later subtask with CLI integration
+        const { rules } = req.body; // 可选的规则配置文件
+
+        // 这将在以后的子任务中通过 CLI 集成实现
         res.status(501).json({
             error: 'TaskMaster initialization not yet implemented',
             message: 'This endpoint will execute task-master init via CLI in a future update',
             projectName,
             rules
         });
-        
+
     } catch (error) {
         console.error('TaskMaster initialization error:', error);
         res.status(500).json({
@@ -455,13 +455,13 @@ router.post('/initialize/:projectName', async (req, res) => {
 
 /**
  * GET /api/taskmaster/next/:projectName
- * Get the next recommended task using task-master CLI
+ * 使用 task-master CLI 获取下一个推荐任务
  */
 router.get('/next/:projectName', async (req, res) => {
     try {
         const { projectName } = req.params;
-        
-        // Get project path
+
+        // 获取项目路径
         let projectPath;
         try {
             projectPath = await extractProjectDirectory(projectName);
@@ -472,10 +472,10 @@ router.get('/next/:projectName', async (req, res) => {
             });
         }
 
-        // Try to execute task-master next command
+        // 尝试执行 task-master next 命令
         try {
             const { spawn } = await import('child_process');
-            
+
             const nextTaskCommand = spawn('task-master', ['next'], {
                 cwd: projectPath,
                 stdio: ['pipe', 'pipe', 'pipe']
@@ -506,13 +506,13 @@ router.get('/next/:projectName', async (req, res) => {
                 });
             });
 
-            // Parse the output - task-master next usually returns JSON
+            // 解析输出 - task-master next 通常返回 JSON
             let nextTaskData = null;
             if (stdout.trim()) {
                 try {
                     nextTaskData = JSON.parse(stdout);
                 } catch (parseError) {
-                    // If not JSON, treat as plain text
+                    // 如果不是 JSON，则视为纯文本
                     nextTaskData = { message: stdout.trim() };
                 }
             }
@@ -526,9 +526,9 @@ router.get('/next/:projectName', async (req, res) => {
 
         } catch (cliError) {
             console.warn('Failed to execute task-master CLI:', cliError.message);
-            
-            // Fallback to loading tasks and finding next one locally
-            // Use localhost to bypass proxy for internal server-to-server calls
+
+            // 回退到本地加载任务并查找下一个任务
+            // 使用 localhost 绕过代理进行内部服务器到服务器的调用
             const tasksResponse = await fetch(`http://localhost:${process.env.PORT || 3001}/api/taskmaster/tasks/${encodeURIComponent(projectName)}`, {
                 headers: {
                     'Authorization': req.headers.authorization
@@ -537,7 +537,7 @@ router.get('/next/:projectName', async (req, res) => {
 
             if (tasksResponse.ok) {
                 const tasksData = await tasksResponse.json();
-                const nextTask = tasksData.tasks?.find(task => 
+                const nextTask = tasksData.tasks?.find(task =>
                     task.status === 'pending' || task.status === 'in-progress'
                 ) || null;
 
@@ -565,13 +565,13 @@ router.get('/next/:projectName', async (req, res) => {
 
 /**
  * GET /api/taskmaster/tasks/:projectName
- * Load actual tasks from .taskmaster/tasks/tasks.json
+ * 从 .taskmaster/tasks/tasks.json 加载实际任务
  */
 router.get('/tasks/:projectName', async (req, res) => {
     try {
         const { projectName } = req.params;
-        
-        // Get project path
+
+        // 获取项目路径
         let projectPath;
         try {
             projectPath = await extractProjectDirectory(projectName);
@@ -585,7 +585,7 @@ router.get('/tasks/:projectName', async (req, res) => {
         const taskMasterPath = path.join(projectPath, '.taskmaster');
         const tasksFilePath = path.join(taskMasterPath, 'tasks', 'tasks.json');
 
-        // Check if tasks file exists
+        // 检查任务文件是否存在
         try {
             await fsPromises.access(tasksFilePath);
         } catch (error) {
@@ -596,30 +596,30 @@ router.get('/tasks/:projectName', async (req, res) => {
             });
         }
 
-        // Read and parse tasks file
+        // 读取并解析任务文件
         try {
             const tasksContent = await fsPromises.readFile(tasksFilePath, 'utf8');
             const tasksData = JSON.parse(tasksContent);
-            
+
             let tasks = [];
             let currentTag = 'master';
-            
-            // Handle both tagged and legacy formats
+
+            // 处理带标签和传统格式
             if (Array.isArray(tasksData)) {
-                // Legacy format
+                // 传统格式
                 tasks = tasksData;
             } else if (tasksData.tasks) {
-                // Simple format with tasks array
+                // 带有任务数组的简单格式
                 tasks = tasksData.tasks;
             } else {
-                // Tagged format - get tasks from current tag or master
+                // 带标签格式 - 从当前标签或 master 获取任务
                 if (tasksData[currentTag] && tasksData[currentTag].tasks) {
                     tasks = tasksData[currentTag].tasks;
                 } else if (tasksData.master && tasksData.master.tasks) {
                     tasks = tasksData.master.tasks;
                 } else {
-                    // Get tasks from first available tag
-                    const firstTag = Object.keys(tasksData).find(key => 
+                    // 从第一个可用标签获取任务
+                    const firstTag = Object.keys(tasksData).find(key =>
                         tasksData[key].tasks && Array.isArray(tasksData[key].tasks)
                     );
                     if (firstTag) {
@@ -629,7 +629,7 @@ router.get('/tasks/:projectName', async (req, res) => {
                 }
             }
 
-            // Transform tasks to ensure all have required fields
+            // 转换任务以确保所有任务都有必填字段
             const transformedTasks = tasks.map(task => ({
                 id: task.id,
                 title: task.title || 'Untitled Task',
@@ -680,13 +680,13 @@ router.get('/tasks/:projectName', async (req, res) => {
 
 /**
  * GET /api/taskmaster/prd/:projectName
- * List all PRD files in the project's .taskmaster/docs directory
+ * 列出项目的 .taskmaster/docs 目录中的所有 PRD 文件
  */
 router.get('/prd/:projectName', async (req, res) => {
     try {
         const { projectName } = req.params;
-        
-        // Get project path
+
+        // 获取项目路径
         let projectPath;
         try {
             projectPath = await extractProjectDirectory(projectName);
@@ -698,8 +698,8 @@ router.get('/prd/:projectName', async (req, res) => {
         }
 
         const docsPath = path.join(projectPath, '.taskmaster', 'docs');
-        
-        // Check if docs directory exists
+
+        // 检查文档目录是否存在
         try {
             await fsPromises.access(docsPath, fs.constants.R_OK);
         } catch (error) {
@@ -710,7 +710,7 @@ router.get('/prd/:projectName', async (req, res) => {
             });
         }
 
-        // Read directory and filter for PRD files
+        // 读取目录并过滤 PRD 文件
         try {
             const files = await fsPromises.readdir(docsPath);
             const prdFiles = [];
@@ -718,7 +718,7 @@ router.get('/prd/:projectName', async (req, res) => {
             for (const file of files) {
                 const filePath = path.join(docsPath, file);
                 const stats = await fsPromises.stat(filePath);
-                
+
                 if (stats.isFile() && (file.endsWith('.txt') || file.endsWith('.md'))) {
                     prdFiles.push({
                         name: file,
@@ -756,7 +756,7 @@ router.get('/prd/:projectName', async (req, res) => {
 
 /**
  * POST /api/taskmaster/prd/:projectName
- * Create or update a PRD file in the project's .taskmaster/docs directory
+ * 在项目的 .taskmaster/docs 目录中创建或更新 PRD 文件
  */
 router.post('/prd/:projectName', async (req, res) => {
     try {
@@ -770,7 +770,7 @@ router.post('/prd/:projectName', async (req, res) => {
             });
         }
 
-        // Validate filename
+        // 验证文件名
         if (!fileName.match(/^[\w\-. ]+\.(txt|md)$/)) {
             return res.status(400).json({
                 error: 'Invalid filename',
@@ -778,7 +778,7 @@ router.post('/prd/:projectName', async (req, res) => {
             });
         }
 
-        // Get project path
+        // 获取项目路径
         let projectPath;
         try {
             projectPath = await extractProjectDirectory(projectName);
@@ -792,7 +792,7 @@ router.post('/prd/:projectName', async (req, res) => {
         const docsPath = path.join(projectPath, '.taskmaster', 'docs');
         const filePath = path.join(docsPath, fileName);
 
-        // Ensure docs directory exists
+        // 确保文档目录存在
         try {
             await fsPromises.mkdir(docsPath, { recursive: true });
         } catch (error) {
@@ -803,11 +803,11 @@ router.post('/prd/:projectName', async (req, res) => {
             });
         }
 
-        // Write the PRD file
+        // 写入 PRD 文件
         try {
             await fsPromises.writeFile(filePath, content, 'utf8');
-            
-            // Get file stats
+
+            // 获取文件统计信息
             const stats = await fsPromises.stat(filePath);
 
             res.json({
@@ -841,13 +841,13 @@ router.post('/prd/:projectName', async (req, res) => {
 
 /**
  * GET /api/taskmaster/prd/:projectName/:fileName
- * Get content of a specific PRD file
+ * 获取特定 PRD 文件的内容
  */
 router.get('/prd/:projectName/:fileName', async (req, res) => {
     try {
         const { projectName, fileName } = req.params;
-        
-        // Get project path
+
+        // 获取项目路径
         let projectPath;
         try {
             projectPath = await extractProjectDirectory(projectName);
@@ -859,8 +859,8 @@ router.get('/prd/:projectName/:fileName', async (req, res) => {
         }
 
         const filePath = path.join(projectPath, '.taskmaster', 'docs', fileName);
-        
-        // Check if file exists
+
+        // 检查文件是否存在
         try {
             await fsPromises.access(filePath, fs.constants.R_OK);
         } catch (error) {
@@ -870,7 +870,7 @@ router.get('/prd/:projectName/:fileName', async (req, res) => {
             });
         }
 
-        // Read file content
+        // 读取文件内容
         try {
             const content = await fsPromises.readFile(filePath, 'utf8');
             const stats = await fsPromises.stat(filePath);
@@ -906,13 +906,13 @@ router.get('/prd/:projectName/:fileName', async (req, res) => {
 
 /**
  * DELETE /api/taskmaster/prd/:projectName/:fileName
- * Delete a specific PRD file
+ * 删除特定的 PRD 文件
  */
 router.delete('/prd/:projectName/:fileName', async (req, res) => {
     try {
         const { projectName, fileName } = req.params;
-        
-        // Get project path
+
+        // 获取项目路径
         let projectPath;
         try {
             projectPath = await extractProjectDirectory(projectName);
@@ -924,8 +924,8 @@ router.delete('/prd/:projectName/:fileName', async (req, res) => {
         }
 
         const filePath = path.join(projectPath, '.taskmaster', 'docs', fileName);
-        
-        // Check if file exists
+
+        // 检查文件是否存在
         try {
             await fsPromises.access(filePath, fs.constants.F_OK);
         } catch (error) {
@@ -935,7 +935,7 @@ router.delete('/prd/:projectName/:fileName', async (req, res) => {
             });
         }
 
-        // Delete the file
+        // 删除文件
         try {
             await fsPromises.unlink(filePath);
 
@@ -966,13 +966,13 @@ router.delete('/prd/:projectName/:fileName', async (req, res) => {
 
 /**
  * POST /api/taskmaster/init/:projectName
- * Initialize TaskMaster in a project
+ * 在项目中初始化 TaskMaster
  */
 router.post('/init/:projectName', async (req, res) => {
     try {
         const { projectName } = req.params;
-        
-        // Get project path
+
+        // 获取项目路径
         let projectPath;
         try {
             projectPath = await extractProjectDirectory(projectName);
@@ -983,7 +983,7 @@ router.post('/init/:projectName', async (req, res) => {
             });
         }
 
-        // Check if TaskMaster is already initialized
+        // 检查 TaskMaster 是否已初始化
         const taskMasterPath = path.join(projectPath, '.taskmaster');
         try {
             await fsPromises.access(taskMasterPath, fs.constants.F_OK);
@@ -992,10 +992,10 @@ router.post('/init/:projectName', async (req, res) => {
                 message: 'TaskMaster is already configured for this project'
             });
         } catch (error) {
-            // Directory doesn't exist, we can proceed
+            // 目录不存在，我们可以继续
         }
 
-        // Run taskmaster init command
+        // 运行 taskmaster init 命令
         const initProcess = spawn('npx', ['task-master', 'init'], {
             cwd: projectPath,
             stdio: ['pipe', 'pipe', 'pipe']
@@ -1014,11 +1014,11 @@ router.post('/init/:projectName', async (req, res) => {
 
         initProcess.on('close', (code) => {
             if (code === 0) {
-                // Broadcast TaskMaster project update via WebSocket
+                // 通过 WebSocket 广播 TaskMaster 项目更新
                 if (req.app.locals.wss) {
                     broadcastTaskMasterProjectUpdate(
-                        req.app.locals.wss, 
-                        projectName, 
+                        req.app.locals.wss,
+                        projectName,
                         { hasTaskmaster: true, status: 'initialized' }
                     );
                 }
@@ -1040,7 +1040,7 @@ router.post('/init/:projectName', async (req, res) => {
             }
         });
 
-        // Send 'yes' responses to automated prompts
+        // 向自动提示发送 'yes' 响应
         initProcess.stdin.write('yes\n');
         initProcess.stdin.end();
 
@@ -1055,7 +1055,7 @@ router.post('/init/:projectName', async (req, res) => {
 
 /**
  * POST /api/taskmaster/add-task/:projectName
- * Add a new task to the project
+ * 向项目添加新任务
  */
 router.post('/add-task/:projectName', async (req, res) => {
     try {
@@ -1068,8 +1068,8 @@ router.post('/add-task/:projectName', async (req, res) => {
                 message: 'Either "prompt" or both "title" and "description" are required'
             });
         }
-        
-        // Get project path
+
+        // 获取项目路径
         let projectPath;
         try {
             projectPath = await extractProjectDirectory(projectName);
@@ -1080,25 +1080,25 @@ router.post('/add-task/:projectName', async (req, res) => {
             });
         }
 
-        // Build the task-master add-task command
+        // 构建 task-master add-task 命令
         const args = ['task-master-ai', 'add-task'];
-        
+
         if (prompt) {
             args.push('--prompt', prompt);
-            args.push('--research'); // Use research for AI-generated tasks
+            args.push('--research'); // 使用研究为 AI 生成的任务
         } else {
             args.push('--prompt', `Create a task titled "${title}" with description: ${description}`);
         }
-        
+
         if (priority) {
             args.push('--priority', priority);
         }
-        
+
         if (dependencies) {
             args.push('--dependencies', dependencies);
         }
 
-        // Run task-master add-task command
+        // 运行 task-master add-task 命令
         const addTaskProcess = spawn('npx', args, {
             cwd: projectPath,
             stdio: ['pipe', 'pipe', 'pipe']
@@ -1119,12 +1119,12 @@ router.post('/add-task/:projectName', async (req, res) => {
             console.log('Add task process completed with code:', code);
             console.log('Stdout:', stdout);
             console.log('Stderr:', stderr);
-            
+
             if (code === 0) {
-                // Broadcast task update via WebSocket
+                // 通过 WebSocket 广播任务更新
                 if (req.app.locals.wss) {
                     broadcastTaskMasterTasksUpdate(
-                        req.app.locals.wss, 
+                        req.app.locals.wss,
                         projectName
                     );
                 }
@@ -1159,14 +1159,14 @@ router.post('/add-task/:projectName', async (req, res) => {
 
 /**
  * PUT /api/taskmaster/update-task/:projectName/:taskId
- * Update a specific task using TaskMaster CLI
+ * 使用 TaskMaster CLI 更新特定任务
  */
 router.put('/update-task/:projectName/:taskId', async (req, res) => {
     try {
         const { projectName, taskId } = req.params;
         const { title, description, status, priority, details } = req.body;
-        
-        // Get project path
+
+        // 获取项目路径
         let projectPath;
         try {
             projectPath = await extractProjectDirectory(projectName);
@@ -1177,7 +1177,7 @@ router.put('/update-task/:projectName/:taskId', async (req, res) => {
             });
         }
 
-        // If only updating status, use set-status command
+        // 如果仅更新状态，使用 set-status 命令
         if (status && Object.keys(req.body).length === 1) {
             const setStatusProcess = spawn('npx', ['task-master-ai', 'set-status', `--id=${taskId}`, `--status=${status}`], {
                 cwd: projectPath,
@@ -1197,7 +1197,7 @@ router.put('/update-task/:projectName/:taskId', async (req, res) => {
 
             setStatusProcess.on('close', (code) => {
                 if (code === 0) {
-                    // Broadcast task update via WebSocket
+                    // 通过 WebSocket 广播任务更新
                     if (req.app.locals.wss) {
                         broadcastTaskMasterTasksUpdate(req.app.locals.wss, projectName);
                     }
@@ -1222,13 +1222,13 @@ router.put('/update-task/:projectName/:taskId', async (req, res) => {
 
             setStatusProcess.stdin.end();
         } else {
-            // For other updates, use update-task command with a prompt describing the changes
+            // 对于其他更新，使用 update-task 命令和描述更改的提示
             const updates = [];
             if (title) updates.push(`title: "${title}"`);
             if (description) updates.push(`description: "${description}"`);
             if (priority) updates.push(`priority: "${priority}"`);
             if (details) updates.push(`details: "${details}"`);
-            
+
             const prompt = `Update task with the following changes: ${updates.join(', ')}`;
 
             const updateProcess = spawn('npx', ['task-master-ai', 'update-task', `--id=${taskId}`, `--prompt=${prompt}`], {
@@ -1249,7 +1249,7 @@ router.put('/update-task/:projectName/:taskId', async (req, res) => {
 
             updateProcess.on('close', (code) => {
                 if (code === 0) {
-                    // Broadcast task update via WebSocket
+                    // 通过 WebSocket 广播任务更新
                     if (req.app.locals.wss) {
                         broadcastTaskMasterTasksUpdate(req.app.locals.wss, projectName);
                     }
@@ -1286,14 +1286,14 @@ router.put('/update-task/:projectName/:taskId', async (req, res) => {
 
 /**
  * POST /api/taskmaster/parse-prd/:projectName
- * Parse a PRD file to generate tasks
+ * 解析 PRD 文件以生成任务
  */
 router.post('/parse-prd/:projectName', async (req, res) => {
     try {
         const { projectName } = req.params;
         const { fileName = 'prd.txt', numTasks, append = false } = req.body;
-        
-        // Get project path
+
+        // 获取项目路径
         let projectPath;
         try {
             projectPath = await extractProjectDirectory(projectName);
@@ -1305,8 +1305,8 @@ router.post('/parse-prd/:projectName', async (req, res) => {
         }
 
         const prdPath = path.join(projectPath, '.taskmaster', 'docs', fileName);
-        
-        // Check if PRD file exists
+
+        // 检查 PRD 文件是否存在
         try {
             await fsPromises.access(prdPath, fs.constants.F_OK);
         } catch (error) {
@@ -1316,20 +1316,20 @@ router.post('/parse-prd/:projectName', async (req, res) => {
             });
         }
 
-        // Build the command args
+        // 构建命令参数
         const args = ['task-master-ai', 'parse-prd', prdPath];
-        
+
         if (numTasks) {
             args.push('--num-tasks', numTasks.toString());
         }
-        
+
         if (append) {
             args.push('--append');
         }
-        
-        args.push('--research'); // Use research for better PRD parsing
 
-        // Run task-master parse-prd command
+        args.push('--research'); // 使用研究以获得更好的 PRD 解析
+
+        // 运行 task-master parse-prd 命令
         const parsePRDProcess = spawn('npx', args, {
             cwd: projectPath,
             stdio: ['pipe', 'pipe', 'pipe']
@@ -1348,10 +1348,10 @@ router.post('/parse-prd/:projectName', async (req, res) => {
 
         parsePRDProcess.on('close', (code) => {
             if (code === 0) {
-                // Broadcast task update via WebSocket
+                // 通过 WebSocket 广播任务更新
                 if (req.app.locals.wss) {
                     broadcastTaskMasterTasksUpdate(
-                        req.app.locals.wss, 
+                        req.app.locals.wss,
                         projectName
                     );
                 }
@@ -1387,11 +1387,11 @@ router.post('/parse-prd/:projectName', async (req, res) => {
 
 /**
  * GET /api/taskmaster/prd-templates
- * Get available PRD templates
+ * 获取可用的 PRD 模板
  */
 router.get('/prd-templates', async (req, res) => {
     try {
-        // Return built-in templates
+        // 返回内置模板
         const templates = [
             {
                 id: 'web-app',
@@ -1459,7 +1459,7 @@ Brief description of what this web application will do and why it's needed.
 
 ## Timeline
 - Phase 1: Core functionality (4-6 weeks)
-- Phase 2: Advanced features (2-4 weeks)  
+- Phase 2: Advanced features (2-4 weeks)
 - Phase 3: Polish and launch (2 weeks)
 
 ## Constraints & Assumptions
@@ -1833,7 +1833,7 @@ Description of the business problem, data sources, and expected insights.
 
 /**
  * POST /api/taskmaster/apply-template/:projectName
- * Apply a PRD template to create a new PRD file
+ * 应用 PRD 模板以创建新的 PRD 文件
  */
 router.post('/apply-template/:projectName', async (req, res) => {
     try {
@@ -1847,7 +1847,7 @@ router.post('/apply-template/:projectName', async (req, res) => {
             });
         }
 
-        // Get project path
+        // 获取项目路径
         let projectPath;
         try {
             projectPath = await extractProjectDirectory(projectName);
@@ -1858,7 +1858,7 @@ router.post('/apply-template/:projectName', async (req, res) => {
             });
         }
 
-        // Get the template content (this would normally fetch from the templates list)
+        // 获取模板内容（通常会从模板列表中获取）
         const templates = await getAvailableTemplates();
         const template = templates.find(t => t.id === templateId);
 
@@ -1869,16 +1869,16 @@ router.post('/apply-template/:projectName', async (req, res) => {
             });
         }
 
-        // Apply customizations to template content
+        // 将自定义项应用到模板内容
         let content = template.content;
-        
-        // Replace placeholders with customizations
+
+        // 用自定义项替换占位符
         for (const [key, value] of Object.entries(customizations)) {
             const placeholder = `[${key}]`;
             content = content.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'), 'g'), value);
         }
 
-        // Ensure .taskmaster/docs directory exists
+        // 确保 .taskmaster/docs 目录存在
         const docsDir = path.join(projectPath, '.taskmaster', 'docs');
         try {
             await fsPromises.mkdir(docsDir, { recursive: true });
@@ -1888,7 +1888,7 @@ router.post('/apply-template/:projectName', async (req, res) => {
 
         const filePath = path.join(docsDir, fileName);
 
-        // Write the template content to the file
+        // 将模板内容写入文件
         try {
             await fsPromises.writeFile(filePath, content, 'utf8');
 
@@ -1920,9 +1920,9 @@ router.post('/apply-template/:projectName', async (req, res) => {
     }
 });
 
-// Helper function to get available templates
+// 获取可用模板的辅助函数
 async function getAvailableTemplates() {
-    // This could be extended to read from files or database
+    // 这可以扩展为从文件或数据库读取
     return [
         {
             id: 'web-app',
@@ -1956,7 +1956,7 @@ Brief description of what this web application will do and why it's needed.
 - Performance benchmarks
 - Business objectives`
         },
-        // Add other templates here if needed
+        // 如果需要，在此添加其他模板
     ];
 }
 

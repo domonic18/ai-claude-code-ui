@@ -1,9 +1,9 @@
 /**
- * MCP SERVER DETECTION UTILITY
- * ============================
- * 
- * Centralized utility for detecting MCP server configurations.
- * Used across TaskMaster integration and other MCP-dependent features.
+ * MCP 服务器检测工具
+ * ===========================
+ *
+ * 用于检测 MCP 服务器配置的集中化工具。
+ * 用于 TaskMaster 集成和其他依赖 MCP 的功能。
  */
 
 import { promises as fsPromises } from 'fs';
@@ -11,23 +11,23 @@ import path from 'path';
 import os from 'os';
 
 /**
- * Check if task-master-ai MCP server is configured
- * Reads directly from Claude configuration files like claude-cli.js does
- * @returns {Promise<Object>} MCP detection result
+ * 检查是否配置了 task-master-ai MCP 服务器
+ * 直接从 Claude 配置文件读取，就像 claude-cli.js 一样
+ * @returns {Promise<Object>} MCP 检测结果
  */
 export async function detectTaskMasterMCPServer() {
     try {
-        // Read Claude configuration files directly (same logic as mcp.js)
+        // 直接读取 Claude 配置文件（与 mcp.js 逻辑相同）
         const homeDir = os.homedir();
         const configPaths = [
             path.join(homeDir, '.claude.json'),
             path.join(homeDir, '.claude', 'settings.json')
         ];
-        
+
         let configData = null;
         let configPath = null;
-        
-        // Try to read from either config file
+
+        // 尝试从任一配置文件读取
         for (const filepath of configPaths) {
             try {
                 const fileContent = await fsPromises.readFile(filepath, 'utf8');
@@ -35,28 +35,28 @@ export async function detectTaskMasterMCPServer() {
                 configPath = filepath;
                 break;
             } catch (error) {
-                // File doesn't exist or is not valid JSON, try next
+                // 文件不存在或不是有效的 JSON，尝试下一个
                 continue;
             }
         }
-        
+
         if (!configData) {
             return {
                 hasMCPServer: false,
-                reason: 'No Claude configuration file found',
+                reason: '未找到 Claude 配置文件',
                 hasConfig: false
             };
         }
 
-        // Look for task-master-ai in user-scoped MCP servers
+        // 在用户范围的 MCP 服务器中查找 task-master-ai
         let taskMasterServer = null;
         if (configData.mcpServers && typeof configData.mcpServers === 'object') {
-            const serverEntry = Object.entries(configData.mcpServers).find(([name, config]) => 
-                name === 'task-master-ai' || 
+            const serverEntry = Object.entries(configData.mcpServers).find(([name, config]) =>
+                name === 'task-master-ai' ||
                 name.includes('task-master') ||
                 (config && config.command && config.command.includes('task-master'))
             );
-            
+
             if (serverEntry) {
                 const [name, config] = serverEntry;
                 taskMasterServer = {
@@ -68,16 +68,16 @@ export async function detectTaskMasterMCPServer() {
             }
         }
 
-        // Also check project-specific MCP servers if not found globally
+        // 如果未在全局找到，还检查项目特定的 MCP 服务器
         if (!taskMasterServer && configData.projects) {
             for (const [projectPath, projectConfig] of Object.entries(configData.projects)) {
                 if (projectConfig.mcpServers && typeof projectConfig.mcpServers === 'object') {
-                    const serverEntry = Object.entries(projectConfig.mcpServers).find(([name, config]) => 
-                        name === 'task-master-ai' || 
+                    const serverEntry = Object.entries(projectConfig.mcpServers).find(([name, config]) =>
+                        name === 'task-master-ai' ||
                         name.includes('task-master') ||
                         (config && config.command && config.command.includes('task-master'))
                     );
-                    
+
                     if (serverEntry) {
                         const [name, config] = serverEntry;
                         taskMasterServer = {
@@ -94,10 +94,10 @@ export async function detectTaskMasterMCPServer() {
         }
 
         if (taskMasterServer) {
-            const isValid = !!(taskMasterServer.config && 
+            const isValid = !!(taskMasterServer.config &&
                              (taskMasterServer.config.command || taskMasterServer.config.url));
-            const hasEnvVars = !!(taskMasterServer.config && 
-                                taskMasterServer.config.env && 
+            const hasEnvVars = !!(taskMasterServer.config &&
+                                taskMasterServer.config.env &&
                                 Object.keys(taskMasterServer.config.env).length > 0);
 
             return {
@@ -114,7 +114,7 @@ export async function detectTaskMasterMCPServer() {
                 }
             };
         } else {
-            // Get list of available servers for debugging
+            // 获取可用服务器列表以进行调试
             const availableServers = [];
             if (configData.mcpServers) {
                 availableServers.push(...Object.keys(configData.mcpServers));
@@ -129,25 +129,25 @@ export async function detectTaskMasterMCPServer() {
 
             return {
                 hasMCPServer: false,
-                reason: 'task-master-ai not found in configured MCP servers',
+                reason: '在配置的 MCP 服务器中未找到 task-master-ai',
                 hasConfig: true,
                 configPath,
                 availableServers
             };
         }
     } catch (error) {
-        console.error('Error detecting MCP server config:', error);
+        console.error('检测 MCP 服务器配置时出错:', error);
         return {
             hasMCPServer: false,
-            reason: `Error checking MCP config: ${error.message}`,
+            reason: `检查 MCP 配置时出错: ${error.message}`,
             hasConfig: false
         };
     }
 }
 
 /**
- * Get all configured MCP servers (not just TaskMaster)
- * @returns {Promise<Object>} All MCP servers configuration
+ * 获取所有配置的 MCP 服务器（不仅是 TaskMaster）
+ * @returns {Promise<Object>} 所有 MCP 服务器配置
  */
 export async function getAllMCPServers() {
     try {
@@ -156,11 +156,11 @@ export async function getAllMCPServers() {
             path.join(homeDir, '.claude.json'),
             path.join(homeDir, '.claude', 'settings.json')
         ];
-        
+
         let configData = null;
         let configPath = null;
-        
-        // Try to read from either config file
+
+        // 尝试从任一配置文件读取
         for (const filepath of configPaths) {
             try {
                 const fileContent = await fsPromises.readFile(filepath, 'utf8');
@@ -171,7 +171,7 @@ export async function getAllMCPServers() {
                 continue;
             }
         }
-        
+
         if (!configData) {
             return {
                 hasConfig: false,
@@ -187,7 +187,7 @@ export async function getAllMCPServers() {
             projectServers: configData.projects || {}
         };
     } catch (error) {
-        console.error('Error getting all MCP servers:', error);
+        console.error('获取所有 MCP 服务器时出错:', error);
         return {
             hasConfig: false,
             error: error.message,

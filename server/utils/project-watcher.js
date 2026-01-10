@@ -1,11 +1,11 @@
 /**
- * Project Watcher Module
+ * 项目监视器模块
  *
- * Monitors the Claude projects directory for changes and broadcasts
- * updates to connected WebSocket clients.
+ * 监视 Claude 项目目录的更改并向连接的
+ * WebSocket 客户端广播更新。
  *
- * In container mode, file watching is disabled as projects are managed
- * inside Docker containers.
+ * 在容器模式下，禁用文件监视，因为项目在
+ * Docker 容器内管理。
  */
 
 import path from 'path';
@@ -13,17 +13,17 @@ import os from 'os';
 import { getProjects } from '../services/project/index.js';
 
 /**
- * Setup file system watcher for Claude projects folder using chokidar
- * @param {Set} connectedClients - Set of connected WebSocket clients
+ * 使用 chokidar 为 Claude 项目文件夹设置文件系统监视器
+ * @param {Set} connectedClients - 已连接的 WebSocket 客户端集合
  * @returns {Promise<void>}
  */
 export async function setupProjectsWatcher(connectedClients) {
-  // Check if container mode is enabled
+  // 检查是否启用了容器模式
   const isContainerMode = process.env.CONTAINER_MODE === 'true' || process.env.CONTAINER_MODE === '1';
 
   if (isContainerMode) {
-    console.log('[INFO] Container mode is enabled, skipping host projects watcher');
-    console.log('[INFO] Projects will be managed inside containers');
+    console.log('[INFO] 已启用容器模式，跳过主机项目监视器');
+    console.log('[INFO] 项目将在容器内管理');
     return;
   }
 
@@ -31,7 +31,7 @@ export async function setupProjectsWatcher(connectedClients) {
   const claudeProjectsPath = path.join(os.homedir(), '.claude', 'projects');
 
   try {
-    // Initialize chokidar watcher with optimized settings
+    // 使用优化设置初始化 chokidar 监视器
     const projectsWatcher = chokidar.watch(claudeProjectsPath, {
       ignored: [
         '**/node_modules/**',
@@ -43,25 +43,25 @@ export async function setupProjectsWatcher(connectedClients) {
         '**/.DS_Store'
       ],
       persistent: true,
-      ignoreInitial: true, // Don't fire events for existing files on startup
+      ignoreInitial: true, // 启动时不为现有文件触发事件
       followSymlinks: false,
-      depth: 10, // Reasonable depth limit
+      depth: 10, // 合理的深度限制
       awaitWriteFinish: {
-        stabilityThreshold: 100, // Wait 100ms for file to stabilize
+        stabilityThreshold: 100, // 等待 100ms 以使文件稳定
         pollInterval: 50
       }
     });
 
-    // Debounce function to prevent excessive notifications
+    // 防抖函数以防止过度通知
     let debounceTimer;
     const debouncedUpdate = async (eventType, filePath) => {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(async () => {
         try {
-          // Get updated projects list
+          // 获取更新后的项目列表
           const updatedProjects = await getProjects();
 
-          // Notify all connected clients about the project changes
+          // 通知所有连接的客户端项目更改
           const updateMessage = JSON.stringify({
             type: 'projects_updated',
             projects: updatedProjects,
@@ -77,12 +77,12 @@ export async function setupProjectsWatcher(connectedClients) {
           });
 
         } catch (error) {
-          console.error('[ERROR] Error handling project changes:', error);
+          console.error('[ERROR] 处理项目更改错误:', error);
         }
-      }, 300); // 300ms debounce
+      }, 300); // 300ms 防抖
     };
 
-    // Set up event listeners
+    // 设置事件监听器
     projectsWatcher
       .on('add', (filePath) => debouncedUpdate('add', filePath))
       .on('change', (filePath) => debouncedUpdate('change', filePath))
@@ -90,18 +90,18 @@ export async function setupProjectsWatcher(connectedClients) {
       .on('addDir', (dirPath) => debouncedUpdate('addDir', dirPath))
       .on('unlinkDir', (dirPath) => debouncedUpdate('unlinkDir', dirPath))
       .on('error', (error) => {
-        console.error('[ERROR] Chokidar watcher error:', error);
+        console.error('[ERROR] Chokidar 监视器错误:', error);
       })
       .on('ready', () => {
-        // Watcher is ready
+        // 监视器已就绪
       });
 
-    console.log('[INFO] Host projects watcher started (non-container mode)');
+    console.log('[INFO] 主机项目监视器已启动（非容器模式）');
 
     return projectsWatcher;
 
   } catch (error) {
-    console.error('[ERROR] Failed to setup projects watcher:', error);
+    console.error('[ERROR] 设置项目监视器失败:', error);
     return null;
   }
 }

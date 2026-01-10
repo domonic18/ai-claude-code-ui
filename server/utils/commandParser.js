@@ -7,9 +7,9 @@ import { parse as parseShellCommand } from 'shell-quote';
 
 const execFileAsync = promisify(execFile);
 
-// Configuration
+// 配置
 const MAX_INCLUDE_DEPTH = 3;
-const BASH_TIMEOUT = 30000; // 30 seconds
+const BASH_TIMEOUT = 30000; // 30 秒
 const BASH_COMMAND_ALLOWLIST = [
   'echo',
   'ls',
@@ -26,9 +26,9 @@ const BASH_COMMAND_ALLOWLIST = [
 ];
 
 /**
- * Parse a markdown command file and extract frontmatter and content
- * @param {string} content - Raw markdown content
- * @returns {object} Parsed command with data (frontmatter) and content
+ * 解析 markdown 命令文件并提取 frontmatter 和内容
+ * @param {string} content - 原始 markdown 内容
+ * @returns {object} 解析后的命令，包含 data（frontmatter）和 content
  */
 export function parseCommand(content) {
   try {
@@ -39,29 +39,29 @@ export function parseCommand(content) {
       raw: content
     };
   } catch (error) {
-    throw new Error(`Failed to parse command: ${error.message}`);
+    throw new Error(`解析命令失败: ${error.message}`);
   }
 }
 
 /**
- * Replace argument placeholders in content
- * @param {string} content - Content with placeholders
- * @param {string|array} args - Arguments to replace (string or array)
- * @returns {string} Content with replaced arguments
+ * 替换内容中的参数占位符
+ * @param {string} content - 包含占位符的内容
+ * @param {string|array} args - 要替换的参数（字符串或数组）
+ * @returns {string} 替换参数后的内容
  */
 export function replaceArguments(content, args) {
   if (!content) return content;
 
   let result = content;
 
-  // Convert args to array if it's a string
+  // 如果 args 是字符串，则转换为数组
   const argsArray = Array.isArray(args) ? args : (args ? [args] : []);
 
-  // Replace $ARGUMENTS with all arguments joined by space
+  // 用所有参数（用空格连接）替换 $ARGUMENTS
   const allArgs = argsArray.join(' ');
   result = result.replace(/\$ARGUMENTS/g, allArgs);
 
-  // Replace positional arguments $1-$9
+  // 替换位置参数 $1-$9
   for (let i = 1; i <= 9; i++) {
     const regex = new RegExp(`\\$${i}`, 'g');
     const value = argsArray[i - 1] || '';
@@ -72,10 +72,10 @@ export function replaceArguments(content, args) {
 }
 
 /**
- * Validate file path to prevent directory traversal
- * @param {string} filePath - Path to validate
- * @param {string} basePath - Base directory path
- * @returns {boolean} True if path is safe
+ * 验证文件路径以防止目录遍历攻击
+ * @param {string} filePath - 要验证的路径
+ * @param {string} basePath - 基础目录路径
+ * @returns {boolean} 如果路径安全则返回 true
  */
 export function isPathSafe(filePath, basePath) {
   const resolvedPath = path.resolve(basePath, filePath);
@@ -89,21 +89,21 @@ export function isPathSafe(filePath, basePath) {
 }
 
 /**
- * Process file includes in content (@filename syntax)
- * @param {string} content - Content with @filename includes
- * @param {string} basePath - Base directory for resolving file paths
- * @param {number} depth - Current recursion depth
- * @returns {Promise<string>} Content with includes resolved
+ * 处理内容中的文件包含（@filename 语法）
+ * @param {string} content - 包含 @filename 包含的内容
+ * @param {string} basePath - 用于解析文件路径的基础目录
+ * @param {number} depth - 当前递归深度
+ * @returns {Promise<string>} 解析包含后的内容
  */
 export async function processFileIncludes(content, basePath, depth = 0) {
   if (!content) return content;
 
-  // Prevent infinite recursion
+  // 防止无限递归
   if (depth >= MAX_INCLUDE_DEPTH) {
-    throw new Error(`Maximum include depth (${MAX_INCLUDE_DEPTH}) exceeded`);
+    throw new Error(`超过最大包含深度 (${MAX_INCLUDE_DEPTH})`);
   }
 
-  // Match @filename patterns (at start of line or after whitespace)
+  // 匹配 @filename 模式（在行首或空格后）
   const includePattern = /(?:^|\s)@([^\s]+)/gm;
   const matches = [...content.matchAll(includePattern)];
 
@@ -117,23 +117,23 @@ export async function processFileIncludes(content, basePath, depth = 0) {
     const fullMatch = match[0];
     const filename = match[1];
 
-    // Security: prevent directory traversal
+    // 安全性：防止目录遍历
     if (!isPathSafe(filename, basePath)) {
-      throw new Error(`Invalid file path (directory traversal detected): ${filename}`);
+      throw new Error(`无效的文件路径（检测到目录遍历攻击）: ${filename}`);
     }
 
     try {
       const filePath = path.resolve(basePath, filename);
       const fileContent = await fs.readFile(filePath, 'utf-8');
 
-      // Recursively process includes in the included file
+      // 递归处理包含文件中的包含
       const processedContent = await processFileIncludes(fileContent, basePath, depth + 1);
 
-      // Replace the @filename with the file content
+      // 用文件内容替换 @filename
       result = result.replace(fullMatch, fullMatch.startsWith(' ') ? ' ' + processedContent : processedContent);
     } catch (error) {
       if (error.code === 'ENOENT') {
-        throw new Error(`File not found: ${filename}`);
+        throw new Error(`文件未找到: ${filename}`);
       }
       throw error;
     }
@@ -143,20 +143,20 @@ export async function processFileIncludes(content, basePath, depth = 0) {
 }
 
 /**
- * Validate that a command and its arguments are safe
- * @param {string} commandString - Command string to validate
- * @returns {{ allowed: boolean, command: string, args: string[], error?: string }} Validation result
+ * 验证命令及其参数是否安全
+ * @param {string} commandString - 要验证的命令字符串
+ * @returns {{ allowed: boolean, command: string, args: string[], error?: string }} 验证结果
  */
 export function validateCommand(commandString) {
   const trimmedCommand = commandString.trim();
   if (!trimmedCommand) {
-    return { allowed: false, command: '', args: [], error: 'Empty command' };
+    return { allowed: false, command: '', args: [], error: '命令为空' };
   }
 
-  // Parse the command using shell-quote to handle quotes properly
+  // 使用 shell-quote 解析命令以正确处理引号
   const parsed = parseShellCommand(trimmedCommand);
 
-  // Check for shell operators or control structures
+  // 检查 shell 运算符或控制结构
   const hasOperators = parsed.some(token =>
     typeof token === 'object' && token.op
   );
@@ -166,23 +166,23 @@ export function validateCommand(commandString) {
       allowed: false,
       command: '',
       args: [],
-      error: 'Shell operators (&&, ||, |, ;, etc.) are not allowed'
+      error: '不允许使用 shell 运算符（&&、||、|、; 等）'
     };
   }
 
-  // Extract command and args (all should be strings after validation)
+  // 提取命令和参数（验证后都应该是字符串）
   const tokens = parsed.filter(token => typeof token === 'string');
 
   if (tokens.length === 0) {
-    return { allowed: false, command: '', args: [], error: 'No valid command found' };
+    return { allowed: false, command: '', args: [], error: '未找到有效命令' };
   }
 
   const [command, ...args] = tokens;
 
-  // Extract just the command name (remove path if present)
+  // 仅提取命令名称（如果有路径则移除）
   const commandName = path.basename(command);
 
-  // Check if command exactly matches allowlist (no prefix matching)
+  // 检查命令是否完全匹配允许列表（无前缀匹配）
   const isAllowed = BASH_COMMAND_ALLOWLIST.includes(commandName);
 
   if (!isAllowed) {
@@ -190,11 +190,11 @@ export function validateCommand(commandString) {
       allowed: false,
       command: commandName,
       args,
-      error: `Command '${commandName}' is not in the allowlist`
+      error: `命令 '${commandName}' 不在允许列表中`
     };
   }
 
-  // Validate arguments don't contain dangerous metacharacters
+  // 验证参数不包含危险的元字符
   const dangerousPattern = /[;&|`$()<>{}[\]\\]/;
   for (const arg of args) {
     if (dangerousPattern.test(arg)) {
@@ -202,7 +202,7 @@ export function validateCommand(commandString) {
         allowed: false,
         command: commandName,
         args,
-        error: `Argument contains dangerous characters: ${arg}`
+        error: `参数包含危险字符: ${arg}`
       };
     }
   }
@@ -211,10 +211,10 @@ export function validateCommand(commandString) {
 }
 
 /**
- * Backward compatibility: Check if command is allowed (deprecated)
- * @deprecated Use validateCommand() instead for better security
- * @param {string} command - Command to validate
- * @returns {boolean} True if command is allowed
+ * 向后兼容：检查命令是否允许（已弃用）
+ * @deprecated 请改用 validateCommand() 以获得更好的安全性
+ * @param {string} command - 要验证的命令
+ * @returns {boolean} 如果命令允许则返回 true
  */
 export function isBashCommandAllowed(command) {
   const result = validateCommand(command);
@@ -222,14 +222,14 @@ export function isBashCommandAllowed(command) {
 }
 
 /**
- * Sanitize bash command output
- * @param {string} output - Raw command output
- * @returns {string} Sanitized output
+ * 清理 bash 命令输出
+ * @param {string} output - 原始命令输出
+ * @returns {string} 清理后的输出
  */
 export function sanitizeOutput(output) {
   if (!output) return '';
 
-  // Remove control characters except \t, \n, \r
+  // 移除控制字符（除 \t、\n、\r 外）
   return [...output]
     .filter(ch => {
       const code = ch.charCodeAt(0);
@@ -242,17 +242,17 @@ export function sanitizeOutput(output) {
 }
 
 /**
- * Process bash commands in content (!command syntax)
- * @param {string} content - Content with !command syntax
- * @param {object} options - Options for bash execution
- * @returns {Promise<string>} Content with bash commands executed and replaced
+ * 处理内容中的 bash 命令（!command 语法）
+ * @param {string} content - 包含 !command 语法的内容
+ * @param {object} options - bash 执行选项
+ * @returns {Promise<string>} bash 命令执行并替换后的内容
  */
 export async function processBashCommands(content, options = {}) {
   if (!content) return content;
 
   const { cwd = process.cwd(), timeout = BASH_TIMEOUT } = options;
 
-  // Match !command patterns (at start of line or after whitespace)
+  // 匹配 !command 模式（在行首或空格后）
   const commandPattern = /(?:^|\n)!(.+?)(?=\n|$)/g;
   const matches = [...content.matchAll(commandPattern)];
 
@@ -266,36 +266,36 @@ export async function processBashCommands(content, options = {}) {
     const fullMatch = match[0];
     const commandString = match[1].trim();
 
-    // Security: validate command and parse args
+    // 安全性：验证命令并解析参数
     const validation = validateCommand(commandString);
 
     if (!validation.allowed) {
-      throw new Error(`Command not allowed: ${commandString} - ${validation.error}`);
+      throw new Error(`命令不允许: ${commandString} - ${validation.error}`);
     }
 
     try {
-      // Execute without shell using execFile with parsed args
+      // 使用 execFile 与解析的参数一起执行，不使用 shell
       const { stdout, stderr } = await execFileAsync(
         validation.command,
         validation.args,
         {
           cwd,
           timeout,
-          maxBuffer: 1024 * 1024, // 1MB max output
-          shell: false, // IMPORTANT: No shell interpretation
-          env: { ...process.env, PATH: process.env.PATH } // Inherit PATH for finding commands
+          maxBuffer: 1024 * 1024, // 最大输出 1MB
+          shell: false, // 重要：无 shell 解释
+          env: { ...process.env, PATH: process.env.PATH } // 继承 PATH 以查找命令
         }
       );
 
       const output = sanitizeOutput(stdout || stderr || '');
 
-      // Replace the !command with the output
+      // 用输出替换 !command
       result = result.replace(fullMatch, fullMatch.startsWith('\n') ? '\n' + output : output);
     } catch (error) {
       if (error.killed) {
-        throw new Error(`Command timeout: ${commandString}`);
+        throw new Error(`命令超时: ${commandString}`);
       }
-      throw new Error(`Command failed: ${commandString} - ${error.message}`);
+      throw new Error(`命令失败: ${commandString} - ${error.message}`);
     }
   }
 

@@ -1,9 +1,9 @@
 /**
- * MCP UTILITIES API ROUTES
- * ========================
- * 
- * API endpoints for MCP server detection and configuration utilities.
- * These endpoints expose centralized MCP detection functionality.
+ * MCP 工具 API 路由
+ * =======================
+ *
+ * MCP 服务器检测和配置工具的 API 端点。
+ * 这些端点提供集中的 MCP 检测功能。
  */
 
 import express from 'express';
@@ -13,7 +13,7 @@ const router = express.Router();
 
 /**
  * GET /api/mcp-utils/taskmaster-server
- * Check if TaskMaster MCP server is configured
+ * 检查 TaskMaster MCP 服务器是否已配置
  */
 router.get('/taskmaster-server', async (req, res) => {
     try {
@@ -30,7 +30,7 @@ router.get('/taskmaster-server', async (req, res) => {
 
 /**
  * GET /api/mcp-utils/all-servers
- * Get all configured MCP servers
+ * 获取所有已配置的 MCP 服务器
  */
 router.get('/all-servers', async (req, res) => {
     try {

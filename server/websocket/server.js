@@ -1,8 +1,8 @@
 /**
- * WebSocket Server Module
+ * WebSocket 服务器模块
  *
- * Manages WebSocket server initialization, authentication, and
- * connection routing based on URL paths.
+ * 管理 WebSocket 服务器初始化、身份验证和
+ * 基于 URL 路径的连接路由。
  *
  * @module websocket/server
  */
@@ -13,22 +13,22 @@ import { handleChatConnection } from './handlers/chat.js';
 import { handleShellConnection } from './handlers/shell.js';
 
 /**
- * Create and configure WebSocket server
- * @param {http.Server} server - The HTTP server to attach WebSocket to
- * @param {Set} connectedClients - Set of connected clients for project updates
- * @param {Map} ptySessionsMap - Map for managing PTY sessions
- * @returns {WebSocketServer} The configured WebSocket server
+ * 创建并配置 WebSocket 服务器
+ * @param {http.Server} server - 要附加 WebSocket 的 HTTP 服务器
+ * @param {Set} connectedClients - 已连接客户端的集合，用于项目更新
+ * @param {Map} ptySessionsMap - 用于管理 PTY 会话的映射
+ * @returns {WebSocketServer} 配置好的 WebSocket 服务器
  */
 export function createWebSocketServer(server, connectedClients, ptySessionsMap) {
-    // Create WebSocket server with authentication
+    // 创建带身份验证的 WebSocket 服务器
     const wss = new WebSocketServer({
         server,
         verifyClient: (info) => {
             console.log('WebSocket connection attempt to:', info.req.url);
 
-            // Platform mode: always allow connection
+            // 平台模式：始终允许连接
             if (process.env.VITE_IS_PLATFORM === 'true') {
-                const user = authenticateWebSocket(null); // Will return first user
+                const user = authenticateWebSocket(null); // 将返回第一个用户
                 if (!user) {
                     console.log('[WARN] Platform mode: No user found in database');
                     return false;
@@ -38,32 +38,32 @@ export function createWebSocketServer(server, connectedClients, ptySessionsMap) 
                 return true;
             }
 
-            // Normal mode: verify token
-            // Extract token from query parameters or headers
+            // 普通模式：验证令牌
+            // 从查询参数或请求头中提取令牌
             const url = new URL(info.req.url, 'http://localhost');
             const token = url.searchParams.get('token') ||
                 info.req.headers.authorization?.split(' ')[1];
 
-            // Verify token
+            // 验证令牌
             const user = authenticateWebSocket(token);
             if (!user) {
                 console.log('[WARN] WebSocket authentication failed');
                 return false;
             }
 
-            // Store user info in the request for later use
+            // 在请求中存储用户信息供后续使用
             info.req.user = user;
             console.log('[OK] WebSocket authenticated for user:', user.username);
             return true;
         }
     });
 
-    // Setup connection routing based on URL path
+    // 基于 URL 路径设置连接路由
     wss.on('connection', (ws, request) => {
         const url = request.url;
         console.log('[INFO] Client connected to:', url);
 
-        // Parse URL to get pathname without query parameters
+        // 解析 URL 以获取不带查询参数的路径名
         const urlObj = new URL(url, 'http://localhost');
         const pathname = urlObj.pathname;
 

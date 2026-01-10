@@ -4,14 +4,14 @@ import { apiKeysDb, credentialsDb } from '../database/db.js';
 const router = express.Router();
 
 // ===============================
-// API Keys Management
+// API 密钥管理
 // ===============================
 
-// Get all API keys for the authenticated user
+// 获取已认证用户的所有 API 密钥
 router.get('/api-keys', async (req, res) => {
   try {
     const apiKeys = apiKeysDb.getApiKeys(req.user.id);
-    // Don't send the full API key in the list for security
+    // 为了安全，不要在列表中发送完整的 API 密钥
     const sanitizedKeys = apiKeys.map(key => ({
       ...key,
       api_key: key.api_key.substring(0, 10) + '...'
@@ -23,7 +23,7 @@ router.get('/api-keys', async (req, res) => {
   }
 });
 
-// Create a new API key
+// 创建新的 API 密钥
 router.post('/api-keys', async (req, res) => {
   try {
     const { keyName } = req.body;
@@ -43,7 +43,7 @@ router.post('/api-keys', async (req, res) => {
   }
 });
 
-// Delete an API key
+// 删除 API 密钥
 router.delete('/api-keys/:keyId', async (req, res) => {
   try {
     const { keyId } = req.params;
@@ -60,7 +60,7 @@ router.delete('/api-keys/:keyId', async (req, res) => {
   }
 });
 
-// Toggle API key active status
+// 切换 API 密钥的活动状态
 router.patch('/api-keys/:keyId/toggle', async (req, res) => {
   try {
     const { keyId } = req.params;
@@ -84,15 +84,15 @@ router.patch('/api-keys/:keyId/toggle', async (req, res) => {
 });
 
 // ===============================
-// Generic Credentials Management
+// 通用凭证管理
 // ===============================
 
-// Get all credentials for the authenticated user (optionally filtered by type)
+// 获取已认证用户的所有凭证（可选择按类型过滤）
 router.get('/credentials', async (req, res) => {
   try {
     const { type } = req.query;
     const credentials = credentialsDb.getCredentials(req.user.id, type || null);
-    // Don't send the actual credential values for security
+    // 为了安全，不要发送实际的凭证值
     res.json({ credentials });
   } catch (error) {
     console.error('Error fetching credentials:', error);
@@ -100,7 +100,7 @@ router.get('/credentials', async (req, res) => {
   }
 });
 
-// Create a new credential
+// 创建新凭证
 router.post('/credentials', async (req, res) => {
   try {
     const { credentialName, credentialType, credentialValue, description } = req.body;
@@ -135,7 +135,7 @@ router.post('/credentials', async (req, res) => {
   }
 });
 
-// Delete a credential
+// 删除凭证
 router.delete('/credentials/:credentialId', async (req, res) => {
   try {
     const { credentialId } = req.params;
@@ -152,7 +152,7 @@ router.delete('/credentials/:credentialId', async (req, res) => {
   }
 });
 
-// Toggle credential active status
+// 切换凭证的活动状态
 router.patch('/credentials/:credentialId/toggle', async (req, res) => {
   try {
     const { credentialId } = req.params;

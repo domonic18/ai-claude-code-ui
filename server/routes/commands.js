@@ -12,17 +12,17 @@ const __dirname = path.dirname(__filename);
 const router = express.Router();
 
 /**
- * Recursively scan directory for command files (.md)
- * @param {string} dir - Directory to scan
- * @param {string} baseDir - Base directory for relative paths
- * @param {string} namespace - Namespace for commands (e.g., 'project', 'user')
- * @returns {Promise<Array>} Array of command objects
+ * 递归扫描目录中的命令文件（.md）
+ * @param {string} dir - 要扫描的目录
+ * @param {string} baseDir - 相对路径的基础目录
+ * @param {string} namespace - 命令的命名空间（例如，'project'、'user'）
+ * @returns {Promise<Array>} 命令对象数组
  */
 async function scanCommandsDirectory(dir, baseDir, namespace) {
   const commands = [];
 
   try {
-    // Check if directory exists
+    // 检查目录是否存在
     await fs.access(dir);
 
     const entries = await fs.readdir(dir, { withFileTypes: true });
@@ -31,21 +31,21 @@ async function scanCommandsDirectory(dir, baseDir, namespace) {
       const fullPath = path.join(dir, entry.name);
 
       if (entry.isDirectory()) {
-        // Recursively scan subdirectories
+        // 递归扫描子目录
         const subCommands = await scanCommandsDirectory(fullPath, baseDir, namespace);
         commands.push(...subCommands);
       } else if (entry.isFile() && entry.name.endsWith('.md')) {
-        // Parse markdown file for metadata
+        // 解析 markdown 文件的元数据
         try {
           const content = await fs.readFile(fullPath, 'utf8');
           const { data: frontmatter, content: commandContent } = matter(content);
 
-          // Calculate relative path from baseDir for command name
+          // 计算从 baseDir 开始的相对路径作为命令名称
           const relativePath = path.relative(baseDir, fullPath);
-          // Remove .md extension and convert to command name
+          // 移除 .md 扩展名并转换为命令名称
           const commandName = '/' + relativePath.replace(/\.md$/, '').replace(/\\/g, '/');
 
-          // Extract description from frontmatter or first line of content
+          // 从 frontmatter 或内容的第一行提取描述
           let description = frontmatter.description || '';
           if (!description) {
             const firstLine = commandContent.trim().split('\n')[0];
@@ -66,7 +66,7 @@ async function scanCommandsDirectory(dir, baseDir, namespace) {
       }
     }
   } catch (err) {
-    // Directory doesn't exist or can't be accessed - this is okay
+    // 目录不存在或无法访问 - 这是正常的
     if (err.code !== 'ENOENT' && err.code !== 'EACCES') {
       console.error(`Error scanning directory ${dir}:`, err.message);
     }
@@ -76,7 +76,7 @@ async function scanCommandsDirectory(dir, baseDir, namespace) {
 }
 
 /**
- * Built-in commands that are always available
+ * 始终可用的内置命令
  */
 const builtInCommands = [
   {
@@ -130,8 +130,8 @@ const builtInCommands = [
 ];
 
 /**
- * Built-in command handlers
- * Each handler returns { type: 'builtin', action: string, data: any }
+ * 内置命令处理器
+ * 每个处理器返回 { type: 'builtin', action: string, data: any }
  */
 const builtInHandlers = {
   '/help': async (args, context) => {
@@ -183,7 +183,7 @@ Custom commands can be created in:
   },
 
   '/model': async (args, context) => {
-    // Read available models from centralized constants
+    // 从集中的常量读取可用模型
     const availableModels = {
       claude: CLAUDE_MODELS.OPTIONS.map(o => o.value),
       cursor: CURSOR_MODELS.OPTIONS.map(o => o.value),
@@ -210,7 +210,7 @@ Custom commands can be created in:
   },
 
   '/status': async (args, context) => {
-    // Read version from package.json
+    // 从 package.json 读取版本
     const packageJsonPath = path.join(path.dirname(__dirname), '..', 'package.json');
     let version = 'unknown';
     let packageName = 'claude-code-ui';
@@ -262,13 +262,13 @@ Custom commands can be created in:
 
     const claudeMdPath = path.join(projectPath, 'CLAUDE.md');
 
-    // Check if CLAUDE.md exists
+    // 检查 CLAUDE.md 是否存在
     let exists = false;
     try {
       await fs.access(claudeMdPath);
       exists = true;
     } catch (err) {
-      // File doesn't exist
+      // 文件不存在
     }
 
     return {
@@ -321,14 +321,14 @@ Custom commands can be created in:
 
 /**
  * POST /api/commands/list
- * List all available commands from project and user directories
+ * 列出来自项目和用户目录的所有可用命令
  */
 router.post('/list', async (req, res) => {
   try {
     const { projectPath } = req.body;
     const allCommands = [...builtInCommands];
 
-    // Scan project-level commands (.claude/commands/)
+    // 扫描项目级命令（.claude/commands/）
     if (projectPath) {
       const projectCommandsDir = path.join(projectPath, '.claude', 'commands');
       const projectCommands = await scanCommandsDirectory(
@@ -339,7 +339,7 @@ router.post('/list', async (req, res) => {
       allCommands.push(...projectCommands);
     }
 
-    // Scan user-level commands (~/.claude/commands/)
+    // 扫描用户级命令（~/.claude/commands/）
     const homeDir = os.homedir();
     const userCommandsDir = path.join(homeDir, '.claude', 'commands');
     const userCommands = await scanCommandsDirectory(
@@ -349,10 +349,10 @@ router.post('/list', async (req, res) => {
     );
     allCommands.push(...userCommands);
 
-    // Separate built-in and custom commands
+    // 分离内置命令和自定义命令
     const customCommands = allCommands.filter(cmd => cmd.namespace !== 'builtin');
 
-    // Sort commands alphabetically by name
+    // 按名称字母顺序排序命令
     customCommands.sort((a, b) => a.name.localeCompare(b.name));
 
     res.json({
@@ -371,7 +371,7 @@ router.post('/list', async (req, res) => {
 
 /**
  * POST /api/commands/load
- * Load a specific command file and return its content and metadata
+ * 加载特定命令文件并返回其内容和元数据
  */
 router.post('/load', async (req, res) => {
   try {
@@ -383,7 +383,7 @@ router.post('/load', async (req, res) => {
       });
     }
 
-    // Security: Prevent path traversal
+    // 安全：防止路径遍历
     const resolvedPath = path.resolve(commandPath);
     if (!resolvedPath.startsWith(path.resolve(os.homedir())) &&
         !resolvedPath.includes('.claude/commands')) {
@@ -393,7 +393,7 @@ router.post('/load', async (req, res) => {
       });
     }
 
-    // Read and parse the command file
+    // 读取并解析命令文件
     const content = await fs.readFile(commandPath, 'utf8');
     const { data: metadata, content: commandContent } = matter(content);
 
@@ -420,9 +420,9 @@ router.post('/load', async (req, res) => {
 
 /**
  * POST /api/commands/execute
- * Execute a command with argument replacement
- * This endpoint prepares the command content but doesn't execute bash commands yet
- * (that will be handled in the command parser utility)
+ * 执行带有参数替换的命令
+ * 此端点准备命令内容，但尚未执行 bash 命令
+ * （将在命令解析器实用程序中处理）
  */
 router.post('/execute', async (req, res) => {
   try {
@@ -434,7 +434,7 @@ router.post('/execute', async (req, res) => {
       });
     }
 
-    // Handle built-in commands
+    // 处理内置命令
     const handler = builtInHandlers[commandName];
     if (handler) {
       try {
@@ -453,15 +453,15 @@ router.post('/execute', async (req, res) => {
       }
     }
 
-    // Handle custom commands
+    // 处理自定义命令
     if (!commandPath) {
       return res.status(400).json({
         error: 'Command path is required for custom commands'
       });
     }
 
-    // Load command content
-    // Security: validate commandPath is within allowed directories
+    // 加载命令内容
+    // 安全：验证 commandPath 是否在允许的目录中
     {
       const resolvedPath = path.resolve(commandPath);
       const userBase = path.resolve(path.join(os.homedir(), '.claude', 'commands'));
@@ -481,14 +481,14 @@ router.post('/execute', async (req, res) => {
     }
     const content = await fs.readFile(commandPath, 'utf8');
     const { data: metadata, content: commandContent } = matter(content);
-    // Basic argument replacement (will be enhanced in command parser utility)
+    // 基本参数替换（将在命令解析器实用程序中增强）
     let processedContent = commandContent;
 
-    // Replace $ARGUMENTS with all arguments joined
+    // 将 $ARGUMENTS 替换为所有连接的参数
     const argsString = args.join(' ');
     processedContent = processedContent.replace(/\$ARGUMENTS/g, argsString);
 
-    // Replace $1, $2, etc. with positional arguments
+    // 将 $1、$2 等替换为位置参数
     args.forEach((arg, index) => {
       const placeholder = `$${index + 1}`;
       processedContent = processedContent.replace(new RegExp(`\\${placeholder}\\b`, 'g'), arg);

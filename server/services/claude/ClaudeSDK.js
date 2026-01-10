@@ -1,15 +1,14 @@
 /**
- * Claude SDK Integration
+ * Claude SDK 集成
  *
- * This module provides SDK-based integration with Claude using the @anthropic-ai/claude-agent-sdk.
- * It mirrors the interface of claude-cli.js but uses the SDK internally for better performance
- * and maintainability.
+ * 此模块提供基于 SDK 的 Claude 集成，使用 @anthropic-ai/claude-agent-sdk。
+ * 它镜像了 claude-cli.js 的接口，但在内部使用 SDK 以获得更好的性能和可维护性。
  *
- * Key features:
- * - Direct SDK integration without child processes
- * - Session management with abort capability
- * - Options mapping between CLI and SDK formats
- * - WebSocket message streaming
+ * 主要功能：
+ * - 直接 SDK 集成，无需子进程
+ * - 支持中止功能的会话管理
+ * - CLI 和 SDK 格式之间的选项映射
+ * - WebSocket 消息流式传输
  */
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
@@ -18,12 +17,12 @@ import path from 'path';
 import os from 'os';
 import { CLAUDE_MODELS } from '../../../shared/modelConstants.js';
 
-// Session tracking: Map of session IDs to active query instances
+// 会话跟踪：会话 ID 到活动查询实例的映射
 const activeSessions = new Map();
 
 /**
- * Gets custom API configuration from environment variables
- * @returns {Object} Custom API configuration (baseURL, apiKey, model)
+ * 从环境变量获取自定义 API 配置
+ * @returns {Object} 自定义 API 配置（baseURL、apiKey、model）
  */
 function getCustomApiConfig() {
   return {
@@ -34,41 +33,41 @@ function getCustomApiConfig() {
 }
 
 /**
- * Maps CLI options to SDK-compatible options format
- * @param {Object} options - CLI options
- * @returns {Object} SDK-compatible options
+ * 将 CLI 选项映射为 SDK 兼容的选项格式
+ * @param {Object} options - CLI 选项
+ * @returns {Object} SDK 兼容的选项
  */
 function mapCliOptionsToSDK(options = {}) {
   const { sessionId, cwd, toolsSettings, permissionMode, images } = options;
 
   const sdkOptions = {};
 
-  // Map working directory
+  // 映射工作目录
   if (cwd) {
     sdkOptions.cwd = cwd;
   }
 
-  // Map permission mode
+  // 映射权限模式
   if (permissionMode && permissionMode !== 'default') {
     sdkOptions.permissionMode = permissionMode;
   }
 
-  // Map tool settings
+  // 映射工具设置
   const settings = toolsSettings || {
     allowedTools: [],
     disallowedTools: [],
     skipPermissions: false
   };
 
-  // Handle tool permissions
+  // 处理工具权限
   if (settings.skipPermissions && permissionMode !== 'plan') {
-    // When skipping permissions, use bypassPermissions mode
+    // 跳过权限时，使用 bypassPermissions 模式
     sdkOptions.permissionMode = 'bypassPermissions';
   } else {
-    // Map allowed tools
+    // 映射允许的工具
     let allowedTools = [...(settings.allowedTools || [])];
 
-    // Add plan mode default tools
+    // 添加计划模式默认工具
     if (permissionMode === 'plan') {
       const planModeTools = ['Read', 'Task', 'exit_plan_mode', 'TodoRead', 'TodoWrite', 'WebFetch', 'WebSearch'];
       for (const tool of planModeTools) {
@@ -82,17 +81,17 @@ function mapCliOptionsToSDK(options = {}) {
       sdkOptions.allowedTools = allowedTools;
     }
 
-    // Map disallowed tools
+    // 映射不允许的工具
     if (settings.disallowedTools && settings.disallowedTools.length > 0) {
       sdkOptions.disallowedTools = settings.disallowedTools;
     }
   }
 
-  // Apply custom API configuration from environment variables
+  // 应用环境变量中的自定义 API 配置
   const customConfig = getCustomApiConfig();
 
-  // Map model (default to sonnet, or custom model from env)
-  // Valid models: sonnet, opus, haiku, opusplan, sonnet[1m], or custom models
+  // 映射模型（默认为 sonnet，或使用环境变量的自定义模型）
+  // 有效模型：sonnet、opus、haiku、opusplan、sonnet[1m] 或自定义模型
   if (customConfig.model) {
     sdkOptions.model = customConfig.model;
     console.log(`Using custom model from environment: ${sdkOptions.model}`);
@@ -101,29 +100,29 @@ function mapCliOptionsToSDK(options = {}) {
     console.log(`Using model: ${sdkOptions.model}`);
   }
 
-  // Apply custom API base URL if specified
+  // 如果指定了自定义 API 基础 URL，则应用
   if (customConfig.baseURL) {
     sdkOptions.baseURL = customConfig.baseURL;
     console.log(`Using custom API endpoint: ${sdkOptions.baseURL}`);
   }
 
-  // Apply custom API key if specified
+  // 如果指定了自定义 API 密钥，则应用
   if (customConfig.apiKey) {
     sdkOptions.apiKey = customConfig.apiKey;
     console.log(`Using custom API key from environment`);
   }
 
-  // Map system prompt configuration
+  // 映射系统提示配置
   sdkOptions.systemPrompt = {
     type: 'preset',
-    preset: 'claude_code'  // Required to use CLAUDE.md
+    preset: 'claude_code'  // 使用 CLAUDE.md 所必需
   };
 
-  // Map setting sources for CLAUDE.md loading
-  // This loads CLAUDE.md from project, user (~/.config/claude/CLAUDE.md), and local directories
+  // 映射 CLAUDE.md 加载的设置源
+  // 这将从项目、用户（~/.config/claude/CLAUDE.md）和本地目录加载 CLAUDE.md
   sdkOptions.settingSources = ['project', 'user', 'local'];
 
-  // Map resume session
+  // 映射恢复会话
   if (sessionId) {
     sdkOptions.resume = sessionId;
   }
@@ -132,11 +131,11 @@ function mapCliOptionsToSDK(options = {}) {
 }
 
 /**
- * Adds a session to the active sessions map
- * @param {string} sessionId - Session identifier
- * @param {Object} queryInstance - SDK query instance
- * @param {Array<string>} tempImagePaths - Temp image file paths for cleanup
- * @param {string} tempDir - Temp directory for cleanup
+ * 将会话添加到活动会话映射
+ * @param {string} sessionId - 会话标识符
+ * @param {Object} queryInstance - SDK 查询实例
+ * @param {Array<string>} tempImagePaths - 用于清理的临时图像文件路径
+ * @param {string} tempDir - 用于清理的临时目录
  */
 function addSession(sessionId, queryInstance, tempImagePaths = [], tempDir = null) {
   activeSessions.set(sessionId, {
@@ -149,53 +148,53 @@ function addSession(sessionId, queryInstance, tempImagePaths = [], tempDir = nul
 }
 
 /**
- * Removes a session from the active sessions map
- * @param {string} sessionId - Session identifier
+ * 从活动会话映射中移除会话
+ * @param {string} sessionId - 会话标识符
  */
 function removeSession(sessionId) {
   activeSessions.delete(sessionId);
 }
 
 /**
- * Gets a session from the active sessions map
- * @param {string} sessionId - Session identifier
- * @returns {Object|undefined} Session data or undefined
+ * 从活动会话映射中获取会话
+ * @param {string} sessionId - 会话标识符
+ * @returns {Object|undefined} 会话数据或 undefined
  */
 function getSession(sessionId) {
   return activeSessions.get(sessionId);
 }
 
 /**
- * Gets all active session IDs
- * @returns {Array<string>} Array of active session IDs
+ * 获取所有活动会话 ID
+ * @returns {Array<string>} 活动会话 ID 数组
  */
 function getAllSessions() {
   return Array.from(activeSessions.keys());
 }
 
 /**
- * Transforms SDK messages to WebSocket format expected by frontend
- * @param {Object} sdkMessage - SDK message object
- * @returns {Object} Transformed message ready for WebSocket
+ * 将 SDK 消息转换为前端期望的 WebSocket 格式
+ * @param {Object} sdkMessage - SDK 消息对象
+ * @returns {Object} 转换后的消息，可用于 WebSocket
  */
 function transformMessage(sdkMessage) {
-  // SDK messages are already in a format compatible with the frontend
-  // The CLI sends them wrapped in {type: 'claude-response', data: message}
-  // We'll do the same here to maintain compatibility
+  // SDK 消息已经与前端兼容的格式
+  // CLI 将它们包装在 {type: 'claude-response', data: message} 中
+  // 我们在这里做同样的事情以保持兼容性
   return sdkMessage;
 }
 
 /**
- * Extracts token usage from SDK result messages
- * @param {Object} resultMessage - SDK result message
- * @returns {Object|null} Token budget object or null
+ * 从 SDK 结果消息中提取 token 使用情况
+ * @param {Object} resultMessage - SDK 结果消息
+ * @returns {Object|null} Token 预算对象或 null
  */
 function extractTokenBudget(resultMessage) {
   if (resultMessage.type !== 'result' || !resultMessage.modelUsage) {
     return null;
   }
 
-  // Get the first model's usage data
+  // 获取第一个模型的使用数据
   const modelKey = Object.keys(resultMessage.modelUsage)[0];
   const modelData = resultMessage.modelUsage[modelKey];
 
@@ -203,18 +202,18 @@ function extractTokenBudget(resultMessage) {
     return null;
   }
 
-  // Use cumulative tokens if available (tracks total for the session)
-  // Otherwise fall back to per-request tokens
+  // 如果可用，使用累计 token（跟踪会话总计）
+  // 否则回退到每个请求的 token
   const inputTokens = modelData.cumulativeInputTokens || modelData.inputTokens || 0;
   const outputTokens = modelData.cumulativeOutputTokens || modelData.outputTokens || 0;
   const cacheReadTokens = modelData.cumulativeCacheReadInputTokens || modelData.cacheReadInputTokens || 0;
   const cacheCreationTokens = modelData.cumulativeCacheCreationInputTokens || modelData.cacheCreationInputTokens || 0;
 
-  // Total used = input + output + cache tokens
+  // 总使用量 = 输入 + 输出 + 缓存 token
   const totalUsed = inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens;
 
-  // Use configured context window budget from environment (default 160000)
-  // This is the user's budget limit, not the model's context window
+  // 使用环境变量中配置的上下文窗口预算（默认 160000）
+  // 这是用户的预算限制，不是模型的上下文窗口
   const contextWindow = parseInt(process.env.CONTEXT_WINDOW) || 160000;
 
   console.log(`Token calculation: input=${inputTokens}, output=${outputTokens}, cache=${cacheReadTokens + cacheCreationTokens}, total=${totalUsed}/${contextWindow}`);
@@ -226,11 +225,11 @@ function extractTokenBudget(resultMessage) {
 }
 
 /**
- * Handles image processing for SDK queries
- * Saves base64 images to temporary files and returns modified prompt with file paths
- * @param {string} command - Original user prompt
- * @param {Array} images - Array of image objects with base64 data
- * @param {string} cwd - Working directory for temp file creation
+ * 处理 SDK 查询的图像处理
+ * 将 base64 图像保存到临时文件并返回带有文件路径的修改后的提示
+ * @param {string} command - 原始用户提示
+ * @param {Array} images - 包含 base64 数据的图像对象数组
+ * @param {string} cwd - 用于创建临时文件的工作目录
  * @returns {Promise<Object>} {modifiedCommand, tempImagePaths, tempDir}
  */
 async function handleImages(command, images, cwd) {
@@ -242,14 +241,14 @@ async function handleImages(command, images, cwd) {
   }
 
   try {
-    // Create temp directory in the project directory
+    // 在项目目录中创建临时目录
     const workingDir = cwd || process.cwd();
     tempDir = path.join(workingDir, '.tmp', 'images', Date.now().toString());
     await fs.mkdir(tempDir, { recursive: true });
 
-    // Save each image to a temp file
+    // 将每个图像保存到临时文件
     for (const [index, image] of images.entries()) {
-      // Extract base64 data and mime type
+      // 提取 base64 数据和 mime 类型
       const matches = image.data.match(/^data:([^;]+);base64,(.+)$/);
       if (!matches) {
         console.error('Invalid image data format');
@@ -261,12 +260,12 @@ async function handleImages(command, images, cwd) {
       const filename = `image_${index}.${extension}`;
       const filepath = path.join(tempDir, filename);
 
-      // Write base64 data to file
+      // 将 base64 数据写入文件
       await fs.writeFile(filepath, Buffer.from(base64Data, 'base64'));
       tempImagePaths.push(filepath);
     }
 
-    // Include the full image paths in the prompt
+    // 在提示中包含完整图像路径
     let modifiedCommand = command;
     if (tempImagePaths.length > 0 && command && command.trim()) {
       const imageNote = `\n\n[Images provided at the following paths:]\n${tempImagePaths.map((p, i) => `${i + 1}. ${p}`).join('\n')}`;
@@ -282,9 +281,9 @@ async function handleImages(command, images, cwd) {
 }
 
 /**
- * Cleans up temporary image files
- * @param {Array<string>} tempImagePaths - Array of temp file paths to delete
- * @param {string} tempDir - Temp directory to remove
+ * 清理临时图像文件
+ * @param {Array<string>} tempImagePaths - 要删除的临时文件路径数组
+ * @param {string} tempDir - 要删除的临时目录
  */
 async function cleanupTempFiles(tempImagePaths, tempDir) {
   if (!tempImagePaths || tempImagePaths.length === 0) {
@@ -292,14 +291,14 @@ async function cleanupTempFiles(tempImagePaths, tempDir) {
   }
 
   try {
-    // Delete individual temp files
+    // 删除单个临时文件
     for (const imagePath of tempImagePaths) {
       await fs.unlink(imagePath).catch(err =>
         console.error(`Failed to delete temp image ${imagePath}:`, err)
       );
     }
 
-    // Delete temp directory
+    // 删除临时目录
     if (tempDir) {
       await fs.rm(tempDir, { recursive: true, force: true }).catch(err =>
         console.error(`Failed to delete temp directory ${tempDir}:`, err)
@@ -313,24 +312,24 @@ async function cleanupTempFiles(tempImagePaths, tempDir) {
 }
 
 /**
- * Loads MCP server configurations from ~/.claude.json
- * @param {string} cwd - Current working directory for project-specific configs
- * @returns {Object|null} MCP servers object or null if none found
+ * 从 ~/.claude.json 加载 MCP 服务器配置
+ * @param {string} cwd - 用于项目特定配置的当前工作目录
+ * @returns {Object|null} MCP 服务器对象，如果未找到则返回 null
  */
 async function loadMcpConfig(cwd) {
   try {
     const claudeConfigPath = path.join(os.homedir(), '.claude.json');
 
-    // Check if config file exists
+    // 检查配置文件是否存在
     try {
       await fs.access(claudeConfigPath);
     } catch (error) {
-      // File doesn't exist, return null
+      // 文件不存在，返回 null
       console.log('No ~/.claude.json found, proceeding without MCP servers');
       return null;
     }
 
-    // Read and parse config file
+    // 读取并解析配置文件
     let claudeConfig;
     try {
       const configContent = await fs.readFile(claudeConfigPath, 'utf8');
@@ -340,16 +339,16 @@ async function loadMcpConfig(cwd) {
       return null;
     }
 
-    // Extract MCP servers (merge global and project-specific)
+    // 提取 MCP 服务器（合并全局和项目特定）
     let mcpServers = {};
 
-    // Add global MCP servers
+    // 添加全局 MCP 服务器
     if (claudeConfig.mcpServers && typeof claudeConfig.mcpServers === 'object') {
       mcpServers = { ...claudeConfig.mcpServers };
       console.log(`Loaded ${Object.keys(mcpServers).length} global MCP servers`);
     }
 
-    // Add/override with project-specific MCP servers
+    // 添加/覆盖项目特定的 MCP 服务器
     if (claudeConfig.claudeProjects && cwd) {
       const projectConfig = claudeConfig.claudeProjects[cwd];
       if (projectConfig && projectConfig.mcpServers && typeof projectConfig.mcpServers === 'object') {
@@ -358,7 +357,7 @@ async function loadMcpConfig(cwd) {
       }
     }
 
-    // Return null if no servers found
+    // 如果未找到服务器，返回 null
     if (Object.keys(mcpServers).length === 0) {
       console.log('No MCP servers configured');
       return null;
@@ -373,10 +372,10 @@ async function loadMcpConfig(cwd) {
 }
 
 /**
- * Executes a Claude query using the SDK
- * @param {string} command - User prompt/command
- * @param {Object} options - Query options
- * @param {Object} ws - WebSocket connection
+ * 使用 SDK 执行 Claude 查询
+ * @param {string} command - 用户提示/命令
+ * @param {Object} options - 查询选项
+ * @param {Object} ws - WebSocket 连接
  * @returns {Promise<void>}
  */
 async function queryClaudeSDK(command, options = {}, ws) {
@@ -387,47 +386,47 @@ async function queryClaudeSDK(command, options = {}, ws) {
   let tempDir = null;
 
   try {
-    // Map CLI options to SDK format
+    // 将 CLI 选项映射为 SDK 格式
     const sdkOptions = mapCliOptionsToSDK(options);
 
-    // Load MCP configuration
+    // 加载 MCP 配置
     const mcpServers = await loadMcpConfig(options.cwd);
     if (mcpServers) {
       sdkOptions.mcpServers = mcpServers;
     }
 
-    // Handle images - save to temp files and modify prompt
+    // 处理图像 - 保存到临时文件并修改提示
     const imageResult = await handleImages(command, options.images, options.cwd);
     const finalCommand = imageResult.modifiedCommand;
     tempImagePaths = imageResult.tempImagePaths;
     tempDir = imageResult.tempDir;
 
-    // Create SDK query instance
+    // 创建 SDK 查询实例
     const queryInstance = query({
       prompt: finalCommand,
       options: sdkOptions
     });
 
-    // Track the query instance for abort capability
+    // 跟踪查询实例以支持中止功能
     if (capturedSessionId) {
       addSession(capturedSessionId, queryInstance, tempImagePaths, tempDir);
     }
 
-    // Process streaming messages
+    // 处理流式消息
     console.log('Starting async generator loop for session:', capturedSessionId || 'NEW');
     for await (const message of queryInstance) {
-      // Capture session ID from first message
+      // 从第一条消息捕获会话 ID
       if (message.session_id && !capturedSessionId) {
 
         capturedSessionId = message.session_id;
         addSession(capturedSessionId, queryInstance, tempImagePaths, tempDir);
 
-        // Set session ID on writer
+        // 在 writer 上设置会话 ID
         if (ws.setSessionId && typeof ws.setSessionId === 'function') {
           ws.setSessionId(capturedSessionId);
         }
 
-        // Send session-created event only once for new sessions
+        // 仅为新会话发送一次 session-created 事件
         if (!sessionId && !sessionCreatedSent) {
           sessionCreatedSent = true;
           ws.send({
@@ -441,14 +440,14 @@ async function queryClaudeSDK(command, options = {}, ws) {
         console.log('No session_id in message or already captured. message.session_id:', message.session_id, 'capturedSessionId:', capturedSessionId);
       }
 
-      // Transform and send message to WebSocket
+      // 转换并发送消息到 WebSocket
       const transformedMessage = transformMessage(message);
       ws.send({
         type: 'claude-response',
         data: transformedMessage
       });
 
-      // Extract and send token budget updates from result messages
+      // 从结果消息中提取并发送 token 预算更新
       if (message.type === 'result') {
         const tokenBudget = extractTokenBudget(message);
         if (tokenBudget) {
@@ -461,15 +460,15 @@ async function queryClaudeSDK(command, options = {}, ws) {
       }
     }
 
-    // Clean up session on completion
+    // 完成时清理会话
     if (capturedSessionId) {
       removeSession(capturedSessionId);
     }
 
-    // Clean up temporary image files
+    // 清理临时图像文件
     await cleanupTempFiles(tempImagePaths, tempDir);
 
-    // Send completion event
+    // 发送完成事件
     console.log('Streaming complete, sending claude-complete event');
     ws.send({
       type: 'claude-complete',
@@ -482,15 +481,15 @@ async function queryClaudeSDK(command, options = {}, ws) {
   } catch (error) {
     console.error('SDK query error:', error);
 
-    // Clean up session on error
+    // 错误时清理会话
     if (capturedSessionId) {
       removeSession(capturedSessionId);
     }
 
-    // Clean up temporary image files on error
+    // 错误时清理临时图像文件
     await cleanupTempFiles(tempImagePaths, tempDir);
 
-    // Send error to WebSocket
+    // 发送错误到 WebSocket
     ws.send({
       type: 'claude-error',
       error: error.message
@@ -501,9 +500,9 @@ async function queryClaudeSDK(command, options = {}, ws) {
 }
 
 /**
- * Aborts an active SDK session
- * @param {string} sessionId - Session identifier
- * @returns {boolean} True if session was aborted, false if not found
+ * 中止活动的 SDK 会话
+ * @param {string} sessionId - 会话标识符
+ * @returns {boolean} 如果会话已中止则为 true，如果未找到则为 false
  */
 async function abortClaudeSDKSession(sessionId) {
   const session = getSession(sessionId);
@@ -516,16 +515,16 @@ async function abortClaudeSDKSession(sessionId) {
   try {
     console.log(`Aborting SDK session: ${sessionId}`);
 
-    // Call interrupt() on the query instance
+    // 在查询实例上调用 interrupt()
     await session.instance.interrupt();
 
-    // Update session status
+    // 更新会话状态
     session.status = 'aborted';
 
-    // Clean up temporary image files
+    // 清理临时图像文件
     await cleanupTempFiles(session.tempImagePaths, session.tempDir);
 
-    // Clean up session
+    // 清理会话
     removeSession(sessionId);
 
     return true;
@@ -536,9 +535,9 @@ async function abortClaudeSDKSession(sessionId) {
 }
 
 /**
- * Checks if an SDK session is currently active
- * @param {string} sessionId - Session identifier
- * @returns {boolean} True if session is active
+ * 检查 SDK 会话是否当前活动
+ * @param {string} sessionId - 会话标识符
+ * @returns {boolean} 如果会话活动则为 true
  */
 function isClaudeSDKSessionActive(sessionId) {
   const session = getSession(sessionId);
@@ -546,14 +545,14 @@ function isClaudeSDKSessionActive(sessionId) {
 }
 
 /**
- * Gets all active SDK session IDs
- * @returns {Array<string>} Array of active session IDs
+ * 获取所有活动 SDK 会话 ID
+ * @returns {Array<string>} 活动会话 ID 数组
  */
 function getActiveClaudeSDKSessions() {
   return getAllSessions();
 }
 
-// Export public API
+// 导出公共 API
 export {
   queryClaudeSDK,
   abortClaudeSDKSession,

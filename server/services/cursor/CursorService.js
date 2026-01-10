@@ -4,55 +4,55 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
 
-// Use cross-spawn on Windows for better command execution
+// 在 Windows 上使用 cross-spawn 以获得更好的命令执行
 const spawnFunction = process.platform === 'win32' ? crossSpawn : spawn;
 
-let activeCursorProcesses = new Map(); // Track active processes by session ID
+let activeCursorProcesses = new Map(); // 按会话 ID 跟踪活动进程
 
 async function spawnCursor(command, options = {}, ws) {
   return new Promise(async (resolve, reject) => {
     const { sessionId, projectPath, cwd, resume, toolsSettings, skipPermissions, model, images } = options;
-    let capturedSessionId = sessionId; // Track session ID throughout the process
-    let sessionCreatedSent = false; // Track if we've already sent session-created event
-    let messageBuffer = ''; // Buffer for accumulating assistant messages
-    
-    // Use tools settings passed from frontend, or defaults
+    let capturedSessionId = sessionId; // 在整个过程中跟踪会话 ID
+    let sessionCreatedSent = false; // 跟踪我们是否已经发送了 session-created 事件
+    let messageBuffer = ''; // 用于累积助手消息的缓冲区
+
+    // 使用前端传递的工具设置，或使用默认值
     const settings = toolsSettings || {
       allowedShellCommands: [],
       skipPermissions: false
     };
-    
-    // Build Cursor CLI command
+
+    // 构建 Cursor CLI 命令
     const args = [];
-    
-    // Build flags allowing both resume and prompt together (reply in existing session)
-    // Treat presence of sessionId as intention to resume, regardless of resume flag
+
+    // 构建允许同时恢复和提示的标志（在现有会话中回复）
+    // 将 sessionId 的存在视为恢复的意图，无论 resume 标志如何
     if (sessionId) {
       args.push('--resume=' + sessionId);
     }
 
     if (command && command.trim()) {
-      // Provide a prompt (works for both new and resumed sessions)
+      // 提供提示（对新会话和恢复的会话都有效）
       args.push('-p', command);
 
-      // Add model flag if specified (only meaningful for new sessions; harmless on resume)
+      // 如果指定了模型标志，则添加（仅对新会话有意义；对恢复无影响）
       if (!sessionId && model) {
         args.push('--model', model);
       }
 
-      // Request streaming JSON when we are providing a prompt
+      // 当我们提供提示时，请求流式 JSON
       args.push('--output-format', 'stream-json');
     }
-    
-    // Add skip permissions flag if enabled
+
+    // 如果启用，则添加跳过权限标志
     if (skipPermissions || settings.skipPermissions) {
       args.push('-f');
       console.log('⚠️  Using -f flag (skip permissions)');
     }
-    
-    // Use cwd (actual project directory) instead of projectPath
+
+    // 使用 cwd（实际项目目录）而不是 projectPath
     const workingDir = cwd || projectPath || process.cwd();
-    
+
     console.log('Spawning Cursor CLI:', 'cursor-agent', args.join(' '));
     console.log('Working directory:', workingDir);
     console.log('Session info - Input sessionId:', sessionId, 'Resume:', resume);
@@ -60,14 +60,14 @@ async function spawnCursor(command, options = {}, ws) {
     const cursorProcess = spawnFunction('cursor-agent', args, {
       cwd: workingDir,
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env } // Inherit all environment variables
+      env: { ...process.env } // 继承所有环境变量
     });
-    
-    // Store process reference for potential abort
+
+    // 存储进程引用以潜在地中止
     const processKey = capturedSessionId || Date.now().toString();
     activeCursorProcesses.set(processKey, cursorProcess);
-    
-    // Handle stdout (streaming JSON responses)
+
+    // 处理 stdout（流式 JSON 响应）
     cursorProcess.stdout.on('data', (data) => {
       const rawOutput = data.toString();
       console.log('📤 Cursor CLI stdout:', rawOutput);
@@ -79,27 +79,27 @@ async function spawnCursor(command, options = {}, ws) {
           const response = JSON.parse(line);
           console.log('📄 Parsed JSON response:', response);
           
-          // Handle different message types
+          // 处理不同的消息类型
           switch (response.type) {
             case 'system':
               if (response.subtype === 'init') {
-                // Capture session ID
+                // 捕获会话 ID
                 if (response.session_id && !capturedSessionId) {
                   capturedSessionId = response.session_id;
                   console.log('📝 Captured session ID:', capturedSessionId);
-                  
-                  // Update process key with captured session ID
+
+                  // 使用捕获的会话 ID 更新进程键
                   if (processKey !== capturedSessionId) {
                     activeCursorProcesses.delete(processKey);
                     activeCursorProcesses.set(capturedSessionId, cursorProcess);
                   }
-                  
-                  // Set session ID on writer (for API endpoint compatibility)
+
+                  // 在 writer 上设置会话 ID（用于 API 端点兼容性）
                   if (ws.setSessionId && typeof ws.setSessionId === 'function') {
                     ws.setSessionId(capturedSessionId);
                   }
 
-                  // Send session-created event only once for new sessions
+                  // 仅为新会话发送一次 session-created 事件
                   if (!sessionId && !sessionCreatedSent) {
                     sessionCreatedSent = true;
                     ws.send({
@@ -110,30 +110,30 @@ async function spawnCursor(command, options = {}, ws) {
                     });
                   }
                 }
-                
-                // Send system info to frontend
+
+                // 向前端发送系统信息
                 ws.send({
                   type: 'cursor-system',
                   data: response
                 });
               }
               break;
-              
+
             case 'user':
-              // Forward user message
+              // 转发用户消息
               ws.send({
                 type: 'cursor-user',
                 data: response
               });
               break;
-              
+
             case 'assistant':
-              // Accumulate assistant message chunks
+              // 累积助手消息块
               if (response.message && response.message.content && response.message.content.length > 0) {
                 const textContent = response.message.content[0].text;
                 messageBuffer += textContent;
-                
-                // Send as Claude-compatible format for frontend
+
+                // 作为 Claude 兼容格式发送到前端
                 ws.send({
                   type: 'claude-response',
                   data: {
@@ -146,12 +146,12 @@ async function spawnCursor(command, options = {}, ws) {
                 });
               }
               break;
-              
+
             case 'result':
-              // Session complete
+              // 会话完成
               console.log('Cursor session result:', response);
-              
-              // Send final message if we have buffered content
+
+              // 如果我们有缓冲内容，则发送最终消息
               if (messageBuffer) {
                 ws.send({
                   type: 'claude-response',
@@ -160,8 +160,8 @@ async function spawnCursor(command, options = {}, ws) {
                   }
                 });
               }
-              
-              // Send completion event
+
+              // 发送完成事件
               ws.send({
                 type: 'cursor-result',
                 sessionId: capturedSessionId || sessionId,
@@ -169,9 +169,9 @@ async function spawnCursor(command, options = {}, ws) {
                 success: response.subtype === 'success'
               });
               break;
-              
+
             default:
-              // Forward any other message types
+              // 转发任何其他消息类型
               ws.send({
                 type: 'cursor-response',
                 data: response
@@ -179,7 +179,7 @@ async function spawnCursor(command, options = {}, ws) {
           }
         } catch (parseError) {
           console.log('📄 Non-JSON response:', line);
-          // If not JSON, send as raw text
+          // 如果不是 JSON，则作为原始文本发送
           ws.send({
             type: 'cursor-output',
             data: line
@@ -187,8 +187,8 @@ async function spawnCursor(command, options = {}, ws) {
         }
       }
     });
-    
-    // Handle stderr
+
+    // 处理 stderr
     cursorProcess.stderr.on('data', (data) => {
       console.error('Cursor CLI stderr:', data.toString());
       ws.send({
@@ -197,11 +197,11 @@ async function spawnCursor(command, options = {}, ws) {
       });
     });
     
-    // Handle process completion
+    // 处理进程完成
     cursorProcess.on('close', async (code) => {
       console.log(`Cursor CLI process exited with code ${code}`);
-      
-      // Clean up process reference
+
+      // 清理进程引用
       const finalSessionId = capturedSessionId || sessionId || processKey;
       activeCursorProcesses.delete(finalSessionId);
 
@@ -209,21 +209,21 @@ async function spawnCursor(command, options = {}, ws) {
         type: 'claude-complete',
         sessionId: finalSessionId,
         exitCode: code,
-        isNewSession: !sessionId && !!command // Flag to indicate this was a new session
+        isNewSession: !sessionId && !!command // 指示这是一个新会话的标志
       });
-      
+
       if (code === 0) {
         resolve();
       } else {
         reject(new Error(`Cursor CLI exited with code ${code}`));
       }
     });
-    
-    // Handle process errors
+
+    // 处理进程错误
     cursorProcess.on('error', (error) => {
       console.error('Cursor CLI process error:', error);
-      
-      // Clean up process reference on error
+
+      // 错误时清理进程引用
       const finalSessionId = capturedSessionId || sessionId || processKey;
       activeCursorProcesses.delete(finalSessionId);
 
@@ -234,8 +234,8 @@ async function spawnCursor(command, options = {}, ws) {
 
       reject(error);
     });
-    
-    // Close stdin since Cursor doesn't need interactive input
+
+    // 关闭 stdin，因为 Cursor 不需要交互式输入
     cursorProcess.stdin.end();
   });
 }

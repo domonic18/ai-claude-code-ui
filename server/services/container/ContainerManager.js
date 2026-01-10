@@ -1,15 +1,15 @@
 /**
- * Container Manager
+ * 容器管理器
  *
- * Manages Docker container lifecycle for multi-user isolation.
- * Each user gets their own container with resource limits and security policies.
+ * 管理用于多用户隔离的 Docker 容器生命周期。
+ * 每个用户都有自己的容器，具有资源限制和安全策略。
  *
- * Key features:
- * - Container lifecycle management (create, start, stop, destroy)
- * - Container pool caching for performance
- * - Resource limits by user tier
- * - Docker volume management for persistence
- * - Health checks and monitoring
+ * 主要功能：
+ * - 容器生命周期管理（创建、启动、停止、销毁）
+ * - 容器池缓存以提高性能
+ * - 按用户层级的资源限制
+ * - Docker 卷管理以实现持久化
+ * - 健康检查和监控
  */
 
 import Docker from 'dockerode';
@@ -24,7 +24,7 @@ const __dirname = dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 
 /**
- * Container resource limits by user tier
+ * 按用户层级的容器资源限制
  */
 const RESOURCE_LIMITS = {
   free: {
@@ -48,25 +48,25 @@ const RESOURCE_LIMITS = {
 };
 
 /**
- * Container Manager class
+ * 容器管理器类
  */
 class ContainerManager {
   constructor(options = {}) {
-    // Initialize Docker client
-    // Support multiple connection methods: socket path, HTTP, or auto-detect
+    // 初始化 Docker 客户端
+    // 支持多种连接方式：socket 路径、HTTP 或自动检测
     let dockerOptions = {};
 
-    // If options explicitly provide socketPath or host, use them
+    // 如果选项明确提供 socketPath 或 host，则使用它们
     if (options.socketPath) {
       dockerOptions = { socketPath: options.socketPath };
     } else if (options.host) {
       dockerOptions = { host: options.host };
-      // Add TLS options if provided
+      // 如果提供了 TLS 选项则添加
       if (options.ca) dockerOptions.ca = options.ca;
       if (options.cert) dockerOptions.cert = options.cert;
       if (options.key) dockerOptions.key = options.key;
     } else if (process.env.DOCKER_HOST) {
-      // Use DOCKER_HOST environment variable
+      // 使用 DOCKER_HOST 环境变量
       dockerOptions = { host: process.env.DOCKER_HOST };
       if (process.env.DOCKER_CERT_PATH) {
         dockerOptions.ca = fs.readFileSync(path.join(process.env.DOCKER_CERT_PATH, 'ca.pem'));
@@ -74,18 +74,18 @@ class ContainerManager {
         dockerOptions.key = fs.readFileSync(path.join(process.env.DOCKER_CERT_PATH, 'key.pem'));
       }
     } else if (process.platform !== 'darwin') {
-      // Only specify socket path on non-macOS platforms
-      // On macOS, Docker Desktop requires special handling - let dockerode auto-detect
+      // 仅在非 macOS 平台上指定 socket 路径
+      // 在 macOS 上，Docker Desktop 需要特殊处理 - 让 dockerode 自动检测
       dockerOptions = { socketPath: '/var/run/docker.sock' };
     }
-    // On macOS (darwin), pass empty object to let dockerode fully auto-detect Docker Desktop
+    // 在 macOS (darwin) 上，传递空对象让 dockerode 完全自动检测 Docker Desktop
 
     this.docker = new Docker(dockerOptions);
 
-    // Container pool cache: userId -> containerInfo
+    // 容器池缓存：userId -> containerInfo
     this.containers = new Map();
 
-    // Configuration
+    // 配置
     this.config = {
       dataDir: options.dataDir || path.join(PROJECT_ROOT, 'workspace'),
       image: options.image || 'claude-code-runtime:latest',
@@ -93,35 +93,35 @@ class ContainerManager {
       ...options
     };
 
-    // Start cleanup interval
+    // 启动清理间隔
     this.startCleanupInterval();
 
-    // Load containers from database on startup
+    // 启动时从数据库加载容器
     this.loadContainersFromDatabase().catch(err => {
       console.warn('[ContainerManager] Failed to load containers from database:', err.message);
     });
   }
 
   /**
-   * Get or create a container for the user
-   * Uses database as the single source of truth for container ownership
-   * @param {number} userId - User ID
-   * @param {object} userConfig - User configuration
-   * @returns {Promise<ContainerInfo>} Container information
+   * 获取或创建用户容器
+   * 使用数据库作为容器所有权的单一事实来源
+   * @param {number} userId - 用户 ID
+   * @param {object} userConfig - 用户配置
+   * @returns {Promise<ContainerInfo>} 容器信息
    */
   async getOrCreateContainer(userId, userConfig = {}) {
     const containerName = `claude-user-${userId}`;
 
-    // Step 1: Check database for existing container record
+    // 步骤 1：检查数据库中是否有现有容器记录
     const dbRecord = containersDb.getContainerByUserId(userId);
 
-    // Step 2: Check memory cache for quick access
+    // 步骤 2：检查内存缓存以快速访问
     if (this.containers.has(userId)) {
       const container = this.containers.get(userId);
       const status = await this.getContainerStatus(container.id);
 
       if (status === 'running') {
-        // Update last active time
+        // 更新最后活动时间
         container.lastActive = new Date();
         containersDb.updateContainerLastActive(container.id).catch(err => {
           console.warn(`[ContainerManager] Failed to update last_active: ${err.message}`);
@@ -129,18 +129,18 @@ class ContainerManager {
         return container;
       }
 
-      // Container not running, remove from cache
+      // 容器未运行，从缓存中移除
       this.containers.delete(userId);
     }
 
-    // Step 3: Verify container state from database record
+    // 步骤 3：从数据库记录验证容器状态
     if (dbRecord) {
       try {
         const existingContainer = this.docker.getContainer(dbRecord.container_id);
         const containerInfo = await existingContainer.inspect();
 
         if (containerInfo.State.Running) {
-          // Container is running, cache and return it
+          // 容器正在运行，缓存并返回它
           console.log(`[ContainerManager] Found running container from database for user ${userId}: ${dbRecord.container_name}`);
           const info = {
             id: containerInfo.Id,
@@ -152,14 +152,14 @@ class ContainerManager {
           };
           this.containers.set(userId, info);
 
-          // Update last_active in database
+          // 更新数据库中的 last_active
           containersDb.updateContainerLastActive(containerInfo.Id).catch(err => {
             console.warn(`[ContainerManager] Failed to update last_active: ${err.message}`);
           });
 
           return info;
         } else {
-          // Container exists but not running, remove it from Docker and database
+          // 容器存在但未运行，从 Docker 和数据库中删除它
           console.log(`[ContainerManager] Removing stale container for user ${userId}: ${dbRecord.container_name}`);
           await existingContainer.remove({ force: true }).catch(err => {
             console.warn(`[ContainerManager] Failed to remove stale container: ${err.message}`);
@@ -168,7 +168,7 @@ class ContainerManager {
         }
       } catch (dockerErr) {
         if (dockerErr.statusCode === 404) {
-          // Container doesn't exist in Docker, remove from database
+          // 容器在 Docker 中不存在，从数据库中删除
           console.log(`[ContainerManager] Container ${dbRecord.container_name} not found in Docker, cleaning database`);
           containersDb.deleteContainer(dbRecord.container_id);
         } else {
@@ -177,32 +177,32 @@ class ContainerManager {
       }
     }
 
-    // Step 4: Check if container name is already in use (data inconsistency case)
+    // 步骤 4：检查容器名称是否已被使用（数据不一致情况）
     try {
       const existingContainer = this.docker.getContainer(containerName);
       const containerInfo = await existingContainer.inspect();
 
-      // Container exists in Docker but not in database - data inconsistency
+      // 容器在 Docker 中存在但在数据库中不存在 - 数据不一致
       console.warn(`[ContainerManager] Found orphaned container ${containerName} in Docker, cleaning up`);
       await existingContainer.remove({ force: true }).catch(err => {
         console.warn(`[ContainerManager] Failed to remove orphaned container: ${err.message}`);
       });
     } catch (err) {
-      // Container doesn't exist, which is expected
+      // 容器不存在，这是预期的
       if (err.statusCode !== 404) {
         console.warn(`[ContainerManager] Error checking for orphaned container: ${err.message}`);
       }
     }
 
-    // Step 5: Create new container
+    // 步骤 5：创建新容器
     return await this.createContainer(userId, userConfig);
   }
 
   /**
-   * Create a new container for the user
-   * @param {number} userId - User ID
-   * @param {object} userConfig - User configuration
-   * @returns {Promise<ContainerInfo>} Container information
+   * 为用户创建新容器
+   * @param {number} userId - 用户 ID
+   * @param {object} userConfig - 用户配置
+   * @returns {Promise<ContainerInfo>} 容器信息
    */
   async createContainer(userId, userConfig = {}) {
     const containerName = `claude-user-${userId}`;
@@ -210,10 +210,10 @@ class ContainerManager {
     const userDataDir = path.join(this.config.dataDir, 'users', `user_${userId}`, 'data');
 
     try {
-      // 1. Create user data directory
+      // 1. 创建用户数据目录
       await fs.promises.mkdir(userDataDir, { recursive: true });
 
-      // 2. Build container configuration
+      // 2. 构建容器配置
       const containerConfig = this.buildContainerConfig({
         name: containerName,
         volumeName,
@@ -222,7 +222,7 @@ class ContainerManager {
         userConfig
       });
 
-      // 3. Create container
+      // 3. 创建容器
       const container = await new Promise((resolve, reject) => {
         this.docker.createContainer(containerConfig, (err, container) => {
           if (err) reject(err);
@@ -230,13 +230,13 @@ class ContainerManager {
         });
       });
 
-      // 4. Start container
+      // 4. 启动容器
       await container.start();
 
-      // 5. Wait for container to be ready
+      // 5. 等待容器准备就绪
       await this.waitForContainerReady(container.id);
 
-      // 6. Cache container info
+      // 6. 缓存容器信息
       const containerInfo = {
         id: container.id,
         name: containerName,
@@ -248,7 +248,7 @@ class ContainerManager {
 
       this.containers.set(userId, containerInfo);
 
-      // 7. Write to database
+      // 7. 写入数据库
       try {
         containersDb.createContainer(userId, container.id, containerName);
         console.log(`[ContainerManager] Container record saved to database: ${containerName}`);
@@ -263,8 +263,8 @@ class ContainerManager {
   }
 
   /**
-   * Load containers from database into memory cache
-   * Called on startup to restore container state from database
+   * 从数据库加载容器到内存缓存
+   * 在启动时调用以从数据库恢复容器状态
    * @returns {Promise<void>}
    */
   async loadContainersFromDatabase() {
@@ -275,13 +275,13 @@ class ContainerManager {
       for (const dbContainer of activeContainers) {
         const { user_id, container_id, container_name, created_at, last_active } = dbContainer;
 
-        // Verify container still exists in Docker
+        // 验证容器在 Docker 中仍然存在
         try {
           const dockerContainer = this.docker.getContainer(container_id);
           const containerInfo = await dockerContainer.inspect();
 
           if (containerInfo.State.Running) {
-            // Container is running, restore to cache
+            // 容器正在运行，恢复到缓存
             this.containers.set(user_id, {
               id: container_id,
               name: container_name,
@@ -292,12 +292,12 @@ class ContainerManager {
             });
             console.log(`[ContainerManager] Restored container for user ${user_id}: ${container_name}`);
           } else {
-            // Container not running, update database status
+            // 容器未运行，更新数据库状态
             containersDb.updateContainerStatus(container_id, 'stopped');
             console.log(`[ContainerManager] Container ${container_name} is stopped, status updated in database`);
           }
         } catch (dockerErr) {
-          // Container doesn't exist in Docker, remove from database
+          // 容器在 Docker 中不存在，从数据库中删除
           if (dockerErr.statusCode === 404) {
             console.log(`[ContainerManager] Container ${container_name} not found in Docker, removing from database`);
             containersDb.deleteContainer(container_id);
@@ -314,9 +314,9 @@ class ContainerManager {
   }
 
   /**
-   * Build container configuration
-   * @param {object} options - Configuration options
-   * @returns {object} Docker container configuration
+   * 构建容器配置
+   * @param {object} options - 配置选项
+   * @returns {object} Docker 容器配置
    */
   buildContainerConfig(options) {
     const { name, volumeName, userDataDir, userId, userConfig } = options;
@@ -361,11 +361,11 @@ class ContainerManager {
   }
 
   /**
-   * Execute a command inside a container
-   * @param {number} userId - User ID
-   * @param {string} command - Command to execute
-   * @param {object} options - Execution options
-   * @returns {Promise<object>} Execution stream
+   * 在容器内执行命令
+   * @param {number} userId - 用户 ID
+   * @param {string} command - 要执行的命令
+   * @param {object} options - 执行选项
+   * @returns {Promise<object>} 执行流
    */
   async execInContainer(userId, command, options = {}) {
     const container = await this.getOrCreateContainer(userId);
@@ -387,9 +387,9 @@ class ContainerManager {
   }
 
   /**
-   * Stop a user's container
-   * @param {number} userId - User ID
-   * @param {number} timeout - Timeout in seconds
+   * 停止用户容器
+   * @param {number} userId - 用户 ID
+   * @param {number} timeout - 超时时间（秒）
    * @returns {Promise<void>}
    */
   async stopContainer(userId, timeout = 10) {
@@ -410,8 +410,8 @@ class ContainerManager {
   }
 
   /**
-   * Start a stopped container
-   * @param {number} userId - User ID
+   * 启动已停止的容器
+   * @param {number} userId - 用户 ID
    * @returns {Promise<void>}
    */
   async startContainer(userId) {
@@ -430,9 +430,9 @@ class ContainerManager {
   }
 
   /**
-   * Destroy a user's container
-   * @param {number} userId - User ID
-   * @param {boolean} removeVolume - Whether to remove the volume
+   * 销毁用户容器
+   * @param {number} userId - 用户 ID
+   * @param {boolean} removeVolume - 是否删除卷
    * @returns {Promise<void>}
    */
   async destroyContainer(userId, removeVolume = false) {
@@ -444,20 +444,20 @@ class ContainerManager {
     try {
       const container = this.docker.getContainer(containerInfo.id);
 
-      // Stop container
+      // 停止容器
       try {
         await container.stop({ t: 5 });
       } catch (error) {
-        // Ignore if already stopped
+        // 如果已经停止则忽略
       }
 
-      // Remove container
+      // 删除容器
       await container.remove();
 
-      // Remove from cache
+      // 从缓存中删除
       this.containers.delete(userId);
 
-      // Remove from database
+      // 从数据库中删除
       try {
         containersDb.deleteContainer(containerInfo.id);
         console.log(`[ContainerManager] Container record removed from database: ${containerInfo.name}`);
@@ -465,7 +465,7 @@ class ContainerManager {
         console.warn(`[ContainerManager] Failed to remove container from database: ${dbErr.message}`);
       }
 
-      // Optionally remove volume
+      // 可选删除卷
       if (removeVolume) {
         const userDataDir = path.join(this.config.dataDir, 'users', `user_${userId}`, 'data');
         await fs.promises.rm(userDataDir, { recursive: true, force: true });
@@ -476,9 +476,9 @@ class ContainerManager {
   }
 
   /**
-   * Get container status
-   * @param {string} containerId - Container ID
-   * @returns {Promise<string>} Container status
+   * 获取容器状态
+   * @param {string} containerId - 容器 ID
+   * @returns {Promise<string>} 容器状态
    */
   async getContainerStatus(containerId) {
     try {
@@ -491,9 +491,9 @@ class ContainerManager {
   }
 
   /**
-   * Wait for container to be ready
-   * @param {string} containerId - Container ID
-   * @param {number} timeout - Timeout in milliseconds
+   * 等待容器准备就绪
+   * @param {string} containerId - 容器 ID
+   * @param {number} timeout - 超时时间（毫秒）
    * @returns {Promise<boolean>}
    */
   async waitForContainerReady(containerId, timeout = 60000) {
@@ -504,7 +504,7 @@ class ContainerManager {
       try {
         const info = await container.inspect();
         if (info.State.Status === 'running') {
-          // Check health endpoint if available
+          // 检查健康端点（如果可用）
           if (info.Config.Healthcheck) {
             if (info.State.Health && info.State.Health.Status === 'healthy') {
               return true;
@@ -514,7 +514,7 @@ class ContainerManager {
           }
         }
       } catch (error) {
-        // Container not ready yet
+        // 容器尚未准备就绪
       }
 
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -524,9 +524,9 @@ class ContainerManager {
   }
 
   /**
-   * Get container statistics
-   * @param {number} userId - User ID
-   * @returns {Promise<object>} Container statistics
+   * 获取容器统计信息
+   * @param {number} userId - 用户 ID
+   * @returns {Promise<object>} 容器统计信息
    */
   async getContainerStats(userId) {
     const containerInfo = this.containers.get(userId);
@@ -552,9 +552,9 @@ class ContainerManager {
   }
 
   /**
-   * Calculate CPU usage percentage
-   * @param {object} stats - Container stats
-   * @returns {number} CPU percentage
+   * 计算 CPU 使用率百分比
+   * @param {object} stats - 容器统计信息
+   * @returns {number} CPU 百分比
    */
   calculateCPUPercent(stats) {
     if (!stats.cpu_stats || !stats.precpu_stats) {
@@ -573,9 +573,9 @@ class ContainerManager {
   }
 
   /**
-   * Cleanup idle containers
-   * @param {number} idleTime - Idle time in milliseconds (default: 2 hours)
-   * @returns {Promise<number>} Number of containers cleaned up
+   * 清理空闲容器
+   * @param {number} idleTime - 空闲时间（毫秒，默认：2 小时）
+   * @returns {Promise<number>} 清理的容器数量
    */
   async cleanupIdleContainers(idleTime = 2 * 60 * 60 * 1000) {
     const now = Date.now();
@@ -598,8 +598,8 @@ class ContainerManager {
   }
 
   /**
-   * Start cleanup interval
-   * @param {number} interval - Check interval in milliseconds (default: 30 minutes)
+   * 启动清理间隔
+   * @param {number} interval - 检查间隔（毫秒，默认：30 分钟）
    */
   startCleanupInterval(interval = 30 * 60 * 1000) {
     if (this.cleanupInterval) {
@@ -619,7 +619,7 @@ class ContainerManager {
   }
 
   /**
-   * Stop cleanup interval
+   * 停止清理间隔
    */
   stopCleanupInterval() {
     if (this.cleanupInterval) {
@@ -629,32 +629,32 @@ class ContainerManager {
   }
 
   /**
-   * Get all managed containers
-   * @returns {Array} Array of container info objects
+   * 获取所有管理的容器
+   * @returns {Array} 容器信息对象数组
    */
   getAllContainers() {
     return Array.from(this.containers.values());
   }
 
   /**
-   * Get container by user ID
-   * @param {number} userId - User ID
-   * @returns {ContainerInfo|undefined} Container info or undefined
+   * 根据用户 ID 获取容器
+   * @param {number} userId - 用户 ID
+   * @returns {ContainerInfo|undefined} 容器信息或 undefined
    */
   getContainerByUserId(userId) {
     return this.containers.get(userId);
   }
 
   /**
-   * Clean up orphaned containers that exist in Docker but not in database
-   * This helps resolve data inconsistencies
-   * @returns {Promise<number>} Number of orphaned containers cleaned up
+   * 清理在 Docker 中存在但数据库中不存在的孤立容器
+   * 这有助于解决数据不一致问题
+   * @returns {Promise<number>} 清理的孤立容器数量
    */
   async cleanupOrphanedContainers() {
     let cleanedCount = 0;
 
     try {
-      // List all containers with our label
+      // 列出所有带有我们标签的容器
       const containers = await this.docker.listContainers({
         all: true,
         filters: {
@@ -664,19 +664,19 @@ class ContainerManager {
 
       for (const containerInfo of containers) {
         const containerId = containerInfo.Id;
-        const containerName = containerInfo.Names[0].replace(/^\//, ''); // Remove leading slash
+        const containerName = containerInfo.Names[0].replace(/^\//, ''); // 移除前导斜杠
 
-        // Check if this container is in our database
+        // 检查此容器是否在我们的数据库中
         const dbRecord = containersDb.getContainerById(containerId);
 
         if (!dbRecord) {
-          // Container exists in Docker but not in database - it's orphaned
+          // 容器在 Docker 中存在但数据库中不存在 - 它是孤立的
           console.warn(`[ContainerManager] Found orphaned container: ${containerName} (${containerId}), cleaning up`);
 
           try {
             const container = this.docker.getContainer(containerId);
 
-            // Stop and remove the container
+            // 停止并删除容器
             if (containerInfo.State === 'running') {
               await container.stop({ t: 5 });
             }
@@ -702,12 +702,12 @@ class ContainerManager {
   }
 }
 
-// Lazy singleton instance
+// 延迟单例实例
 let _singletonInstance = null;
 
 /**
- * Get or create the singleton ContainerManager instance
- * @returns {ContainerManager} The singleton instance
+ * 获取或创建单例 ContainerManager 实例
+ * @returns {ContainerManager} 单例实例
  */
 function getContainerManager() {
   if (!_singletonInstance) {
@@ -716,13 +716,13 @@ function getContainerManager() {
   return _singletonInstance;
 }
 
-// Export a proxy that forwards all operations to the singleton instance
+// 导出一个代理，将所有操作转发到单例实例
 const containerManager = new Proxy({}, {
   get(target, prop) {
     const instance = getContainerManager();
     const value = instance[prop];
 
-    // If it's a function, bind it to the instance
+    // 如果是函数，绑定到实例
     if (typeof value === 'function') {
       return value.bind(instance);
     }

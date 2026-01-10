@@ -2,14 +2,14 @@
 /**
  * Claude Code UI CLI
  *
- * Provides command-line utilities for managing Claude Code UI
+ * 提供用于管理 Claude Code UI 的命令行工具
  *
- * Commands:
- *   (no args)     - Start the server (default)
- *   start         - Start the server
- *   status        - Show configuration and data locations
- *   help          - Show help information
- *   version       - Show version information
+ * 命令:
+ *   (无参数)      - 启动服务器（默认）
+ *   start         - 启动服务器
+ *   status        - 显示配置和数据位置
+ *   help          - 显示帮助信息
+ *   version       - 显示版本信息
  */
 
 import fs from 'fs';
@@ -21,13 +21,13 @@ import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// ANSI color codes for terminal output
+// 用于终端输出的 ANSI 颜色代码
 const colors = {
     reset: '\x1b[0m',
     bright: '\x1b[1m',
     dim: '\x1b[2m',
 
-    // Foreground colors
+    // 前景色
     cyan: '\x1b[36m',
     green: '\x1b[32m',
     yellow: '\x1b[33m',
@@ -37,7 +37,7 @@ const colors = {
     gray: '\x1b[90m',
 };
 
-// Helper to colorize text
+// 文本着色辅助函数
 const c = {
     info: (text) => `${colors.cyan}${text}${colors.reset}`,
     ok: (text) => `${colors.green}${text}${colors.reset}`,
@@ -48,11 +48,11 @@ const c = {
     dim: (text) => `${colors.dim}${text}${colors.reset}`,
 };
 
-// Load package.json for version info
+// 加载 package.json 以获取版本信息
 const packageJsonPath = path.join(__dirname, '../package.json');
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
-// Load environment variables from .env file if it exists
+// 如果 .env 文件存在，则从中加载环境变量
 function loadEnvFile() {
     try {
         const envPath = path.join(__dirname, '../.env');
@@ -67,35 +67,35 @@ function loadEnvFile() {
             }
         });
     } catch (e) {
-        // .env file is optional
+        // .env 文件是可选的
     }
 }
 
-// Get the database path (same logic as db.js)
+// 获取数据库路径（与 db.js 中的逻辑相同）
 function getDatabasePath() {
     loadEnvFile();
     return process.env.DATABASE_PATH || path.join(__dirname, 'database', 'auth.db');
 }
 
-// Get the installation directory
+// 获取安装目录
 function getInstallDir() {
     return path.join(__dirname, '..');
 }
 
-// Show status command
+// 显示状态命令
 function showStatus() {
     console.log(`\n${c.bright('Claude Code UI - Status')}\n`);
     console.log(c.dim('═'.repeat(60)));
 
-    // Version info
+    // 版本信息
     console.log(`\n${c.info('[INFO]')} Version: ${c.bright(packageJson.version)}`);
 
-    // Installation location
+    // 安装位置
     const installDir = getInstallDir();
     console.log(`\n${c.info('[INFO]')} Installation Directory:`);
     console.log(`       ${c.dim(installDir)}`);
 
-    // Database location
+    // 数据库位置
     const dbPath = getDatabasePath();
     const dbExists = fs.existsSync(dbPath);
     console.log(`\n${c.info('[INFO]')} Database Location:`);
@@ -108,21 +108,21 @@ function showStatus() {
         console.log(`       Modified: ${c.dim(stats.mtime.toLocaleString())}`);
     }
 
-    // Environment variables
+    // 环境变量
     console.log(`\n${c.info('[INFO]')} Configuration:`);
     console.log(`       PORT: ${c.bright(process.env.PORT || '3001')} ${c.dim(process.env.PORT ? '' : '(default)')}`);
     console.log(`       DATABASE_PATH: ${c.dim(process.env.DATABASE_PATH || '(using default location)')}`);
     console.log(`       CLAUDE_CLI_PATH: ${c.dim(process.env.CLAUDE_CLI_PATH || 'claude (default)')}`);
     console.log(`       CONTEXT_WINDOW: ${c.dim(process.env.CONTEXT_WINDOW || '160000 (default)')}`);
 
-    // Claude projects folder
+    // Claude 项目文件夹
     const claudeProjectsPath = path.join(os.homedir(), '.claude', 'projects');
     const projectsExists = fs.existsSync(claudeProjectsPath);
     console.log(`\n${c.info('[INFO]')} Claude Projects Folder:`);
     console.log(`       ${c.dim(claudeProjectsPath)}`);
     console.log(`       Status: ${projectsExists ? c.ok('[OK] Exists') : c.warn('[WARN] Not found')}`);
 
-    // Config file location
+    // 配置文件位置
     const envFilePath = path.join(__dirname, '../.env');
     const envExists = fs.existsSync(envFilePath);
     console.log(`\n${c.info('[INFO]')} Configuration File:`);
@@ -137,7 +137,7 @@ function showStatus() {
     console.log(`      ${c.dim('>')} Access the UI at http://localhost:${process.env.PORT || '3001'}\n`);
 }
 
-// Show help
+// 显示帮助
 function showHelp() {
     console.log(`
 ╔═══════════════════════════════════════════════════════════════╗
@@ -182,12 +182,12 @@ Report Issues:
 `);
 }
 
-// Show version
+// 显示版本
 function showVersion() {
     console.log(`${packageJson.version}`);
 }
 
-// Compare semver versions, returns true if v1 > v2
+// 比较语义化版本，如果 v1 > v2 则返回 true
 function isNewerVersion(v1, v2) {
     const parts1 = v1.split('.').map(Number);
     const parts2 = v2.split('.').map(Number);
@@ -221,7 +221,7 @@ async function checkForUpdates(silent = false) {
     }
 }
 
-// Update the package
+// 更新包
 async function updatePackage() {
     try {
         const { execSync } = await import('child_process');
@@ -243,16 +243,16 @@ async function updatePackage() {
     }
 }
 
-// Start the server
+// 启动服务器
 async function startServer() {
-    // Check for updates silently on startup
+    // 启动时静默检查更新
     checkForUpdates(true);
 
-    // Import and run the server
+    // 导入并运行服务器
     await import('./index.js');
 }
 
-// Parse CLI arguments
+// 解析 CLI 参数
 function parseArgs(args) {
     const parsed = { command: 'start', options: {} };
 
@@ -279,12 +279,12 @@ function parseArgs(args) {
     return parsed;
 }
 
-// Main CLI handler
+// 主 CLI 处理函数
 async function main() {
     const args = process.argv.slice(2);
     const { command, options } = parseArgs(args);
 
-    // Apply CLI options to environment variables
+    // 将 CLI 选项应用到环境变量
     if (options.port) {
         process.env.PORT = options.port;
     }
@@ -320,7 +320,7 @@ async function main() {
     }
 }
 
-// Run the CLI
+// 运行 CLI
 main().catch(error => {
     console.error('\n❌ Error:', error.message);
     process.exit(1);
