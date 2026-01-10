@@ -3,7 +3,10 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
 import os from 'os';
-import { addProjectManually } from '../services/project/index.js';
+import { addProjectManually, getProjects, renameProject, deleteProject } from '../services/project/index.js';
+import { getFileOperations } from '../config/container-config.js';
+import { getProjectsInContainer } from '../services/container/index.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -147,6 +150,86 @@ async function validateWorkspacePath(requestedPath) {
     };
   }
 }
+
+/**
+ * GET /api/projects
+ * Get list of all projects
+ * Supports both container mode and host mode
+ */
+router.get('/', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    console.log('[DEBUG] Get projects request - userId:', userId);
+
+    // Check if container mode is enabled
+    const fileOps = await getFileOperations(userId);
+    console.log('[DEBUG] File operations mode:', fileOps.isContainer ? 'CONTAINER' : 'HOST');
+
+    let projects;
+    if (fileOps.isContainer) {
+      // Container mode: get projects from container
+      console.log('[DEBUG] Using container mode for projects');
+      projects = await getProjectsInContainer(userId);
+    } else {
+      // Host mode: get projects from host filesystem
+      console.log('[DEBUG] Using host mode for projects');
+      projects = await getProjects();
+    }
+
+    res.json(projects);
+  } catch (error) {
+    console.error('[ERROR] Failed to get projects:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * PUT /api/projects/:projectName/rename
+ * Rename a project's display name
+ */
+router.put('/:projectName/rename', authenticateToken, async (req, res) => {
+  try {
+    const { displayName } = req.body;
+    await renameProject(req.params.projectName, displayName);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * DELETE /api/projects/:projectName
+ * Delete a project (only if empty)
+ */
+router.delete('/:projectName', authenticateToken, async (req, res) => {
+  try {
+    const { projectName } = req.params;
+    await deleteProject(projectName);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/projects/create
+ * Create a new project by adding a path manually
+ */
+router.post('/create', authenticateToken, async (req, res) => {
+  try {
+    const { path: projectPath } = req.body;
+
+    if (!projectPath || !projectPath.trim()) {
+      return res.status(400).json({ error: 'Project path is required' });
+    }
+
+    const project = await addProjectManually(projectPath.trim());
+    res.json({ success: true, project });
+  } catch (error) {
+    console.error('Error creating project:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 /**
  * Create a new workspace
