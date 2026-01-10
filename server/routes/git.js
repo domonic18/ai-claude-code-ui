@@ -3,8 +3,8 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import { promises as fs } from 'fs';
-import { extractProjectDirectory } from '../projects.js';
-import { queryClaudeSDK } from '../claude-sdk.js';
+import { extractProjectDirectory } from '../services/project/index.js';
+import { queryClaudeSDK } from '../services/claude/index.js';
 import { spawnCursor } from '../cursor-cli.js';
 
 const router = express.Router();

@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
 import os from 'os';
-import { addProjectManually } from '../projects.js';
+import { addProjectManually } from '../services/project/index.js';
 
 const router = express.Router();
 

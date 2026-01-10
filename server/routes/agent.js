@@ -5,10 +5,10 @@ import os from 'os';
 import { promises as fs } from 'fs';
 import crypto from 'crypto';
 import { userDb, apiKeysDb, githubTokensDb } from '../database/db.js';
-import { addProjectManually } from '../projects.js';
-import { queryClaudeSDK } from '../claude-sdk.js';
+import { addProjectManually } from '../services/project/index.js';
+import { queryClaudeSDK } from '../services/claude/index.js';
 import { spawnCursor } from '../cursor-cli.js';
-import { queryCodex } from '../openai-codex.js';
+import { queryCodex } from '../services/openai/index.js';
 import { Octokit } from '@octokit/rest';
 import { CLAUDE_MODELS, CURSOR_MODELS, CODEX_MODELS } from '../../shared/modelConstants.js';
 
