@@ -1,0 +1,296 @@
+{
+  "defaultAction": "SCMP_ACT_ERRNO",
+  "architectures": [
+    "SCMP_ARCH_X86_64",
+    "SCMP_ARCH_X86",
+    "SCMP_ARCH_X32"
+  ],
+  "syscalls": [
+    { "name": "access", "action": "SCMP_ACT_ALLOW" },
+    { "name": "arch_prctl", "action": "SCMP_ACT_ALLOW" },
+    { "name": "brk", "action": "SCMP_ACT_ALLOW" },
+    { "name": "capget", "action": "SCMP_ACT_ALLOW" },
+    { "name": "capset", "action": "SCMP_ACT_ALLOW" },
+    { "name": "chdir", "action": "SCMP_ACT_ALLOW" },
+    { "name": "chmod", "action": "SCMP_ACT_ALLOW" },
+    { "name": "chown", "action": "SCMP_ACT_ALLOW" },
+    { "name": "clone", "action": "SCMP_ACT_ALLOW" },
+    { "name": "close", "action": "SCMP_ACT_ALLOW" },
+    { "name": "connect", "action": "SCMP_ACT_ALLOW" },
+    { "name": "creat", "action": "SCMP_ACT_ALLOW" },
+    { "name": "dup", "action": "SCMP_ACT_ALLOW" },
+    { "name": "dup2", "action": "SCMP_ACT_ALLOW" },
+    { "name": "dup3", "action": "SCMP_ACT_ALLOW" },
+    { "name": "epoll_create", "action": "SCMP_ACT_ALLOW" },
+    { "name": "epoll_create1", "action": "SCMP_ACT_ALLOW" },
+    { "name": "epoll_ctl", "action": "SCMP_ACT_ALLOW" },
+    { "name": "epoll_pwait", "action": "SCMP_ACT_ALLOW" },
+    { "name": "epoll_wait", "action": "SCMP_ACT_ALLOW" },
+    { "name": "execve", "action": "SCMP_ACT_ALLOW" },
+    { "name": "exit", "action": "SCMP_ACT_ALLOW" },
+    { "name": "exit_group", "action": "SCMP_ACT_ALLOW" },
+    { "name": "faccessat", "action": "SCMP_ACT_ALLOW" },
+    { "name": "fadvise64", "action": "SCMP_ACT_ALLOW" },
+    { "name": "fchdir", "action": "SCMP_ACT_ALLOW" },
+    { "name": "fchmod", "action": "SCMP_ACT_ALLOW" },
+    { "name": "fchmodat", "action": "SCMP_ACT_ALLOW" },
+    { "name": "fchown", "action": "SCMP_ACT_ALLOW" },
+    { "name": "fchownat", "action": "SCMP_ACT_ALLOW" },
+    { "name": "fcntl", "action": "SCMP_ACT_ALLOW" },
+    { "name": "fstat", "action": "SCMP_ACT_ALLOW" },
+    { "name": "fstatfs", "action": "SCMP_ACT_ALLOW" },
+    { "name": "fsync", "action": "SCMP_ACT_ALLOW" },
+    { "name": "ftruncate", "action": "SCMP_ACT_ALLOW" },
+    { "name": "futex", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getcwd", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getdents", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getdents64", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getegid", "action": "SCMP_ACT_ALLOW" },
+    { "name": "geteuid", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getgid", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getgroups", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getpeername", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getpid", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getppid", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getrlimit", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getsockname", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getsockopt", "action": "SCMP_ACT_ALLOW" },
+    { "name": "gettid", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getuid", "action": "SCMP_ACT_ALLOW" },
+    { "name": "ioctl", "action": "SCMP_ACT_ALLOW" },
+    { "name": "lseek", "action": "SCMP_ACT_ALLOW" },
+    { "name": "lstat", "action": "SCMP_ACT_ALLOW" },
+    { "name": "madvise", "action": "SCMP_ACT_ALLOW" },
+    { "name": "mkdir", "action": "SCMP_ACT_ALLOW" },
+    { "name": "mkdirat", "action": "SCMP_ACT_ALLOW" },
+    { "name": "mknod", "action": "SCMP_ACT_ALLOW" },
+    { "name": "mmap", "action": "SCMP_ACT_ALLOW" },
+    { "name": "mprotect", "action": "SCMP_ACT_ALLOW" },
+    { "name": "munmap", "action": "SCMP_ACT_ALLOW" },
+    { "name": "nanosleep", "action": "SCMP_ACT_ALLOW" },
+    { "name": "newfstatat", "action": "SCMP_ACT_ALLOW" },
+    { "name": "open", "action": "SCMP_ACT_ALLOW" },
+    { "name": "openat", "action": "SCMP_ACT_ALLOW" },
+    { "name": "pipe", "action": "SCMP_ACT_ALLOW" },
+    { "name": "pipe2", "action": "SCMP_ACT_ALLOW" },
+    { "name": "poll", "action": "SCMP_ACT_ALLOW" },
+    { "name": "ppoll", "action": "SCMP_ACT_ALLOW" },
+    { "name": "pread64", "action": "SCMP_ACT_ALLOW" },
+    { "name": "prctl", "action": "SCMP_ACT_ALLOW" },
+    { "name": "preadv", "action": "SCMP_ACT_ALLOW" },
+    { "name": "pwrite64", "action": "SCMP_ACT_ALLOW" },
+    { "name": "pwritev", "action": "SCMP_ACT_ALLOW" },
+    { "name": "read", "action": "SCMP_ACT_ALLOW" },
+    { "name": "readlink", "action": "SCMP_ACT_ALLOW" },
+    { "name": "readlinkat", "action": "SCMP_ACT_ALLOW" },
+    { "name": "recvfrom", "action": "SCMP_ACT_ALLOW" },
+    { "name": "recvmsg", "action": "SCMP_ACT_ALLOW" },
+    { "name": "rename", "action": "SCMP_ACT_ALLOW" },
+    { "name": "renameat", "action": "SCMP_ACT_ALLOW" },
+    { "name": "renameat2", "action": "SCMP_ACT_ALLOW" },
+    { "name": "rmdir", "action": "SCMP_ACT_ALLOW" },
+    { "name": "rt_sigaction", "action": "SCMP_ACT_ALLOW" },
+    { "name": "rt_sigprocmask", "action": "SCMP_ACT_ALLOW" },
+    { "name": "rt_sigreturn", "action": "SCMP_ACT_ALLOW" },
+    { "name": "sched_getaffinity", "action": "SCMP_ACT_ALLOW" },
+    { "name": "sched_yield", "action": "SCMP_ACT_ALLOW" },
+    { "name": "sendmsg", "action": "SCMP_ACT_ALLOW" },
+    { "name": "sendto", "action": "SCMP_ACT_ALLOW" },
+    { "name": "setsockopt", "action": "SCMP_ACT_ALLOW" },
+    { "name": "set_tid_address", "action": "SCMP_ACT_ALLOW" },
+    { "name": "sigaltstack", "action": "SCMP_ACT_ALLOW" },
+    { "name": "socket", "action": "SCMP_ACT_ALLOW" },
+    { "name": "socketpair", "action": "SCMP_ACT_ALLOW" },
+    { "name": "stat", "action": "SCMP_ACT_ALLOW" },
+    { "name": "statfs", "action": "SCMP_ACT_ALLOW" },
+    { "name": "symlink", "action": "SCMP_ACT_ALLOW" },
+    { "name": "symlinkat", "action": "SCMP_ACT_ALLOW" },
+    { "name": "tgkill", "action": "SCMP_ACT_ALLOW" },
+    { "name": "time", "action": "SCMP_ACT_ALLOW" },
+    { "name": "tkill", "action": "SCMP_ACT_ALLOW" },
+    { "name": "uname", "action": "SCMP_ACT_ALLOW" },
+    { "name": "unlink", "action": "SCMP_ACT_ALLOW" },
+    { "name": "unlinkat", "action": "SCMP_ACT_ALLOW" },
+    { "name": "utimensat", "action": "SCMP_ACT_ALLOW" },
+    { "name": "wait4", "action": "SCMP_ACT_ALLOW" },
+    { "name": "waitpid", "action": "SCMP_ACT_ALLOW" },
+    { "name": "write", "action": "SCMP_ACT_ALLOW" },
+    { "name": "writev", "action": "SCMP_ACT_ALLOW" },
+    { "name": "exit_group", "action": "SCMP_ACT_ALLOW" },
+    { "name": "set_robust_list", "action": "SCMP_ACT_ALLOW" },
+    { "name": "get_robust_list", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getrandom", "action": "SCMP_ACT_ALLOW" },
+    { "name": "memfd_create", "action": "SCMP_ACT_ALLOW" },
+    { "name": "clock_gettime", "action": "SCMP_ACT_ALLOW" },
+    { "name": "clock_getres", "action": "SCMP_ACT_ALLOW" },
+    { "name": "fstatat64", "action": "SCMP_ACT_ALLOW" },
+    { "name": "stat64", "action": "SCMP_ACT_ALLOW" },
+    { "name": "lstat64", "action": "SCMP_ACT_ALLOW" },
+    { "name": "fstat64", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getdents64", "action": "SCMP_ACT_ALLOW" },
+    { "name": "ugetrlimit", "action": "SCMP_ACT_ALLOW" },
+    { "name": "setrlimit", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getrlimit", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getrusage", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getsid", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getpgid", "action": "SCMP_ACT_ALLOW" },
+    { "name": "setpgid", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getitimer", "action": "SCMP_ACT_ALLOW" },
+    { "name": "setitimer", "action": "SCMP_ACT_ALLOW" },
+    { "name": "sched_getparam", "action": "SCMP_ACT_ALLOW" },
+    { "name": "sched_setparam", "action": "SCMP_ACT_ALLOW" },
+    { "name": "sched_getscheduler", "action": "SCMP_ACT_ALLOW" },
+    { "name": "sched_setscheduler", "action": "SCMP_ACT_ALLOW" },
+    { "name": "sched_get_priority_max", "action": "SCMP_ACT_ALLOW" },
+    { "name": "sched_get_priority_min", "action": "SCMP_ACT_ALLOW" },
+    { "name": "sched_rr_get_interval", "action": "SCMP_ACT_ALLOW" },
+    { "name": "seccomp", "action": "SCMP_ACT_ALLOW" },
+    { "name": "signalfd", "action": "SCMP_ACT_ALLOW" },
+    { "name": "signalfd4", "action": "SCMP_ACT_ALLOW" },
+    { "name": "eventfd", "action": "SCMP_ACT_ALLOW" },
+    { "name": "eventfd2", "action": "SCMP_ACT_ALLOW" },
+    { "name": "inotify_init", "action": "SCMP_ACT_ALLOW" },
+    { "name": "inotify_init1", "action": "SCMP_ACT_ALLOW" },
+    { "name": "inotify_add_watch", "action": "SCMP_ACT_ALLOW" },
+    { "name": "inotify_rm_watch", "action": "SCMP_ACT_ALLOW" },
+    { "name": "accept4", "action": "SCMP_ACT_ALLOW" },
+    { "name": "recvmmsg", "action": "SCMP_ACT_ALLOW" },
+    { "name": "sendmmsg", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getsockname", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getpeername", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getsockopt", "action": "SCMP_ACT_ALLOW" },
+    { "name": "setsockopt", "action": "SCMP_ACT_ALLOW" },
+    { "name": "socketpair", "action": "SCMP_ACT_ALLOW" },
+    { "name": "gettid", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getcpu", "action": "SCMP_ACT_ALLOW" },
+    { "name": "gettimeofday", "action": "SCMP_ACT_ALLOW" },
+    { "name": "times", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getgroups", "action": "SCMP_ACT_ALLOW" },
+    { "name": "setgroups", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getresuid", "action": "SCMP_ACT_ALLOW" },
+    { "name": "setresuid", "action": "SCMP_ACT_ALLOW" },
+    { "name": "getresgid", "action": "SCMP_ACT_ALLOW" },
+    { "name": "setresgid", "action": "SCMP_ACT_ALLOW" },
+    { "name": "restart_syscall", "action": "SCMP_ACT_ALLOW" },
+    {
+      "name": "setns",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "unshare",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "mount",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "pivot_root",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "ptrace",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "kexec_load",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "init_module",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "finit_module",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "delete_module",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "acct",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "swapon",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "swapoff",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "syslog",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "sethostname",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "setdomainname",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "vhangup",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "reboot",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "settimeofday",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "stime",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "clock_settime",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "adjtimex",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "lookup_dcookie",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "perf_event_open",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "fanotify_init",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "fanotify_mark",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "process_vm_readv",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "process_vm_writev",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "name_to_handle_at",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "open_by_handle_at",
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "name": "userfaultfd",
+      "action": "SCMP_ACT_ERRNO"
+    }
+  ]
+}

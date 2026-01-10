@@ -1,0 +1,172 @@
+# AppArmor profile for Claude Code container
+#
+# This profile restricts the container's access to system resources
+# following the principle of least privilege.
+#
+# Install:
+#   sudo cp workspace/containers/apparmor/docker-claude-code /etc/apparmor.d/
+#   sudo apparmor_parser -r /etc/apparmor.d/docker-claude-code
+#   sudo aa-status
+#
+# Use in Docker:
+#   docker run --security-opt apparmor=docker-claude-code ...
+
+#include <tunables/global>
+
+profile docker-claude-code flags=(attach_disconnected,mediate_deleted) {
+  # Include basic abstractions
+  #include <abstractions/base>
+  #include <abstractions/namespaces>
+
+  # Capabilities
+  capability,
+  dac_override,
+  dac_read_search,
+  fowner,
+  fsetid,
+  kill,
+  setgid,
+  setuid,
+  setfcap,
+  setpcap,
+  net_bind_service,
+  net_raw,
+  sys_chroot,
+  mknod,
+
+  # Allow basic file operations in workspace
+  /workspace/** rw,
+  /tmp/** rw,
+  /home/node/** rw,
+
+  # Allow reading system libraries
+  /usr/lib/** r,
+  /lib/** r,
+  /lib64/** r,
+  /etc/ld.so.cache r,
+  /etc/ld.so.preload r,
+
+  # Allow access to Node.js and npm
+  /usr/bin/node* rx,
+  /usr/local/bin/node* rx,
+  /home/node/.nvm/versions/node/*/bin/node rx,
+  /usr/bin/npm rx,
+  /usr/local/bin/npm rx,
+
+  # Allow git operations
+  /usr/bin/git rx,
+  /usr/lib/git-core/** rx,
+
+  # Allow common utilities
+  /bin/bash rx,
+  /bin/sh rx,
+  /usr/bin/curl rx,
+  /usr/bin/wget rx,
+  /usr/bin/python3 rx,
+  /usr/bin/python3.* rx,
+  /bin/vi rx,
+  /bin/vim.tiny rx,
+  /usr/bin/jq rx,
+
+  # Allow read access to system config
+  /etc/passwd r,
+  /etc/group r,
+  /etc/nsswitch.conf r,
+  /etc/host.conf r,
+  /etc/hosts r,
+  /etc/resolv.conf r,
+  /etc/timezone r,
+
+  # Allow network access
+  network inet stream,
+  network inet dgram,
+
+  # Allow Unix domain sockets
+  unix (send, receive) type=stream addr=none,
+  unix (send, receive) type=dgram addr=none,
+
+  # Allow ptrace for debugging (restricted)
+  ptrace (read,trace) peer=unconfined,
+  signal (receive) peer=unconfined,
+
+  # Deny access to sensitive system directories
+  deny /proc/sys/** w,
+  deny /sys/** w,
+  deny /proc/kcore rw,
+  deny /proc/kallsyms rw,
+  deny /proc/mem rw,
+  deny /proc/[0-9]*/mem rw,
+  deny /proc/[0-9]*/maps rw,
+  deny /proc/[0-9]*/auxv rw,
+
+  # Deny access to Docker socket
+  deny /var/run/docker.sock rw,
+  deny /run/docker.sock rw,
+
+  # Deny access to other users' data
+  deny /home/*/.ssh/** rw,
+  deny /root/.ssh/** rw,
+
+  # Deny module loading
+  deny /sbin/insmod x,
+  deny /sbin/rmmod x,
+  deny /sbin/modprobe x,
+
+  # Deny system time changes
+  deny /sbin/hwclock x,
+  deny /bin/date x,
+
+  # Allow creation of temporary files
+  owner /tmp/** rw,
+  owner /dev/shm/** rw,
+  owner /dev/shm/sem.* rw,
+
+  # Allow access to /dev/null and /dev/zero
+  /dev/null rw,
+  /dev/zero rw,
+  /dev/full rw,
+  /dev/tty rw,
+  /dev/ptmx rw,
+
+  # Allow access to pseudo-terminals
+  /dev/pts/[0-9]* rw,
+
+  # Deny access to other devices
+  deny /dev/sd* rw,
+  deny /dev/hd* rw,
+  deny /dev/fd* rw,
+  deny /dev/sr* rw,
+
+  # Allow read access to /proc for basic info
+  /proc/[0-9]*/status r,
+  /proc/[0-9]*/stat r,
+  /proc/[0-9]*/statm r,
+  /proc/meminfo r,
+  /proc/cpuinfo r,
+  /proc/loadavg r,
+  /proc/uptime r,
+  /proc/version r,
+  /proc/sys/kernel/hostname r,
+  /proc/sys/kernel/domainname r,
+
+  # Allow cgroup access for resource limits
+  /sys/fs/cgroup/** r,
+
+  # Deny writing to cgroup (no resource limit changes)
+  deny /sys/fs/cgroup/** w,
+
+  # Allow access to locale data
+  /usr/share/locale/** r,
+  /usr/share/zoneinfo/** r,
+
+  # Allow TLS certificate access
+  /etc/ssl/certs/** r,
+  /etc/ssl/openssl.cnf r,
+  /usr/share/ca-certificates/** r,
+
+  # Deny modification of system packages
+  deny /usr/bin/** w,
+  deny /usr/lib/** w,
+  deny /lib/** w,
+  deny /lib64/** w,
+}
