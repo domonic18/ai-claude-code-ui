@@ -184,7 +184,7 @@ router.post('/:projectName/upload-images', async (req, res) => {
     // 为图片上传配置 multer
     const storage = multer.diskStorage({
       destination: async (req, file, cb) => {
-        const uploadDir = path.join(os.tmpdir(), 'claude-ui-uploads', String(req.user.id));
+        const uploadDir = path.join(os.tmpdir(), 'claude-ui-uploads', String(req.user.userId));
         await fs.mkdir(uploadDir, { recursive: true });
         cb(null, uploadDir);
       },

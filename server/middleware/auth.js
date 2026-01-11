@@ -27,7 +27,11 @@ const authenticateToken = async (req, res, next) => {
       if (!user) {
         return res.status(500).json({ error: 'Platform mode: No user found in database' });
       }
-      req.user = user;
+      // 将 userId 添加到 req.user 中
+      req.user = {
+        ...user,
+        userId: user.id  // 添加 userId 别名指向 id
+      };
       return next();
     } catch (error) {
       console.error('Platform mode error:', error);
@@ -52,7 +56,12 @@ const authenticateToken = async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid token. User not found.' });
     }
 
-    req.user = user;
+    // 将 userId 添加到 req.user 中，以便路由可以访问
+    // 数据库对象有 'id' 字段，但 JWT payload 使用 'userId'
+    req.user = {
+      ...user,
+      userId: user.id  // 添加 userId 别名指向 id
+    };
     next();
   } catch (error) {
     console.error('Token verification error:', error);
@@ -95,9 +104,18 @@ const authenticateWebSocket = (token) => {
 
   try {
     const decoded = jwt.verify(token, AUTH.jwtSecret);
+
+    // 验证用户仍然存在于数据库中
+    const user = User.getById(decoded.userId);
+    if (!user) {
+      console.warn(`[WS AUTH] Failed: User ${decoded.userId} not found in database`);
+      return null;
+    }
+
+    console.log(`[WS AUTH] Success: User ${decoded.userId} (${decoded.username}) verified from database`);
     return decoded;
   } catch (error) {
-    console.error('WebSocket token verification error:', error);
+    console.error('[WS AUTH] Token verification error:', error.message);
     return null;
   }
 };

@@ -158,7 +158,7 @@ async function validateWorkspacePath(requestedPath) {
  */
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     console.log('[DEBUG] Get projects request - userId:', userId);
 
     // 检查是否启用容器模式
@@ -318,7 +318,7 @@ router.post('/create-workspace', async (req, res) => {
         // 如果需要，获取 GitHub 令牌
         if (githubTokenId) {
           // 从数据库获取令牌
-          const token = await getGithubTokenById(githubTokenId, req.user.id);
+          const token = await getGithubTokenById(githubTokenId, req.user.userId);
           if (!token) {
             // 清理已创建的目录
             await fs.rm(absolutePath, { recursive: true, force: true });

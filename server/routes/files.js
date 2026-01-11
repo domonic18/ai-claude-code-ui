@@ -30,7 +30,7 @@ router.get('/:projectName/file', async (req, res) => {
   try {
     const { projectName } = req.params;
     const { filePath } = req.query;
-    const userId = req.user.id;
+    const userId = req.user.userId;
 
     console.log('[DEBUG] File read request:', projectName, filePath);
 
@@ -93,7 +93,7 @@ router.put('/:projectName/file', async (req, res) => {
   try {
     const { projectName } = req.params;
     const { filePath, content } = req.body;
-    const userId = req.user.id;
+    const userId = req.user.userId;
 
     console.log('[DEBUG] File save request:', projectName, filePath);
 
@@ -168,7 +168,7 @@ router.put('/:projectName/file', async (req, res) => {
  */
 router.get('/:projectName/files', async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const projectName = req.params.projectName;
     console.log('[DEBUG] Get files request - userId:', userId, 'projectName:', projectName);
 

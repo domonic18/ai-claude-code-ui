@@ -12,7 +12,7 @@ const router = express.Router();
 
 router.get('/git-config', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     let gitConfig = User.getGitConfig(userId);
 
     // 如果数据库为空，尝试从系统 git 配置获取
@@ -41,7 +41,7 @@ router.get('/git-config', authenticateToken, async (req, res) => {
 // 通过 git config --global 全局应用 git 配置
 router.post('/git-config', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { gitName, gitEmail } = req.body;
 
     if (!gitName || !gitEmail) {
@@ -77,7 +77,7 @@ router.post('/git-config', authenticateToken, async (req, res) => {
 
 router.post('/complete-onboarding', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     User.completeOnboarding(userId);
 
     res.json({
@@ -92,7 +92,7 @@ router.post('/complete-onboarding', authenticateToken, async (req, res) => {
 
 router.get('/onboarding-status', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const hasCompleted = User.hasCompletedOnboarding(userId);
 
     res.json({

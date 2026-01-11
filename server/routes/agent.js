@@ -872,7 +872,7 @@ router.post('/', validateExternalApiKey, async (req, res) => {
     // Determine the final project path
     if (githubUrl) {
       // Clone repository (to projectPath if provided, otherwise generate path)
-      const tokenToUse = githubToken || GitHubToken.getActive(req.user.id);
+      const tokenToUse = githubToken || GitHubToken.getActive(req.user.userId);
 
       let targetPath;
       if (projectPath) {
@@ -982,7 +982,7 @@ router.post('/', validateExternalApiKey, async (req, res) => {
         console.log('🔄 Starting GitHub branch/PR creation workflow...');
 
         // Get GitHub token
-        const tokenToUse = githubToken || GitHubToken.getActive(req.user.id);
+        const tokenToUse = githubToken || GitHubToken.getActive(req.user.userId);
 
         if (!tokenToUse) {
           throw new Error('GitHub token required for branch/PR creation. Please configure a GitHub token in settings.');
