@@ -43,9 +43,19 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
       tier: userTier
     });
 
-    // 2. 确定工作目录 - 容器中使用 /workspace 作为根目录
-    const workingDir = '/workspace';
-    console.log(`[Container SDK] Using workspace directory: ${workingDir}`);
+    // 2. 使用正确的工作目录构建 SDK 选项
+    // 对于容器项目，使用 /home/node/.claude/projects/{projectPath}
+    // 对于工作空间文件，使用 /workspace/{path}
+    let workingDir;
+    if (isContainerProject && projectPath) {
+      // 容器项目：使用项目目录
+      workingDir = `/home/node/.claude/projects/${projectPath}`;
+    } else if (cwd) {
+      // 工作空间文件：提取基本名称并使用 /workspace
+      workingDir = `/workspace/${path.basename(cwd)}`;
+    } else {
+      workingDir = '/workspace';
+    }
 
     const mappedOptions = {
       ...sdkOptions,
@@ -124,53 +134,31 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
  */
 async function executeSDKInContainer(containerId, command, options, writer, sessionId) {
   try {
-    console.log('[Container SDK] Starting execution in container:', containerId);
-    console.log('[Container SDK] Command:', command);
-    console.log('[Container SDK] Options:', JSON.stringify(options));
-
     // 构建 Node.js 脚本以在容器内运行 SDK
     const sdkScript = buildSDKScript(command, options);
-    console.log('[Container SDK] Script length:', sdkScript.length);
 
     // 在容器中执行
-    console.log('[Container SDK] Executing in container...');
-    const { stream, exec } = await containerManager.execInContainer(
+    const { stream } = await containerManager.execInContainer(
       options.userId,
       sdkScript,
       {
         cwd: options.cwd || '/workspace',
         env: {
-          NODE_PATH: '/app/node_modules',  // 设置 NODE_PATH 以便 Node.js 能找到 SDK
-          // 使用 ANTHROPIC_AUTH_TOKEN 作为统一的环境变量名
+          NODE_PATH: '/app/node_modules',
           ANTHROPIC_AUTH_TOKEN: process.env.ANTHROPIC_AUTH_TOKEN,
           ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL,
           ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL
         }
       }
     );
-    console.log('[Container SDK] Stream created, waiting for output...');
 
     // 收集输出
     const chunks = [];
     let errorOutput = '';
-    let hasReceivedData = false;
 
     return new Promise((resolve, reject) => {
-      // 设置超时（5 分钟）
-      const timeout = setTimeout(() => {
-        console.error('[Container SDK] Timeout - no data received for 5 minutes');
-        reject(new Error('SDK execution timeout: no response within 5 minutes'));
-      }, 5 * 60 * 1000);
-
       stream.on('data', (chunk) => {
-        if (!hasReceivedData) {
-          console.log('[Container SDK] First data chunk received');
-          hasReceivedData = true;
-          clearTimeout(timeout);
-        }
         const output = chunk.toString();
-        // 打印完整输出用于调试
-        console.log('[Container SDK] Data chunk:', output);
         chunks.push(output);
 
         // 如果可用，发送到 WebSocket
@@ -199,17 +187,13 @@ async function executeSDKInContainer(containerId, command, options, writer, sess
       });
 
       stream.on('error', (chunk) => {
-        const error = chunk.toString();
-        console.error('[Container SDK] Error chunk:', error);
-        errorOutput += error;
+        errorOutput += chunk.toString();
       });
 
       stream.on('end', () => {
-        console.log('[Container SDK] Stream ended, total chunks:', chunks.length);
         const fullOutput = chunks.join('');
 
         if (errorOutput) {
-          console.error('[Container SDK] Full error output:', errorOutput);
           reject(new Error(`SDK execution error: ${errorOutput}`));
         } else {
           resolve({ output: fullOutput, sessionId });
@@ -218,7 +202,6 @@ async function executeSDKInContainer(containerId, command, options, writer, sess
     });
 
   } catch (error) {
-    console.error('[Container SDK] Execution failed:', error);
     throw new Error(`在容器中执行 SDK 失败：${error.message}`);
   }
 }
@@ -230,50 +213,21 @@ async function executeSDKInContainer(containerId, command, options, writer, sess
  * @returns {string} Node.js 脚本
  */
 function buildSDKScript(command, options) {
-  // 从环境变量获取自定义 API 配置
-  const customBaseURL = process.env.ANTHROPIC_BASE_URL;
-  const customApiKey = process.env.ANTHROPIC_AUTH_TOKEN;
-  const customModel = process.env.ANTHROPIC_MODEL;
+  const sdkOptions = JSON.stringify(options);
 
-  // 将自定义配置添加到 SDK 选项中
-  const sdkOptions = { ...options };
-
-  // 如果环境变量中有自定义配置，应用到选项中
-  if (customBaseURL) {
-    sdkOptions.baseURL = customBaseURL;
-    console.log(`[Container] Using custom API endpoint: ${customBaseURL}`);
-  }
-  if (customApiKey) {
-    sdkOptions.apiKey = customApiKey;
-    console.log(`[Container] Using custom API key from environment`);
-  }
-  if (customModel) {
-    sdkOptions.model = customModel;
-    console.log(`[Container] Using custom model: ${customModel}`);
-  }
-
-  const optionsStr = JSON.stringify(sdkOptions);
+  // 转义命令中的单引号和反斜杠
+  const escapedCommand = command
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'");
 
   // 使用 ESM 模块语法（@anthropic-ai/claude-agent-sdk 是纯 ESM 模块）
-  // 使用绝对路径导入以解决容器内的模块解析问题
   return `node --input-type=module -e '
-import { query } from "/app/node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs";
+import { query } from "@anthropic-ai/claude-agent-sdk";
 
 async function execute() {
   try {
-    // 调试：打印环境变量
-    console.log(JSON.stringify({
-      type: "debug",
-      message: "SDK starting",
-      env: {
-        hasAuthToken: !!process.env.ANTHROPIC_AUTH_TOKEN,
-        baseURL: process.env.ANTHROPIC_BASE_URL,
-        model: process.env.ANTHROPIC_MODEL
-      }
-    }));
-
-    const options = ${optionsStr};
-    const result = await query(${JSON.stringify(command)}, options);
+    const options = ${sdkOptions};
+    const result = await query("${escapedCommand}", options);
 
     // 流式输出
     for await (const chunk of result) {
@@ -291,12 +245,10 @@ async function execute() {
     }));
 
   } catch (error) {
-    // 打印完整错误信息
     console.error(JSON.stringify({
       type: "error",
       error: error.message,
-      stack: error.stack,
-      name: error.name
+      stack: error.stack
     }));
     process.exit(1);
   }
