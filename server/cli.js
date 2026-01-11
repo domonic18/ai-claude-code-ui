@@ -27,8 +27,8 @@ const packageJsonPath = path.join(__dirname, '../package.json');
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
 // 获取数据库路径（使用统一配置）
+// 注意：loadEnvironment() 已在 config.js 模块加载时自动调用
 function getDatabasePath() {
-    loadEnvironment();
     return DATABASE.path;
 }
 
@@ -239,10 +239,8 @@ async function main() {
     const args = process.argv.slice(2);
     const { command, options } = parseArgs(args);
 
-    // 加载环境变量
-    loadEnvironment();
-
-    // 将 CLI 选项应用到环境变量（在统一配置加载之前）
+    // 注意：loadEnvironment() 已在 config.js 模块加载时自动调用
+    // CLI 参数覆盖（注意：这些覆盖不会反映在已加载的配置常量中）
     if (options.port) {
         process.env.PORT = options.port;
     }

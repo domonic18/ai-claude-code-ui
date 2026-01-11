@@ -14,7 +14,37 @@ import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const PROJECT_ROOT = path.resolve(__dirname, '..');
+// config.js 位于 server/config/，需要向上两级到达项目根目录
+const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
+
+// ============================================================================
+// 首先加载环境变量（必须在任何配置读取之前）
+// ============================================================================
+
+/**
+ * 从 .env 文件加载环境变量
+ * 如果环境变量尚不存在，则设置它们
+ */
+export function loadEnvironment() {
+  try {
+    const envPath = path.join(PROJECT_ROOT, '.env');
+    const envFile = fs.readFileSync(envPath, 'utf8');
+    envFile.split('\n').forEach(line => {
+      const trimmedLine = line.trim();
+      if (trimmedLine && !trimmedLine.startsWith('#')) {
+        const [key, ...valueParts] = trimmedLine.split('=');
+        if (key && valueParts.length > 0 && !process.env[key]) {
+          process.env[key] = valueParts.join('=').trim();
+        }
+      }
+    });
+  } catch (e) {
+    // .env 文件不存在或无法读取，静默忽略
+  }
+}
+
+// 立即加载环境变量，确保配置常量能读取到正确的值
+loadEnvironment();
 
 // ============================================================================
 // 环境变量配置与默认值
@@ -187,28 +217,6 @@ export const BACKUP = {
 // ============================================================================
 // 辅助函数
 // ============================================================================
-
-/**
- * 从 .env 文件加载环境变量
- * 如果环境变量尚不存在，则设置它们
- */
-export function loadEnvironment() {
-  try {
-    const envPath = path.join(PROJECT_ROOT, '.env');
-    const envFile = fs.readFileSync(envPath, 'utf8');
-    envFile.split('\n').forEach(line => {
-      const trimmedLine = line.trim();
-      if (trimmedLine && !trimmedLine.startsWith('#')) {
-        const [key, ...valueParts] = trimmedLine.split('=');
-        if (key && valueParts.length > 0 && !process.env[key]) {
-          process.env[key] = valueParts.join('=').trim();
-        }
-      }
-    });
-  } catch (e) {
-    // .env 文件不存在或无法读取，静默忽略
-  }
-}
 
 /**
  * 获取项目根目录的绝对路径

@@ -7,6 +7,8 @@
  * @deprecated 请直接从 config/config 导入配置
  */
 
+import { isContainerModeEnabled } from './config.js';
+
 export {
   isContainerModeEnabled,
   CONTAINER,

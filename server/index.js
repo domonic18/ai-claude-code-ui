@@ -13,7 +13,7 @@ import http from 'http';
 import express from 'express';
 
 // 统一配置模块
-import { loadEnvironment, logConfigStatus, SERVER, c } from './config/config.js';
+import { logConfigStatus, SERVER, c } from './config/config.js';
 import { configureExpress } from './config/express-config.js';
 import { createWebSocketServer } from './websocket/server.js';
 
@@ -21,8 +21,7 @@ import { createWebSocketServer } from './websocket/server.js';
 import { initializeDatabase } from './database/db.js';
 import { setupProjectsWatcher } from './utils/project-watcher.js';
 
-// 加载环境变量和配置
-loadEnvironment();
+// 注意：loadEnvironment() 已在 config.js 模块加载时自动调用
 
 // 已连接的 WebSocket 客户端，用于项目更新
 const connectedClients = new Set();
