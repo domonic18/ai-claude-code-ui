@@ -244,10 +244,6 @@ async function testGitHubTokenRepository() {
         assert.truthy(typeof GitHubToken.get === 'function', 'GitHubToken.get 应该是函数');
         assert.truthy(typeof GitHubToken.getActive === 'function', 'GitHubToken.getActive 应该是函数');
         assert.truthy(typeof GitHubToken.delete === 'function', 'GitHubToken.delete 应该是函数');
-        assert.truthy(typeof GitHubToken.getActiveGithubToken === 'function', 'GitHubToken.getActiveGithubToken 应该是函数（向后兼容）');
-        assert.truthy(typeof GitHubToken.saveToken === 'function', 'GitHubToken.saveToken 应该是函数（向后兼容）');
-        assert.truthy(typeof GitHubToken.getToken === 'function', 'GitHubToken.getToken 应该是函数（向后兼容）');
-        assert.truthy(typeof GitHubToken.deleteToken === 'function', 'GitHubToken.deleteToken 应该是函数（向后兼容）');
     });
 
     console.log();
@@ -269,7 +265,6 @@ async function testContainerRepository() {
         assert.truthy(typeof Container.updateLastActive === 'function', 'Container.updateLastActive 应该是函数');
         assert.truthy(typeof Container.delete === 'function', 'Container.delete 应该是函数');
         assert.truthy(typeof Container.listActive === 'function', 'Container.listActive 应该是函数');
-        assert.truthy(typeof Container.listActiveContainers === 'function', 'Container.listActiveContainers 应该是函数（向后兼容）');
     });
 
     console.log();
@@ -304,16 +299,7 @@ async function testDatabaseMain() {
         assert.truthy(typeof initializeDatabase === 'function', 'initializeDatabase 应该是函数');
     });
 
-    await test('导出向后兼容的 DAO 对象', async () => {
-        const { userDb, apiKeysDb, githubTokensDb, containersDb, credentialsDb } = await import('../../database/db.js');
-        assert.notNull(userDb, 'userDb 应该被导出');
-        assert.notNull(apiKeysDb, 'apiKeysDb 应该被导出');
-        assert.notNull(githubTokensDb, 'githubTokensDb 应该被导出');
-        assert.notNull(containersDb, 'containersDb 应该被导出');
-        assert.notNull(credentialsDb, 'credentialsDb 应该被导出');
-    });
-
-    await test('导出新的 repositories 对象', async () => {
+    await test('导出 repositories 对象', async () => {
         const { repositories } = await import('../../database/db.js');
         assert.notNull(repositories, 'repositories 应该被导出');
         assert.hasProperty(repositories, 'User', 'repositories 应该有 User');
@@ -333,40 +319,6 @@ async function testDatabaseMain() {
     await test('导出日志工具 c', async () => {
         const { c } = await import('../../database/db.js');
         assert.truthy(c && typeof c === 'object', 'c 应该被导出');
-    });
-
-    console.log();
-}
-
-/**
- * 测试：向后兼容性
- */
-async function testBackwardCompatibility() {
-    console.log('Test Group: Backward Compatibility');
-
-    await test('userDb 与 repositories.User 是同一个对象', async () => {
-        const { userDb, repositories } = await import('../../database/db.js');
-        assert.equal(userDb, repositories.User, 'userDb 应该引用同一个 User 对象');
-    });
-
-    await test('apiKeysDb 与 repositories.ApiKey 是同一个对象', async () => {
-        const { apiKeysDb, repositories } = await import('../../database/db.js');
-        assert.equal(apiKeysDb, repositories.ApiKey, 'apiKeysDb 应该引用同一个 ApiKey 对象');
-    });
-
-    await test('githubTokensDb 与 repositories.GitHubToken 是同一个对象', async () => {
-        const { githubTokensDb, repositories } = await import('../../database/db.js');
-        assert.equal(githubTokensDb, repositories.GitHubToken, 'githubTokensDb 应该引用同一个 GitHubToken 对象');
-    });
-
-    await test('containersDb 与 repositories.Container 是同一个对象', async () => {
-        const { containersDb, repositories } = await import('../../database/db.js');
-        assert.equal(containersDb, repositories.Container, 'containersDb 应该引用同一个 Container 对象');
-    });
-
-    await test('credentialsDb 与 repositories.Credential 是同一个对象', async () => {
-        const { credentialsDb, repositories } = await import('../../database/db.js');
-        assert.equal(credentialsDb, repositories.Credential, 'credentialsDb 应该引用同一个 Credential 对象');
     });
 
     console.log();
@@ -411,7 +363,6 @@ async function runAllTests() {
     await testContainerRepository();
     await testCredentialRepository();
     await testDatabaseMain();
-    await testBackwardCompatibility();
 
     printSummary();
 }
