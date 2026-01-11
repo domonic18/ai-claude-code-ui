@@ -1,14 +1,16 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
-import { userDb, db } from '../database/db.js';
+import { repositories, db } from '../database/db.js';
 import { generateToken, authenticateToken } from '../middleware/auth.js';
+
+const { User } = repositories;
 
 const router = express.Router();
 
 // 检查身份验证状态和设置要求
 router.get('/status', async (req, res) => {
   try {
-    const hasUsers = await userDb.hasUsers();
+    const hasUsers = User.hasUsers();
     res.json({
       needsSetup: !hasUsers,
       isAuthenticated: false // 如果令牌存在，将由前端覆盖
@@ -34,12 +36,12 @@ router.post('/register', async (req, res) => {
     }
 
     // 使用事务来防止竞态条件
-    db.prepare('BEGIN').run();
+    db().prepare('BEGIN').run();
     try {
       // 检查用户是否已存在（只允许一个用户）
-      const hasUsers = userDb.hasUsers();
+      const hasUsers = User.hasUsers();
       if (hasUsers) {
-        db.prepare('ROLLBACK').run();
+        db().prepare('ROLLBACK').run();
         return res.status(403).json({ error: 'User already exists. This is a single-user system.' });
       }
 
@@ -48,15 +50,15 @@ router.post('/register', async (req, res) => {
       const passwordHash = await bcrypt.hash(password, saltRounds);
 
       // 创建用户
-      const user = userDb.createUser(username, passwordHash);
+      const user = User.create(username, passwordHash);
 
       // 生成令牌
       const token = generateToken(user);
 
       // 更新最后登录时间
-      userDb.updateLastLogin(user.id);
+      User.updateLastLogin(user.id);
 
-      db.prepare('COMMIT').run();
+      db().prepare('COMMIT').run();
 
       res.json({
         success: true,
@@ -64,7 +66,7 @@ router.post('/register', async (req, res) => {
         token
       });
     } catch (error) {
-      db.prepare('ROLLBACK').run();
+      db().prepare('ROLLBACK').run();
       throw error;
     }
 
@@ -89,7 +91,7 @@ router.post('/login', async (req, res) => {
     }
 
     // 从数据库获取用户
-    const user = userDb.getUserByUsername(username);
+    const user = User.getByUsername(username);
     if (!user) {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
@@ -104,7 +106,7 @@ router.post('/login', async (req, res) => {
     const token = generateToken(user);
 
     // 更新最后登录时间
-    userDb.updateLastLogin(user.id);
+    User.updateLastLogin(user.id);
 
     res.json({
       success: true,

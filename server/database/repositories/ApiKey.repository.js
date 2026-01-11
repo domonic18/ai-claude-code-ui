@@ -76,5 +76,18 @@ export const ApiKey = {
         const stmt = db().prepare('DELETE FROM api_keys WHERE id = ? AND user_id = ?');
         const result = stmt.run(apiKeyId, userId);
         return result.changes > 0;
+    },
+
+    /**
+     * 切换API密钥活动状态
+     * @param {number} userId
+     * @param {number} apiKeyId
+     * @param {boolean} isActive
+     * @returns {boolean}
+     */
+    toggle(userId, apiKeyId, isActive) {
+        const stmt = db().prepare('UPDATE api_keys SET is_active = ? WHERE id = ? AND user_id = ?');
+        const result = stmt.run(isActive ? 1 : 0, apiKeyId, userId);
+        return result.changes > 0;
     }
 };

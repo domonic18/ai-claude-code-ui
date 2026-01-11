@@ -17,7 +17,9 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { containersDb } from '../../database/db.js';
+import { repositories } from '../../database/db.js';
+
+const { Container } = repositories;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -113,7 +115,7 @@ class ContainerManager {
     const containerName = `claude-user-${userId}`;
 
     // 步骤 1：检查数据库中是否有现有容器记录
-    const dbRecord = containersDb.getContainerByUserId(userId);
+    const dbRecord = Container.getByUserId(userId);
 
     // 步骤 2：检查内存缓存以快速访问
     if (this.containers.has(userId)) {
@@ -123,7 +125,7 @@ class ContainerManager {
       if (status === 'running') {
         // 更新最后活动时间
         container.lastActive = new Date();
-        containersDb.updateContainerLastActive(container.id).catch(err => {
+        Container.updateLastActive(container.id).catch(err => {
           console.warn(`[ContainerManager] Failed to update last_active: ${err.message}`);
         });
         return container;
@@ -153,7 +155,7 @@ class ContainerManager {
           this.containers.set(userId, info);
 
           // 更新数据库中的 last_active
-          containersDb.updateContainerLastActive(containerInfo.Id).catch(err => {
+          Container.updateLastActive(containerInfo.Id).catch(err => {
             console.warn(`[ContainerManager] Failed to update last_active: ${err.message}`);
           });
 
@@ -164,13 +166,13 @@ class ContainerManager {
           await existingContainer.remove({ force: true }).catch(err => {
             console.warn(`[ContainerManager] Failed to remove stale container: ${err.message}`);
           });
-          containersDb.deleteContainer(dbRecord.container_id);
+          Container.delete(dbRecord.container_id);
         }
       } catch (dockerErr) {
         if (dockerErr.statusCode === 404) {
           // 容器在 Docker 中不存在，从数据库中删除
           console.log(`[ContainerManager] Container ${dbRecord.container_name} not found in Docker, cleaning database`);
-          containersDb.deleteContainer(dbRecord.container_id);
+          Container.delete(dbRecord.container_id);
         } else {
           console.warn(`[ContainerManager] Error checking container ${dbRecord.container_name}: ${dockerErr.message}`);
         }
@@ -250,7 +252,7 @@ class ContainerManager {
 
       // 7. 写入数据库
       try {
-        containersDb.createContainer(userId, container.id, containerName);
+        Container.create(userId, container.id, containerName);
         console.log(`[ContainerManager] Container record saved to database: ${containerName}`);
       } catch (dbErr) {
         console.warn(`[ContainerManager] Failed to save container to database: ${dbErr.message}`);
@@ -270,7 +272,7 @@ class ContainerManager {
   async loadContainersFromDatabase() {
     try {
       console.log('[ContainerManager] Loading containers from database...');
-      const activeContainers = containersDb.listActiveContainers();
+      const activeContainers = Container.listActive();
 
       for (const dbContainer of activeContainers) {
         const { user_id, container_id, container_name, created_at, last_active } = dbContainer;
@@ -293,14 +295,14 @@ class ContainerManager {
             console.log(`[ContainerManager] Restored container for user ${user_id}: ${container_name}`);
           } else {
             // 容器未运行，更新数据库状态
-            containersDb.updateContainerStatus(container_id, 'stopped');
+            Container.updateStatus(container_id, 'stopped');
             console.log(`[ContainerManager] Container ${container_name} is stopped, status updated in database`);
           }
         } catch (dockerErr) {
           // 容器在 Docker 中不存在，从数据库中删除
           if (dockerErr.statusCode === 404) {
             console.log(`[ContainerManager] Container ${container_name} not found in Docker, removing from database`);
-            containersDb.deleteContainer(container_id);
+            Container.delete(container_id);
           } else {
             console.warn(`[ContainerManager] Error checking container ${container_name}: ${dockerErr.message}`);
           }
@@ -464,7 +466,7 @@ class ContainerManager {
 
       // 从数据库中删除
       try {
-        containersDb.deleteContainer(containerInfo.id);
+        Container.delete(containerInfo.id);
         console.log(`[ContainerManager] Container record removed from database: ${containerInfo.name}`);
       } catch (dbErr) {
         console.warn(`[ContainerManager] Failed to remove container from database: ${dbErr.message}`);
@@ -672,7 +674,7 @@ class ContainerManager {
         const containerName = containerInfo.Names[0].replace(/^\//, ''); // 移除前导斜杠
 
         // 检查此容器是否在我们的数据库中
-        const dbRecord = containersDb.getContainerById(containerId);
+        const dbRecord = Container.getById(containerId);
 
         if (!dbRecord) {
           // 容器在 Docker 中存在但数据库中不存在 - 它是孤立的

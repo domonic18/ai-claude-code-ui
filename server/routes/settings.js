@@ -1,5 +1,7 @@
 import express from 'express';
-import { apiKeysDb, credentialsDb } from '../database/db.js';
+import { repositories } from '../database/db.js';
+
+const { ApiKey, Credential } = repositories;
 
 const router = express.Router();
 
@@ -10,7 +12,7 @@ const router = express.Router();
 // 获取已认证用户的所有 API 密钥
 router.get('/api-keys', async (req, res) => {
   try {
-    const apiKeys = apiKeysDb.getApiKeys(req.user.id);
+    const apiKeys = ApiKey.getByUserId(req.user.id);
     // 为了安全，不要在列表中发送完整的 API 密钥
     const sanitizedKeys = apiKeys.map(key => ({
       ...key,
@@ -32,7 +34,7 @@ router.post('/api-keys', async (req, res) => {
       return res.status(400).json({ error: 'Key name is required' });
     }
 
-    const result = apiKeysDb.createApiKey(req.user.id, keyName.trim());
+    const result = ApiKey.create(req.user.id, keyName.trim());
     res.json({
       success: true,
       apiKey: result
@@ -47,7 +49,7 @@ router.post('/api-keys', async (req, res) => {
 router.delete('/api-keys/:keyId', async (req, res) => {
   try {
     const { keyId } = req.params;
-    const success = apiKeysDb.deleteApiKey(req.user.id, parseInt(keyId));
+    const success = ApiKey.delete(req.user.id, parseInt(keyId));
 
     if (success) {
       res.json({ success: true });
@@ -70,7 +72,7 @@ router.patch('/api-keys/:keyId/toggle', async (req, res) => {
       return res.status(400).json({ error: 'isActive must be a boolean' });
     }
 
-    const success = apiKeysDb.toggleApiKey(req.user.id, parseInt(keyId), isActive);
+    const success = ApiKey.toggle(req.user.id, parseInt(keyId), isActive);
 
     if (success) {
       res.json({ success: true });
@@ -91,7 +93,7 @@ router.patch('/api-keys/:keyId/toggle', async (req, res) => {
 router.get('/credentials', async (req, res) => {
   try {
     const { type } = req.query;
-    const credentials = credentialsDb.getCredentials(req.user.id, type || null);
+    const credentials = Credential.getByUserId(req.user.id, type || null);
     // 为了安全，不要发送实际的凭证值
     res.json({ credentials });
   } catch (error) {
@@ -117,7 +119,7 @@ router.post('/credentials', async (req, res) => {
       return res.status(400).json({ error: 'Credential value is required' });
     }
 
-    const result = credentialsDb.createCredential(
+    const result = Credential.create(
       req.user.id,
       credentialName.trim(),
       credentialType.trim(),
@@ -139,7 +141,7 @@ router.post('/credentials', async (req, res) => {
 router.delete('/credentials/:credentialId', async (req, res) => {
   try {
     const { credentialId } = req.params;
-    const success = credentialsDb.deleteCredential(req.user.id, parseInt(credentialId));
+    const success = Credential.delete(req.user.id, parseInt(credentialId));
 
     if (success) {
       res.json({ success: true });
@@ -162,7 +164,7 @@ router.patch('/credentials/:credentialId/toggle', async (req, res) => {
       return res.status(400).json({ error: 'isActive must be a boolean' });
     }
 
-    const success = credentialsDb.toggleCredential(req.user.id, parseInt(credentialId), isActive);
+    const success = Credential.toggle(req.user.id, parseInt(credentialId), isActive);
 
     if (success) {
       res.json({ success: true });

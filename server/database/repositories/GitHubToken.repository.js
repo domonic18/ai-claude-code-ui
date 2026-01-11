@@ -50,40 +50,5 @@ export const GitHubToken = {
     delete(userId) {
         const stmt = db().prepare('DELETE FROM github_tokens WHERE user_id = ?');
         stmt.run(userId);
-    },
-
-    /**
-     * 获取活动的GitHub Token（向后兼容别名）
-     * @param {number} userId
-     * @returns {string|undefined}
-     */
-    getActiveGithubToken(userId) {
-        return GitHubToken.get(userId);
-    },
-
-    /**
-     * 保存Token（别名，向后兼容）
-     * @param {number} userId
-     * @param {string} token
-     */
-    saveToken(userId, token) {
-        return GitHubToken.save(userId, token);
-    },
-
-    /**
-     * 获取Token（别名，向后兼容）
-     * @param {number} userId
-     * @returns {string|undefined}
-     */
-    getToken(userId) {
-        return GitHubToken.get(userId);
-    },
-
-    /**
-     * 删除Token（别名，向后兼容）
-     * @param {number} userId
-     */
-    deleteToken(userId) {
-        return GitHubToken.delete(userId);
     }
 };

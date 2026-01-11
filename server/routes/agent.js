@@ -4,13 +4,15 @@ import path from 'path';
 import os from 'os';
 import { promises as fs } from 'fs';
 import crypto from 'crypto';
-import { userDb, apiKeysDb, githubTokensDb } from '../database/db.js';
+import { repositories } from '../database/db.js';
 import { addProjectManually } from '../services/project/index.js';
 import { queryClaudeSDK } from '../services/claude/index.js';
 import { spawnCursor } from '../services/cursor/index.js';
 import { queryCodex } from '../services/openai/index.js';
 import { Octokit } from '@octokit/rest';
 import { CLAUDE_MODELS, CURSOR_MODELS, CODEX_MODELS } from '../../shared/modelConstants.js';
+
+const { User, ApiKey, GitHubToken } = repositories;
 
 const router = express.Router();
 
@@ -29,7 +31,7 @@ const validateExternalApiKey = (req, res, next) => {
   // 信任请求并使用默认用户上下文。
   if (process.env.VITE_IS_PLATFORM === 'true') {
     try {
-      const user = userDb.getFirstUser();
+      const user = User.getFirst();
       if (!user) {
         return res.status(500).json({ error: 'Platform mode: No user found in database' });
       }
@@ -48,7 +50,7 @@ const validateExternalApiKey = (req, res, next) => {
     return res.status(401).json({ error: 'API key required' });
   }
 
-  const user = apiKeysDb.validateApiKey(apiKey);
+  const user = ApiKey.validate(apiKey);
 
   if (!user) {
     return res.status(401).json({ error: 'Invalid or inactive API key' });
@@ -870,7 +872,7 @@ router.post('/', validateExternalApiKey, async (req, res) => {
     // Determine the final project path
     if (githubUrl) {
       // Clone repository (to projectPath if provided, otherwise generate path)
-      const tokenToUse = githubToken || githubTokensDb.getActiveGithubToken(req.user.id);
+      const tokenToUse = githubToken || GitHubToken.getActive(req.user.id);
 
       let targetPath;
       if (projectPath) {
@@ -980,7 +982,7 @@ router.post('/', validateExternalApiKey, async (req, res) => {
         console.log('🔄 Starting GitHub branch/PR creation workflow...');
 
         // Get GitHub token
-        const tokenToUse = githubToken || githubTokensDb.getActiveGithubToken(req.user.id);
+        const tokenToUse = githubToken || GitHubToken.getActive(req.user.id);
 
         if (!tokenToUse) {
           throw new Error('GitHub token required for branch/PR creation. Please configure a GitHub token in settings.');

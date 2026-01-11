@@ -1,9 +1,11 @@
 import express from 'express';
-import { userDb } from '../database/db.js';
+import { repositories } from '../database/db.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { getSystemGitConfig } from '../utils/gitConfig.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+
+const { User } = repositories;
 
 const execAsync = promisify(exec);
 const router = express.Router();
@@ -11,7 +13,7 @@ const router = express.Router();
 router.get('/git-config', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    let gitConfig = userDb.getGitConfig(userId);
+    let gitConfig = User.getGitConfig(userId);
 
     // 如果数据库为空，尝试从系统 git 配置获取
     if (!gitConfig || (!gitConfig.git_name && !gitConfig.git_email)) {
@@ -19,7 +21,7 @@ router.get('/git-config', authenticateToken, async (req, res) => {
 
       // 如果系统有值，则将其保存到数据库中供此用户使用
       if (systemConfig.git_name || systemConfig.git_email) {
-        userDb.updateGitConfig(userId, systemConfig.git_name, systemConfig.git_email);
+        User.updateGitConfig(userId, systemConfig.git_name, systemConfig.git_email);
         gitConfig = systemConfig;
         console.log(`Auto-populated git config from system for user ${userId}: ${systemConfig.git_name} <${systemConfig.git_email}>`);
       }
@@ -52,7 +54,7 @@ router.post('/git-config', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Invalid email format' });
     }
 
-    userDb.updateGitConfig(userId, gitName, gitEmail);
+    User.updateGitConfig(userId, gitName, gitEmail);
 
     try {
       await execAsync(`git config --global user.name "${gitName.replace(/"/g, '\\"')}"`);
@@ -76,7 +78,7 @@ router.post('/git-config', authenticateToken, async (req, res) => {
 router.post('/complete-onboarding', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    userDb.completeOnboarding(userId);
+    User.completeOnboarding(userId);
 
     res.json({
       success: true,
@@ -91,7 +93,7 @@ router.post('/complete-onboarding', authenticateToken, async (req, res) => {
 router.get('/onboarding-status', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    const hasCompleted = userDb.hasCompletedOnboarding(userId);
+    const hasCompleted = User.hasCompletedOnboarding(userId);
 
     res.json({
       success: true,

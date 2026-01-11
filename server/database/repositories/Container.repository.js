@@ -82,13 +82,5 @@ export const Container = {
     listActive() {
         const rows = db().prepare('SELECT * FROM user_containers WHERE status = ?').all('running');
         return rows;
-    },
-
-    /**
-     * 列出所有活动容器（别名方法，向后兼容）
-     * @returns {Array}
-     */
-    listActiveContainers() {
-        return Container.listActive();
     }
 };

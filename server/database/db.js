@@ -41,14 +41,7 @@ export async function initializeDatabase() {
     }
 }
 
-// 导出数据访问对象（向后兼容）
-export const userDb = User;
-export const apiKeysDb = ApiKey;
-export const githubTokensDb = GitHubToken;
-export const containersDb = Container;
-export const credentialsDb = Credential;
-
-// 导出数据仓库（新API）
+// 导出数据仓库
 export const repositories = {
     User,
     ApiKey,

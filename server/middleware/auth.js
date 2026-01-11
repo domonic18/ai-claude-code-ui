@@ -1,5 +1,7 @@
 import jwt from 'jsonwebtoken';
-import { userDb } from '../database/db.js';
+import { repositories } from '../database/db.js';
+
+const { User } = repositories;
 
 // 从环境变量获取 JWT 密钥或使用默认值（用于开发）
 const JWT_SECRET = process.env.JWT_SECRET || 'claude-ui-dev-secret-change-in-production';
@@ -23,7 +25,7 @@ const authenticateToken = async (req, res, next) => {
   // 平台模式：使用单个数据库用户
   if (process.env.VITE_IS_PLATFORM === 'true') {
     try {
-      const user = userDb.getFirstUser();
+      const user = User.getFirst();
       if (!user) {
         return res.status(500).json({ error: 'Platform mode: No user found in database' });
       }
@@ -47,7 +49,7 @@ const authenticateToken = async (req, res, next) => {
     const decoded = jwt.verify(token, JWT_SECRET);
 
     // 验证用户仍然存在且处于活动状态
-    const user = userDb.getUserById(decoded.userId);
+    const user = User.getById(decoded.userId);
     if (!user) {
       return res.status(401).json({ error: 'Invalid token. User not found.' });
     }
@@ -77,7 +79,7 @@ const authenticateWebSocket = (token) => {
   // 平台模式：绕过令牌验证，返回第一个用户
   if (process.env.VITE_IS_PLATFORM === 'true') {
     try {
-      const user = userDb.getFirstUser();
+      const user = User.getFirst();
       if (user) {
         return { userId: user.id, username: user.username };
       }
