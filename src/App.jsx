@@ -64,7 +64,7 @@ function AppContent() {
   const [sendByCtrlEnter, setSendByCtrlEnter] = useLocalStorage('sendByCtrlEnter', false);
   const [sidebarVisible, setSidebarVisible] = useLocalStorage('sidebarVisible', true);
   // Auto-refresh projects interval (in seconds, 0 = disabled)
-  const [autoRefreshInterval, setAutoRefreshInterval] = useLocalStorage('autoRefreshInterval', 30);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useLocalStorage('autoRefreshInterval', 0);
   // Session Protection System: Track sessions with active conversations to prevent
   // automatic project updates from interrupting ongoing chats. When a user sends
   // a message, the session is marked as "active" and project updates are paused
