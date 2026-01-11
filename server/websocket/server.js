@@ -11,6 +11,7 @@ import { WebSocketServer } from 'ws';
 import { authenticateWebSocket } from '../middleware/auth.js';
 import { handleChatConnection } from './handlers/chat.js';
 import { handleShellConnection } from './handlers/shell.js';
+import { SERVER } from '../config/config.js';
 
 /**
  * 创建并配置 WebSocket 服务器
@@ -27,7 +28,7 @@ export function createWebSocketServer(server, connectedClients, ptySessionsMap) 
             console.log('WebSocket connection attempt to:', info.req.url);
 
             // 平台模式：始终允许连接
-            if (process.env.VITE_IS_PLATFORM === 'true') {
+            if (SERVER.isPlatform) {
                 const user = authenticateWebSocket(null); // 将返回第一个用户
                 if (!user) {
                     console.log('[WARN] Platform mode: No user found in database');

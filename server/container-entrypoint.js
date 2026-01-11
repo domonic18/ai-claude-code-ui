@@ -14,12 +14,13 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { spawnSync } from 'child_process';
+import { SERVER } from './config/config.js';
 
 // 配置
 const HOME = process.env.HOME || '/home/node';
 const CLAUDE_DIR = process.env.CLAUDE_CONFIG_DIR || path.join(HOME, '.claude');
 const PROJECTS_DIR = path.join(CLAUDE_DIR, 'projects');
-const HEALTH_PORT = process.env.HEALTH_CHECK_PORT || 3001;
+const HEALTH_PORT = SERVER.healthCheckPort;
 
 // Container info
 const containerInfo = {

@@ -15,40 +15,10 @@
 import Docker from 'dockerode';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 import { repositories } from '../../database/db.js';
+import { RESOURCE_LIMITS, CONTAINER, getProjectRoot, getWorkspaceDir } from '../../config/config.js';
 
 const { Container } = repositories;
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-// 从 server/services/container 向上 3 级到项目根目录
-const PROJECT_ROOT = path.resolve(__dirname, '..', '..', '..');
-
-/**
- * 按用户层级的容器资源限制
- */
-const RESOURCE_LIMITS = {
-  free: {
-    memory: 1 * 1024 * 1024 * 1024,  // 1GB
-    cpuQuota: 50000,                  // 0.5 CPU
-    cpuPeriod: 100000,
-    securityOptions: []
-  },
-  pro: {
-    memory: 4 * 1024 * 1024 * 1024,  // 4GB
-    cpuQuota: 200000,                 // 2 CPU
-    cpuPeriod: 100000,
-    securityOptions: []
-  },
-  enterprise: {
-    memory: 8 * 1024 * 1024 * 1024,  // 8GB
-    cpuQuota: 400000,                 // 4 CPU
-    cpuPeriod: 100000,
-    securityOptions: []
-  }
-};
 
 /**
  * 容器管理器类
@@ -68,18 +38,17 @@ class ContainerManager {
       if (options.ca) dockerOptions.ca = options.ca;
       if (options.cert) dockerOptions.cert = options.cert;
       if (options.key) dockerOptions.key = options.key;
-    } else if (process.env.DOCKER_HOST) {
-      // 使用 DOCKER_HOST 环境变量
-      dockerOptions = { host: process.env.DOCKER_HOST };
-      if (process.env.DOCKER_CERT_PATH) {
-        dockerOptions.ca = fs.readFileSync(path.join(process.env.DOCKER_CERT_PATH, 'ca.pem'));
-        dockerOptions.cert = fs.readFileSync(path.join(process.env.DOCKER_CERT_PATH, 'cert.pem'));
-        dockerOptions.key = fs.readFileSync(path.join(process.env.DOCKER_CERT_PATH, 'key.pem'));
+    } else if (CONTAINER.docker.host) {
+      // 使用配置的 Docker 主机
+      dockerOptions = { host: CONTAINER.docker.host };
+      if (CONTAINER.docker.certPath) {
+        dockerOptions.ca = fs.readFileSync(path.join(CONTAINER.docker.certPath, 'ca.pem'));
+        dockerOptions.cert = fs.readFileSync(path.join(CONTAINER.docker.certPath, 'cert.pem'));
+        dockerOptions.key = fs.readFileSync(path.join(CONTAINER.docker.certPath, 'key.pem'));
       }
-    } else if (process.platform !== 'darwin') {
-      // 仅在非 macOS 平台上指定 socket 路径
-      // 在 macOS 上，Docker Desktop 需要特殊处理 - 让 dockerode 自动检测
-      dockerOptions = { socketPath: '/var/run/docker.sock' };
+    } else if (CONTAINER.docker.socketPath) {
+      // 使用配置的 socket 路径
+      dockerOptions = { socketPath: CONTAINER.docker.socketPath };
     }
     // 在 macOS (darwin) 上，传递空对象让 dockerode 完全自动检测 Docker Desktop
 
@@ -94,9 +63,9 @@ class ContainerManager {
 
     // 配置
     this.config = {
-      dataDir: options.dataDir || path.join(PROJECT_ROOT, 'workspace'),
-      image: options.image || 'claude-code-runtime:latest',
-      network: options.network || 'claude-network',
+      dataDir: options.dataDir || getWorkspaceDir(),
+      image: options.image || CONTAINER.image,
+      network: options.network || CONTAINER.network,
       ...options
     };
 
@@ -779,4 +748,4 @@ const containerManager = new Proxy({}, {
 });
 
 export default containerManager;
-export { ContainerManager, RESOURCE_LIMITS };
+export { ContainerManager };

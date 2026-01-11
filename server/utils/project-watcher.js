@@ -11,6 +11,7 @@
 import path from 'path';
 import os from 'os';
 import { getProjects } from '../services/project/index.js';
+import { isContainerModeEnabled } from '../config/config.js';
 
 /**
  * 使用 chokidar 为 Claude 项目文件夹设置文件系统监视器
@@ -19,7 +20,7 @@ import { getProjects } from '../services/project/index.js';
  */
 export async function setupProjectsWatcher(connectedClients) {
   // 检查是否启用了容器模式
-  const isContainerMode = process.env.CONTAINER_MODE === 'true' || process.env.CONTAINER_MODE === '1';
+  const isContainerMode = isContainerModeEnabled();
 
   if (isContainerMode) {
     console.log('[INFO] 已启用容器模式，跳过主机项目监视器');
