@@ -1,370 +1,175 @@
 <div align="center">
   <img src="public/logo.svg" alt="Claude Code UI" width="64" height="64">
-  <h1>Cloud CLI (aka Claude Code UI)</h1>
+  <h1>Claude Code UI</h1>
+  <p>为 Claude Code、Cursor CLI 和 OpenAI Codex 提供的多用户 Web 界面</p>
 </div>
 
+# ✨ 项目特色
 
-A desktop and mobile UI for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Cursor CLI](https://docs.cursor.com/en/cli/overview) and [Codex](https://developers.openai.com/codex). You can use it locally or remotely to view your active projects and sessions in Claude Code, Cursor, or Codex and make changes to them from everywhere (mobile or desktop). This gives you a proper interface that works everywhere. 
+1. **多用户架构** - 基于 SQLite 的用户认证和会话管理，支持多用户独立使用
+2. **容器隔离** - 每个用户拥有独立的 Docker 容器环境，确保安全和隔离
+3. **响应式设计** - 完美支持桌面端和移动端，随时随地访问
+4. **多 AI 支持** - 集成 Claude Code、Cursor CLI 和 OpenAI Codex
+5. **实时通信** - 基于 WebSocket 的流式响应，实时获取 AI 回复
+6. **文件管理** - 内置文件浏览器，支持在线查看和编辑代码
+7. **会话管理** - 自动保存对话历史，支持恢复和继续之前的对话
 
-## Screenshots
+# 📸 项目截图
 
 <div align="center">
-  
+
 <table>
 <tr>
 <td align="center">
-<h3>Desktop View</h3>
+<h3>桌面端界面</h3>
 <img src="public/screenshots/desktop-main.png" alt="Desktop Interface" width="400">
-<br>
-<em>Main interface showing project overview and chat</em>
 </td>
 <td align="center">
-<h3>Mobile Experience</h3>
+<h3>移动端体验</h3>
 <img src="public/screenshots/mobile-chat.png" alt="Mobile Interface" width="250">
-<br>
-<em>Responsive mobile design with touch navigation</em>
-</td>
-</tr>
-<tr>
-<td align="center" colspan="2">
-<h3>CLI Selection</h3>
-<img src="public/screenshots/cli-selection.png" alt="CLI Selection" width="400">
-<br>
-<em>Select between Claude Code, Cursor CLI and Codex</em>
 </td>
 </tr>
 </table>
 
-
-
 </div>
 
-## Features
+# 🚀 快速开始
 
-- **Responsive Design** - Works seamlessly across desktop, tablet, and mobile so you can also use Claude Code, Cursor, or Codex from mobile 
-- **Interactive Chat Interface** - Built-in chat interface for seamless communication with Claude Code, Cursor, or Codex
-- **Integrated Shell Terminal** - Direct access to Claude Code, Cursor CLI, or Codex through built-in shell functionality
-- **File Explorer** - Interactive file tree with syntax highlighting and live editing
-- **Git Explorer** - View, stage and commit your changes. You can also switch branches 
-- **Session Management** - Resume conversations, manage multiple sessions, and track history
-- **TaskMaster AI Integration** *(Optional)* - Advanced project management with AI-powered task planning, PRD parsing, and workflow automation
-- **Model Compatibility** - Works with Claude Sonnet 4.5, Opus 4.5, and GPT-5.2 
-
-
-## Quick Start
-
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) v20 or higher
-- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and configured, and/or
-- [Cursor CLI](https://docs.cursor.com/en/cli/overview) installed and configured, and/or
-- [Codex](https://developers.openai.com/codex) installed and configured
-
-### One-click Operation (Recommended)
-
-No installation required, direct operation:
+## 本地开发
 
 ```bash
-npx @siteboon/claude-code-ui
-```
+# 克隆仓库
+git clone https://github.com/domonic18/ai-claude-code-ui.git
+cd ai-claude-code-ui
 
-The server will start and be accessible at `http://localhost:3001` (or your configured PORT).
-
-**To restart**: Simply run the same `npx` command again after stopping the server
-### Global Installation (For Regular Use)
-
-For frequent use, install globally once:
-
-```bash
-npm install -g @siteboon/claude-code-ui
-```
-
-Then start with a simple command:
-
-```bash
-claude-code-ui
-```
-
-
-**To restart**: Stop with Ctrl+C and run `claude-code-ui` again.
-
-**To update**:
-```bash
-cloudcli update
-```
-
-### CLI Usage
-
-After global installation, you have access to both `claude-code-ui` and `cloudcli` commands:
-
-| Command / Option | Short | Description |
-|------------------|-------|-------------|
-| `cloudcli` or `claude-code-ui` | | Start the server (default) |
-| `cloudcli start` | | Start the server explicitly |
-| `cloudcli status` | | Show configuration and data locations |
-| `cloudcli update` | | Update to the latest version |
-| `cloudcli help` | | Show help information |
-| `cloudcli version` | | Show version information |
-| `--port <port>` | `-p` | Set server port (default: 3001) |
-| `--database-path <path>` | | Set custom database location |
-
-**Examples:**
-```bash
-cloudcli                          # Start with defaults
-cloudcli -p 8080              # Start on custom port
-cloudcli status                   # Show current configuration
-```
-
-### Run as Background Service (Recommended for Production)
-
-For production use, run Claude Code UI as a background service using PM2 (Process Manager 2):
-
-#### Install PM2
-
-```bash
-npm install -g pm2
-```
-
-#### Start as Background Service
-
-```bash
-# Start the server in background
-pm2 start claude-code-ui --name "claude-code-ui"
-
-# Or using the shorter alias
-pm2 start cloudcli --name "claude-code-ui"
-
-# Start on a custom port
-pm2 start cloudcli --name "claude-code-ui" -- --port 8080
-```
-
-
-#### Auto-Start on System Boot
-
-To make Claude Code UI start automatically when your system boots:
-
-```bash
-# Generate startup script for your platform
-pm2 startup
-
-# Save current process list
-pm2 save
-```
-
-
-### Local Development Installation
-
-1. **Clone the repository:**
-```bash
-git clone https://github.com/siteboon/claudecodeui.git
-cd claudecodeui
-```
-
-2. **Install dependencies:**
-```bash
+# 安装依赖
 npm install
-```
 
-3. **Configure environment:**
-```bash
-cp .env.example .env
-# Edit .env with your preferred settings
-```
+# 构建 Docker 镜像（必须，容器模式依赖）
+docker build -f docker/Dockerfile.runtime -t claude-code-runtime:latest .
 
-4. **Start the application:**
-```bash
-# Development mode (with hot reload)
+# 启动开发服务
 npm run dev
-
-```
-The application will start at the port you specified in your .env
-
-5. **Open your browser:**
-   - Development: `http://localhost:3001`
-
-## Security & Tools Configuration
-
-**🔒 Important Notice**: All Claude Code tools are **disabled by default**. This prevents potentially harmful operations from running automatically.
-
-### Enabling Tools
-
-To use Claude Code's full functionality, you'll need to manually enable tools:
-
-1. **Open Tools Settings** - Click the gear icon in the sidebar
-3. **Enable Selectively** - Turn on only the tools you need
-4. **Apply Settings** - Your preferences are saved locally
-
-<div align="center">
-
-![Tools Settings Modal](public/screenshots/tools-modal.png)
-*Tools Settings interface - enable only what you need*
-
-</div>
-
-**Recommended approach**: Start with basic tools enabled and add more as needed. You can always adjust these settings later.
-
-## TaskMaster AI Integration *(Optional)*
-
-Claude Code UI supports **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)** (aka claude-task-master) integration for advanced project management and AI-powered task planning.
-
-It provides
-- AI-powered task generation from PRDs (Product Requirements Documents)
-- Smart task breakdown and dependency management  
-- Visual task boards and progress tracking
-
-**Setup & Documentation**: Visit the [TaskMaster AI GitHub repository](https://github.com/eyaltoledano/claude-task-master) for installation instructions, configuration guides, and usage examples.
-After installing it you should be able to enable it from the Settings
-
-
-## Usage Guide
-
-### Core Features
-
-#### Project Management
-It automatically discovers Claude Code, Cursor or Codex sessions when available and groups them together into projects
-session counts
-- **Project Actions** - Rename, delete, and organize projects
-- **Smart Navigation** - Quick access to recent projects and sessions
-- **MCP support** - Add your own MCP servers through the UI 
-
-#### Chat Interface
-- **Use responsive chat or Claude Code/Cursor CLI/Codex CLI** - You can either use the adapted chat interface or use the shell button to connect to your selected CLI. 
-- **Real-time Communication** - Stream responses from your selected CLI (Claude Code/Cursor/Codex) with WebSocket connection
-- **Session Management** - Resume previous conversations or start fresh sessions
-- **Message History** - Complete conversation history with timestamps and metadata
-- **Multi-format Support** - Text, code blocks, and file references
-
-#### File Explorer & Editor
-- **Interactive File Tree** - Browse project structure with expand/collapse navigation
-- **Live File Editing** - Read, modify, and save files directly in the interface
-- **Syntax Highlighting** - Support for multiple programming languages
-- **File Operations** - Create, rename, delete files and directories
-
-#### Git Explorer
-
-
-#### TaskMaster AI Integration *(Optional)*
-- **Visual Task Board** - Kanban-style interface for managing development tasks
-- **PRD Parser** - Create Product Requirements Documents and parse them into structured tasks
-- **Progress Tracking** - Real-time status updates and completion tracking
-
-#### Session Management
-- **Session Persistence** - All conversations automatically saved
-- **Session Organization** - Group sessions by project and timestamp
-- **Session Actions** - Rename, delete, and export conversation history
-- **Cross-device Sync** - Access sessions from any device
-
-### Mobile App
-- **Responsive Design** - Optimized for all screen sizes
-- **Touch-friendly Interface** - Swipe gestures and touch navigation
-- **Mobile Navigation** - Bottom tab bar for easy thumb navigation
-- **Adaptive Layout** - Collapsible sidebar and smart content prioritization
-- **Add shortcut to Home Screen** - Add a shortcut to your home screen and the app will behave like a PWA
-
-## Architecture
-
-### System Overview
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Frontend      │    │   Backend       │    │  Agent     │
-│   (React/Vite)  │◄──►│ (Express/WS)    │◄──►│  Integration    │
-│                 │    │                 │    │                │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
-### Backend (Node.js + Express)
-- **Express Server** - RESTful API with static file serving
-- **WebSocket Server** - Communication for chats and project refresh
-- **Agent Integration (Claude Code / Cursor CLI / Codex)** - Process spawning and management
-- **File System API** - Exposing file browser for projects
+# ⚙️ 配置说明
 
-### Frontend (React + Vite)
-- **React 18** - Modern component architecture with hooks
-- **CodeMirror** - Advanced code editor with syntax highlighting
+## 环境变量
 
+在项目根目录创建 `.env` 文件：
 
+```bash
+# 服务器配置
+PORT=3001
+NODE_ENV=development
 
+# JWT 密钥（生产环境请修改）
+JWT_SECRET=your-secret-key-change-in-production
 
+# Docker 容器配置
+CONTAINER_MODE=enabled
+CONTAINER_IMAGE=claude-code-runtime:latest
 
-### Contributing
+# Claude API 配置（可选）
+ANTHROPIC_API_KEY=your-api-key
+ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/anthropic
+ANTHROPIC_MODEL=glm-4.7
+```
 
-We welcome contributions! Please follow these guidelines:
+## Docker 部署
 
-#### Getting Started
-1. **Fork** the repository
-2. **Clone** your fork: `git clone <your-fork-url>`
-3. **Install** dependencies: `npm install`
-4. **Create** a feature branch: `git checkout -b feature/amazing-feature`
+使用 Docker Compose 部署：
 
-#### Development Process
-1. **Make your changes** following the existing code style
-2. **Test thoroughly** - ensure all features work correctly
-3. **Run quality checks**: `npm run lint && npm run format`
-4. **Commit** with descriptive messages following [Conventional Commits](https://conventionalcommits.org/)
-5. **Push** to your branch: `git push origin feature/amazing-feature`
-6. **Submit** a Pull Request with:
-   - Clear description of changes
-   - Screenshots for UI changes
-   - Test results if applicable
+```bash
+# 构建镜像
+docker build -f docker/Dockerfile.runtime -t claude-code-runtime:latest .
 
-#### What to Contribute
-- **Bug fixes** - Help us improve stability
-- **New features** - Enhance functionality (discuss in issues first)
-- **Documentation** - Improve guides and API docs
-- **UI/UX improvements** - Better user experience
-- **Performance optimizations** - Make it faster
+# 启动服务
+docker-compose up -d
 
-## Troubleshooting
+# 查看日志
+docker-compose logs -f
 
-### Common Issues & Solutions
+# 停止服务
+docker-compose down
+```
 
+## CLI 命令
 
-#### "No Claude projects found"
-**Problem**: The UI shows no projects or empty project list
-**Solutions**:
-- Ensure [Claude Code](https://docs.anthropic.com/en/docs/claude-code) is properly installed
-- Run `claude` command in at least one project directory to initialize
-- Verify `~/.claude/projects/` directory exists and has proper permissions
+| 命令 | 说明 |
+|------|------|
+| `cloudcli` | 启动服务 |
+| `cloudcli status` | 显示配置状态 |
+| `cloudcli update` | 更新到最新版本 |
+| `cloudcli --port 8080` | 指定端口启动 |
 
-#### File Explorer Issues
-**Problem**: Files not loading, permission errors, empty directories
-**Solutions**:
-- Check project directory permissions (`ls -la` in terminal)
-- Verify the project path exists and is accessible
-- Review server console logs for detailed error messages
-- Ensure you're not trying to access system directories outside project scope
+# 📚 主要功能
 
+## 用户管理
+- 多用户注册和登录
+- JWT Token 认证
+- 用户会话隔离
 
-## License
+## 项目管理
+- 自动发现 Claude Code 项目
+- 项目操作：重命名、删除、组织
+- 会话历史管理
 
-GNU General Public License v3.0 - see [LICENSE](LICENSE) file for details.
+## 聊天界面
+- 实时流式响应
+- 会话恢复和继续
+- 多格式支持（文本、代码块、文件引用）
+- 图片上传支持
 
-This project is open source and free to use, modify, and distribute under the GPL v3 license.
+## 文件浏览器
+- 交互式文件树
+- 在线查看和编辑代码
+- 语法高亮支持
+- 文件操作：创建、重命名、删除
 
-## Acknowledgments
+## 容器管理
+- 每用户独立容器
+- 自动容器创建和销毁
+- 资源使用监控
+- 空闲容器自动清理
 
-### Built With
-- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** - Anthropic's official CLI
-- **[Cursor CLI](https://docs.cursor.com/en/cli/overview)** - Cursor's official CLI
-- **[Codex](https://developers.openai.com/codex)** - OpenAI Codex
-- **[React](https://react.dev/)** - User interface library
-- **[Vite](https://vitejs.dev/)** - Fast build tool and dev server
-- **[Tailwind CSS](https://tailwindcss.com/)** - Utility-first CSS framework
-- **[CodeMirror](https://codemirror.net/)** - Advanced code editor
-- **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)** *(Optional)* - AI-powered project management and task planning
+# 🛠️ 技术栈
 
-## Support & Community
+## 后端
+- **Node.js** + **Express** - RESTful API 服务器
+- **WebSocket** - 实时通信
+- **SQLite** - 用户数据存储
+- **Docker** - 容器隔离
 
-### Stay Updated
-- **Star** this repository to show support
-- **Watch** for updates and new releases
-- **Follow** the project for announcements
+## 前端
+- **React 18** - 现代组件架构
+- **Vite** - 快速构建工具
+- **Tailwind CSS** - 样式框架
+- **CodeMirror** - 代码编辑器
 
-### Sponsors
-- [Siteboon - AI powered website builder](https://siteboon.ai)
+## AI 集成
+- **@anthropic-ai/claude-agent-sdk** - Claude Code SDK
+- **Cursor CLI** - Cursor 集成
+- **OpenAI Codex** - Codex 集成
+
+# 📄 版权声明
+
+## 项目来源
+
+本项目基于原 [Claude Code UI](https://github.com/siteboon/claudecodeui) 项目开发，向原项目作者 **Siteboon** 致敬。
+
+原项目仓库：https://github.com/siteboon/claudecodeui
+
+## 开源协议
+
+[GNU General Public License v3.0](/LICENSE) | Copyright © 2024 [Siteboon](https://github.com/siteboon)
+
+## 贡献说明
+
+欢迎开发者为本项目贡献代码，共同推进 Claude Code UI 的发展。
+
 ---
 
 <div align="center">
-  <strong>Made with care for the Claude Code, Cursor and Codex community.</strong>
+  <strong>为 Claude Code、Cursor 和 Codex 社区用心打造</strong>
 </div>
