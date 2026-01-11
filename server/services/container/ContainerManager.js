@@ -23,7 +23,8 @@ const { Container } = repositories;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const PROJECT_ROOT = path.resolve(__dirname, '..');
+// 从 server/services/container 向上 3 级到项目根目录
+const PROJECT_ROOT = path.resolve(__dirname, '..', '..', '..');
 
 /**
  * 按用户层级的容器资源限制
@@ -231,17 +232,19 @@ class ContainerManager {
    */
   async createContainer(userId, userConfig = {}) {
     const containerName = `claude-user-${userId}`;
-    const volumeName = `claude-user-${userId}`;
+
+    // 统一数据目录：所有用户数据都在 workspace/users/user_{id}/data 下
+    // 容器内统一挂载到 /workspace
     const userDataDir = path.join(this.config.dataDir, 'users', `user_${userId}`, 'data');
 
     try {
       // 1. 创建用户数据目录
       await fs.promises.mkdir(userDataDir, { recursive: true });
+      console.log(`[ContainerManager] Created user data directory: ${userDataDir}`);
 
       // 2. 构建容器配置
       const containerConfig = this.buildContainerConfig({
         name: containerName,
-        volumeName,
         userDataDir,
         userId,
         userConfig
@@ -349,10 +352,16 @@ class ContainerManager {
    * @returns {object} Docker 容器配置
    */
   buildContainerConfig(options) {
-    const { name, volumeName, userDataDir, userId, userConfig } = options;
+    const { name, userDataDir, userId, userConfig } = options;
     const tier = userConfig.tier || 'free';
     const resourceLimits = RESOURCE_LIMITS[tier] || RESOURCE_LIMITS.free;
 
+    // 统一工作目录方案：
+    // - 宿主机: workspace/users/user_{id}/data
+    // - 容器内: /workspace (唯一工作目录)
+    // - Claude 配置: /workspace/.claude
+    // - 项目代码: /workspace/project-1, /workspace/project-2, ...
+    // - 全局数据库: workspace/database/auth.db (宿主机，由服务器管理)
     return {
       name: name,
       Image: this.config.image,
@@ -360,13 +369,13 @@ class ContainerManager {
         `USER_ID=${userId}`,
         `NODE_ENV=production`,
         `USER_TIER=${tier}`,
-        `CLAUDE_CONFIG_DIR=/home/node/.claude`,
-        `DATABASE_PATH=/workspace/database/claude-code.db`
+        `CLAUDE_CONFIG_DIR=/workspace/.claude`,           // Claude 配置目录
+        `PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`
       ],
       HostConfig: {
+        // 单一挂载点：所有数据统一在 /workspace 下
         Binds: [
-          `${userDataDir}:/workspace:rw`,
-          `${userDataDir}/.claude:/home/node/.claude:rw`
+          `${userDataDir}:/workspace:rw`    // 统一工作目录
         ],
         Memory: resourceLimits.memory,
         CpuQuota: resourceLimits.cpuQuota,
