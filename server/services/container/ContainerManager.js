@@ -325,6 +325,26 @@ class ContainerManager {
     const tier = userConfig.tier || 'free';
     const resourceLimits = RESOURCE_LIMITS[tier] || RESOURCE_LIMITS.free;
 
+    // 构建容器环境变量
+    const containerEnv = [
+      `USER_ID=${userId}`,
+      `NODE_ENV=production`,
+      `USER_TIER=${tier}`,
+      `CLAUDE_CONFIG_DIR=/workspace/.claude`,           // Claude 配置目录
+      `PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`
+    ];
+
+    // 添加自定义 Anthropic API 配置（如果存在）
+    if (process.env.ANTHROPIC_BASE_URL) {
+      containerEnv.push(`ANTHROPIC_BASE_URL=${process.env.ANTHROPIC_BASE_URL}`);
+    }
+    if (process.env.ANTHROPIC_AUTH_TOKEN) {
+      containerEnv.push(`ANTHROPIC_AUTH_TOKEN=${process.env.ANTHROPIC_AUTH_TOKEN}`);
+    }
+    if (process.env.ANTHROPIC_MODEL) {
+      containerEnv.push(`ANTHROPIC_MODEL=${process.env.ANTHROPIC_MODEL}`);
+    }
+
     // 统一工作目录方案：
     // - 宿主机: workspace/users/user_{id}/data
     // - 容器内: /workspace (唯一工作目录)
@@ -334,13 +354,7 @@ class ContainerManager {
     return {
       name: name,
       Image: this.config.image,
-      Env: [
-        `USER_ID=${userId}`,
-        `NODE_ENV=production`,
-        `USER_TIER=${tier}`,
-        `CLAUDE_CONFIG_DIR=/workspace/.claude`,           // Claude 配置目录
-        `PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`
-      ],
+      Env: containerEnv,
       HostConfig: {
         // 单一挂载点：所有数据统一在 /workspace 下
         Binds: [
