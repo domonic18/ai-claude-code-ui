@@ -45,7 +45,7 @@ export function handleChatConnection(ws, connectedClients) {
                     const originalProjectName = data.options?.projectPath?.replace(/\//g, '-') || '';
                     const containerOptions = {
                         ...data.options,
-                        userId: ws.user.id,
+                        userId: ws.user.userId,  // JWT payload 中是 userId，不是 id
                         isContainerProject: true,
                         projectPath: originalProjectName,
                         // 不要在这里设置 cwd - 让 SDK 函数根据 isContainerProject 确定

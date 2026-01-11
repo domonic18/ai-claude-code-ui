@@ -50,7 +50,8 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
     const mappedOptions = {
       ...sdkOptions,
       sessionId,
-      cwd: workingDir
+      cwd: workingDir,
+      userId  // 确保 userId 被传递
     };
 
     // 3. 创建会话信息
@@ -139,7 +140,9 @@ async function executeSDKInContainer(containerId, command, options, writer, sess
       {
         cwd: options.cwd || '/workspace',
         env: {
-          ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+          NODE_PATH: '/app/node_modules',  // 设置 NODE_PATH 以便 Node.js 能找到 SDK
+          // 使用 ANTHROPIC_AUTH_TOKEN 作为统一的环境变量名
+          ANTHROPIC_AUTH_TOKEN: process.env.ANTHROPIC_AUTH_TOKEN,
           ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL,
           ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL
         }
@@ -166,7 +169,8 @@ async function executeSDKInContainer(containerId, command, options, writer, sess
           clearTimeout(timeout);
         }
         const output = chunk.toString();
-        console.log('[Container SDK] Data chunk:', output.substring(0, 100));
+        // 打印完整输出用于调试
+        console.log('[Container SDK] Data chunk:', output);
         chunks.push(output);
 
         // 如果可用，发送到 WebSocket
@@ -205,6 +209,7 @@ async function executeSDKInContainer(containerId, command, options, writer, sess
         const fullOutput = chunks.join('');
 
         if (errorOutput) {
+          console.error('[Container SDK] Full error output:', errorOutput);
           reject(new Error(`SDK execution error: ${errorOutput}`));
         } else {
           resolve({ output: fullOutput, sessionId });
@@ -227,7 +232,7 @@ async function executeSDKInContainer(containerId, command, options, writer, sess
 function buildSDKScript(command, options) {
   // 从环境变量获取自定义 API 配置
   const customBaseURL = process.env.ANTHROPIC_BASE_URL;
-  const customApiKey = process.env.ANTHROPIC_API_KEY;
+  const customApiKey = process.env.ANTHROPIC_AUTH_TOKEN;
   const customModel = process.env.ANTHROPIC_MODEL;
 
   // 将自定义配置添加到 SDK 选项中
@@ -249,12 +254,24 @@ function buildSDKScript(command, options) {
 
   const optionsStr = JSON.stringify(sdkOptions);
 
-  // 使用单引号作为外层引号，避免与 JSON 中的双引号冲突
-  return `node -e '
-const { query } = require("@anthropic-ai/claude-agent-sdk");
+  // 使用 ESM 模块语法（@anthropic-ai/claude-agent-sdk 是纯 ESM 模块）
+  // 使用绝对路径导入以解决容器内的模块解析问题
+  return `node --input-type=module -e '
+import { query } from "/app/node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs";
 
 async function execute() {
   try {
+    // 调试：打印环境变量
+    console.log(JSON.stringify({
+      type: "debug",
+      message: "SDK starting",
+      env: {
+        hasAuthToken: !!process.env.ANTHROPIC_AUTH_TOKEN,
+        baseURL: process.env.ANTHROPIC_BASE_URL,
+        model: process.env.ANTHROPIC_MODEL
+      }
+    }));
+
     const options = ${optionsStr};
     const result = await query(${JSON.stringify(command)}, options);
 
@@ -274,9 +291,12 @@ async function execute() {
     }));
 
   } catch (error) {
+    // 打印完整错误信息
     console.error(JSON.stringify({
       type: "error",
-      error: error.message
+      error: error.message,
+      stack: error.stack,
+      name: error.name
     }));
     process.exit(1);
   }

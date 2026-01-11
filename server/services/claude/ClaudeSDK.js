@@ -27,7 +27,7 @@ const activeSessions = new Map();
 function getCustomApiConfig() {
   return {
     baseURL: process.env.ANTHROPIC_BASE_URL,
-    apiKey: process.env.ANTHROPIC_API_KEY,
+    apiKey: process.env.ANTHROPIC_AUTH_TOKEN,
     model: process.env.ANTHROPIC_MODEL
   };
 }
