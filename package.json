@@ -30,10 +30,11 @@
     "preview": "vite preview",
     "start": "npm run build && npm run server",
     "release": "./release.sh",
-    "test": "npm run test:imports && npm run test:database && npm run test:container && npm run test:fileops",
+    "test": "npm run test:imports && npm run test:database && npm run test:container && npm run test:docker && npm run test:fileops",
     "test:imports": "node server/tests/unit/module-imports.test.js",
     "test:database": "node server/tests/unit/database.test.js",
     "test:container": "node server/tests/integration/container.test.js",
+    "test:docker": "node server/tests/integration/docker-container.test.js",
     "test:fileops": "node server/tests/integration/file-operations.test.js"
   },
   "keywords": [
