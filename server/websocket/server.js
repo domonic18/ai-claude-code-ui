@@ -63,6 +63,9 @@ export function createWebSocketServer(server, connectedClients, ptySessionsMap) 
         const url = request.url;
         console.log('[INFO] Client connected to:', url);
 
+        // 将用户信息从请求传递到 WebSocket 对象
+        ws.user = request.user;
+
         // 解析 URL 以获取不带查询参数的路径名
         const urlObj = new URL(url, 'http://localhost');
         const pathname = urlObj.pathname;

@@ -309,7 +309,12 @@ class ContainerManager {
 
       console.log(`[ContainerManager] Loaded ${this.containers.size} containers from database`);
     } catch (error) {
-      console.error('[ContainerManager] Failed to load containers from database:', error);
+      // 如果表不存在（数据库尚未迁移），静默忽略
+      if (error.code === 'SQLITE_ERROR' && error.message.includes('no such table')) {
+        console.log('[ContainerManager] Database not yet initialized, skipping container load');
+      } else {
+        console.warn('[ContainerManager] Failed to load containers from database:', error.message);
+      }
     }
   }
 

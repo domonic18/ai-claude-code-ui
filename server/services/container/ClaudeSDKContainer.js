@@ -43,19 +43,9 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
       tier: userTier
     });
 
-    // 2. 使用正确的工作目录构建 SDK 选项
-    // 对于容器项目，使用 /home/node/.claude/projects/{projectPath}
-    // 对于工作空间文件，使用 /workspace/{path}
-    let workingDir;
-    if (isContainerProject && projectPath) {
-      // 容器项目：使用项目目录
-      workingDir = `/home/node/.claude/projects/${projectPath}`;
-    } else if (cwd) {
-      // 工作空间文件：提取基本名称并使用 /workspace
-      workingDir = `/workspace/${path.basename(cwd)}`;
-    } else {
-      workingDir = '/workspace';
-    }
+    // 2. 确定工作目录 - 容器中使用 /workspace 作为根目录
+    const workingDir = '/workspace';
+    console.log(`[Container SDK] Using workspace directory: ${workingDir}`);
 
     const mappedOptions = {
       ...sdkOptions,
@@ -133,11 +123,17 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
  */
 async function executeSDKInContainer(containerId, command, options, writer, sessionId) {
   try {
+    console.log('[Container SDK] Starting execution in container:', containerId);
+    console.log('[Container SDK] Command:', command);
+    console.log('[Container SDK] Options:', JSON.stringify(options));
+
     // 构建 Node.js 脚本以在容器内运行 SDK
     const sdkScript = buildSDKScript(command, options);
+    console.log('[Container SDK] Script length:', sdkScript.length);
 
     // 在容器中执行
-    const { stream } = await containerManager.execInContainer(
+    console.log('[Container SDK] Executing in container...');
+    const { stream, exec } = await containerManager.execInContainer(
       options.userId,
       sdkScript,
       {
@@ -149,14 +145,28 @@ async function executeSDKInContainer(containerId, command, options, writer, sess
         }
       }
     );
+    console.log('[Container SDK] Stream created, waiting for output...');
 
     // 收集输出
     const chunks = [];
     let errorOutput = '';
+    let hasReceivedData = false;
 
     return new Promise((resolve, reject) => {
+      // 设置超时（5 分钟）
+      const timeout = setTimeout(() => {
+        console.error('[Container SDK] Timeout - no data received for 5 minutes');
+        reject(new Error('SDK execution timeout: no response within 5 minutes'));
+      }, 5 * 60 * 1000);
+
       stream.on('data', (chunk) => {
+        if (!hasReceivedData) {
+          console.log('[Container SDK] First data chunk received');
+          hasReceivedData = true;
+          clearTimeout(timeout);
+        }
         const output = chunk.toString();
+        console.log('[Container SDK] Data chunk:', output.substring(0, 100));
         chunks.push(output);
 
         // 如果可用，发送到 WebSocket
@@ -185,10 +195,13 @@ async function executeSDKInContainer(containerId, command, options, writer, sess
       });
 
       stream.on('error', (chunk) => {
-        errorOutput += chunk.toString();
+        const error = chunk.toString();
+        console.error('[Container SDK] Error chunk:', error);
+        errorOutput += error;
       });
 
       stream.on('end', () => {
+        console.log('[Container SDK] Stream ended, total chunks:', chunks.length);
         const fullOutput = chunks.join('');
 
         if (errorOutput) {
@@ -200,6 +213,7 @@ async function executeSDKInContainer(containerId, command, options, writer, sess
     });
 
   } catch (error) {
+    console.error('[Container SDK] Execution failed:', error);
     throw new Error(`在容器中执行 SDK 失败：${error.message}`);
   }
 }
@@ -211,42 +225,65 @@ async function executeSDKInContainer(containerId, command, options, writer, sess
  * @returns {string} Node.js 脚本
  */
 function buildSDKScript(command, options) {
-  const sdkOptions = JSON.stringify(options);
+  // 从环境变量获取自定义 API 配置
+  const customBaseURL = process.env.ANTHROPIC_BASE_URL;
+  const customApiKey = process.env.ANTHROPIC_API_KEY;
+  const customModel = process.env.ANTHROPIC_MODEL;
 
-  return `node -e "
-  const { query } = require('@anthropic-ai/claude-agent-sdk');
+  // 将自定义配置添加到 SDK 选项中
+  const sdkOptions = { ...options };
 
-  async function execute() {
-    try {
-      const options = ${sdkOptions};
-      const result = await query('${command.replace(/'/g, "\\'")}', options);
-
-      // 流式输出
-      for await (const chunk of result) {
-        if (chunk.content) {
-          console.log(JSON.stringify({
-            type: 'content',
-            content: chunk.content
-          }));
-        }
-      }
-
-      console.log(JSON.stringify({
-        type: 'done',
-        sessionId: '${options.sessionId}'
-      }));
-
-    } catch (error) {
-      console.error(JSON.stringify({
-        type: 'error',
-        error: error.message
-      }));
-      process.exit(1);
-    }
+  // 如果环境变量中有自定义配置，应用到选项中
+  if (customBaseURL) {
+    sdkOptions.baseURL = customBaseURL;
+    console.log(`[Container] Using custom API endpoint: ${customBaseURL}`);
+  }
+  if (customApiKey) {
+    sdkOptions.apiKey = customApiKey;
+    console.log(`[Container] Using custom API key from environment`);
+  }
+  if (customModel) {
+    sdkOptions.model = customModel;
+    console.log(`[Container] Using custom model: ${customModel}`);
   }
 
-  execute();
-"`;
+  const optionsStr = JSON.stringify(sdkOptions);
+
+  // 使用单引号作为外层引号，避免与 JSON 中的双引号冲突
+  return `node -e '
+const { query } = require("@anthropic-ai/claude-agent-sdk");
+
+async function execute() {
+  try {
+    const options = ${optionsStr};
+    const result = await query(${JSON.stringify(command)}, options);
+
+    // 流式输出
+    for await (const chunk of result) {
+      if (chunk.content) {
+        console.log(JSON.stringify({
+          type: "content",
+          content: chunk.content
+        }));
+      }
+    }
+
+    console.log(JSON.stringify({
+      type: "done",
+      sessionId: "${options.sessionId || ""}"
+    }));
+
+  } catch (error) {
+    console.error(JSON.stringify({
+      type: "error",
+      error: error.message
+    }));
+    process.exit(1);
+  }
+}
+
+execute();
+'`;
 }
 
 /**
