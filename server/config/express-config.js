@@ -69,11 +69,13 @@ export function configureExpress(app, wss) {
         });
     });
 
-    // 可选的 API 密钥验证（如果已配置）
-    app.use('/api', validateApiKey);
-
-    // ===== 公共路由 =====
+    // ===== 公共路由（无需身份验证）=====
+    // 认证路由必须在 validateApiKey 之前定义
     app.use('/api/auth', authRoutes);
+
+    // 可选的 API 密钥验证（如果已配置）
+    // 只对非认证路由生效
+    app.use('/api', validateApiKey);
 
     // ===== 受保护的路由 =====
     app.use('/api/projects', authenticateToken, projectsRoutes);

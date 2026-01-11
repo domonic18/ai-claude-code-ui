@@ -2,6 +2,7 @@ import express from 'express';
 import bcrypt from 'bcrypt';
 import { repositories, db } from '../database/db.js';
 import { generateToken, authenticateToken } from '../middleware/auth.js';
+import containerManager from '../services/container/ContainerManager.js';
 
 const { User } = repositories;
 
@@ -59,6 +60,11 @@ router.post('/register', async (req, res) => {
       User.updateLastLogin(user.id);
 
       db().prepare('COMMIT').run();
+
+      // 在后台为用户创建容器（不阻塞注册响应）
+      containerManager.getOrCreateContainer(user.id).catch(err => {
+        console.error(`[Auth] Failed to create container for user ${user.id}:`, err.message);
+      });
 
       res.json({
         success: true,

@@ -87,6 +87,10 @@ class ContainerManager {
     // 容器池缓存：userId -> containerInfo
     this.containers = new Map();
 
+    // 正在创建的容器：userId -> Promise<ContainerInfo>
+    // 用于避免并发创建请求导致的冲突
+    this.creating = new Map();
+
     // 配置
     this.config = {
       dataDir: options.dataDir || path.join(PROJECT_ROOT, 'workspace'),
@@ -114,8 +118,11 @@ class ContainerManager {
   async getOrCreateContainer(userId, userConfig = {}) {
     const containerName = `claude-user-${userId}`;
 
-    // 步骤 1：检查数据库中是否有现有容器记录
-    const dbRecord = Container.getByUserId(userId);
+    // 步骤 1：检查是否正在创建中（避免并发创建冲突）
+    if (this.creating.has(userId)) {
+      console.log(`[ContainerManager] Container creation in progress for user ${userId}, waiting...`);
+      return await this.creating.get(userId);
+    }
 
     // 步骤 2：检查内存缓存以快速访问
     if (this.containers.has(userId)) {
@@ -125,9 +132,11 @@ class ContainerManager {
       if (status === 'running') {
         // 更新最后活动时间
         container.lastActive = new Date();
-        Container.updateLastActive(container.id).catch(err => {
+        try {
+          Container.updateLastActive(container.id);
+        } catch (err) {
           console.warn(`[ContainerManager] Failed to update last_active: ${err.message}`);
-        });
+        }
         return container;
       }
 
@@ -135,7 +144,10 @@ class ContainerManager {
       this.containers.delete(userId);
     }
 
-    // 步骤 3：从数据库记录验证容器状态
+    // 步骤 3：检查数据库中是否有现有容器记录
+    const dbRecord = Container.getByUserId(userId);
+
+    // 步骤 4：从数据库记录验证容器状态
     if (dbRecord) {
       try {
         const existingContainer = this.docker.getContainer(dbRecord.container_id);
@@ -155,9 +167,11 @@ class ContainerManager {
           this.containers.set(userId, info);
 
           // 更新数据库中的 last_active
-          Container.updateLastActive(containerInfo.Id).catch(err => {
+          try {
+            Container.updateLastActive(containerInfo.Id);
+          } catch (err) {
             console.warn(`[ContainerManager] Failed to update last_active: ${err.message}`);
-          });
+          }
 
           return info;
         } else {
@@ -179,7 +193,7 @@ class ContainerManager {
       }
     }
 
-    // 步骤 4：检查容器名称是否已被使用（数据不一致情况）
+    // 步骤 5：检查容器名称是否已被使用（数据不一致情况）
     try {
       const existingContainer = this.docker.getContainer(containerName);
       const containerInfo = await existingContainer.inspect();
@@ -196,8 +210,17 @@ class ContainerManager {
       }
     }
 
-    // 步骤 5：创建新容器
-    return await this.createContainer(userId, userConfig);
+    // 步骤 6：创建新容器（使用 Promise 链跟踪创建状态）
+    const createPromise = this.createContainer(userId, userConfig);
+    this.creating.set(userId, createPromise);
+
+    try {
+      const result = await createPromise;
+      return result;
+    } finally {
+      // 创建完成后移除创建状态，允许将来重新创建
+      this.creating.delete(userId);
+    }
   }
 
   /**
