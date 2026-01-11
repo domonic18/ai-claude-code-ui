@@ -34,7 +34,7 @@ export {
   cleanupIdlePtySessions
 } from './PtyContainer.js';
 
-// 从 FileContainer 重新导出文件操作函数
+// 从 file 模块导出文件操作函数
 export {
   validatePath,
   hostPathToContainerPath,
@@ -44,4 +44,4 @@ export {
   getFileStatsInContainer,
   deleteFileInContainer,
   getProjectsInContainer
-} from './FileContainer.js';
+} from './file/index.js';

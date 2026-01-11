@@ -51,8 +51,8 @@ async function runImportTests() {
     () => import('../../services/container/PtyContainer.js')
   );
   await testImport(
-    'FileContainer exports',
-    () => import('../../services/container/FileContainer.js')
+    'File module (new architecture)',
+    () => import('../../services/container/file/index.js')
   );
   await testImport(
     'Container index (all exports)',
