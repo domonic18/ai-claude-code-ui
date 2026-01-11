@@ -11,17 +11,26 @@
  */
 function filterSDKOptions(options) {
   const sdkOptions = { ...options };
-  
+
   // 移除不需要传给 SDK 的字段
   delete sdkOptions.userId;
   delete sdkOptions.isContainerProject;
   delete sdkOptions.projectPath;
-  
+
+  // 处理 resume 参数：SDK 期望 resume 是 sessionId 字符串，而不是 resume: true + sessionId
+  // 如果有 sessionId 且 resume 为 true，将 resume 设置为 sessionId
+  if (options.resume && options.sessionId) {
+    sdkOptions.resume = options.sessionId;
+  }
+
+  // 移除 sessionId（SDK 不需要这个参数）
+  delete sdkOptions.sessionId;
+
   // 处理 model 参数：如果是 "custom"，则从环境变量读取
   if (sdkOptions.model === 'custom') {
     delete sdkOptions.model;
   }
-  
+
   return sdkOptions;
 }
 
