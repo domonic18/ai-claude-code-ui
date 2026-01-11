@@ -50,7 +50,14 @@ export function handleChatConnection(ws, connectedClients) {
                         projectPath: originalProjectName,
                         // 不要在这里设置 cwd - 让 SDK 函数根据 isContainerProject 确定
                     };
-                    await queryClaudeSDKInContainer(data.command, containerOptions, writer);
+                    console.log('[DEBUG] Calling queryClaudeSDKInContainer with options:', JSON.stringify(containerOptions));
+                    try {
+                        await queryClaudeSDKInContainer(data.command, containerOptions, writer);
+                        console.log('[DEBUG] queryClaudeSDKInContainer completed');
+                    } catch (sdkError) {
+                        console.error('[ERROR] queryClaudeSDKInContainer failed:', sdkError);
+                        throw sdkError;
+                    }
                 } else {
                     // 使用 Claude Agents SDK（宿主机模式）
                     await queryClaudeSDK(data.command, data.options, writer);
