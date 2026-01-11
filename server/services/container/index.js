@@ -12,14 +12,14 @@ import { ContainerManager as _CM } from './ContainerManager.js';
 const _instance = new _CM();
 export default _instance;
 
-// 从 ClaudeSDKContainer 重新导出常用函数
+// 从 claude 模块导出常用函数
 export {
   queryClaudeSDKInContainer,
   abortClaudeSDKSessionInContainer,
   isClaudeSDKSessionActiveInContainer,
   getActiveClaudeSDKSessionsInContainer,
   getContainerSessionInfo
-} from './ClaudeSDKContainer.js';
+} from './claude/index.js';
 
 // 从 PtyContainer 重新导出常用函数
 export {

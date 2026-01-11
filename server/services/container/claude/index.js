@@ -15,10 +15,4 @@ export {
   getSession as getContainerSessionInfo
 } from './SessionManager.js';
 
-// 向后兼容的别名导出
-export {
-  abortSession as abortClaudeSDKSession,
-  isSessionActive as isClaudeSDKSessionActive,
-  getActiveSessions as getActiveClaudeSDKSessions
-} from './SessionManager.js';
 

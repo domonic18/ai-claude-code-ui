@@ -43,8 +43,8 @@ async function runImportTests() {
     () => import('../../services/container/ContainerManager.js')
   );
   await testImport(
-    'ClaudeSDKContainer exports',
-    () => import('../../services/container/ClaudeSDKContainer.js')
+    'Container Claude module (new architecture)',
+    () => import('../../services/container/claude/index.js')
   );
   await testImport(
     'PtyContainer exports',

@@ -8,7 +8,7 @@
  */
 
 import { queryClaudeSDK, abortClaudeSDKSession, isClaudeSDKSessionActive, getActiveClaudeSDKSessions } from '../../services/claude/index.js';
-import { queryClaudeSDKInContainer, abortClaudeSDKSessionInContainer, isClaudeSDKSessionActiveInContainer } from '../../services/container/ClaudeSDKContainer.js';
+import { queryClaudeSDKInContainer, abortClaudeSDKSessionInContainer, isClaudeSDKSessionActiveInContainer } from '../../services/container/claude/index.js';
 import { spawnCursor, abortCursorSession, isCursorSessionActive, getActiveCursorSessions } from '../../services/cursor/index.js';
 import { queryCodex, abortCodexSession, isCodexSessionActive, getActiveCodexSessions } from '../../services/openai/index.js';
 import { WebSocketWriter } from '../writer.js';
