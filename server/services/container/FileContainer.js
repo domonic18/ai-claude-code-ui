@@ -11,7 +11,7 @@
  * - 二进制文件支持
  */
 
-import containerManager from './ContainerManager.js';
+import containerManager from './core/index.js';
 
 // 读取操作的最大文件大小（10MB）
 const MAX_FILE_SIZE = 10 * 1024 * 1024;

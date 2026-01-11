@@ -39,8 +39,8 @@ async function runImportTests() {
   // Test 1: Container Services
   console.log('Test Group 1: Container Services');
   await testImport(
-    'ContainerManager class',
-    () => import('../../services/container/ContainerManager.js')
+    'Container Core module (new architecture)',
+    () => import('../../services/container/core/index.js')
   );
   await testImport(
     'Container Claude module (new architecture)',

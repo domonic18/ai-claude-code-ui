@@ -4,13 +4,12 @@
  * 导出所有容器相关服务以便于导入。
  */
 
-// 容器管理器类 - 直接导入
-export { ContainerManager } from './ContainerManager.js';
+// 容器管理器类 - 直接从核心模块导入
+export { ContainerManager } from './core/index.js';
 
-// 用于向后兼容的默认导出
-import { ContainerManager as _CM } from './ContainerManager.js';
-const _instance = new _CM();
-export default _instance;
+// 用于向后兼容的默认导出（单例实例）
+import containerManager from './core/index.js';
+export default containerManager;
 
 // 从 claude 模块导出常用函数
 export {

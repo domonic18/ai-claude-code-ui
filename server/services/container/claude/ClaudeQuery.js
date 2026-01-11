@@ -6,7 +6,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
-import containerManager from '../ContainerManager.js';
+import containerManager from '../core/index.js';
 import { executeInContainer } from './DockerExecutor.js';
 import { createSession, updateSession } from './SessionManager.js';
 

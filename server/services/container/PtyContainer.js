@@ -11,7 +11,7 @@
  * - 终端缓冲区管理
  */
 
-import containerManager from './ContainerManager.js';
+import containerManager from './core/index.js';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 

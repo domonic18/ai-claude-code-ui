@@ -4,7 +4,7 @@
  * 负责在 Docker 容器内执行脚本并处理流式输出。
  */
 
-import containerManager from '../ContainerManager.js';
+import containerManager from '../core/index.js';
 import { buildSDKScript } from './ScriptBuilder.js';
 import { processOutput } from './MessageTransformer.js';
 

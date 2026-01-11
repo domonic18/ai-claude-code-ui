@@ -2,7 +2,7 @@ import express from 'express';
 import bcrypt from 'bcrypt';
 import { repositories, db } from '../database/db.js';
 import { generateToken, authenticateToken } from '../middleware/auth.js';
-import containerManager from '../services/container/ContainerManager.js';
+import containerManager from '../services/container/core/index.js';
 
 const { User } = repositories;
 
