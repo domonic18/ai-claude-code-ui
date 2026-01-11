@@ -64,8 +64,8 @@ COPY --chown=node:node server ./server
 COPY --chown=node:node shared ./shared
 
 # Create workspace and config directories (node user already exists in base image)
-RUN mkdir -p /workspace /app /home/node/.claude/projects && \
-    chown -R node:node /workspace /home/node/.claude /app
+RUN mkdir -p /workspace /app /workspace/.claude/projects && \
+    chown -R node:node /workspace /app
 
 # Switch to non-root user
 USER node
@@ -75,7 +75,7 @@ WORKDIR /workspace
 
 # Set environment variables
 ENV NODE_ENV=production \
-    CLAUDE_CONFIG_DIR=/home/node/.claude
+    CLAUDE_CONFIG_DIR=/workspace/.claude
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

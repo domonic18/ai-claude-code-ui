@@ -7,7 +7,7 @@
  * @module container/core/ContainerConfig
  */
 
-import { RESOURCE_LIMITS } from '../../../config/config.js';
+import { RESOURCE_LIMITS, CONTAINER } from '../../../config/config.js';
 
 /**
  * 容器配置构建器类
@@ -36,7 +36,7 @@ export class ContainerConfigBuilder {
       HostConfig: {
         // 单一挂载点：所有数据统一在 /workspace 下
         Binds: [
-          `${userDataDir}:/workspace:rw`    // 统一工作目录
+          `${userDataDir}:${CONTAINER.paths.workspace}:rw`    // 统一工作目录
         ],
         Memory: resourceLimits.memory,
         CpuQuota: resourceLimits.cpuQuota,
@@ -67,20 +67,10 @@ export class ContainerConfigBuilder {
       `USER_ID=${userId}`,
       `NODE_ENV=production`,
       `USER_TIER=${tier}`,
-      `CLAUDE_CONFIG_DIR=/workspace/.claude`,           // Claude 配置目录
+      `CLAUDE_CONFIG_DIR=${CONTAINER.paths.claudeConfig}`,           // Claude 配置目录
       `PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`
     ];
 
-    // 添加自定义 Anthropic API 配置（如果存在）
-    if (process.env.ANTHROPIC_BASE_URL) {
-      containerEnv.push(`ANTHROPIC_BASE_URL=${process.env.ANTHROPIC_BASE_URL}`);
-    }
-    if (process.env.ANTHROPIC_AUTH_TOKEN) {
-      containerEnv.push(`ANTHROPIC_AUTH_TOKEN=${process.env.ANTHROPIC_AUTH_TOKEN}`);
-    }
-    if (process.env.ANTHROPIC_MODEL) {
-      containerEnv.push(`ANTHROPIC_MODEL=${process.env.ANTHROPIC_MODEL}`);
-    }
 
     return containerEnv;
   }
@@ -118,7 +108,7 @@ export class ContainerConfigBuilder {
       AttachStderr: true,
       AttachStdin: !!options.stdin,
       Tty: options.tty || false,
-      WorkingDir: options.cwd || '/workspace',
+      WorkingDir: options.cwd || CONTAINER.paths.workspace,
       Env: options.env ? Object.entries(options.env).map(([k, v]) => `${k}=${v}`) : []
     };
   }

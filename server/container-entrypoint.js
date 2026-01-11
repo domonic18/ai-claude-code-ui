@@ -17,8 +17,8 @@ import { spawnSync } from 'child_process';
 import { SERVER } from './config/config.js';
 
 // 配置
-const HOME = process.env.HOME || '/home/node';
-const CLAUDE_DIR = process.env.CLAUDE_CONFIG_DIR || path.join(HOME, '.claude');
+const WORKSPACE = '/workspace';
+const CLAUDE_DIR = process.env.CLAUDE_CONFIG_DIR || path.join(WORKSPACE, '.claude');
 const PROJECTS_DIR = path.join(CLAUDE_DIR, 'projects');
 const HEALTH_PORT = SERVER.healthCheckPort;
 

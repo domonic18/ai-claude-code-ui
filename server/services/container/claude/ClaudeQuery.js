@@ -9,6 +9,7 @@ import path from 'path';
 import containerManager from '../core/index.js';
 import { executeInContainer } from './DockerExecutor.js';
 import { createSession, updateSession } from './SessionManager.js';
+import { CONTAINER } from '../../../config/config.js';
 
 /**
  * 映射工作目录
@@ -20,12 +21,12 @@ import { createSession, updateSession } from './SessionManager.js';
 function mapWorkingDirectory(isContainerProject, projectPath, cwd) {
   if (isContainerProject && projectPath) {
     // 容器项目：使用项目目录
-    return `/home/node/.claude/projects/${projectPath}`;
+    return `${CONTAINER.paths.projects}/${projectPath}`.replace(/\/+/g, '/');
   } else if (cwd) {
     // 工作空间文件：提取基本名称并使用 /workspace
-    return `/workspace/${path.basename(cwd)}`;
+    return `${CONTAINER.paths.workspace}/${path.basename(cwd)}`.replace(/\/+/g, '/');
   } else {
-    return '/workspace';
+    return CONTAINER.paths.workspace;
   }
 }
 

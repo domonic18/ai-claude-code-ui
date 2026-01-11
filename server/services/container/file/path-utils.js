@@ -5,6 +5,7 @@
  */
 
 import containerManager from '../core/index.js';
+import { CONTAINER } from '../../../config/config.js';
 
 /**
  * 在容器内执行命令并等待完成
@@ -61,7 +62,17 @@ export function validatePath(filePath) {
 
   // 检查绝对路径
   if (cleanPath.startsWith('/')) {
-    return { safePath: '', error: 'Absolute paths not allowed' };
+    // 允许容器内的合法绝对路径前缀
+    const allowedPrefixes = [
+      CONTAINER.paths.projects,
+      CONTAINER.paths.workspace
+    ];
+
+    const isAllowed = allowedPrefixes.some(prefix => cleanPath.startsWith(prefix));
+
+    if (!isAllowed) {
+      return { safePath: '', error: 'Absolute paths not allowed' };
+    }
   }
 
   // 检查 shell 命令注入
@@ -81,7 +92,7 @@ export function validatePath(filePath) {
  * @returns {string} 容器内的路径
  */
 export function hostPathToContainerPath(hostPath) {
-  return hostPath.replace(/^.*:/, '/workspace');
+  return hostPath.replace(/^.*:/, CONTAINER.paths.workspace);
 }
 
 /**
@@ -93,17 +104,21 @@ export function hostPathToContainerPath(hostPath) {
  * @returns {string} 容器内完整路径
  */
 export function buildContainerPath(safePath, options = {}) {
+  // 如果 safePath 已经是容器内的绝对路径，直接返回
+  if (safePath.startsWith(CONTAINER.paths.projects) || safePath.startsWith(CONTAINER.paths.workspace)) {
+    return safePath;
+  }
+
   const { projectPath = '', isContainerProject = false } = options;
 
-  // 对于容器项目，使用 /home/node/.claude/projects
-  // 对于工作区文件，使用 /workspace
+  // 使用配置中的路径规范
   let basePath = isContainerProject
-    ? `/home/node/.claude/projects/${projectPath}`
-    : '/workspace';
+    ? `${CONTAINER.paths.projects}/${projectPath}`
+    : CONTAINER.paths.workspace;
 
   if (!isContainerProject && projectPath) {
     basePath = hostPathToContainerPath(projectPath);
   }
 
-  return `${basePath}/${safePath}`;
+  return `${basePath}/${safePath}`.replace(/\/+/g, '/');
 }

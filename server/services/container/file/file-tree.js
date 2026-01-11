@@ -4,9 +4,40 @@
  * 提供容器内文件树遍历功能。
  */
 
+import { PassThrough } from 'stream';
 import containerManager from '../core/index.js';
 import { MAX_TREE_DEPTH } from './constants.js';
 import { validatePath, buildContainerPath } from './path-utils.js';
+
+/**
+ * 清理文件名中的控制字符和特殊字符
+ * @param {string} name - 原始文件名
+ * @returns {string} 清理后的文件名
+ */
+function cleanFileName(name) {
+  if (!name || typeof name !== 'string') {
+    return '';
+  }
+
+  // 移除空字节
+  let cleaned = name.replace(/\0/g, '');
+
+  // 移除控制字符（保留常见安全字符）
+  // 保留：字母、数字、中文、常用符号、点、横线、下划线、空格
+  cleaned = cleaned.replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '');
+
+  // 移除 ANSI 转义序列
+  cleaned = cleaned.replace(/\x1b\[[0-9;]*m/g, '');
+  cleaned = cleaned.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+
+  // 移除回车和换行
+  cleaned = cleaned.replace(/[\r\n]/g, '');
+
+  // 移除前后空白
+  cleaned = cleaned.trim();
+
+  return cleaned;
+}
 
 /**
  * 从容器内获取文件树
@@ -46,10 +77,19 @@ export async function getFileTreeInContainer(userId, dirPath = '.', options = {}
     );
 
     return new Promise((resolve, reject) => {
+      const stdout = new PassThrough();
+      const stderr = new PassThrough();
       let output = '';
 
-      stream.on('data', (chunk) => {
+      // 使用 Docker 的 demuxStream 分离 stdout/stderr，移除 8 字节协议头
+      containerManager.docker.modem.demuxStream(stream, stdout, stderr);
+
+      stdout.on('data', (chunk) => {
         output += chunk.toString();
+      });
+
+      stderr.on('data', (chunk) => {
+        console.error('[FileTree] STDERR:', chunk.toString());
       });
 
       stream.on('error', (err) => {
@@ -70,7 +110,16 @@ export async function getFileTreeInContainer(userId, dirPath = '.', options = {}
               continue;
             }
 
-            const [name, type, size, mtime] = parts;
+            const [rawName, type, size, mtime] = parts;
+
+            // 清理文件名
+            const name = cleanFileName(rawName);
+
+            // 跳过空文件名
+            if (!name || name === '' || name === '.') {
+              console.warn('[FileTree] Skipping empty or invalid filename:', JSON.stringify(rawName));
+              continue;
+            }
 
             // 跳过繁重的构建目录
             if (name === 'node_modules' || name === 'dist' || name === 'build') {

@@ -114,6 +114,20 @@ export const CONTAINER = {
 
   // Docker 网络
   network: process.env.CONTAINER_NETWORK || 'claude-network',
+
+  // 容器内路径规范（符合 docs/arch/data-storage-design.md）
+  paths: {
+    // 统一工作目录
+    workspace: '/workspace',
+    // Claude 配置根目录
+    claudeConfig: '/workspace/.claude',
+    // 项目元数据目录
+    projects: '/workspace/.claude/projects',
+    // 设置文件
+    settings: '/workspace/.claude/settings.json',
+    // API 密钥文件
+    apiKeys: '/workspace/.claude/api_keys.json',
+  }
 };
 
 /**
@@ -192,8 +206,8 @@ export const LOG = {
   // 日志级别
   level: process.env.LOG_LEVEL || 'info',
 
-  // 日志目录
-  dir: process.env.LOG_DIR || path.join(PROJECT_ROOT, 'logs'),
+  // 日志目录（符合 docs/arch/data-storage-design.md，位于 workspace/logs）
+  dir: process.env.LOG_DIR || path.join(PROJECT_ROOT, 'workspace', 'logs'),
 };
 
 /**

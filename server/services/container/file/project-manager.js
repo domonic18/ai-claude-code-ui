@@ -4,14 +4,16 @@
  * 提供容器内的项目管理功能，包括列出项目和创建默认工作区。
  */
 
+import { PassThrough } from 'stream';
 import containerManager from '../core/index.js';
 import { execCommand } from './path-utils.js';
+import { CONTAINER } from '../../../config/config.js';
 
 /** 默认项目名称 */
 const DEFAULT_PROJECT_NAME = 'my-workspace';
 
 /** Claude 项目路径 */
-const CLAUDE_PROJECTS_PATH = '/home/node/.claude/projects';
+const CLAUDE_PROJECTS_PATH = CONTAINER.paths.projects;
 
 /**
  * 从容器内获取项目列表
@@ -38,10 +40,19 @@ export async function getProjectsInContainer(userId) {
 
     // 收集输出
     const projects = await new Promise((resolve, reject) => {
+      const stdout = new PassThrough();
+      const stderr = new PassThrough();
       let output = '';
 
-      stream.on('data', (chunk) => {
+      // 使用 Docker 的 demuxStream 分离 stdout/stderr，这会移除 8 字节协议头
+      containerManager.docker.modem.demuxStream(stream, stdout, stderr);
+
+      stdout.on('data', (chunk) => {
         output += chunk.toString();
+      });
+
+      stderr.on('data', (chunk) => {
+        console.error('[ProjectManager] STDERR:', chunk.toString());
       });
 
       stream.on('error', (err) => {

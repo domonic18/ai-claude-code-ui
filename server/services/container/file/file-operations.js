@@ -7,6 +7,7 @@
 import containerManager from '../core/index.js';
 import { MAX_FILE_SIZE } from './constants.js';
 import { validatePath, buildContainerPath } from './path-utils.js';
+import { CONTAINER } from '../../../config/config.js';
 
 /**
  * 从容器内读取文件内容
@@ -96,8 +97,9 @@ export async function writeFileInContainer(userId, filePath, content, options = 
 
     // 如果目录不存在则创建
     const dirPath = containerPath.substring(0, containerPath.lastIndexOf('/'));
-    const projectsBasePath = '/home/node/.claude/projects';
-    if (dirPath && dirPath !== '/workspace' && dirPath !== projectsBasePath) {
+    const projectsBasePath = CONTAINER.paths.projects;
+    const workspacePath = CONTAINER.paths.workspace;
+    if (dirPath && dirPath !== workspacePath && dirPath !== projectsBasePath) {
       await new Promise(async (resolve, reject) => {
         const result = await containerManager.execInContainer(
           userId,
