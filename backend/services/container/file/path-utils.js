@@ -106,19 +106,35 @@ export function hostPathToContainerPath(hostPath) {
 export function buildContainerPath(safePath, options = {}) {
   // 如果 safePath 已经是容器内的绝对路径，直接返回
   if (safePath.startsWith(CONTAINER.paths.projects) || safePath.startsWith(CONTAINER.paths.workspace)) {
+    console.log('[PathUtils] Path is already absolute container path:', safePath);
     return safePath;
   }
 
   const { projectPath = '', isContainerProject = false } = options;
 
+  console.log('[PathUtils] buildContainerPath - safePath:', safePath, 'projectPath:', projectPath, 'isContainerProject:', isContainerProject);
+
+  // 验证 projectPath：如果是绝对路径（以 / 开头），这是错误的用法
+  if (projectPath && projectPath.startsWith('/')) {
+    console.error('[PathUtils] ERROR: projectPath should not be an absolute path:', projectPath);
+    // 移除前导斜杠，只保留相对部分
+    projectPath = projectPath.substring(1);
+    console.log('[PathUtils] Normalized projectPath to:', projectPath);
+  }
+
   // 使用配置中的路径规范
+  // 注意：容器项目代码直接在 /workspace 下，不在 .claude/projects 下
+  // .claude/projects 是 SDK 自动管理会话文件的元数据目录
   let basePath = isContainerProject
-    ? `${CONTAINER.paths.projects}/${projectPath}`
+    ? `${CONTAINER.paths.workspace}/${projectPath}`
     : CONTAINER.paths.workspace;
 
   if (!isContainerProject && projectPath) {
     basePath = hostPathToContainerPath(projectPath);
   }
 
-  return `${basePath}/${safePath}`.replace(/\/+/g, '/');
+  const result = `${basePath}/${safePath}`.replace(/\/+/g, '/');
+  console.log('[PathUtils] Final container path:', result);
+
+  return result;
 }

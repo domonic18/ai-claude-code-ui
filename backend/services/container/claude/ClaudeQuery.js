@@ -14,14 +14,20 @@ import { CONTAINER } from '../../../config/config.js';
 /**
  * 映射工作目录
  * @param {boolean} isContainerProject - 是否为容器项目
- * @param {string} projectPath - 项目路径
+ * @param {string} projectPath - 项目路径（如 "my-workspace"）
  * @param {string} cwd - 当前工作目录
  * @returns {string} 映射后的工作目录
+ *
+ * 注意：根据文档设计（docs/arch/data-storage-design.md）：
+ * - 项目代码目录：/workspace/my-workspace/ （实际的项目代码）
+ * - Claude 元数据：/workspace/.claude/projects/my-workspace/ （会话历史）
+ * - SDK 需要在项目代码目录中运行（cwd: /workspace/my-workspace）
  */
 function mapWorkingDirectory(isContainerProject, projectPath, cwd) {
   if (isContainerProject && projectPath) {
-    // 容器项目：使用项目目录
-    return `${CONTAINER.paths.projects}/${projectPath}`.replace(/\/+/g, '/');
+    // 容器项目：项目代码直接在 /workspace 下，不在 .claude/projects 下
+    // 例如：my-workspace -> /workspace/my-workspace
+    return `${CONTAINER.paths.workspace}/${projectPath}`.replace(/\/+/g, '/');
   } else if (cwd) {
     // 工作空间文件：提取基本名称并使用 /workspace
     return `${CONTAINER.paths.workspace}/${path.basename(cwd)}`.replace(/\/+/g, '/');
@@ -62,17 +68,17 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
     });
     console.log('[ClaudeQuery] Container obtained:', container.name);
 
-    // 2. 映射工作目录（仅用于日志，不传递给 SDK）
+    // 2. 映射工作目录
     const workingDir = mapWorkingDirectory(isContainerProject, projectPath, cwd);
     console.log('[ClaudeQuery] Working directory (mapped):', workingDir);
 
-    // 注意：不传递 cwd 给 SDK
-    // SDK 的 ProcessTransport 会创建子进程，如果设置了 cwd，
-    // 子进程将无法访问 /app/node_modules 中的 SDK 模块
+    // 传递 cwd 给 SDK，但 SDK 脚本会使用它来设置 HOME 环境变量
+    // 这样 SDK 会在正确的项目目录下创建会话文件，而不会影响子进程的模块查找
     const mappedOptions = {
       ...sdkOptions,
       sessionId,
-      userId
+      userId,
+      cwd: workingDir
     };
 
     // 3. 创建会话

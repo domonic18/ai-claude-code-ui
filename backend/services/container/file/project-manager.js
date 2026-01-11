@@ -30,13 +30,14 @@ export async function getProjectsInContainer(userId) {
     const container = await containerManager.getOrCreateContainer(userId);
     console.log('[ProjectManager] Container:', container.id, container.name);
 
-    // 确保项目目录存在
-    await execCommand(userId, `mkdir -p "${CLAUDE_PROJECTS_PATH}"`);
+    // 根据文档设计，项目直接在 /workspace 下，不在 .claude/projects 下
+    // 我们需要从 /workspace 列出所有目录，排除 .claude 等系统目录
+    const workspacePath = CONTAINER.paths.workspace;
 
-    // 列出容器中的项目目录
+    // 列出容器中的项目目录（排除 .claude 等系统目录）
     const { stream } = await containerManager.execInContainer(
       userId,
-      `find "${CLAUDE_PROJECTS_PATH}" -mindepth 1 -maxdepth 1 -type d -printf "%f\\n" 2>/dev/null || echo ""`
+      `find "${workspacePath}" -mindepth 1 -maxdepth 1 -type d -printf "%f\\n" 2>/dev/null | grep -v "/\\.claude$" | grep -v "/\\." || echo ""`
     );
 
     // 收集输出
@@ -127,7 +128,13 @@ export async function getProjectsInContainer(userId) {
  * @returns {Promise<object|null>} 默认项目信息
  */
 async function createDefaultWorkspace(userId) {
-  const projectPath = `${CLAUDE_PROJECTS_PATH}/${DEFAULT_PROJECT_NAME}`;
+  // 根据文档设计（docs/arch/data-storage-design.md）：
+  // - 项目代码目录：/workspace/my-workspace/ （实际的项目代码）
+  // - Claude 元数据：/workspace/.claude/projects/my-workspace/ （会话历史）
+  // 项目应该直接在 /workspace 下，不在 .claude/projects 下
+  const projectPath = `${CONTAINER.paths.workspace}/${DEFAULT_PROJECT_NAME}`;
+
+  console.log('[ProjectManager] Creating default workspace at:', projectPath);
 
   try {
     // 创建默认项目目录 - 使用 containerManager.execInContainer 确保命令执行完成
@@ -140,6 +147,7 @@ async function createDefaultWorkspace(userId) {
     await new Promise((resolve) => {
       createDirResult.stream.on('end', resolve);
     });
+    console.log('[ProjectManager] Directory created:', projectPath);
 
     // 初始化为 git 仓库
     const gitResult = await containerManager.execInContainer(

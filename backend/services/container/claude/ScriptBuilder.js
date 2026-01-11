@@ -80,14 +80,25 @@ async function execute() {
     console.error("[SDK] - ANTHROPIC_AUTH_TOKEN:", process.env.ANTHROPIC_AUTH_TOKEN ? "SET (" + process.env.ANTHROPIC_AUTH_TOKEN.substring(0, 10) + "...)" : "NOT SET");
     console.error("[SDK] - ANTHROPIC_BASE_URL:", process.env.ANTHROPIC_BASE_URL || "NOT SET (will use default)");
     console.error("[SDK] - ANTHROPIC_MODEL:", process.env.ANTHROPIC_MODEL || "NOT SET (will use default)");
-    
+
     // 从 base64 解码 options
     const optionsJson = Buffer.from("${optionsBase64}", "base64").toString("utf-8");
     const options = JSON.parse(optionsJson);
-    
+
     console.error("[SDK] Options:", JSON.stringify(options, null, 2));
     console.error("[SDK] Command:", "${escapedCommand}");
-    
+
+    // 重要：设置 SDK 的工作目录环境变量
+    // SDK 使用 HOME 或 USERPROFILE 等环境变量来确定配置文件位置
+    // 我们通过设置这些环境变量来确保 SDK 在正确的位置创建会话文件
+    if (options.cwd) {
+      const projectDir = options.cwd;
+      console.error("[SDK] Setting HOME to project directory:", projectDir);
+      process.env.HOME = projectDir;
+      // 也设置其他可能的环境变量
+      process.env.USERPROFILE = projectDir;
+    }
+
     // Claude SDK 接受一个对象参数：{ prompt, options }
     const result = query({
       prompt: "${escapedCommand}",

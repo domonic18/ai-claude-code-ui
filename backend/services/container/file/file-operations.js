@@ -99,7 +99,13 @@ export async function writeFileInContainer(userId, filePath, content, options = 
     const dirPath = containerPath.substring(0, containerPath.lastIndexOf('/'));
     const projectsBasePath = CONTAINER.paths.projects;
     const workspacePath = CONTAINER.paths.workspace;
+
+    console.log('[FileOperations] writeFileInContainer - filePath:', filePath, 'safePath:', safePath);
+    console.log('[FileOperations] containerPath:', containerPath);
+    console.log('[FileOperations] dirPath:', dirPath);
+
     if (dirPath && dirPath !== workspacePath && dirPath !== projectsBasePath) {
+      console.log('[FileOperations] Creating directory:', dirPath);
       await new Promise(async (resolve, reject) => {
         const result = await containerManager.execInContainer(
           userId,
@@ -109,6 +115,8 @@ export async function writeFileInContainer(userId, filePath, content, options = 
         mkdirStream.on('end', resolve);
         mkdirStream.on('error', reject);
       });
+    } else {
+      console.log('[FileOperations] Not creating directory (base path)');
     }
 
     // 使用 base64 安全处理特殊字符
