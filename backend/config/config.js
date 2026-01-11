@@ -14,7 +14,7 @@ import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-// config.js 位于 server/config/，需要向上两级到达项目根目录
+// config.js 位于 backend/config/，需要向上两级到达项目根目录
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 
 // ============================================================================

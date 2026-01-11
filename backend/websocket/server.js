@@ -4,7 +4,7 @@
  * 管理 WebSocket 服务器初始化、身份验证和
  * 基于 URL 路径的连接路由。
  *
- * @module websocket/server
+ * @module backend/websocket/server
  */
 
 import { WebSocketServer } from 'ws';

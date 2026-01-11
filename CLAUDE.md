@@ -15,9 +15,11 @@
 **⚠️ 重要：** 在执行任何任务前，必须先阅读 [架构调研文档](/docs/architecture-research.md)，了解完整的技术栈、数据流和系统架构。
 
 完整的技术栈和文件树结构：
-- **前端** (`src/`): React 组件、Context 状态管理、自定义 Hooks
-- **后端** (`server/`): Express API、WebSocket 服务、SDK 集成
+- **前端** (`frontend/`): React 组件、Context 状态管理、自定义 Hooks
+- **后端** (`backend/`): Express API、WebSocket 服务、SDK 集成
 - **共享** (`shared/`): 常量定义、工具函数
+- **脚本** (`scripts/`): 发布脚本、构建脚本
+- **Docker** (`docker/`): Dockerfile、docker-compose 配置
 - **文档** (`docs/`): 架构调研、多用户沙箱评估
 
 ## 3. 编码规范与 AI 指令
@@ -123,4 +125,4 @@ async function queryClaudeSDK(command, options = {}, ws) {
 
 
 **文档维护**：请根据项目发展及时更新此文件
-**最后更新**：2026-01-10
+**最后更新**：2026-01-11

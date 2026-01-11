@@ -3,13 +3,13 @@
   "version": "1.13.6",
   "description": "A web-based UI for Claude Code CLI",
   "type": "module",
-  "main": "server/index.js",
+  "main": "backend/index.js",
   "bin": {
-    "claude-code-ui": "server/cli.js",
-    "cloudcli": "server/cli.js"
+    "claude-code-ui": "backend/cli.js",
+    "cloudcli": "backend/cli.js"
   },
   "files": [
-    "server/",
+    "backend/",
     "shared/",
     "dist/",
     "README.md"
@@ -24,19 +24,19 @@
   },
   "scripts": {
     "dev": "concurrently --kill-others \"npm run server\" \"npm run client\"",
-    "server": "node server/index.js",
+    "server": "node backend/index.js",
     "client": "vite --host",
     "build": "vite build",
     "preview": "vite preview",
     "start": "npm run build && npm run server",
-    "release": "./release.sh",
+    "release": "./scripts/release.sh",
     "test": "npm run test:imports && npm run test:database && npm run test:container && npm run test:docker && npm run test:fileops && npm run test:sdk",
-    "test:imports": "node server/tests/unit/module-imports.test.js",
-    "test:database": "node server/tests/unit/database.test.js",
-    "test:container": "node server/tests/integration/container.test.js",
-    "test:docker": "node server/tests/integration/docker-container.test.js",
-    "test:fileops": "node server/tests/integration/file-operations.test.js",
-    "test:sdk": "node server/tests/integration/claude-sdk-invocation.test.js"
+    "test:imports": "node backend/tests/unit/module-imports.test.js",
+    "test:database": "node backend/tests/unit/database.test.js",
+    "test:container": "node backend/tests/integration/container.test.js",
+    "test:docker": "node backend/tests/integration/docker-container.test.js",
+    "test:fileops": "node backend/tests/integration/file-operations.test.js",
+    "test:sdk": "node backend/tests/integration/claude-sdk-invocation.test.js"
   },
   "keywords": [
     "claude coode",

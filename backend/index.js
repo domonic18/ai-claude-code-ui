@@ -4,7 +4,7 @@
  *
  * 初始化并启动带 WebSocket 支持的 Express 服务器。
  *
- * @module server/index
+ * @module backend/index
  */
 
 import fs from 'fs';
