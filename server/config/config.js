@@ -1,0 +1,374 @@
+/**
+ * 统一配置模块
+ *
+ * 集中管理所有应用配置，包括环境变量、默认值、资源限制等。
+ * 所有配置相关的定义都应该在此文件中维护。
+ *
+ * @module config/config
+ */
+
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import fs from 'fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const PROJECT_ROOT = path.resolve(__dirname, '..');
+
+// ============================================================================
+// 环境变量配置与默认值
+// ============================================================================
+
+/**
+ * 服务器配置
+ */
+export const SERVER = {
+  // 端口配置
+  port: parseInt(process.env.PORT || '3001', 10),
+
+  // 运行环境
+  env: process.env.NODE_ENV || 'production',
+
+  // 是否为平台模式（单用户模式）
+  isPlatform: process.env.VITE_IS_PLATFORM === 'true',
+
+  // Vite 开发服务器端口（开发模式）
+  vitePort: parseInt(process.env.VITE_PORT || '5173', 10),
+
+  // 健康检查端口（容器入口点）
+  healthCheckPort: parseInt(process.env.HEALTH_CHECK_PORT || '3001', 10),
+};
+
+/**
+ * 数据库配置
+ */
+export const DATABASE = {
+  // 数据库文件路径
+  path: process.env.DATABASE_PATH || path.join(PROJECT_ROOT, 'workspace', 'database', 'auth.db'),
+
+  // 数据库目录
+  dir: path.dirname(process.env.DATABASE_PATH || path.join(PROJECT_ROOT, 'workspace', 'database', 'auth.db')),
+};
+
+/**
+ * 认证配置
+ */
+export const AUTH = {
+  // JWT 密钥（生产环境必须设置）
+  jwtSecret: process.env.JWT_SECRET || 'claude-ui-dev-secret-change-in-production',
+
+  // API 密钥（可选，用于额外的 API 访问控制）
+  apiKey: process.env.API_KEY || null,
+
+  // JWT 过期时间
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+};
+
+/**
+ * 容器模式配置
+ */
+export const CONTAINER = {
+  // 是否启用容器模式
+  enabled: process.env.CONTAINER_MODE === 'true' || process.env.CONTAINER_MODE === '1',
+
+  // Docker 配置
+  docker: {
+    host: process.env.DOCKER_HOST || null,
+    socketPath: process.platform !== 'darwin' ? '/var/run/docker.sock' : null,
+    certPath: process.env.DOCKER_CERT_PATH || null,
+  },
+
+  // Docker 镜像
+  image: process.env.CONTAINER_IMAGE || 'claude-code-runtime:latest',
+
+  // Docker 网络
+  network: process.env.CONTAINER_NETWORK || 'claude-network',
+};
+
+/**
+ * 容器资源限制配置
+ * �用户层级定义 CPU、内存等资源限制
+ */
+export const RESOURCE_LIMITS = {
+  free: {
+    memory: 1 * 1024 * 1024 * 1024,  // 1GB
+    cpuQuota: 50000,                  // 0.5 CPU
+    cpuPeriod: 100000,
+    securityOptions: []
+  },
+  pro: {
+    memory: 4 * 1024 * 1024 * 1024,  // 4GB
+    cpuQuota: 200000,                 // 2 CPU
+    cpuPeriod: 100000,
+    securityOptions: []
+  },
+  enterprise: {
+    memory: 8 * 1024 * 1024 * 1024,  // 8GB
+    cpuQuota: 400000,                 // 4 CPU
+    cpuPeriod: 100000,
+    securityOptions: []
+  }
+};
+
+/**
+ * Claude CLI 配置
+ */
+export const CLAUDE = {
+  // CLI 路径
+  cliPath: process.env.CLAUDE_CLI_PATH || 'claude',
+
+  // 配置目录
+  configDir: process.env.CLAUDE_CONFIG_DIR || null,
+
+  // 上下文窗口大小
+  contextWindow: parseInt(process.env.CONTEXT_WINDOW || '200000', 10),
+};
+
+/**
+ * 文件操作配置
+ */
+export const FILES = {
+  // 最大上传大小
+  maxUploadSize: process.env.MAX_UPLOAD_SIZE || '50mb',
+
+  // 支持的文件类型
+  allowedExtensions: process.env.ALLOWED_EXTENSIONS
+    ? process.env.ALLOWED_EXTENSIONS.split(',')
+    : ['.js', '.ts', '.jsx', '.tsx', '.py', '.go', '.rs', '.java', '.c', '.cpp', '.h', '.hpp', '.css', '.html', '.md', '.json', '.yaml', '.yml', '.txt', '.sh'],
+
+  // 排除的目录（文件树遍历时）
+  excludedDirs: ['.git', 'node_modules', 'dist', 'build', '.next', '.nuxt', 'target', 'bin', 'obj'],
+
+  // 最大文件深度
+  maxDepth: parseInt(process.env.MAX_FILE_DEPTH || '3', 10),
+};
+
+/**
+ * WebSocket 配置
+ */
+export const WEBSOCKET = {
+  // 心跳间隔（毫秒）
+  heartbeatInterval: parseInt(process.env.WS_HEARTBEAT_INTERVAL || '30000', 10),
+
+  // 连接超时（毫秒）
+  timeout: parseInt(process.env.WS_TIMEOUT || '120000', 10),
+};
+
+/**
+ * 日志配置
+ */
+export const LOG = {
+  // 日志级别
+  level: process.env.LOG_LEVEL || 'info',
+
+  // 日志目录
+  dir: process.env.LOG_DIR || path.join(PROJECT_ROOT, 'logs'),
+};
+
+/**
+ * 备份配置
+ */
+export const BACKUP = {
+  // 是否启用自动备份
+  enabled: process.env.BACKUP_ENABLED !== 'false',
+
+  // 备份目录
+  dir: process.env.BACKUP_DIR || path.join(PROJECT_ROOT, 'workspace', 'backups'),
+
+  // 保留策略
+  retention: {
+    daily: parseInt(process.env.BACKUP_RETENTION_DAILY || '7', 10),
+    weekly: parseInt(process.env.BACKUP_RETENTION_WEEKLY || '4', 10),
+    monthly: parseInt(process.env.BACKUP_RETENTION_MONTHLY || '3', 10),
+  },
+};
+
+// ============================================================================
+// 辅助函数
+// ============================================================================
+
+/**
+ * 从 .env 文件加载环境变量
+ * 如果环境变量尚不存在，则设置它们
+ */
+export function loadEnvironment() {
+  try {
+    const envPath = path.join(PROJECT_ROOT, '.env');
+    const envFile = fs.readFileSync(envPath, 'utf8');
+    envFile.split('\n').forEach(line => {
+      const trimmedLine = line.trim();
+      if (trimmedLine && !trimmedLine.startsWith('#')) {
+        const [key, ...valueParts] = trimmedLine.split('=');
+        if (key && valueParts.length > 0 && !process.env[key]) {
+          process.env[key] = valueParts.join('=').trim();
+        }
+      }
+    });
+  } catch (e) {
+    // .env 文件不存在或无法读取，静默忽略
+  }
+}
+
+/**
+ * 获取项目根目录的绝对路径
+ */
+export function getProjectRoot() {
+  return PROJECT_ROOT;
+}
+
+/**
+ * 获取 workspace 目录的绝对路径
+ */
+export function getWorkspaceDir() {
+  return path.join(PROJECT_ROOT, 'workspace');
+}
+
+/**
+ * 获取用户数据目录的绝对路径
+ * @param {number} userId - 用户 ID
+ */
+export function getUserDataDir(userId) {
+  return path.join(getWorkspaceDir(), 'users', `user_${userId}`, 'data');
+}
+
+/**
+ * 检查是否启用容器模式
+ */
+export function isContainerModeEnabled() {
+  return CONTAINER.enabled;
+}
+
+/**
+ * 检查是否为平台模式
+ */
+export function isPlatformMode() {
+  return SERVER.isPlatform;
+}
+
+/**
+ * 获取资源限制配置
+ * @param {string} tier - 用户层级 (free, pro, enterprise)
+ */
+export function getResourceLimits(tier = 'free') {
+  return RESOURCE_LIMITS[tier] || RESOURCE_LIMITS.free;
+}
+
+/**
+ * 验证必需的配置
+ * 在生产环境中检查必需的配置项是否已设置
+ * @throws {Error} 如果缺少必需的配置
+ */
+export function validateConfig() {
+  const errors = [];
+
+  if (SERVER.env === 'production') {
+    if (AUTH.jwtSecret === 'claude-ui-dev-secret-change-in-production') {
+      errors.push('JWT_SECRET must be set in production environment');
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error('Configuration validation failed:\n  - ' + errors.join('\n  - '));
+  }
+}
+
+/**
+ * 获取配置摘要（用于日志和状态显示）
+ */
+export function getConfigSummary() {
+  return {
+    server: {
+      port: SERVER.port,
+      env: SERVER.env,
+      isPlatform: SERVER.isPlatform,
+    },
+    database: {
+      path: DATABASE.path,
+    },
+    container: {
+      enabled: CONTAINER.enabled,
+      image: CONTAINER.image,
+    },
+    auth: {
+      hasApiKey: !!AUTH.apiKey,
+      jwtExpiresIn: AUTH.jwtExpiresIn,
+    },
+  };
+}
+
+// ============================================================================
+// ANSI 颜色配置（用于终端输出）
+// ============================================================================
+
+/**
+ * ANSI 颜色代码
+ */
+export const COLORS = {
+  reset: '\x1b[0m',
+  bright: '\x1b[1m',
+  cyan: '\x1b[36m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  red: '\x1b[31m',
+  dim: '\x1b[2m',
+};
+
+/**
+ * 彩色控制台输出工具
+ */
+export const c = {
+  info: (text) => `${COLORS.cyan}${text}${COLORS.reset}`,
+  ok: (text) => `${COLORS.green}${text}${COLORS.reset}`,
+  warn: (text) => `${COLORS.yellow}${text}${COLORS.reset}`,
+  error: (text) => `${COLORS.red}${text}${COLORS.reset}`,
+  tip: (text) => `${COLORS.blue}${text}${COLORS.reset}`,
+  bright: (text) => `${COLORS.bright}${text}${COLORS.reset}`,
+  dim: (text) => `${COLORS.dim}${text}${COLORS.reset}`,
+};
+
+/**
+ * 记录配置状态到控制台
+ */
+export function logConfigStatus() {
+  console.log(`${c.info('[CONFIG]')} ===== 配置状态 =====`);
+  console.log(`${c.info('[CONFIG]')} 模式: ${c.bright(SERVER.isPlatform ? 'PLATFORM (单用户)' : 'STANDARD (多用户)')}`);
+  console.log(`${c.info('[CONFIG]')} 容器模式: ${CONTAINER.enabled ? c.ok('启用') : c.dim('禁用')}`);
+  console.log(`${c.info('[CONFIG]')} 数据库: ${c.dim(DATABASE.path)}`);
+  console.log(`${c.info('[CONFIG]')} 端口: ${c.bright(SERVER.port)}`);
+
+  if (SERVER.env === 'production') {
+    if (AUTH.jwtSecret === 'claude-ui-dev-secret-change-in-production') {
+      console.log(`${c.warn('[WARN]')} 使用默认 JWT 密钥，请在生产环境中设置 JWT_SECRET`);
+    }
+  }
+
+  console.log(`${c.info('[CONFIG]')} ====================`);
+}
+
+// 默认导出所有配置
+export default {
+  SERVER,
+  DATABASE,
+  AUTH,
+  CONTAINER,
+  RESOURCE_LIMITS,
+  CLAUDE,
+  FILES,
+  WEBSOCKET,
+  LOG,
+  BACKUP,
+  COLORS,
+  c,
+  loadEnvironment,
+  getProjectRoot,
+  getWorkspaceDir,
+  getUserDataDir,
+  isContainerModeEnabled,
+  isPlatformMode,
+  getResourceLimits,
+  validateConfig,
+  getConfigSummary,
+  logConfigStatus,
+};
