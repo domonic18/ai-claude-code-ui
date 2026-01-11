@@ -84,6 +84,12 @@ export class ContainerConfigBuilder {
    */
   _buildLabels(userId, tier) {
     return {
+      // Docker Compose 风格标签 - 用于在 Docker 客户端中分组显示
+      'com.docker.compose.project': 'claude-code-ui',
+      'com.docker.compose.service': 'user-sandbox',
+      'com.docker.compose.oneoff': 'false',
+
+      // 自定义标签 - 用于容器识别和管理
       'com.claude-code.user': String(userId),
       'com.claude-code.managed': 'true',
       'com.claude-code.tier': tier,
