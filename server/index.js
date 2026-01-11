@@ -12,8 +12,8 @@ import path from 'path';
 import http from 'http';
 import express from 'express';
 
-// 配置模块
-import { loadEnvironment, c } from './config/environment.js';
+// 统一配置模块
+import { loadEnvironment, logConfigStatus, SERVER, c } from './config/config.js';
 import { configureExpress } from './config/express-config.js';
 import { createWebSocketServer } from './websocket/server.js';
 
@@ -29,9 +29,6 @@ const connectedClients = new Set();
 
 // PTY 会话映射，用于 shell 终端管理
 const ptySessionsMap = new Map();
-
-// 服务器配置
-const PORT = process.env.PORT || 3001;
 
 // 初始化 Express 应用和 HTTP 服务器
 const app = express();
@@ -55,23 +52,26 @@ async function startServer() {
         const distIndexPath = path.join(process.cwd(), 'dist/index.html');
         const isProduction = fs.existsSync(distIndexPath);
 
-        // 记录 Claude 实现模式
+        // 记录配置状态
+        logConfigStatus();
+
+        // 记录运行模式
         console.log(`${c.info('[INFO]')} Using Claude Agents SDK for Claude integration`);
         console.log(`${c.info('[INFO]')} Running in ${c.bright(isProduction ? 'PRODUCTION' : 'DEVELOPMENT')} mode`);
 
         if (!isProduction) {
-            console.log(`${c.warn('[WARN]')} Note: Requests will be proxied to Vite dev server at ${c.dim('http://localhost:' + (process.env.VITE_PORT || 5173))}`);
+            console.log(`${c.warn('[WARN]')} Note: Requests will be proxied to Vite dev server at ${c.dim('http://localhost:' + SERVER.vitePort)}`);
         }
 
-        server.listen(PORT, '0.0.0.0', async () => {
-            const appInstallPath = path.join(process.cwd());
+        server.listen(SERVER.port, '0.0.0.0', async () => {
+            const appInstallPath = process.cwd();
 
             console.log('');
             console.log(c.dim('═'.repeat(63)));
             console.log(`  ${c.bright('Claude Code UI Server - Ready')}`);
             console.log(c.dim('═'.repeat(63)));
             console.log('');
-            console.log(`${c.info('[INFO]')} Server URL:  ${c.bright('http://0.0.0.0:' + PORT)}`);
+            console.log(`${c.info('[INFO]')} Server URL:  ${c.bright('http://0.0.0.0:' + SERVER.port)}`);
             console.log(`${c.info('[INFO]')} Installed at: ${c.dim(appInstallPath)}`);
             console.log(`${c.tip('[TIP]')}  Run "cloudcli status" for full configuration details`);
             console.log('');

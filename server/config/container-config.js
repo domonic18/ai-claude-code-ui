@@ -1,30 +1,16 @@
 /**
  * 容器模式配置
  *
- * 控制文件操作是通过 Docker 容器执行还是直接在主机系统上执行。
+ * 重新导出统一配置模块的内容，保持向后兼容。
+ *
+ * @module config/container-config
+ * @deprecated 请直接从 config/config 导入配置
  */
 
-/**
- * 检查是否通过环境变量启用了容器模式
- * @returns {boolean} - 如果启用了容器模式则返回 true
- */
-export function isContainerModeEnabled() {
-  return process.env.CONTAINER_MODE === 'true' || process.env.CONTAINER_MODE === '1';
-}
-
-/**
- * 记录容器模式状态（在加载 .env 后调用此函数）
- */
-export function logContainerModeStatus() {
-  if (isContainerModeEnabled()) {
-    console.log('[CONFIG] Container mode: ENABLED');
-    console.log('[CONFIG] File operations will be performed through Docker containers');
-  } else {
-    console.log('[CONFIG] Container mode: DISABLED (default)');
-    console.log('[CONFIG] File operations will be performed on host system');
-    console.log('[CONFIG] To enable container mode, set CONTAINER_MODE=1');
-  }
-}
+export {
+  isContainerModeEnabled,
+  CONTAINER,
+} from './config.js';
 
 /**
  * 根据容器模式获取文件操作实现
@@ -62,7 +48,7 @@ export async function getFileOperations(userId) {
         const fullPath = options.projectPath
           ? path.join(options.projectPath, filePath)
           : filePath;
-        const content = await fs.readFile(fullPath, 'utf-8');
+        const content = await fs.readFile(fullPath, 'utf8');
         return { content, path: fullPath };
       },
 
@@ -70,7 +56,7 @@ export async function getFileOperations(userId) {
         const fullPath = options.projectPath
           ? path.join(options.projectPath, filePath)
           : filePath;
-        await fs.writeFile(fullPath, content, 'utf-8');
+        await fs.writeFile(fullPath, content, 'utf8');
         return { success: true, path: fullPath };
       },
 

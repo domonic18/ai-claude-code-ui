@@ -10,6 +10,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import mime from 'mime-types';
+import { FILES, SERVER } from './config.js';
 
 // 路由导入
 import gitRoutes from '../routes/git.js';
@@ -47,7 +48,7 @@ export function configureExpress(app, wss) {
 
     // 带有自定义类型检查的 JSON 主体解析器
     app.use(express.json({
-        limit: '50mb',
+        limit: FILES.maxUploadSize,
         type: (req) => {
             // 跳过 multipart/form-data 请求（用于文件上传，如图像）
             const contentType = req.headers['content-type'] || '';
@@ -59,7 +60,7 @@ export function configureExpress(app, wss) {
     }));
 
     // URL 编码解析器
-    app.use(express.urlencoded({ limit: '50mb', extended: true }));
+    app.use(express.urlencoded({ limit: FILES.maxUploadSize, extended: true }));
 
     // 公共健康检查端点（无需身份验证）
     app.get('/health', (req, res) => {
@@ -144,7 +145,7 @@ export function configureExpress(app, wss) {
             res.sendFile(indexPath);
         } else {
             // 在开发环境中，仅当 dist 不存在时重定向到 Vite 开发服务器
-            res.redirect(`http://localhost:${process.env.VITE_PORT || 5173}`);
+            res.redirect(`http://localhost:${SERVER.vitePort}`);
         }
     });
 }

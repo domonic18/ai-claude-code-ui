@@ -9,7 +9,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
-import { c } from './utils/logger.js';
+import { c, DATABASE } from '../config/config.js';
 
 // 数据库连接单例
 let _db = null;
@@ -20,8 +20,7 @@ let _isInitialized = false;
  * @returns {string} 数据库文件的绝对路径
  */
 export function getDatabasePath() {
-    const defaultPath = path.join(process.cwd(), 'workspace', 'database', 'auth.db');
-    let dbPath = process.env.DATABASE_PATH || defaultPath;
+    let dbPath = DATABASE.path;
 
     if (!path.isAbsolute(dbPath)) {
         dbPath = path.resolve(process.cwd(), dbPath);
@@ -38,7 +37,7 @@ export function getDatabase() {
         const dbPath = getDatabasePath();
 
         // 确保数据库目录存在
-        const dbDir = path.dirname(dbPath);
+        const dbDir = DATABASE.dir;
         if (!fs.existsSync(dbDir)) {
             fs.mkdirSync(dbDir, { recursive: true });
         }

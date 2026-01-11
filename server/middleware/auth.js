@@ -1,20 +1,18 @@
 import jwt from 'jsonwebtoken';
 import { repositories } from '../database/db.js';
+import { AUTH, SERVER } from '../config/config.js';
 
 const { User } = repositories;
-
-// 从环境变量获取 JWT 密钥或使用默认值（用于开发）
-const JWT_SECRET = process.env.JWT_SECRET || 'claude-ui-dev-secret-change-in-production';
 
 // 可选的 API 密钥中间件
 const validateApiKey = (req, res, next) => {
   // 如果未配置，则跳过 API 密钥验证
-  if (!process.env.API_KEY) {
+  if (!AUTH.apiKey) {
     return next();
   }
 
   const apiKey = req.headers['x-api-key'];
-  if (apiKey !== process.env.API_KEY) {
+  if (apiKey !== AUTH.apiKey) {
     return res.status(401).json({ error: 'Invalid API key' });
   }
   next();
@@ -23,7 +21,7 @@ const validateApiKey = (req, res, next) => {
 // JWT 认证中间件
 const authenticateToken = async (req, res, next) => {
   // 平台模式：使用单个数据库用户
-  if (process.env.VITE_IS_PLATFORM === 'true') {
+  if (SERVER.isPlatform) {
     try {
       const user = User.getFirst();
       if (!user) {
@@ -46,7 +44,7 @@ const authenticateToken = async (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, AUTH.jwtSecret);
 
     // 验证用户仍然存在且处于活动状态
     const user = User.getById(decoded.userId);
@@ -69,7 +67,7 @@ const generateToken = (user) => {
       userId: user.id,
       username: user.username
     },
-    JWT_SECRET
+    AUTH.jwtSecret
     // 无过期时间 - 令牌永久有效
   );
 };
@@ -77,7 +75,7 @@ const generateToken = (user) => {
 // WebSocket 认证函数
 const authenticateWebSocket = (token) => {
   // 平台模式：绕过令牌验证，返回第一个用户
-  if (process.env.VITE_IS_PLATFORM === 'true') {
+  if (SERVER.isPlatform) {
     try {
       const user = User.getFirst();
       if (user) {
@@ -96,7 +94,7 @@ const authenticateWebSocket = (token) => {
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, AUTH.jwtSecret);
     return decoded;
   } catch (error) {
     console.error('WebSocket token verification error:', error);
@@ -108,6 +106,5 @@ export {
   validateApiKey,
   authenticateToken,
   generateToken,
-  authenticateWebSocket,
-  JWT_SECRET
+  authenticateWebSocket
 };

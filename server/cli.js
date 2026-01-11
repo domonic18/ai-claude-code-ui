@@ -17,64 +17,19 @@ import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { loadEnvironment, DATABASE, SERVER, CLAUDE, c } from './config/config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-// 用于终端输出的 ANSI 颜色代码
-const colors = {
-    reset: '\x1b[0m',
-    bright: '\x1b[1m',
-    dim: '\x1b[2m',
-
-    // 前景色
-    cyan: '\x1b[36m',
-    green: '\x1b[32m',
-    yellow: '\x1b[33m',
-    blue: '\x1b[34m',
-    magenta: '\x1b[35m',
-    white: '\x1b[37m',
-    gray: '\x1b[90m',
-};
-
-// 文本着色辅助函数
-const c = {
-    info: (text) => `${colors.cyan}${text}${colors.reset}`,
-    ok: (text) => `${colors.green}${text}${colors.reset}`,
-    warn: (text) => `${colors.yellow}${text}${colors.reset}`,
-    error: (text) => `${colors.yellow}${text}${colors.reset}`,
-    tip: (text) => `${colors.blue}${text}${colors.reset}`,
-    bright: (text) => `${colors.bright}${text}${colors.reset}`,
-    dim: (text) => `${colors.dim}${text}${colors.reset}`,
-};
 
 // 加载 package.json 以获取版本信息
 const packageJsonPath = path.join(__dirname, '../package.json');
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
-// 如果 .env 文件存在，则从中加载环境变量
-function loadEnvFile() {
-    try {
-        const envPath = path.join(__dirname, '../.env');
-        const envFile = fs.readFileSync(envPath, 'utf8');
-        envFile.split('\n').forEach(line => {
-            const trimmedLine = line.trim();
-            if (trimmedLine && !trimmedLine.startsWith('#')) {
-                const [key, ...valueParts] = trimmedLine.split('=');
-                if (key && valueParts.length > 0 && !process.env[key]) {
-                    process.env[key] = valueParts.join('=').trim();
-                }
-            }
-        });
-    } catch (e) {
-        // .env 文件是可选的
-    }
-}
-
-// 获取数据库路径（与 db.js 中的逻辑相同）
+// 获取数据库路径（使用统一配置）
 function getDatabasePath() {
-    loadEnvFile();
-    return process.env.DATABASE_PATH || path.join(__dirname, 'database', 'auth.db');
+    loadEnvironment();
+    return DATABASE.path;
 }
 
 // 获取安装目录
@@ -110,10 +65,10 @@ function showStatus() {
 
     // 环境变量
     console.log(`\n${c.info('[INFO]')} Configuration:`);
-    console.log(`       PORT: ${c.bright(process.env.PORT || '3001')} ${c.dim(process.env.PORT ? '' : '(default)')}`);
-    console.log(`       DATABASE_PATH: ${c.dim(process.env.DATABASE_PATH || '(using default location)')}`);
-    console.log(`       CLAUDE_CLI_PATH: ${c.dim(process.env.CLAUDE_CLI_PATH || 'claude (default)')}`);
-    console.log(`       CONTEXT_WINDOW: ${c.dim(process.env.CONTEXT_WINDOW || '160000 (default)')}`);
+    console.log(`       PORT: ${c.bright(SERVER.port)} ${c.dim(process.env.PORT ? '' : '(default)')}`);
+    console.log(`       DATABASE_PATH: ${c.dim(DATABASE.path)}`);
+    console.log(`       CLAUDE_CLI_PATH: ${c.dim(CLAUDE.cliPath)}`);
+    console.log(`       CONTEXT_WINDOW: ${c.dim(CLAUDE.contextWindow)}`);
 
     // Claude 项目文件夹
     const claudeProjectsPath = path.join(os.homedir(), '.claude', 'projects');
@@ -134,7 +89,7 @@ function showStatus() {
     console.log(`      ${c.dim('>')} Use ${c.bright('cloudcli --port 8080')} to run on a custom port`);
     console.log(`      ${c.dim('>')} Use ${c.bright('cloudcli --database-path /path/to/db')} for custom database`);
     console.log(`      ${c.dim('>')} Run ${c.bright('cloudcli help')} for all options`);
-    console.log(`      ${c.dim('>')} Access the UI at http://localhost:${process.env.PORT || '3001'}\n`);
+    console.log(`      ${c.dim('>')} Access the UI at http://localhost:${SERVER.port}\n`);
 }
 
 // 显示帮助
@@ -284,7 +239,10 @@ async function main() {
     const args = process.argv.slice(2);
     const { command, options } = parseArgs(args);
 
-    // 将 CLI 选项应用到环境变量
+    // 加载环境变量
+    loadEnvironment();
+
+    // 将 CLI 选项应用到环境变量（在统一配置加载之前）
     if (options.port) {
         process.env.PORT = options.port;
     }
