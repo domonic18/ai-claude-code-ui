@@ -1,7 +1,8 @@
 # 多用户 Claude Code 系统 - 数据存储设计
 
-> **文档版本**: 1.0
+> **文档版本**: 2.1
 > **创建时间**: 2026-01-10
+> **最后更新**: 2026-01-11 (修正数据库位置)
 > **所属架构**: Docker + Seccomp 容器隔离
 
 ---
@@ -12,6 +13,7 @@
 - [二、Docker Volume 设计](#二docker-volume-设计)
 - [三、数据库设计](#三数据库设计)
 - [四、容器数据持久化策略](#四容器数据持久化策略)
+- [五、目录结构规范](#五目录结构规范)
 
 ---
 
@@ -22,54 +24,57 @@
 ```
 宿主机存储结构:
 /
-├── /path/to/ai-claude-code-ui/                 # 项目根目录
-│   ├── server/                                 # 服务端代码
-│   ├── src/                                    # 前端代码
-│   ├── dist/                                   # 构建产物
-│   ├── workspace/                              # 持久化数据目录（与代码分离）
-│   │   ├── database/                           # 数据库文件
-│   │   │   └── claude-code.db                  # 用户认证数据
-│   │   ├── users/                              # 用户数据目录
-│   │   │   ├── user_1/                         # 用户 1 数据
-│   │   │   │   ├── data/                       # 工作数据目录 (挂载到容器)
-│   │   │   │   ├── projects/                   # Claude 项目数据
-│   │   │   │   ├── config/                     # 用户配置
-│   │   │   │   └── logs/                       # 用户日志
-│   │   │   ├── user_2/                         # 用户 2 数据
-│   │   │   └── ...
-│   │   ├── containers/                         # 容器配置
-│   │   │   ├── seccomp/                        # Seccomp 策略
-│   │   │   │   └── claude-code.json           # 默认策略
-│   │   │   └── apparmor/                       # AppArmor 配置
-│   │   ├── cache/                              # 缓存数据
-│   │   │   └── container-pool/                 # 容器预热池
-│   │   ├── logs/                               # 系统日志
-│   │   │   ├── container-manager.log           # 容器管理日志
-│   │   │   └── container-*.log                 # 各容器日志
-│   │   └── backups/                            # 备份目录
-│   │       ├── daily/                          # 每日备份
-│   │       ├── weekly/                         # 每周备份
-│   │       └── monthly/                        # 每月备份
+└── /path/to/ai-claude-code-ui/                 # 项目根目录
+    ├── server/                                 # 服务端代码
+    ├── src/                                    # 前端代码
+    ├── dist/                                   # 构建产物
+    └── workspace/                              # 持久化数据目录（与代码分离）
+        ├── database/                           # 全局数据库
+        │   └── auth.db                         # 用户认证数据
+        ├── users/                              # 用户数据目录
+        │   ├── user_1/                         # 用户 1 数据
+        │   │   └── data/                       # 挂载到容器的统一目录
+        │   │       ├── .claude/                # Claude 配置（容器内生成）
+        │   │       │   ├── projects/           # 项目元数据
+        │   │       │   ├── api_keys.json      # API 密钥
+        │   │       │   └── settings.json      # Claude 设置
+        │   │       ├── project-1/              # 项目代码
+        │   │       ├── project-2/              # 项目代码
+        │   │       └── ...
+        │   ├── user_2/                         # 用户 2 数据
+        │   └── ...
+        ├── containers/                         # 容器配置
+        │   ├── seccomp/                        # Seccomp 策略
+        │   │   └── claude-code.json           # 默认策略
+        │   └── apparmor/                       # AppArmor 配置
+        ├── logs/                               # 系统日志
+        │   ├── container-manager.log           # 容器管理日志
+        │   └── container-*.log                 # 各容器日志
+        └── backups/                            # 备份目录
+            ├── daily/                          # 每日备份
+            ├── weekly/                         # 每周备份
+            └── monthly/                        # 每月备份
 ```
 
 ### 1.2 设计原则
 
 1. **数据与代码分离**：将用户数据存储在 `workspace/` 目录下，与代码仓库分离
 2. **用户数据隔离**：每个用户拥有独立的数据目录
-3. **容器卷挂载**：使用 Docker Volume 实现容器内外数据共享
-4. **定期备份**：自动化备份策略，防止数据丢失
-5. **日志分离**：系统日志和用户日志分开存储
+3. **统一工作目录**：容器内使用 `/workspace` 作为唯一工作目录，简化路径管理
+4. **单一挂载点**：通过单一 bind mount 实现数据持久化，避免配置复杂度
+5. **定期备份**：自动化备份策略，防止数据丢失
+6. **日志分离**：系统日志和用户日志分开存储
 
 ---
 
 ## 二、Docker Volume 设计
 
-### 2.1 用户工作目录卷
+### 2.1 统一工作目录卷
 
 #### 2.1.1 卷配置
 
 ```javascript
-// 为每个用户创建专属的 Docker Volume
+// 为每个用户创建专属的数据目录
 // 使用项目根目录下的 ./workspace 目录
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -79,46 +84,75 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 
-const createUserVolume = (userId) => ({
-  name: `claude-user-${userId}`,
-  driver: 'local',
-  driverOpts: {
-    type: 'none',
-    device: path.join(PROJECT_ROOT, 'workspace', 'users', `user_${userId}`, 'data'),
-    o: 'bind'
-  }
-});
+const createUserVolume = (userId) => {
+  const userDataDir = path.join(PROJECT_ROOT, 'workspace', 'users', `user_${userId}`, 'data');
+
+  return {
+    // 容器内挂载点
+    containerPath: '/workspace',
+    // 宿主机源路径
+    hostPath: userDataDir,
+    // 挂载选项
+    options: 'rw'  // 读写
+  };
+};
 ```
 
-#### 2.1.2 挂载点映射
+#### 2.1.2 挂载点映射（统一方案）
 
 | 宿主机路径 | 容器内路径 | 说明 |
 |-----------|-----------|------|
-| `./workspace/users/user_{id}/data` | `/workspace` | 用户工作目录 |
-| `./workspace/users/user_{id}/projects` | `/root/.claude/projects` | Claude 项目数据 |
+| `./workspace/users/user_{id}/data` | `/workspace` | 统一工作目录 |
 
-### 2.2 共享配置卷
+**容器内目录结构**：
+```
+/workspace/                              # 统一工作目录（所有操作都在这里）
+├── .claude/                             # Claude 配置目录
+│   ├── projects/                        # 项目元数据
+│   │   ├── project-1.json
+│   │   └── project-2.json
+│   ├── api_keys.json                    # API 密钥存储
+│   └── settings.json                    # Claude 设置
+├── project-1/                           # 项目 1 代码
+│   ├── src/
+│   ├── package.json
+│   └── ...
+├── project-2/                           # 项目 2 代码
+│   └── ...
+└── ...
+```
+
+**注意**：全局数据库位于宿主机 `workspace/database/auth.db`，由服务器统一管理，容器内无数据库。
+
+### 2.2 环境变量配置
 
 ```javascript
-// 共享配置卷（只读）
-const sharedConfigVolume = {
-  name: 'claude-shared-config',
-  driver: 'local',
-  // 包含默认配置、CA 证书等
+// 容器环境变量
+const containerEnv = {
+  // 用户标识
+  USER_ID: userId,
+  USER_TIER: 'free',  // free, pro, enterprise
+
+  // Claude 配置
+  CLAUDE_CONFIG_DIR: '/workspace/.claude',  // 统一配置目录
+
+  // 节点环境
+  NODE_ENV: 'production',
+  PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
 };
 ```
 
 ### 2.3 卷管理策略
 
 #### 创建策略
-- 用户首次登录时自动创建专属 Volume
+- 用户注册时自动创建专属数据目录
 - 使用 bind mount 模式，数据直接存储在宿主机
 - 避免使用 Docker 管理的 Volume，便于备份和恢复
 
 #### 删除策略
-- 用户删除账户时，可选择删除或保留 Volume
-- 容器销毁时不自动删除 Volume，保护用户数据
-- 提供手动清理工具，定期清理孤儿 Volume
+- 用户删除账户时，可选择删除或保留数据目录
+- 容器销毁时不自动删除数据目录，保护用户数据
+- 提供手动清理工具，定期清理孤儿数据
 
 ---
 
@@ -193,8 +227,7 @@ const UserContainerConfig = {
   userId: 1,
   tier: 'pro',  // free, pro, enterprise
   containerId: 'claude-user-1-container',
-  volumeName: 'claude-user-1',
-  networkName: 'claude-network-1',
+  dataDir: '/workspace',
   resourceLimits: {
     cpu: '2',
     memory: '4G',
@@ -227,11 +260,12 @@ CREATE INDEX idx_container_metrics_recorded_at ON container_metrics(recorded_at)
 
 | 数据类型 | 存储位置 | 持久化策略 | 备份策略 |
 |---------|---------|-----------|---------|
-| 用户代码 | `/workspace` | Docker Volume | 每日备份 |
-| Claude 项目 | `/root/.claude/projects` | Docker Volume | 每日备份 |
+| 用户代码 | `/workspace/project-xxx` | Docker Volume (bind mount) | 每日备份 |
+| Claude 配置 | `/workspace/.claude` | Docker Volume (bind mount) | 每日备份 |
+| 项目元数据 | `/workspace/.claude/projects` | Docker Volume (bind mount) | 每日备份 |
 | 会话历史 | 宿主机 SQLite | 持久化 | 每日备份 |
 | 临时文件 | 容器内 `/tmp` | 容器销毁时删除 | 不备份 |
-| 构建产物 | `/workspace/node_modules` | Docker Volume | 按需备份 |
+| 构建产物 | `/workspace/project-xxx/node_modules` | Docker Volume (bind mount) | 按需备份 |
 
 ### 4.2 备份策略
 
@@ -255,7 +289,7 @@ const backupStrategy = {
     monthly: 3     // 保留 3 个月
   },
   compression: 'gzip',
-  sourceDir: path.join(PROJECT_ROOT, 'workspace'),
+  sourceDir: path.join(PROJECT_ROOT, 'workspace', 'users'),
   destination: path.join(PROJECT_ROOT, 'workspace', 'backups')
 };
 ```
@@ -281,7 +315,7 @@ for user_dir in ${WORKSPACE_DIR}/users/*/; do
   user_name=$(basename "$user_dir")
   backup_file="${BACKUP_DIR}/daily/${user_name}_${DATE}.tar.gz"
 
-  tar -czf "$backup_file" -C "$user_dir" .
+  tar -czf "$backup_file" -C "$user_dir/data" .
 
   # 验证备份
   if [ $? -eq 0 ]; then
@@ -292,10 +326,11 @@ for user_dir in ${WORKSPACE_DIR}/users/*/; do
 done
 
 # 备份数据库
-cp "${WORKSPACE_DIR}/database/claude-code.db" "${BACKUP_DIR}/daily/db_${DATE}.db"
+cp "${WORKSPACE_DIR}/database/auth.db" "${BACKUP_DIR}/daily/db_${DATE}.db"
 
 # 清理过期备份
 find "${BACKUP_DIR}/daily" -name "*.tar.gz" -mtime +7 -delete
+find "${BACKUP_DIR}/daily" -name "*.db" -mtime +7 -delete
 find "${BACKUP_DIR}/weekly" -name "*.tar.gz" -mtime +30 -delete
 find "${BACKUP_DIR}/monthly" -name "*.tar.gz" -mtime +90 -delete
 ```
@@ -315,17 +350,17 @@ if [ -z "$BACKUP_FILE" ] || [ -z "$USER_ID" ]; then
   exit 1
 fi
 
-USER_DIR="${PROJECT_ROOT}/workspace/users/user_${USER_ID}"
+USER_DIR="${PROJECT_ROOT}/workspace/users/user_${USER_ID}/data"
 
 # 停止用户容器
-docker stop "claude-user-${USER_ID}"
+docker stop "claude-user-${USER_ID}" 2>/dev/null || true
 
 # 恢复数据
 mkdir -p "$USER_DIR"
 tar -xzf "$BACKUP_FILE" -C "$USER_DIR"
 
 # 重启容器
-docker start "claude-user-${USER_ID}"
+docker start "claude-user-${USER_ID}" 2>/dev/null || echo "Container will be created on next login"
 
 echo "Restore completed for user ${USER_ID}"
 ```
@@ -340,7 +375,7 @@ import fs from 'fs';
 import path from 'path';
 
 function checkStorageUsage() {
-  const workspaceDir = path.join(PROJECT_ROOT, 'workspace');
+  const workspaceDir = path.join(PROJECT_ROOT, 'workspace', 'users');
 
   function getDirSize(dirPath) {
     let size = 0;
@@ -361,11 +396,10 @@ function checkStorageUsage() {
   }
 
   // 检查每个用户的存储使用
-  const usersDir = path.join(workspaceDir, 'users');
-  const userDirs = fs.readdirSync(usersDir);
+  const userDirs = fs.readdirSync(workspaceDir);
 
   for (const userDir of userDirs) {
-    const userPath = path.join(usersDir, userDir);
+    const userPath = path.join(workspaceDir, userDir, 'data');
     const size = getDirSize(userPath);
     const sizeGB = (size / (1024 ** 3)).toFixed(2);
 
@@ -401,6 +435,130 @@ const storageQuotas = {
 
 ---
 
+## 五、目录结构规范
+
+### 5.1 宿主机目录规范
+
+```
+/workspace/
+├── database/
+│   └── auth.db                    # 全局认证数据库（可选使用）
+├── users/
+│   ├── user_1/
+│   │   └── data/                  # 持久化到容器 /workspace
+│   │       ├── .claude/           # Claude 配置（容器内生成）
+│   │       │   ├── projects/      # 项目元数据
+│   │       │   ├── api_keys.json # API 密钥
+│   │       │   └── settings.json # Claude 设置
+│   │       ├── project-1/         # 项目代码
+│   │       └── project-2/
+│   ├── user_2/
+│   │   └── data/
+│   └── ...
+├── containers/
+│   └── seccomp/
+│       └── claude-code.json       # Seccomp 安全策略
+├── logs/
+│   ├── container-manager.log
+│   └── container-*.log
+└── backups/
+    ├── daily/
+    ├── weekly/
+    └── monthly/
+```
+
+### 5.2 容器内目录规范
+
+```
+/workspace/                              # 唯一工作目录
+├── .claude/                             # Claude 配置目录
+│   ├── projects/                        # 项目元数据
+│   │   ├── project-1.json
+│   │   │   {
+│   │   │     "path": "/workspace/project-1",
+│   │   │     "displayName": "Project 1",
+│   │   │     "createdAt": "2026-01-11T00:00:00Z"
+│   │   │   }
+│   │   └── project-2.json
+│   ├── api_keys.json                    # API 密钥存储
+│   │   [
+│   │     {
+│   │       "name": "OpenAI",
+│   │       "provider": "openai",
+│   │       "apiKey": "sk-...",
+│   │       "baseURL": "https://api.openai.com/v1"
+│   │     }
+│   │   ]
+│   ├── settings.json                    # Claude 设置
+│   │   {
+│   │     "editor": "vim",
+│   │     "autoConfirm": "dangerous"
+│   │   }
+│   └── sessions/                         # 会话历史（可选）
+├── project-1/                           # 项目 1 代码
+│   ├── src/
+│   ├── tests/
+│   ├── package.json
+│   └── README.md
+├── project-2/                           # 项目 2 代码
+│   └── ...
+└── temp/                                # 临时文件（可选）
+```
+
+### 5.3 路径使用规范
+
+| 用途 | 路径示例 | 说明 |
+|------|---------|------|
+| 项目根目录 | `/workspace/project-1` | 项目代码根目录 |
+| Claude 配置 | `/workspace/.claude` | Claude CLI 配置目录 |
+| 项目元数据 | `/workspace/.claude/projects` | 项目列表和配置 |
+| 工作命令执行 | `cwd: /workspace/project-1` | 在项目目录执行命令 |
+| 文件读取 | `/workspace/project-1/src/main.js` | 读取项目文件 |
+| 文件写入 | `/workspace/project-1/new-file.js` | 写入项目文件 |
+
+### 5.4 API 密钥存储格式
+
+```json
+// /workspace/.claude/api_keys.json
+{
+  "providers": [
+    {
+      "name": "Anthropic",
+      "provider": "anthropic",
+      "apiKey": "sk-ant-...",
+      "baseURL": "https://api.anthropic.com"
+    },
+    {
+      "name": "OpenAI",
+      "provider": "openai",
+      "apiKey": "sk-...",
+      "baseURL": "https://api.openai.com/v1"
+    },
+    {
+      "name": "智谱 GLM",
+      "provider": "custom",
+      "apiKey": "...",
+      "baseURL": "https://open.bigmodel.cn/api/anthropic"
+    }
+  ]
+}
+```
+
+### 5.5 Claude 设置文件格式
+
+```json
+// /workspace/.claude/settings.json
+{
+  "editor": "vim",
+  "autoConfirm": "dangerous",
+  "dangerouslyAllowSearch": true,
+  "maxTokens": 200000,
+  "model": "claude-sonnet-4-20250514"
+}
+```
+
+---
+
 ## 相关文档
 
 - [架构概述](./architecture-overview.md)
@@ -418,3 +576,5 @@ const storageQuotas = {
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
 | 1.0 | 2026-01-10 | Claude | 初始版本 |
+| 2.0 | 2026-01-11 | Claude | 统一工作目录方案，简化目录结构 |
+| 2.1 | 2026-01-11 | Claude | 修正数据库位置：全局数据库位于宿主机 workspace/database，容器内无数据库 |
