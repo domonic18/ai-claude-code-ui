@@ -71,6 +71,20 @@ export class ContainerConfigBuilder {
       `PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`
     ];
 
+    // 从宿主机环境变量中传递 API 配置到容器
+    // SDK 需要这些环境变量才能正常工作
+    const authToken = process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY;
+    if (authToken) {
+      containerEnv.push(`ANTHROPIC_AUTH_TOKEN=${authToken}`);
+    }
+
+    if (process.env.ANTHROPIC_BASE_URL) {
+      containerEnv.push(`ANTHROPIC_BASE_URL=${process.env.ANTHROPIC_BASE_URL}`);
+    }
+
+    if (process.env.ANTHROPIC_MODEL) {
+      containerEnv.push(`ANTHROPIC_MODEL=${process.env.ANTHROPIC_MODEL}`);
+    }
 
     return containerEnv;
   }

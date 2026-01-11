@@ -28,18 +28,50 @@ const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 export function loadEnvironment() {
   try {
     const envPath = path.join(PROJECT_ROOT, '.env');
+    console.log(`[CONFIG] Loading environment from: ${envPath}`);
+
+    // 检查文件是否存在
+    if (!fs.existsSync(envPath)) {
+      console.log(`[CONFIG] .env file not found at ${envPath}`);
+      return;
+    }
+
     const envFile = fs.readFileSync(envPath, 'utf8');
+    let loadedCount = 0;
+
     envFile.split('\n').forEach(line => {
       const trimmedLine = line.trim();
       if (trimmedLine && !trimmedLine.startsWith('#')) {
         const [key, ...valueParts] = trimmedLine.split('=');
-        if (key && valueParts.length > 0 && !process.env[key]) {
-          process.env[key] = valueParts.join('=').trim();
+        if (key && valueParts.length > 0) {
+          const value = valueParts.join('=').trim();
+          // 只有当变量未设置时才从 .env 加载（允许环境变量覆盖 .env）
+          if (process.env[key] === undefined) {
+            process.env[key] = value;
+            loadedCount++;
+          } else {
+            console.log(`[CONFIG] Skipping ${key} (already set in environment)`);
+          }
         }
       }
     });
+
+    console.log(`[CONFIG] Loaded ${loadedCount} environment variables from .env`);
+
+    // 关键变量检查
+    const criticalVars = ['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_MODEL'];
+    console.log('[CONFIG] Critical environment variables status:');
+    criticalVars.forEach(varName => {
+      const isSet = !!process.env[varName];
+      const value = isSet ? (varName.includes('TOKEN') || varName.includes('KEY')
+        ? `${process.env[varName].substring(0, 10)}...`
+        : process.env[varName])
+        : 'NOT SET';
+      console.log(`[CONFIG] - ${varName}: ${value}`);
+    });
   } catch (e) {
-    // .env 文件不存在或无法读取，静默忽略
+    console.error(`[CONFIG] Error loading .env file: ${e.message}`);
+    // 继续执行，使用默认值
   }
 }
 

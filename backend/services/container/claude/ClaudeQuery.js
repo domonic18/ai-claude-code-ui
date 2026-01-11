@@ -62,14 +62,16 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
     });
     console.log('[ClaudeQuery] Container obtained:', container.name);
 
-    // 2. 映射工作目录
+    // 2. 映射工作目录（仅用于日志，不传递给 SDK）
     const workingDir = mapWorkingDirectory(isContainerProject, projectPath, cwd);
-    console.log('[ClaudeQuery] Working directory:', workingDir);
+    console.log('[ClaudeQuery] Working directory (mapped):', workingDir);
 
+    // 注意：不传递 cwd 给 SDK
+    // SDK 的 ProcessTransport 会创建子进程，如果设置了 cwd，
+    // 子进程将无法访问 /app/node_modules 中的 SDK 模块
     const mappedOptions = {
       ...sdkOptions,
       sessionId,
-      cwd: workingDir,
       userId
     };
 

@@ -7,6 +7,7 @@
 import { PassThrough } from 'stream';
 import containerManager from '../core/index.js';
 import { execCommand } from './path-utils.js';
+import { writeFileInContainer } from './file-operations.js';
 import { CONTAINER } from '../../../config/config.js';
 
 /** 默认项目名称 */
@@ -129,11 +130,26 @@ async function createDefaultWorkspace(userId) {
   const projectPath = `${CLAUDE_PROJECTS_PATH}/${DEFAULT_PROJECT_NAME}`;
 
   try {
-    // 创建默认项目目录
-    await execCommand(userId, `mkdir -p "${projectPath}"`);
+    // 创建默认项目目录 - 使用 containerManager.execInContainer 确保命令执行完成
+    const createDirResult = await containerManager.execInContainer(
+      userId,
+      `mkdir -p "${projectPath}"`
+    );
+
+    // 等待命令完成
+    await new Promise((resolve) => {
+      createDirResult.stream.on('end', resolve);
+    });
 
     // 初始化为 git 仓库
-    await execCommand(userId, `cd "${projectPath}" && git init`);
+    const gitResult = await containerManager.execInContainer(
+      userId,
+      `cd "${projectPath}" && git init`
+    );
+
+    await new Promise((resolve) => {
+      gitResult.stream.on('end', resolve);
+    });
 
     // 创建 README 文件
     const readmeContent = `# My Workspace
@@ -154,10 +170,10 @@ Welcome to your Claude Code workspace! This is your default project where you ca
 
 Happy coding!
 `;
-    await execCommand(
-      userId,
-      `cat > "${projectPath}/README.md" << 'EOF'\n${readmeContent}\nEOF`
-    );
+    await writeFileInContainer(userId, 'README.md', readmeContent, {
+      projectPath: DEFAULT_PROJECT_NAME,
+      isContainerProject: true
+    });
 
     // 创建 .gitignore
     const gitignoreContent = `# Dependencies
@@ -179,10 +195,10 @@ npm-debug.log*
 .env
 .env.local
 `;
-    await execCommand(
-      userId,
-      `cat > "${projectPath}/.gitignore" << 'EOF'\n${gitignoreContent}\nEOF`
-    );
+    await writeFileInContainer(userId, '.gitignore', gitignoreContent, {
+      projectPath: DEFAULT_PROJECT_NAME,
+      isContainerProject: true
+    });
 
     // 创建 package.json
     const packageJson = {
@@ -196,10 +212,10 @@ npm-debug.log*
       author: '',
       license: 'ISC'
     };
-    await execCommand(
-      userId,
-      `cat > "${projectPath}/package.json" << 'EOF'\n${JSON.stringify(packageJson, null, 2)}\nEOF`
-    );
+    await writeFileInContainer(userId, 'package.json', JSON.stringify(packageJson, null, 2), {
+      projectPath: DEFAULT_PROJECT_NAME,
+      isContainerProject: true
+    });
 
     console.log('[ProjectManager] Default workspace created successfully');
 

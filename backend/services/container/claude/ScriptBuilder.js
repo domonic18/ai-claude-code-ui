@@ -17,10 +17,14 @@ function filterSDKOptions(options) {
   delete sdkOptions.isContainerProject;
   delete sdkOptions.projectPath;
 
-  // 处理 resume 参数：SDK 期望 resume 是 sessionId 字符串，而不是 resume: true + sessionId
-  // 如果有 sessionId 且 resume 为 true，将 resume 设置为 sessionId
-  if (options.resume && options.sessionId) {
+  // 处理 resume 参数：
+  // - 如果有 sessionId 且 resume 为 true，将 resume 设置为 sessionId
+  // - 否则完全移除 resume 参数（SDK 不接受 resume: false）
+  if (options.sessionId && options.resume === true) {
     sdkOptions.resume = options.sessionId;
+  } else {
+    // 移除 resume 参数（不管是 false 还是其他值）
+    delete sdkOptions.resume;
   }
 
   // 移除 sessionId（SDK 不需要这个参数）

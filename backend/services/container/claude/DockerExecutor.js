@@ -48,10 +48,16 @@ export async function executeInContainer(userId, command, options, writer, sessi
 
     // 记录环境变量状态
     console.log('[DockerExecutor] Host environment:');
-    console.log('[DockerExecutor] - ANTHROPIC_AUTH_TOKEN:', 
-      process.env.ANTHROPIC_AUTH_TOKEN ? `SET (${process.env.ANTHROPIC_AUTH_TOKEN.substring(0, 15)}...)` : 'NOT SET');
+    const authToken = process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY;
+    console.log('[DockerExecutor] - ANTHROPIC_AUTH_TOKEN:',
+      authToken ? `SET (${authToken.substring(0, 15)}...)` : 'NOT SET');
     console.log('[DockerExecutor] - ANTHROPIC_BASE_URL:', process.env.ANTHROPIC_BASE_URL || 'NOT SET');
     console.log('[DockerExecutor] - ANTHROPIC_MODEL:', process.env.ANTHROPIC_MODEL || 'NOT SET');
+
+    // 验证必需的环境变量
+    if (!authToken) {
+      throw new Error('ANTHROPIC_AUTH_TOKEN or ANTHROPIC_API_KEY must be set in environment or .env file');
+    }
     
     // 在容器中执行
     const { stream, exec } = await containerManager.execInContainer(
@@ -62,7 +68,7 @@ export async function executeInContainer(userId, command, options, writer, sessi
         tty: false,  // 不使用 TTY，以便可以分离 stdout 和 stderr
         env: {
           NODE_PATH: '/app/node_modules',
-          ANTHROPIC_AUTH_TOKEN: process.env.ANTHROPIC_AUTH_TOKEN,
+          ANTHROPIC_AUTH_TOKEN: authToken,
           ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL,
           ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL
         }
