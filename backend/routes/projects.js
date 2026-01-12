@@ -74,9 +74,15 @@ router.put('/:projectName/rename', authenticateToken, async (req, res) => {
 router.delete('/:projectName', authenticateToken, async (req, res) => {
   try {
     const { projectName } = req.params;
+    console.log(`\n[DELETE /api/projects/:projectName] Route handler called`);
+    console.log(`[DELETE /api/projects/:projectName] projectName: "${projectName}"`);
+    console.log(`[DELETE /api/projects/:projectName] userId: ${req.user.userId}`);
+    console.log(`[DELETE /api/projects/:projectName] Timestamp: ${new Date().toISOString()}`);
+
     await deleteProject(projectName);
     res.json({ success: true });
   } catch (error) {
+    console.error(`[DELETE /api/projects/:projectName] ERROR:`, error.message);
     res.status(500).json({ error: error.message });
   }
 });

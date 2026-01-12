@@ -418,30 +418,56 @@ async function cloneGitHubRepo(githubUrl, githubToken = null, projectPath) {
  * @param {string} sessionId - 要清理的会话 ID
  */
 async function cleanupProject(projectPath, sessionId = null) {
+  const startTime = Date.now();
+
+  console.log(`\n========================================`);
+  console.log(`[cleanupProject] START - Called to clean up project`);
+  console.log(`[cleanupProject] projectPath: "${projectPath}"`);
+  console.log(`[cleanupProject] sessionId: ${sessionId || 'N/A'}`);
+  console.log(`[cleanupProject] Timestamp: ${new Date().toISOString()}`);
+  console.log(`[cleanupProject] Call stack:\n${new Error().stack.split('\n').slice(2, 7).join('\n')}`);
+  console.log(`========================================\n`);
+
   try {
     // Only clean up projects in the external-projects directory
     if (!projectPath.includes('.claude/external-projects')) {
-      console.warn('⚠️ Refusing to clean up non-external project:', projectPath);
+      console.log(`[cleanupProject] SKIP - Project path does not contain '.claude/external-projects'`);
+      console.log(`[cleanupProject] Refusing to clean up non-external project: "${projectPath}"`);
+      console.log(`[cleanupProject] This appears to be a user workspace, will NOT delete`);
       return;
     }
 
-    console.log('🧹 Cleaning up project:', projectPath);
+    console.log(`[cleanupProject] VALIDATION - Project path contains '.claude/external-projects', proceeding with cleanup`);
+    console.log(`[cleanupProject] 🧹 Cleaning up project: ${projectPath}`);
+
     await fs.rm(projectPath, { recursive: true, force: true });
-    console.log('✅ Project cleaned up');
+
+    const duration = Date.now() - startTime;
+    console.log(`[cleanupProject] ✅ Project cleaned up successfully in ${duration}ms`);
 
     // Also clean up the Claude session directory if sessionId provided
     if (sessionId) {
       try {
         const sessionPath = path.join(os.homedir(), '.claude', 'sessions', sessionId);
-        console.log('🧹 Cleaning up session directory:', sessionPath);
+        console.log(`[cleanupProject] 🧹 Cleaning up session directory: ${sessionPath}`);
         await fs.rm(sessionPath, { recursive: true, force: true });
-        console.log('✅ Session directory cleaned up');
+        console.log(`[cleanupProject] ✅ Session directory cleaned up`);
       } catch (error) {
-        console.error('⚠️ Failed to clean up session directory:', error.message);
+        console.error(`[cleanupProject] ⚠️ Failed to clean up session directory:`, error.message);
       }
     }
+
+    console.log(`\n========================================`);
+    console.log(`[cleanupProject] COMPLETE - Total duration: ${Date.now() - startTime}ms`);
+    console.log(`========================================\n`);
+
   } catch (error) {
-    console.error('❌ Failed to clean up project:', error);
+    console.error(`\n========================================`);
+    console.error(`[cleanupProject] FAILED - Failed to clean up project`);
+    console.error(`[cleanupProject] Error: ${error.message}`);
+    console.error(`[cleanupProject] projectPath: "${projectPath}"`);
+    console.error(`[cleanupProject] Error stack:`, error.stack);
+    console.error(`========================================\n`);
   }
 }
 
