@@ -211,17 +211,6 @@ export function validateCommand(commandString) {
 }
 
 /**
- * 向后兼容：检查命令是否允许（已弃用）
- * @deprecated 请改用 validateCommand() 以获得更好的安全性
- * @param {string} command - 要验证的命令
- * @returns {boolean} 如果命令允许则返回 true
- */
-export function isBashCommandAllowed(command) {
-  const result = validateCommand(command);
-  return result.allowed;
-}
-
-/**
  * 清理 bash 命令输出
  * @param {string} output - 原始命令输出
  * @returns {string} 清理后的输出
