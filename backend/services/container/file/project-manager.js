@@ -2,12 +2,13 @@
  * 项目管理模块
  *
  * 提供容器内的项目管理功能，包括列出项目和创建默认工作区。
+ * 支持从容器内读取会话信息。
  */
 
 import { PassThrough } from 'stream';
 import containerManager from '../core/index.js';
-import { execCommand } from './path-utils.js';
 import { writeFileInContainer } from './file-operations.js';
+import { getSessionsInContainer } from './container-sessions.js';
 import { CONTAINER } from '../../../config/config.js';
 
 /** 默认项目名称 */
@@ -114,6 +115,25 @@ export async function getProjectsInContainer(userId) {
       const defaultProject = await createDefaultWorkspace(userId);
       if (defaultProject) {
         projects.push(defaultProject);
+      }
+    }
+
+    // 加载每个项目的会话信息
+    for (const project of projects) {
+      try {
+        console.log(`[ProjectManager] Loading sessions for project: ${project.name}`);
+        const sessionResult = await getSessionsInContainer(userId, project.name, 5, 0);
+        project.sessions = sessionResult.sessions || [];
+        project.sessionMeta = {
+          hasMore: sessionResult.hasMore,
+          total: sessionResult.total
+        };
+        console.log(`[ProjectManager] Loaded ${project.sessions.length} sessions for ${project.name} (total: ${sessionResult.total})`);
+      } catch (error) {
+        console.warn(`[ProjectManager] Could not load sessions for project ${project.name}:`, error.message);
+        // 保持空会话列表
+        project.sessions = [];
+        project.sessionMeta = { hasMore: false, total: 0 };
       }
     }
 
