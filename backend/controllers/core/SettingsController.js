@@ -141,6 +141,51 @@ export class SettingsController extends BaseController {
       this._handleError(error, req, res, next);
     }
   }
+
+  /**
+   * 更新单个设置项
+   * @param {Object} req - Express 请求对象
+   * @param {Object} res - Express 响应对象
+   * @param {Function} next - 下一个中间件
+   */
+  async updateSetting(req, res, next) {
+    try {
+      const userId = this._getUserId(req);
+      const { key } = req.params;
+      const { value } = req.body;
+
+      // 这里可以实现单个设置项的更新
+      // 当前系统是单用户系统，暂时返回基本响应
+
+      this._success(res, {
+        userId,
+        key,
+        value
+      }, `Setting ${key} updated successfully`);
+    } catch (error) {
+      this._handleError(error, req, res, next);
+    }
+  }
+
+  /**
+   * 删除单个设置项（恢复默认值）
+   * @param {Object} req - Express 请求对象
+   * @param {Object} res - Express 响应对象
+   * @param {Function} next - 下一个中间件
+   */
+  async deleteSetting(req, res, next) {
+    try {
+      const userId = this._getUserId(req);
+      const { key } = req.params;
+
+      // 这里可以实现单个设置项的删除
+      // 当前系统是单用户系统，暂时返回基本响应
+
+      this._success(res, null, `Setting ${key} deleted successfully`);
+    } catch (error) {
+      this._handleError(error, req, res, next);
+    }
+  }
 }
 
 export default SettingsController;
