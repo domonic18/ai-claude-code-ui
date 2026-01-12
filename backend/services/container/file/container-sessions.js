@@ -446,10 +446,92 @@ async function getSessionFilesInfo(userId, projectName) {
   }
 }
 
+/**
+ * 从容器内获取特定会话的消息（支持分页）
+ * @param {number} userId - 用户 ID
+ * @param {string} projectName - 项目名称
+ * @param {string} sessionId - 会话 ID
+ * @param {number|null} limit - 消息数量限制（null 表示返回全部）
+ * @param {number} offset - 分页偏移量
+ * @returns {Promise<Object|Array>} 消息列表和分页信息，或全部消息
+ */
+async function getSessionMessagesInContainer(userId, projectName, sessionId, limit = null, offset = 0) {
+  console.log(`[ContainerSessions] Getting messages for session: ${sessionId} in project: ${projectName}`);
+
+  try {
+    const encodedProjectName = encodeProjectName(projectName);
+    const projectDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
+
+    // 获取会话文件列表
+    const sessionFiles = await listSessionFiles(userId, projectName);
+
+    if (sessionFiles.length === 0) {
+      return { messages: [], total: 0, hasMore: false };
+    }
+
+    const messages = [];
+
+    // 读取所有会话文件以查找该 session 的消息
+    for (const fileName of sessionFiles) {
+      try {
+        const filePath = `${projectDir}/${fileName}`;
+        const content = await readFileFromContainer(userId, filePath);
+
+        // 解析 JSONL 内容
+        const lines = content.split('\n');
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const entry = JSON.parse(line);
+              if (entry.sessionId === sessionId) {
+                messages.push(entry);
+              }
+            } catch (parseError) {
+              // 跳过格式错误的行
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`[ContainerSessions] Failed to read session file ${fileName}:`, error.message);
+      }
+    }
+
+    // 按时间戳排序
+    messages.sort((a, b) => {
+      const timeA = new Date(a.timestamp || 0).getTime();
+      const timeB = new Date(b.timestamp || 0).getTime();
+      return timeA - timeB;
+    });
+
+    // 处理分页
+    const total = messages.length;
+    const hasMore = limit !== null && offset + limit < total;
+
+    if (limit === null) {
+      // 返回全部消息（向后兼容）
+      return messages;
+    } else {
+      // 返回分页消息
+      const paginatedMessages = messages.slice(offset, offset + limit);
+      return {
+        messages: paginatedMessages,
+        total,
+        hasMore,
+        offset,
+        limit
+      };
+    }
+  } catch (error) {
+    console.error(`[ContainerSessions] Error getting session messages:`, error);
+    return { messages: [], total: 0, hasMore: false };
+  }
+}
+
 export {
   encodeProjectName,
   readFileFromContainer,
   parseJsonlContent,
   getSessionsInContainer,
-  getSessionFilesInfo
+  getSessionFilesInfo,
+  getSessionMessagesInContainer
 };

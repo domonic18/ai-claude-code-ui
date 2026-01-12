@@ -17,6 +17,8 @@ import { promises as fsPromises } from 'fs';
 import os from 'os';
 
 import { getSessions, getSessionMessages, deleteSession } from '../services/project/index.js';
+import { getSessionMessagesInContainer } from '../services/container/file/container-sessions.js';
+import { CONTAINER_MODE } from '../config/config.js';
 
 const router = express.Router();
 
@@ -47,7 +49,15 @@ router.get('/:projectName/sessions/:sessionId/messages', async (req, res) => {
     const parsedLimit = limit ? parseInt(limit, 10) : null;
     const parsedOffset = offset ? parseInt(offset, 10) : 0;
 
-    const result = await getSessionMessages(projectName, sessionId, parsedLimit, parsedOffset);
+    let result;
+    if (CONTAINER_MODE === '1') {
+      // 容器模式：从容器内读取 session 消息
+      const userId = req.user.userId;
+      result = await getSessionMessagesInContainer(userId, projectName, sessionId, parsedLimit, parsedOffset);
+    } else {
+      // 主机模式：从宿主机读取 session 消息
+      result = await getSessionMessages(projectName, sessionId, parsedLimit, parsedOffset);
+    }
 
     // 处理旧和新两种响应格式
     if (Array.isArray(result)) {

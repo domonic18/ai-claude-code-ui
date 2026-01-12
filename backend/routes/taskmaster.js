@@ -19,11 +19,27 @@ import os from 'os';
 import { extractProjectDirectory } from '../services/project/index.js';
 import { detectTaskMasterMCPServer } from '../utils/mcp-detector.js';
 import { broadcastTaskMasterProjectUpdate, broadcastTaskMasterTasksUpdate } from '../utils/taskmaster-websocket.js';
+import { CONTAINER_MODE } from '../config/config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const router = express.Router();
+
+/**
+ * 获取项目路径（支持容器模式和主机模式）
+ * @param {string} projectName - 项目名称
+ * @returns {Promise<string>} 项目路径
+ */
+async function getProjectPath(projectName) {
+  if (CONTAINER_MODE === '1') {
+    // 容器模式：项目路径为 /workspace/{projectName}
+    return `/workspace/${projectName}`;
+  } else {
+    // 主机模式：从会话文件中提取项目路径
+    return await extractProjectDirectory(projectName);
+  }
+}
 
 /**
  * 检查 TaskMaster CLI 是否已全局安装
@@ -279,10 +295,10 @@ router.get('/detect/:projectName', async (req, res) => {
     try {
         const { projectName } = req.params;
 
-        // 使用现有的 extractProjectDirectory 函数获取实际项目路径
+        // 使用现有的 getProjectPath 函数获取实际项目路径
         let projectPath;
         try {
-            projectPath = await extractProjectDirectory(projectName);
+            projectPath = await getProjectPath(projectName);
         } catch (error) {
             console.error('Error extracting project directory:', error);
             return res.status(404).json({
@@ -362,7 +378,7 @@ router.get('/detect-all', async (req, res) => {
                     projectPath = project.fullPath;
                 } else {
                     try {
-                        projectPath = await extractProjectDirectory(project.name);
+                        projectPath = await getProjectPath(project.name);
                     } catch (error) {
                         throw new Error(`Failed to extract project directory: ${error.message}`);
                     }
@@ -464,7 +480,7 @@ router.get('/next/:projectName', async (req, res) => {
         // 获取项目路径
         let projectPath;
         try {
-            projectPath = await extractProjectDirectory(projectName);
+            projectPath = await getProjectPath(projectName);
         } catch (error) {
             return res.status(404).json({
                 error: 'Project not found',
@@ -574,7 +590,7 @@ router.get('/tasks/:projectName', async (req, res) => {
         // 获取项目路径
         let projectPath;
         try {
-            projectPath = await extractProjectDirectory(projectName);
+            projectPath = await getProjectPath(projectName);
         } catch (error) {
             return res.status(404).json({
                 error: 'Project not found',
@@ -689,7 +705,7 @@ router.get('/prd/:projectName', async (req, res) => {
         // 获取项目路径
         let projectPath;
         try {
-            projectPath = await extractProjectDirectory(projectName);
+            projectPath = await getProjectPath(projectName);
         } catch (error) {
             return res.status(404).json({
                 error: 'Project not found',
@@ -781,7 +797,7 @@ router.post('/prd/:projectName', async (req, res) => {
         // 获取项目路径
         let projectPath;
         try {
-            projectPath = await extractProjectDirectory(projectName);
+            projectPath = await getProjectPath(projectName);
         } catch (error) {
             return res.status(404).json({
                 error: 'Project not found',
@@ -850,7 +866,7 @@ router.get('/prd/:projectName/:fileName', async (req, res) => {
         // 获取项目路径
         let projectPath;
         try {
-            projectPath = await extractProjectDirectory(projectName);
+            projectPath = await getProjectPath(projectName);
         } catch (error) {
             return res.status(404).json({
                 error: 'Project not found',
@@ -915,7 +931,7 @@ router.delete('/prd/:projectName/:fileName', async (req, res) => {
         // 获取项目路径
         let projectPath;
         try {
-            projectPath = await extractProjectDirectory(projectName);
+            projectPath = await getProjectPath(projectName);
         } catch (error) {
             return res.status(404).json({
                 error: 'Project not found',
@@ -975,7 +991,7 @@ router.post('/init/:projectName', async (req, res) => {
         // 获取项目路径
         let projectPath;
         try {
-            projectPath = await extractProjectDirectory(projectName);
+            projectPath = await getProjectPath(projectName);
         } catch (error) {
             return res.status(404).json({
                 error: 'Project not found',
@@ -1072,7 +1088,7 @@ router.post('/add-task/:projectName', async (req, res) => {
         // 获取项目路径
         let projectPath;
         try {
-            projectPath = await extractProjectDirectory(projectName);
+            projectPath = await getProjectPath(projectName);
         } catch (error) {
             return res.status(404).json({
                 error: 'Project not found',
@@ -1169,7 +1185,7 @@ router.put('/update-task/:projectName/:taskId', async (req, res) => {
         // 获取项目路径
         let projectPath;
         try {
-            projectPath = await extractProjectDirectory(projectName);
+            projectPath = await getProjectPath(projectName);
         } catch (error) {
             return res.status(404).json({
                 error: 'Project not found',
@@ -1296,7 +1312,7 @@ router.post('/parse-prd/:projectName', async (req, res) => {
         // 获取项目路径
         let projectPath;
         try {
-            projectPath = await extractProjectDirectory(projectName);
+            projectPath = await getProjectPath(projectName);
         } catch (error) {
             return res.status(404).json({
                 error: 'Project not found',
@@ -1850,7 +1866,7 @@ router.post('/apply-template/:projectName', async (req, res) => {
         // 获取项目路径
         let projectPath;
         try {
-            projectPath = await extractProjectDirectory(projectName);
+            projectPath = await getProjectPath(projectName);
         } catch (error) {
             return res.status(404).json({
                 error: 'Project not found',

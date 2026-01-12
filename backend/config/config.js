@@ -130,9 +130,11 @@ export const AUTH = {
 /**
  * 容器模式配置
  */
+export const CONTAINER_MODE = process.env.CONTAINER_MODE || '0';
+
 export const CONTAINER = {
   // 是否启用容器模式
-  enabled: process.env.CONTAINER_MODE === 'true' || process.env.CONTAINER_MODE === '1',
+  enabled: CONTAINER_MODE === 'true' || CONTAINER_MODE === '1',
 
   // Docker 配置
   docker: {
