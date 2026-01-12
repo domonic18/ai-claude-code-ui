@@ -101,11 +101,26 @@ async function deleteSession(projectName, sessionId) {
  * @returns {Promise<boolean>} 项目是否为空
  */
 async function isProjectEmpty(projectName) {
+  const startTime = Date.now();
+  console.log(`[isProjectEmpty] START - Checking if project "${projectName}" is empty`);
+  console.log(`[isProjectEmpty] Timestamp: ${new Date().toISOString()}`);
+
   try {
     const sessionsResult = await getSessions(projectName, 1, 0);
-    return sessionsResult.total === 0;
+    const isEmpty = sessionsResult.total === 0;
+
+    const duration = Date.now() - startTime;
+    console.log(`[isProjectEmpty] END - Project "${projectName}" is ${isEmpty ? 'EMPTY' : 'NOT EMPTY'}`);
+    console.log(`[isProjectEmpty] Total sessions: ${sessionsResult.total}, Duration: ${duration}ms`);
+
+    // 打印调用堆栈以追踪谁调用了这个函数
+    const stack = new Error().stack;
+    console.log(`[isProjectEmpty] Call stack:\n${stack.split('\n').slice(2, 6).join('\n')}`);
+
+    return isEmpty;
   } catch (error) {
-    console.error(`Error checking if project ${projectName} is empty:`, error);
+    console.error(`[isProjectEmpty] ERROR - Error checking if project "${projectName}" is empty:`, error);
+    console.error(`[isProjectEmpty] Error stack:`, error.stack);
     return false;
   }
 }
@@ -116,26 +131,69 @@ async function isProjectEmpty(projectName) {
  * @returns {Promise<boolean>} 是否成功
  */
 async function deleteProject(projectName) {
+  const startTime = Date.now();
   const projectDir = path.join(os.homedir(), '.claude', 'projects', projectName);
+
+  console.log(`\n========================================`);
+  console.log(`[deleteProject] START - Attempting to delete project "${projectName}"`);
+  console.log(`[deleteProject] Timestamp: ${new Date().toISOString()}`);
+  console.log(`[deleteProject] Project directory: ${projectDir}`);
+  console.log(`[deleteProject] Call stack:\n${new Error().stack.split('\n').slice(2, 7).join('\n')}`);
+  console.log(`========================================\n`);
 
   try {
     // First check if the project is empty
     const isEmpty = await isProjectEmpty(projectName);
+
+    console.log(`[deleteProject] isEmpty check result: ${isEmpty}`);
+
     if (!isEmpty) {
+      console.log(`[deleteProject] ABORT - Project "${projectName}" has existing sessions, cannot delete`);
       throw new Error('Cannot delete project with existing sessions');
     }
 
+    // 检查目录是否真的存在
+    try {
+      const stats = await fs.stat(projectDir);
+      console.log(`[deleteProject] Directory exists: ${projectDir}`);
+      console.log(`[deleteProject] Directory stats: isDirectory=${stats.isDirectory()}, isFile=${stats.isFile()}`);
+    } catch (statError) {
+      if (statError.code === 'ENOENT') {
+        console.log(`[deleteProject] Directory does not exist (ENOENT): ${projectDir}`);
+      } else {
+        console.error(`[deleteProject] Error checking directory:`, statError);
+      }
+    }
+
     // Remove the project directory
+    console.log(`[deleteProject] Executing fs.rm() on: ${projectDir}`);
     await fs.rm(projectDir, { recursive: true, force: true });
+    console.log(`[deleteProject] ✓ Directory removed successfully`);
 
     // Remove from project config
+    console.log(`[deleteProject] Removing from config...`);
     const config = await loadProjectConfig();
+    console.log(`[deleteProject] Config before delete:`, config[projectName] ? 'EXISTS' : 'NOT FOUND');
     delete config[projectName];
     await saveProjectConfig(config);
+    console.log(`[deleteProject] ✓ Removed from config`);
+
+    const duration = Date.now() - startTime;
+    console.log(`\n========================================`);
+    console.log(`[deleteProject] SUCCESS - Project "${projectName}" deleted successfully`);
+    console.log(`[deleteProject] Total duration: ${duration}ms`);
+    console.log(`========================================\n`);
 
     return true;
   } catch (error) {
-    console.error(`Error deleting project ${projectName}:`, error);
+    const duration = Date.now() - startTime;
+    console.error(`\n========================================`);
+    console.error(`[deleteProject] FAILED - Failed to delete project "${projectName}"`);
+    console.error(`[deleteProject] Error: ${error.message}`);
+    console.error(`[deleteProject] Error code: ${error.code || 'N/A'}`);
+    console.error(`[deleteProject] Duration: ${duration}ms`);
+    console.error(`[deleteProject] Error stack:`, error.stack);
+    console.error(`========================================\n`);
     throw error;
   }
 }

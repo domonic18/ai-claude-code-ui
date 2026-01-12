@@ -18,7 +18,7 @@ const CLAUDE_PROJECTS_PATH = CONTAINER.paths.projects;
 
 /**
  * 从容器内获取项目列表
- * 在容器模式下，项目存储在 /home/node/.claude/projects
+ * 在容器模式下，项目存储在 /workspace 下
  * 如果用户没有项目，自动创建默认工作区
  * @param {number} userId - 用户 ID
  * @returns {Promise<Array>} 项目列表
@@ -35,9 +35,10 @@ export async function getProjectsInContainer(userId) {
     const workspacePath = CONTAINER.paths.workspace;
 
     // 列出容器中的项目目录（排除 .claude 等系统目录）
+    // 使用单个命令完成：列出目录 + 过滤 + 验证
     const { stream } = await containerManager.execInContainer(
       userId,
-      `find "${workspacePath}" -mindepth 1 -maxdepth 1 -type d -printf "%f\\n" 2>/dev/null | grep -v "/\\.claude$" | grep -v "/\\." || echo ""`
+      `for item in "${workspacePath}"/*; do [ -d "$item" ] && basename "$item"; done 2>/dev/null | grep -v "^\\.claude$" || echo ""`
     );
 
     // 收集输出
@@ -79,7 +80,11 @@ export async function getProjectsInContainer(userId) {
               .replace(/[\r\n]/g, '')
               .trim();
 
-            if (!projectName || projectName === '') continue;
+            // 跳过空行和隐藏目录（以 . 开头）
+            if (!projectName || projectName === '' || projectName.startsWith('.')) {
+              console.log('[ProjectManager] Skipping hidden/empty:', projectName);
+              continue;
+            }
 
             const decodedPath = projectName.replace(/-/g, '/');
 
