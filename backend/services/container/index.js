@@ -4,6 +4,9 @@
  * 导出所有容器相关服务以便于导入。
  */
 
+// 容器适配器（新增）
+export * from './adapters/index.js';
+
 // 容器管理器类 - 直接从核心模块导入
 export { ContainerManager } from './core/index.js';
 
