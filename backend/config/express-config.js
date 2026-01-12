@@ -12,24 +12,25 @@ import path from 'path';
 import mime from 'mime-types';
 import { FILES, SERVER } from './config.js';
 
-// 路由导入
+// 路由导入 - 新结构（按功能分组）
+import { auth, settings } from '../routes/core/index.js';
+import { projects, sessions, files } from '../routes/resources/index.js';
+import { claude } from '../routes/integrations/index.js';
+import { commands } from '../routes/tools/index.js';
+
+// 路由导入 - 保留现有路由（待迁移）
 import gitRoutes from '../routes/git.js';
-import authRoutes from '../routes/auth.js';
 import mcpRoutes from '../routes/mcp.js';
 import cursorRoutes from '../routes/cursor.js';
 import taskmasterRoutes from '../routes/taskmaster.js';
 import mcpUtilsRoutes from '../routes/mcp-utils.js';
-import commandsRoutes from '../routes/commands.js';
-import settingsRoutes from '../routes/settings.js';
 import agentRoutes from '../routes/agent.js';
-import projectsRoutes from '../routes/projects.js';
 import cliAuthRoutes from '../routes/cli-auth.js';
 import userRoutes from '../routes/user.js';
 import codexRoutes from '../routes/codex.js';
-import filesRoutes from '../routes/files.js';
-import sessionsRoutes from '../routes/sessions.js';
 import uploadsRoutes from '../routes/uploads.js';
 import systemRoutes from '../routes/system.js';
+import { customCommands } from '../routes/index.js';
 
 // 中间件导入
 import { validateApiKey, authenticateToken } from '../middleware/auth.js';
@@ -72,21 +73,34 @@ export function configureExpress(app, wss) {
 
     // ===== 公共路由（无需身份验证）=====
     // 认证路由必须在 validateApiKey 之前定义
-    app.use('/api/auth', authRoutes);
+    app.use('/api/auth', auth);
 
     // 可选的 API 密钥验证（如果已配置）
     // 只对非认证路由生效
     app.use('/api', validateApiKey);
 
-    // ===== 受保护的路由 =====
-    app.use('/api/projects', authenticateToken, projectsRoutes);
+    // ===== 受保护的路由 - 新结构 =====
+    // 核心路由
+    app.use('/api/settings', authenticateToken, settings);
+
+    // 资源路由
+    app.use('/api/projects', authenticateToken, projects);
+    app.use('/api/sessions', authenticateToken, sessions);
+    app.use('/api/projects', authenticateToken, files);
+
+    // 集成路由
+    app.use('/api/claude', authenticateToken, claude);
+
+    // 工具路由
+    app.use('/api/tools/commands', authenticateToken, commands);
+
+    // ===== 受保护的路由 - 保留现有路由 =====
     app.use('/api/git', authenticateToken, gitRoutes);
     app.use('/api/mcp', authenticateToken, mcpRoutes);
     app.use('/api/cursor', authenticateToken, cursorRoutes);
     app.use('/api/taskmaster', authenticateToken, taskmasterRoutes);
     app.use('/api/mcp-utils', authenticateToken, mcpUtilsRoutes);
-    app.use('/api/commands', authenticateToken, commandsRoutes);
-    app.use('/api/settings', authenticateToken, settingsRoutes);
+    app.use('/api/commands', authenticateToken, customCommands);
     app.use('/api/cli', authenticateToken, cliAuthRoutes);
     app.use('/api/user', authenticateToken, userRoutes);
     app.use('/api/codex', authenticateToken, codexRoutes);
@@ -95,12 +109,6 @@ export function configureExpress(app, wss) {
     // ===== 特殊路由 =====
     // Agent API 路由（使用 API 密钥身份验证，不是令牌身份验证）
     app.use('/api/agent', agentRoutes);
-
-    // 文件 API 路由（受保护）
-    app.use('/api/projects', authenticateToken, filesRoutes);
-
-    // 会话 API 路由（受保护）
-    app.use('/api/projects', authenticateToken, sessionsRoutes);
 
     // 上传 API 路由（受保护）
     app.use('/api', authenticateToken, uploadsRoutes);
