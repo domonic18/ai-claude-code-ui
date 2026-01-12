@@ -1,0 +1,254 @@
+/**
+ * AuthController.js
+ *
+ * 认证控制器
+ * 处理用户认证相关的请求
+ *
+ * @module controllers/AuthController
+ */
+
+import bcrypt from 'bcrypt';
+import { BaseController } from './BaseController.js';
+import { repositories, db } from '../../database/db.js';
+import { generateToken } from '../../middleware/auth.middleware.js';
+import containerManager from '../../services/container/core/index.js';
+import { NotFoundError, UnauthorizedError, ValidationError } from '../../middleware/error-handler.middleware.js';
+
+const { User } = repositories;
+
+/**
+ * 认证控制器
+ */
+export class AuthController extends BaseController {
+  /**
+   * 获取认证状态
+   * @param {Object} req - Express 请求对象
+   * @param {Object} res - Express 响应对象
+   * @param {Function} next - 下一个中间件
+   */
+  async getStatus(req, res, next) {
+    try {
+      const hasUsers = User.hasUsers();
+
+      this._success(res, {
+        needsSetup: !hasUsers,
+        isAuthenticated: false
+      });
+    } catch (error) {
+      this._handleError(error, req, res, next);
+    }
+  }
+
+  /**
+   * 用户注册（仅在没有用户存在时）
+   * @param {Object} req - Express 请求对象
+   * @param {Object} res - Express 响应对象
+   * @param {Function} next - 下一个中间件
+   */
+  async register(req, res, next) {
+    try {
+      const { username, password } = req.body;
+
+      // 验证输入
+      this._validateCredentials(username, password);
+
+      // 使用事务防止竞态条件
+      db().prepare('BEGIN').run();
+
+      try {
+        // 检查是否已有用户
+        const hasUsers = User.hasUsers();
+        if (hasUsers) {
+          db().prepare('ROLLBACK').run();
+          throw new ValidationError('User already exists. This is a single-user system.');
+        }
+
+        // 哈希密码
+        const saltRounds = 12;
+        const passwordHash = await bcrypt.hash(password, saltRounds);
+
+        // 创建用户
+        const user = User.create(username, passwordHash);
+
+        // 生成令牌
+        const token = generateToken(user);
+
+        // 更新最后登录时间
+        User.updateLastLogin(user.id);
+
+        db().prepare('COMMIT').run();
+
+        // 在后台为用户创建容器
+        containerManager.getOrCreateContainer(user.id).catch(err => {
+          console.error(`[AuthController] Failed to create container for user ${user.id}:`, err.message);
+        });
+
+        this._success(res, {
+          user: { id: user.id, username: user.username },
+          token
+        }, 'Registration successful', 201);
+      } catch (error) {
+        db().prepare('ROLLBACK').run();
+        throw error;
+      }
+    } catch (error) {
+      this._handleError(error, req, res, next);
+    }
+  }
+
+  /**
+   * 用户登录
+   * @param {Object} req - Express 请求对象
+   * @param {Object} res - Express 响应对象
+   * @param {Function} next - 下一个中间件
+   */
+  async login(req, res, next) {
+    try {
+      const { username, password } = req.body;
+
+      // 验证输入
+      if (!username || !password) {
+        throw new ValidationError('Username and password are required');
+      }
+
+      // 获取用户
+      const user = User.getByUsername(username);
+
+      if (!user) {
+        throw new UnauthorizedError('Invalid username or password');
+      }
+
+      // 验证密码
+      const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+
+      if (!isValidPassword) {
+        throw new UnauthorizedError('Invalid username or password');
+      }
+
+      // 生成令牌
+      const token = generateToken(user);
+
+      // 更新最后登录时间
+      User.updateLastLogin(user.id);
+
+      this._success(res, {
+        user: { id: user.id, username: user.username },
+        token
+      }, 'Login successful');
+    } catch (error) {
+      this._handleError(error, req, res, next);
+    }
+  }
+
+  /**
+   * 获取当前用户信息
+   * @param {Object} req - Express 请求对象
+   * @param {Object} res - Express 响应对象
+   * @param {Function} next - 下一个中间件
+   */
+  async getCurrentUser(req, res, next) {
+    try {
+      const userId = this._getUserId(req);
+      const user = User.getById(userId);
+
+      if (!user) {
+        throw new NotFoundError('User', userId);
+      }
+
+      this._success(res, {
+        id: user.id,
+        username: user.username,
+        createdAt: user.createdAt,
+        lastLoginAt: user.lastLoginAt
+      });
+    } catch (error) {
+      this._handleError(error, req, res, next);
+    }
+  }
+
+  /**
+   * 修改密码
+   * @param {Object} req - Express 请求对象
+   * @param {Object} res - Express 响应对象
+   * @param {Function} next - 下一个中间件
+   */
+  async changePassword(req, res, next) {
+    try {
+      const userId = this._getUserId(req);
+      const { currentPassword, newPassword } = req.body;
+
+      // 验证输入
+      if (!currentPassword || !newPassword) {
+        throw new ValidationError('Current password and new password are required');
+      }
+
+      if (newPassword.length < 6) {
+        throw new ValidationError('New password must be at least 6 characters');
+      }
+
+      // 获取用户
+      const user = User.getById(userId);
+
+      if (!user) {
+        throw new NotFoundError('User', userId);
+      }
+
+      // 验证当前密码
+      const isValidPassword = await bcrypt.compare(currentPassword, user.passwordHash);
+
+      if (!isValidPassword) {
+        throw new UnauthorizedError('Current password is incorrect');
+      }
+
+      // 哈希新密码
+      const saltRounds = 12;
+      const passwordHash = await bcrypt.hash(newPassword, saltRounds);
+
+      // 更新密码
+      User.updatePassword(userId, passwordHash);
+
+      this._success(res, null, 'Password changed successfully');
+    } catch (error) {
+      this._handleError(error, req, res, next);
+    }
+  }
+
+  /**
+   * 注销（令牌由客户端处理）
+   * @param {Object} req - Express 请求对象
+   * @param {Object} res - Express 响应对象
+   * @param {Function} next - 下一个中间件
+   */
+  async logout(req, res, next) {
+    try {
+      // JWT 是无状态的，客户端删除令牌即可
+      // 这里可以添加任何额外的注销逻辑（如清理缓存等）
+      this._success(res, null, 'Logged out successfully');
+    } catch (error) {
+      this._handleError(error, req, res, next);
+    }
+  }
+
+  /**
+   * 验证用户凭据
+   * @private
+   * @param {string} username - 用户名
+   * @param {string} password - 密码
+   * @throws {ValidationError} 验证失败时抛出
+   */
+  _validateCredentials(username, password) {
+    if (!username || !password) {
+      throw new ValidationError('Username and password are required');
+    }
+
+    if (username.length < 3) {
+      throw new ValidationError('Username must be at least 3 characters');
+    }
+
+    if (password.length < 6) {
+      throw new ValidationError('Password must be at least 6 characters');
+    }
+  }
+}
+
+export default AuthController;
