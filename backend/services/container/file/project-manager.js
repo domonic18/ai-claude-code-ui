@@ -13,9 +13,6 @@ import { CONTAINER } from '../../../config/config.js';
 /** 默认项目名称 */
 const DEFAULT_PROJECT_NAME = 'my-workspace';
 
-/** Claude 项目路径 */
-const CLAUDE_PROJECTS_PATH = CONTAINER.paths.projects;
-
 /**
  * 从容器内获取项目列表
  * 在容器模式下，项目存储在 /workspace 下
@@ -133,10 +130,11 @@ export async function getProjectsInContainer(userId) {
  * @returns {Promise<object|null>} 默认项目信息
  */
 async function createDefaultWorkspace(userId) {
-  // 根据文档设计（docs/arch/data-storage-design.md）：
+  // 根据文档设计（docs/arch/data-storage-design.md v3.1）：
   // - 项目代码目录：/workspace/my-workspace/ （实际的项目代码）
-  // - Claude 元数据：/workspace/.claude/projects/my-workspace/ （会话历史）
-  // 项目应该直接在 /workspace 下，不在 .claude/projects 下
+  // - 用户级配置：/workspace/.claude/ （~/.claude/，所有项目共享）
+  // - 项目级配置：/workspace/my-workspace/.claude/ （项目特定，覆盖用户级）
+  // 项目直接在 /workspace 下，不在 .claude/ 下
   const projectPath = `${CONTAINER.paths.workspace}/${DEFAULT_PROJECT_NAME}`;
 
   console.log('[ProjectManager] Creating default workspace at:', projectPath);
