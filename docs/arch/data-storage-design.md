@@ -1,8 +1,8 @@
 # 多用户 Claude Code 系统 - 数据存储设计
 
-> **文档版本**: 2.1
+> **文档版本**: 3.1
 > **创建时间**: 2026-01-10
-> **最后更新**: 2026-01-11 (修正数据库位置)
+> **最后更新**: 2026-01-12 (明确容器内 HOME=/workspace 方案，统一路径映射)
 > **所属架构**: Docker + Seccomp 容器隔离
 
 ---
@@ -25,8 +25,8 @@
 宿主机存储结构:
 /
 └── /path/to/ai-claude-code-ui/                 # 项目根目录
-    ├── server/                                 # 服务端代码
-    ├── src/                                    # 前端代码
+    ├── backend/                                # 后端代码
+    ├── frontend/                               # 前端代码
     ├── dist/                                   # 构建产物
     └── workspace/                              # 持久化数据目录（与代码分离）
         ├── database/                           # 全局数据库
@@ -34,14 +34,34 @@
         ├── users/                              # 用户数据目录
         │   ├── user_1/                         # 用户 1 数据
         │   │   └── data/                       # 挂载到容器的统一目录
-        │   │       ├── .claude/                # Claude 配置（容器内生成）
-        │   │       │   ├── projects/           # 项目元数据
-        │   │       │   ├── api_keys.json      # API 密钥
-        │   │       │   └── settings.json      # Claude 设置
-        │   │       ├── project-1/              # 项目代码
-        │   │       ├── project-2/              # 项目代码
+        │   │       ├── .claude/                # 用户级 Claude 配置（所有项目共享）
+        │   │       │   ├── settings.json       # Claude 设置（hooks、工具开关等）
+        │   │       │   ├── CLAUDE.md           # 用户级项目上下文
+        │   │       │   ├── commands/           # 自定义斜杠命令
+        │   │       │   │   ├── my-command.md
+        │   │       │   │   └── ...
+        │   │       │   ├── skills/             # Agent Skills（所有项目共享）
+        │   │       │   │   └── skill-name/
+        │   │       │   │       ├── SKILL.md
+        │   │       │   │       ├── schema.json
+        │   │       │   │       └── helper.js
+        │   │       │   ├── agents/             # Subagent 配置
+        │   │       │   │   └── subagent-name.json
+        │   │       │   ├── api_keys.json       # API 密钥
+        │   │       ├── my-workspace/           # 默认工作区（项目代码）
+        │   │       │   ├── .claude/            # 项目级配置（覆盖用户级）
+        │   │       │   │   ├── CLAUDE.md       # 项目上下文
+        │   │       │   │   ├── settings.local.json
+        │   │       │   │   ├── commands/       # 项目级命令
+        │   │       │   │   └── skills/         # 项目级 Skills
+        │   │       │   ├── src/
+        │   │       │   ├── package.json
+        │   │       │   └── README.md
+        │   │       ├── project-2/              # 其他项目
+        │   │       │   └── .claude/            # 项目级配置
         │   │       └── ...
         │   ├── user_2/                         # 用户 2 数据
+        │   │   └── data/
         │   └── ...
         ├── containers/                         # 容器配置
         │   ├── seccomp/                        # Seccomp 策略
@@ -107,17 +127,32 @@ const createUserVolume = (userId) => {
 **容器内目录结构**：
 ```
 /workspace/                              # 统一工作目录（所有操作都在这里）
-├── .claude/                             # Claude 配置目录
-│   ├── projects/                        # 项目元数据
-│   │   ├── project-1.json
-│   │   └── project-2.json
-│   ├── api_keys.json                    # API 密钥存储
-│   └── settings.json                    # Claude 设置
-├── project-1/                           # 项目 1 代码
+├── .claude/                             # 用户级 Claude 配置（共享给所有项目）
+│   ├── settings.json                    # Claude 设置（包含 hooks、工具开关等）
+│   ├── CLAUDE.md                        # 用户级项目上下文和指令
+│   ├── commands/                        # 自定义斜杠命令（.md 文件）
+│   │   ├── my-command.md
+│   │   └── ...
+│   ├── skills/                          # Agent Skills（用户级，所有项目共享）
+│   │   └── skill-name/
+│   │       ├── SKILL.md                 # 必需：技能描述
+│   │       └── ...                      # 可选：支持文件/脚本
+│   ├── agents/                          # Subagent 配置
+│   │   └── agent-name.json
+│   └── hooks/                           # 事件钩子（配置在 settings.json 中）
+├── my-workspace/                        # 默认工作区（项目代码）
+│   ├── .claude/                         # 项目级 Claude 配置（覆盖用户级配置）
+│   │   ├── CLAUDE.md                    # 项目上下文
+│   │   ├── settings.local.json          # 项目本地设置（覆盖用户级）
+│   │   ├── commands/                    # 项目级自定义命令
+│   │   │   └── project-command.md
+│   │   └── skills/                      # 项目级 Agent Skills
+│   │       └── project-skill/
+│   │           └── SKILL.md
 │   ├── src/
 │   ├── package.json
 │   └── ...
-├── project-2/                           # 项目 2 代码
+├── project-2/                           # 其他项目
 │   └── ...
 └── ...
 ```
@@ -129,12 +164,16 @@ const createUserVolume = (userId) => {
 ```javascript
 // 容器环境变量
 const containerEnv = {
+  // 关键：设置 HOME 指向 /workspace
+  // 这样 ~/.claude/ = /workspace/.claude/，符合 Claude Code 官方标准
+  HOME: '/workspace',
+
   // 用户标识
   USER_ID: userId,
   USER_TIER: 'free',  // free, pro, enterprise
 
-  // Claude 配置
-  CLAUDE_CONFIG_DIR: '/workspace/.claude',  // 统一配置目录
+  // Claude 配置目录（可选，HOME 设置后自动使用 ~/.claude/）
+  CLAUDE_CONFIG_DIR: '/workspace/.claude',
 
   // 节点环境
   NODE_ENV: 'production',
@@ -142,7 +181,103 @@ const containerEnv = {
 };
 ```
 
-### 2.3 卷管理策略
+**重要说明**：
+- `HOME=/workspace` 是核心配置，确保容器内 `~` 指向 `/workspace`
+- 这样 `~/.claude/` 自动映射到 `/workspace/.claude/`，符合 Claude Code 官方标准
+- 所有项目共享用户级配置（`~/.claude/skills/`、`~/.claude/commands/`）
+
+### 2.3 Claude Code 配置作用域
+
+根据官方文档，Claude Code 支持多个配置作用域，优先级从低到高：
+
+| 作用域 | 位置（宿主机） | 位置（容器内） | 说明 | 示例 |
+|--------|---------------|---------------|------|------|
+| **Managed** | - | `/etc/claude/` | 系统管理员配置，不可被用户修改 | `/etc/claude/settings.json` |
+| **User** | `workspace/users/user_1/data/.claude/` | `~/.claude/` = `/workspace/.claude/` | 用户级配置，所有项目共享 | 用户自定义 skills/commands |
+| **Project** | `workspace/users/user_1/data/my-workspace/.claude/` | `/workspace/my-workspace/.claude/` | 项目级配置，覆盖用户级 | 项目特定的 CLAUDE.md |
+| **Local** | `workspace/users/user_1/data/my-workspace/.claude/*.local.*` | `/workspace/my-workspace/.claude/*.local.*` | 本地覆盖，不提交到 Git | `settings.local.json` |
+
+**关键说明**：
+- 容器内设置 `HOME=/workspace` 后，`~/.claude/` 等同于 `/workspace/.claude/`
+- 这符合 Claude Code 官方标准的 `~/.claude/` 用户配置路径
+- 所有配置都持久化到宿主机，容器重启后不会丢失
+
+**配置继承规则**：
+1. 项目启动时，按优先级合并配置：Managed → User → Project → Local
+2. 同一配置项，高优先级覆盖低优先级
+3. Skills 和 Commands 支持用户级和项目级，项目级优先
+
+**共享配置实现方案**：
+
+```
+# 用户级配置（所有项目共享）
+/workspace/.claude/
+├── skills/
+│   └── common-task/           # 通用技能（所有项目可用）
+│       └── SKILL.md
+├── commands/
+│   └── analyze.md             # 自定义命令（所有项目可用）
+└── settings.json              # 用户偏好设置
+
+# 项目级配置（项目特定，覆盖用户级）
+/workspace/my-workspace/.claude/
+├── CLAUDE.md                  # 项目上下文（仅此项目）
+├── skills/
+│   └── project-specific/      # 项目专用技能
+│       └── SKILL.md
+└── settings.local.json        # 项目本地设置（不提交）
+```
+
+**API 密钥存储位置**：
+根据官方文档，API 密钥应存储在用户级配置目录：
+```bash
+/workspace/.claude/api_keys.json  # 用户级密钥（所有项目共享）
+```
+
+### 2.4 会话历史存储机制
+
+**重要说明**：官方 Claude Code 文档中**未明确说明**会话历史的具体存储位置。官方文档提到：
+- `.claude/` 目录用于配置、skills、commands、agents
+- 会话历史由 SDK 内部管理，但具体位置未在文档中说明
+
+**当前实现的会话存储**：
+根据项目现有代码分析，会话历史可能存储在以下位置（需进一步验证）：
+```bash
+# 主机模式（非容器）
+~/.claude/sessions/              # 会话历史（可能位置）
+~/.claude/projects/              # 项目元数据（当前代码使用）
+
+# 容器模式
+/workspace/.claude/sessions/      # 容器内会话历史
+/workspace/.claude/projects/      # 项目元数据（需评估是否为官方标准）
+```
+
+**UI 显示会话历史的实现方案**：
+
+1. **通过 SDK API 读取**（推荐）：
+   ```javascript
+   // 使用 Claude SDK 的会话历史 API
+   const sessions = await claudeSDK.getSessionHistory(projectPath);
+   ```
+
+2. **从项目元数据读取**（当前实现）：
+   ```javascript
+   // 从 .claude/projects/{projectName}/ 读取会话记录
+   const sessions = await getSessions(projectName);
+   ```
+
+3. **会话索引文件**：
+   ```json
+   // /workspace/.claude/sessions/index.json
+   {
+     "sessionId": "uuid",
+     "projectPath": "/workspace/my-workspace",
+     "createdAt": "2026-01-12T00:00:00Z",
+     "lastAccessed": "2026-01-12T01:00:00Z"
+   }
+   ```
+
+### 2.5 卷管理策略
 
 #### 创建策略
 - 用户注册时自动创建专属数据目录
@@ -258,14 +393,17 @@ CREATE INDEX idx_container_metrics_recorded_at ON container_metrics(recorded_at)
 
 ### 4.1 数据分类处理
 
-| 数据类型 | 存储位置 | 持久化策略 | 备份策略 |
-|---------|---------|-----------|---------|
-| 用户代码 | `/workspace/project-xxx` | Docker Volume (bind mount) | 每日备份 |
-| Claude 配置 | `/workspace/.claude` | Docker Volume (bind mount) | 每日备份 |
-| 项目元数据 | `/workspace/.claude/projects` | Docker Volume (bind mount) | 每日备份 |
-| 会话历史 | 宿主机 SQLite | 持久化 | 每日备份 |
-| 临时文件 | 容器内 `/tmp` | 容器销毁时删除 | 不备份 |
-| 构建产物 | `/workspace/project-xxx/node_modules` | Docker Volume (bind mount) | 按需备份 |
+| 数据类型 | 存储位置 | 持久化策略 | 备份策略 | 说明 |
+|---------|---------|-----------|---------|------|
+| 用户代码 | `/workspace/my-workspace/` | Docker Volume (bind mount) | 每日备份 | 项目实际代码 |
+| 用户级配置 | `/workspace/.claude/` | Docker Volume (bind mount) | 每日备份 | 共享给所有项目 |
+| 用户级 Skills | `/workspace/.claude/skills/` | Docker Volume (bind mount) | 每日备份 | 所有项目共享 |
+| 用户级 Commands | `/workspace/.claude/commands/` | Docker Volume (bind mount) | 每日备份 | 所有项目共享 |
+| 项目级配置 | `/workspace/my-workspace/.claude/` | Docker Volume (bind mount) | 每日备份 | 项目特定，覆盖用户级 |
+| API 密钥 | `/workspace/.claude/api_keys.json` | Docker Volume (bind mount) | 每日备份 | 用户级密钥 |
+| 会话历史 | `/workspace/.claude/sessions/` | Docker Volume (bind mount) | 每日备份 | SDK 管理 |
+| 临时文件 | 容器内 `/tmp` | 容器销毁时删除 | 不备份 | 临时数据 |
+| 构建产物 | `/workspace/my-workspace/node_modules/` | Docker Volume (bind mount) | 按需备份 | 可重建 |
 
 ### 4.2 备份策略
 
@@ -440,24 +578,48 @@ const storageQuotas = {
 ### 5.1 宿主机目录规范
 
 ```
-/workspace/
+/workspace/                              # 宿主机项目根目录
 ├── database/
-│   └── auth.db                    # 全局认证数据库（可选使用）
+│   └── auth.db                        # 全局认证数据库
 ├── users/
 │   ├── user_1/
-│   │   └── data/                  # 持久化到容器 /workspace
-│   │       ├── .claude/           # Claude 配置（容器内生成）
-│   │       │   ├── projects/      # 项目元数据
-│   │       │   ├── api_keys.json # API 密钥
-│   │       │   └── settings.json # Claude 设置
-│   │       ├── project-1/         # 项目代码
-│   │       └── project-2/
+│   │   └── data/                      # 持久化到容器 /workspace
+│   │       ├── .claude/               # 用户级 Claude 配置（所有项目共享）
+│   │       │   ├── settings.json      # Claude 设置（hooks、工具开关等）
+│   │       │   ├── CLAUDE.md          # 用户级项目上下文
+│   │       │   ├── commands/          # 自定义斜杠命令
+│   │       │   │   ├── my-command.md
+│   │       │   │   └── ...
+│   │       │   ├── skills/            # Agent Skills（所有项目共享）
+│   │       │   │   └── skill-name/
+│   │       │   │       ├── SKILL.md
+│   │       │   │       ├── schema.json
+│   │       │   │       └── helper.js
+│   │       │   ├── agents/            # Subagent 配置
+│   │       │   │   └── subagent-name.json
+│   │       │   ├── api_keys.json      # API 密钥
+│   │       │   └── sessions/          # 会话历史（SDK 管理）
+│   │       │       └── {session-id}/
+│   │       │           ├── metadata.json
+│   │       │           └── messages.jsonl
+│   │       ├── my-workspace/          # 默认工作区（项目代码）
+│   │       │   ├── .claude/           # 项目级配置（覆盖用户级）
+│   │       │   │   ├── CLAUDE.md      # 项目上下文
+│   │       │   │   ├── settings.local.json
+│   │       │   │   ├── commands/      # 项目级命令
+│   │       │   │   └── skills/        # 项目级 Skills
+│   │       │   ├── src/
+│   │       │   ├── package.json
+│   │       │   └── README.md
+│   │       ├── project-2/             # 其他项目
+│   │       │   └── .claude/           # 项目级配置
+│   │       └── ...
 │   ├── user_2/
 │   │   └── data/
 │   └── ...
 ├── containers/
 │   └── seccomp/
-│       └── claude-code.json       # Seccomp 安全策略
+│       └── claude-code.json           # Seccomp 安全策略
 ├── logs/
 │   ├── container-manager.log
 │   └── container-*.log
@@ -467,45 +629,112 @@ const storageQuotas = {
     └── monthly/
 ```
 
-### 5.2 容器内目录规范
+**宿主机与容器内路径对应关系**：
+
+| 宿主机路径 | 容器内路径 | 容器内简写 | 说明 |
+|-----------|-----------|-----------|------|
+| `workspace/users/user_1/data` | `/workspace` | `~` | 通过 HOME=/workspace |
+| `workspace/users/user_1/data/.claude/` | `/workspace/.claude/` | `~/.claude/` | **用户级配置，符合官方标准** |
+| `workspace/users/user_1/data/.claude/skills/` | `/workspace/.claude/skills/` | `~/.claude/skills/` | 所有项目共享 |
+| `workspace/users/user_1/data/my-workspace/` | `/workspace/my-workspace/` | - | 项目代码 |
+| `workspace/users/user_1/data/my-workspace/.claude/` | `/workspace/my-workspace/.claude/` | - | **项目级配置** |
+
+### 5.2 容器内目录规范（基于官方文档）
 
 ```
-/workspace/                              # 唯一工作目录
-├── .claude/                             # Claude 配置目录
-│   ├── projects/                        # 项目元数据
-│   │   ├── project-1.json
-│   │   │   {
-│   │   │     "path": "/workspace/project-1",
-│   │   │     "displayName": "Project 1",
-│   │   │     "createdAt": "2026-01-11T00:00:00Z"
-│   │   │   }
-│   │   └── project-2.json
-│   ├── api_keys.json                    # API 密钥存储
-│   │   [
-│   │     {
-│   │       "name": "OpenAI",
-│   │       "provider": "openai",
-│   │       "apiKey": "sk-...",
-│   │       "baseURL": "https://api.openai.com/v1"
-│   │     }
-│   │   ]
-│   ├── settings.json                    # Claude 设置
+/workspace/                              # 统一工作目录
+├── .claude/                             # 用户级 Claude 配置（所有项目共享）
+│   ├── settings.json                    # Claude 设置（hooks、工具开关等）
 │   │   {
 │   │     "editor": "vim",
-│   │     "autoConfirm": "dangerous"
+│   │     "autoConfirm": "dangerous",
+│   │     "hooks": {
+│   │       "preCommand": "",
+│   │       "postCommand": ""
+│   │     }
 │   │   }
-│   └── sessions/                         # 会话历史（可选）
-├── project-1/                           # 项目 1 代码
+│   ├── CLAUDE.md                        # 用户级项目上下文和指令
+│   ├── commands/                        # 自定义斜杠命令（.md 文件）
+│   │   ├── analyze.md                   # 命令定义
+│   │   └── review.md
+│   ├── skills/                          # Agent Skills（用户级，所有项目共享）
+│   │   └── code-review/                 # Skill 名称
+│   │       ├── SKILL.md                 # 必需：技能描述
+│   │       ├── schema.json              # 可选：参数结构
+│   │       └── helper.js                # 可选：辅助脚本
+│   ├── agents/                          # Subagent 配置
+│   │   └── subagent-name.json
+│   ├── api_keys.json                    # API 密钥存储
+│   │   {
+│   │     "providers": [
+│   │       {
+│   │         "name": "Anthropic",
+│   │         "provider": "anthropic",
+│   │         "apiKey": "sk-ant-..."
+│   │       }
+│   │     ]
+│   │   }
+│   └── sessions/                        # 会话历史（SDK 管理）
+│       └── {session-id}/
+│           ├── metadata.json
+│           └── messages.jsonl
+├── my-workspace/                        # 默认工作区（项目代码）
+│   ├── .claude/                         # 项目级配置（覆盖用户级）
+│   │   ├── CLAUDE.md                    # 项目上下文
+│   │   ├── settings.local.json          # 项目本地设置（不提交 Git）
+│   │   ├── commands/                    # 项目级自定义命令
+│   │   │   └── build.md
+│   │   └── skills/                      # 项目级 Agent Skills
+│   │       └── project-specific/
+│   │           └── SKILL.md
 │   ├── src/
 │   ├── tests/
 │   ├── package.json
 │   └── README.md
-├── project-2/                           # 项目 2 代码
-│   └── ...
+├── project-2/                           # 其他项目
+│   └── .claude/                         # 项目级配置
+│       └── CLAUDE.md
 └── temp/                                # 临时文件（可选）
 ```
 
-### 5.3 路径使用规范
+### 5.3 路径显示映射规范
+
+**问题**：当前 UI 显示 `workspace/users/user_1/data/my-workspace` 而不是 `/workspace/my-workspace`
+
+**解决方案**：在项目数据返回给前端之前，统一进行路径转换
+
+| 宿主机路径 | 容器内路径 | UI 显示路径 | 说明 |
+|-----------|-----------|-----------|------|
+| `workspace/users/user_1/data/my-workspace` | `/workspace/my-workspace` | `/workspace/my-workspace` | 用户项目 |
+| `workspace/users/user_1/data/.claude` | `/workspace/.claude` | 不显示 | 系统目录，过滤掉 |
+| `workspace/users/user_1/data/project-2` | `/workspace/project-2` | `/workspace/project-2` | 其他项目 |
+
+**代码实现建议**：
+
+```javascript
+// backend/services/container/file/project-manager.js
+export async function getProjectsInContainer(userId) {
+  // ... 列出项目的代码 ...
+
+  const projectList = [];
+
+  for (const projectName of projectNames) {
+    // 转换路径：只返回容器内路径，不返回宿主机路径
+    projectList.push({
+      name: projectName,
+      path: projectName,                    // 简短路径
+      displayName: projectName,
+      fullPath: `/workspace/${projectName}`, // 容器内完整路径
+      isContainerProject: true,
+      // 不返回 hostPath
+    });
+  }
+
+  return projectList;
+}
+```
+
+### 5.4 路径使用规范
 
 | 用途 | 路径示例 | 说明 |
 |------|---------|------|
@@ -516,7 +745,7 @@ const storageQuotas = {
 | 文件读取 | `/workspace/project-1/src/main.js` | 读取项目文件 |
 | 文件写入 | `/workspace/project-1/new-file.js` | 写入项目文件 |
 
-### 5.4 API 密钥存储格式
+### 5.5 API 密钥存储格式
 
 ```json
 // /workspace/.claude/api_keys.json
@@ -544,7 +773,7 @@ const storageQuotas = {
 }
 ```
 
-### 5.5 Claude 设置文件格式
+### 5.6 Claude 设置文件格式
 
 ```json
 // /workspace/.claude/settings.json
@@ -578,3 +807,5 @@ const storageQuotas = {
 | 1.0 | 2026-01-10 | Claude | 初始版本 |
 | 2.0 | 2026-01-11 | Claude | 统一工作目录方案，简化目录结构 |
 | 2.1 | 2026-01-11 | Claude | 修正数据库位置：全局数据库位于宿主机 workspace/database，容器内无数据库 |
+| 3.0 | 2026-01-12 | Claude | 基于官方文档更新 .claude 目录结构，添加配置作用域说明，添加路径映射规范 |
+| 3.1 | 2026-01-12 | Claude | 明确容器内 HOME=/workspace 方案，统一路径映射，确保 ~/.claude/ 符合 Claude Code 官方标准 |
