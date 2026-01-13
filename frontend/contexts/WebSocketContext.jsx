@@ -1,5 +1,6 @@
 import React, { createContext, useContext } from 'react';
 import { useWebSocket } from '../utils/websocket';
+import { useAuth } from './AuthContext';
 
 const WebSocketContext = createContext({
   ws: null,
@@ -17,8 +18,10 @@ export const useWebSocketContext = () => {
 };
 
 export const WebSocketProvider = ({ children }) => {
-  const webSocketData = useWebSocket();
-  
+  const { user } = useAuth();
+  // 只有用户登录后才连接 WebSocket
+  const webSocketData = useWebSocket(!!user);
+
   return (
     <WebSocketContext.Provider value={webSocketData}>
       {children}
