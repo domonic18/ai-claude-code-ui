@@ -519,6 +519,11 @@ export class ContainerFileAdapter extends BaseFileAdapter {
     const processedPaths = new Set();
 
     for (const line of lines) {
+      // 跳过空行和以点开头的隐藏文件/目录
+      if (!line || line.trim() === '') {
+        continue;
+      }
+
       const relativePath = line.replace(basePath + '/', '').replace(basePath, '');
 
       if (processedPaths.has(relativePath)) {
@@ -526,7 +531,11 @@ export class ContainerFileAdapter extends BaseFileAdapter {
       }
       processedPaths.add(relativePath);
 
-      const parts = relativePath.split('/');
+      const parts = relativePath.split('/').filter(Boolean); // 过滤空字符串
+      if (parts.length === 0) {
+        continue; // 跳过空路径
+      }
+
       let currentLevel = tree;
 
       for (let i = 0; i < parts.length; i++) {
@@ -548,10 +557,15 @@ export class ContainerFileAdapter extends BaseFileAdapter {
           }
 
           currentLevel.push(existing);
+        } else if (isDir && !existing.children) {
+          // 如果已存在的节点是文件，但我们需要它作为目录，更新它
+          existing.type = 'directory';
+          existing.children = [];
         }
 
         if (isDir) {
-          currentLevel = existing.children;
+          // 确保 currentLevel 始终是一个数组
+          currentLevel = existing.children || tree;
         } else {
           break;
         }
