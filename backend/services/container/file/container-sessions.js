@@ -527,11 +527,231 @@ async function getSessionMessagesInContainer(userId, projectName, sessionId, lim
   }
 }
 
+/**
+ * 更新会话摘要（容器模式）
+ * @param {number} userId - 用户 ID
+ * @param {string} projectName - 项目名称
+ * @param {string} sessionId - 会话 ID
+ * @param {string} newSummary - 新的摘要
+ * @returns {Promise<boolean>} 是否成功
+ */
+async function updateSessionSummaryInContainer(userId, projectName, sessionId, newSummary) {
+  console.log(`[ContainerSessions] Updating summary for session: ${sessionId} in project: ${projectName}`);
+
+  try {
+    const encodedProjectName = encodeProjectName(projectName);
+    const projectDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
+
+    // 获取会话文件列表
+    const sessionFiles = await listSessionFiles(userId, projectName);
+
+    if (sessionFiles.length === 0) {
+      console.error(`[ContainerSessions] No session files found for project: ${projectName}`);
+      return false;
+    }
+
+    // 在所有会话文件中查找该会话
+    for (const fileName of sessionFiles) {
+      try {
+        const filePath = `${projectDir}/${fileName}`;
+        const content = await readFileFromContainer(userId, filePath);
+
+        // 解析 JSONL 内容
+        const lines = content.split('\n');
+        const entries = [];
+        let sessionFound = false;
+        let summaryEntryIndex = -1;
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (line) {
+            try {
+              const entry = JSON.parse(line);
+              entries.push(entry);
+
+              if (entry.sessionId === sessionId) {
+                sessionFound = true;
+                // 查找或更新 summary 条目
+                if (entry.type === 'summary') {
+                  summaryEntryIndex = entries.length - 1;
+                  entries[entries.length - 1] = {
+                    ...entry,
+                    summary: newSummary,
+                    timestamp: entry.timestamp || new Date().toISOString()
+                  };
+                }
+              }
+            } catch (parseError) {
+              // 保留无法解析的行
+              entries.push({ _raw: line });
+            }
+          }
+        }
+
+        if (sessionFound) {
+          // 如果没有找到 summary 条目，添加一个新的
+          if (summaryEntryIndex === -1) {
+            entries.push({
+              type: 'summary',
+              sessionId: sessionId,
+              summary: newSummary,
+              timestamp: new Date().toISOString()
+            });
+          }
+
+          // 重建 JSONL 内容
+          const updatedContent = entries
+            .map(entry => entry._raw || JSON.stringify(entry))
+            .filter(line => line.trim())
+            .join('\n') + '\n';
+
+          // 写回文件
+          const base64Content = Buffer.from(updatedContent, 'utf8').toString('base64');
+          const { stream } = await containerManager.execInContainer(
+            userId,
+            `printf '%s' "$(echo '${base64Content}' | base64 -d)" > "${filePath}"`
+          );
+
+          await new Promise((resolve, reject) => {
+            let errorOutput = '';
+            stream.on('data', (chunk) => {
+              const output = chunk.toString();
+              if (output.toLowerCase().includes('error')) {
+                errorOutput += output;
+              }
+            });
+            stream.on('error', () => reject(new Error('Failed to write file')));
+            stream.on('end', () => {
+              if (errorOutput) {
+                reject(new Error(`Write failed: ${errorOutput}`));
+              } else {
+                resolve();
+              }
+            });
+          });
+
+          console.log(`[ContainerSessions] Summary updated successfully for session: ${sessionId}`);
+          return true;
+        }
+      } catch (error) {
+        console.warn(`[ContainerSessions] Failed to process session file ${fileName}:`, error.message);
+      }
+    }
+
+    console.error(`[ContainerSessions] Session ${sessionId} not found in any file`);
+    return false;
+  } catch (error) {
+    console.error(`[ContainerSessions] Error updating session summary:`, error);
+    return false;
+  }
+}
+
+/**
+ * 删除会话（容器模式）
+ * @param {number} userId - 用户 ID
+ * @param {string} projectName - 项目名称
+ * @param {string} sessionId - 会话 ID
+ * @returns {Promise<boolean>} 是否成功
+ */
+async function deleteSessionInContainer(userId, projectName, sessionId) {
+  console.log(`[ContainerSessions] Deleting session: ${sessionId} in project: ${projectName}`);
+
+  try {
+    const encodedProjectName = encodeProjectName(projectName);
+    const projectDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
+
+    // 获取会话文件列表
+    const sessionFiles = await listSessionFiles(userId, projectName);
+
+    if (sessionFiles.length === 0) {
+      console.error(`[ContainerSessions] No session files found for project: ${projectName}`);
+      return false;
+    }
+
+    // 在所有会话文件中查找并删除该会话的条目
+    for (const fileName of sessionFiles) {
+      try {
+        const filePath = `${projectDir}/${fileName}`;
+        const content = await readFileFromContainer(userId, filePath);
+
+        // 解析 JSONL 内容
+        const lines = content.split('\n');
+        const entries = [];
+        let sessionFound = false;
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (trimmedLine) {
+            try {
+              const entry = JSON.parse(line);
+              // 只保留不属于该会话的条目
+              if (entry.sessionId !== sessionId) {
+                entries.push(entry);
+              } else {
+                sessionFound = true;
+              }
+            } catch (parseError) {
+              // 保留无法解析的行
+              entries.push({ _raw: line });
+            }
+          }
+        }
+
+        if (sessionFound) {
+          // 重建 JSONL 内容
+          const updatedContent = entries
+            .map(entry => entry._raw || JSON.stringify(entry))
+            .filter(line => line.trim())
+            .join('\n') + '\n';
+
+          // 写回文件
+          const base64Content = Buffer.from(updatedContent, 'utf8').toString('base64');
+          const { stream } = await containerManager.execInContainer(
+            userId,
+            `printf '%s' "$(echo '${base64Content}' | base64 -d)" > "${filePath}"`
+          );
+
+          await new Promise((resolve, reject) => {
+            let errorOutput = '';
+            stream.on('data', (chunk) => {
+              const output = chunk.toString();
+              if (output.toLowerCase().includes('error')) {
+                errorOutput += output;
+              }
+            });
+            stream.on('error', () => reject(new Error('Failed to write file')));
+            stream.on('end', () => {
+              if (errorOutput) {
+                reject(new Error(`Write failed: ${errorOutput}`));
+              } else {
+                resolve();
+              }
+            });
+          });
+
+          console.log(`[ContainerSessions] Session deleted successfully: ${sessionId}`);
+          return true;
+        }
+      } catch (error) {
+        console.warn(`[ContainerSessions] Failed to process session file ${fileName}:`, error.message);
+      }
+    }
+
+    console.error(`[ContainerSessions] Session ${sessionId} not found in any file`);
+    return false;
+  } catch (error) {
+    console.error(`[ContainerSessions] Error deleting session:`, error);
+    return false;
+  }
+}
+
 export {
   encodeProjectName,
   readFileFromContainer,
   parseJsonlContent,
   getSessionsInContainer,
   getSessionFilesInfo,
-  getSessionMessagesInContainer
+  getSessionMessagesInContainer,
+  updateSessionSummaryInContainer,
+  deleteSessionInContainer
 };

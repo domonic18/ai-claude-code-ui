@@ -404,6 +404,87 @@ export class ProjectController extends BaseController {
   }
 
   /**
+   * 重命名会话摘要
+   * @param {Object} req - Express 请求对象
+   * @param {Object} res - Express 响应对象
+   * @param {Function} next - 下一个中间件
+   */
+  async renameSession(req, res, next) {
+    try {
+      const userId = this._getUserId(req);
+      const { projectName } = req.params;
+      const { sessionId } = req.params;
+      const { summary } = req.body;
+
+      if (!summary || typeof summary !== 'string') {
+        throw new ValidationError('Summary is required');
+      }
+
+      const trimmedSummary = summary.trim();
+
+      if (trimmedSummary.length === 0) {
+        throw new ValidationError('Summary cannot be empty');
+      }
+
+      if (trimmedSummary.length > 200) {
+        throw new ValidationError('Summary is too long (max 200 characters)');
+      }
+
+      // 容器模式：在容器中更新会话摘要
+      if (CONTAINER.enabled) {
+        const { updateSessionSummaryInContainer } = await import('../../services/container/file/container-sessions.js');
+        const success = await updateSessionSummaryInContainer(userId, projectName, sessionId, trimmedSummary);
+
+        if (!success) {
+          throw new NotFoundError('Session', sessionId);
+        }
+      } else {
+        // 非容器模式：暂不支持
+        throw new Error('Session rename is only supported in container mode');
+      }
+
+      this._success(res, {
+        sessionId,
+        summary: trimmedSummary
+      }, 'Session renamed successfully');
+    } catch (error) {
+      this._handleError(error, req, res, next);
+    }
+  }
+
+  /**
+   * 删除会话
+   * @param {Object} req - Express 请求对象
+   * @param {Object} res - Express 响应对象
+   * @param {Function} next - 下一个中间件
+   */
+  async deleteSession(req, res, next) {
+    try {
+      const userId = this._getUserId(req);
+      const { projectName, sessionId } = req.params;
+
+      // 容器模式：在容器中删除会话
+      if (CONTAINER.enabled) {
+        const { deleteSessionInContainer } = await import('../../services/container/file/container-sessions.js');
+        const success = await deleteSessionInContainer(userId, projectName, sessionId);
+
+        if (!success) {
+          throw new NotFoundError('Session', sessionId);
+        }
+      } else {
+        // 非容器模式：暂不支持
+        throw new Error('Session deletion is only supported in container mode');
+      }
+
+      this._success(res, {
+        sessionId
+      }, 'Session deleted successfully');
+    } catch (error) {
+      this._handleError(error, req, res, next);
+    }
+  }
+
+  /**
    * 应用分页和排序
    * @private
    * @param {Array} items - 项目列表

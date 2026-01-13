@@ -39,6 +39,22 @@ router.get('/:projectName/sessions', authenticate(), projectController._asyncHan
 router.get('/:projectName/sessions/:sessionId/messages', authenticate(), projectController._asyncHandler(projectController.getSessionMessages));
 
 /**
+ * PUT /api/projects/:projectName/sessions/:sessionId/rename
+ * 重命名会话摘要
+ */
+router.put('/:projectName/sessions/:sessionId/rename', authenticate(), validate({
+  body: {
+    summary: { required: true, type: 'string' }
+  }
+}), projectController._asyncHandler(projectController.renameSession));
+
+/**
+ * DELETE /api/projects/:projectName/sessions/:sessionId
+ * 删除会话
+ */
+router.delete('/:projectName/sessions/:sessionId', authenticate(), projectController._asyncHandler(projectController.deleteSession));
+
+/**
  * PUT /api/projects/:projectName/rename
  * 重命名项目的显示名称
  */
