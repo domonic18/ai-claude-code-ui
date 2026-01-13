@@ -494,15 +494,27 @@ export class ContainerLifecycleManager {
             });
             console.log(`[Lifecycle] Restored container for user ${user_id}: ${container_name}`);
           } else {
-            // 容器未运行，更新数据库状态
+            // 容器未运行，更新数据库状态并清理状态机
             Container.updateStatus(container_id, 'stopped');
             console.log(`[Lifecycle] Container ${container_name} is stopped, status updated in database`);
+            // 清理状态机状态
+            const stateMachine = this.stateMachines.get(user_id);
+            if (stateMachine) {
+              stateMachine.transitionTo(ContainerState.NON_EXISTENT);
+              await containerStateStore.save(stateMachine);
+            }
           }
         } catch (dockerErr) {
-          // 容器在 Docker 中不存在，从数据库中删除
+          // 容器在 Docker 中不存在，从数据库中删除并清理状态机
           if (dockerErr.statusCode === 404) {
             console.log(`[Lifecycle] Container ${container_name} not found in Docker, removing from database`);
             Container.delete(container_id);
+            // 清理状态机状态
+            const stateMachine = this.stateMachines.get(user_id);
+            if (stateMachine) {
+              stateMachine.transitionTo(ContainerState.NON_EXISTENT);
+              await containerStateStore.save(stateMachine);
+            }
           } else {
             console.warn(`[Lifecycle] Error checking container ${container_name}: ${dockerErr.message}`);
           }
