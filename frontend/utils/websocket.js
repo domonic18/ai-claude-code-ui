@@ -41,15 +41,18 @@ export function useWebSocket(isEnabled = true) {
           });
           if (response.ok) {
             const data = await response.json();
-            token = data.token;
+            token = data.token ?? data.data?.token;
+          } else {
+            console.warn('[WebSocket] Failed to get ws-token:', response.status, response.statusText);
+            return;
           }
         } catch (error) {
-          // 静默跳过：用户未登录时不显示错误
+          console.error('[WebSocket] Error fetching ws-token:', error);
           return;
         }
 
         if (!token) {
-          // 静默跳过：用户未登录时不显示警告
+          console.warn('[WebSocket] No token received from server');
           return;
         }
 
