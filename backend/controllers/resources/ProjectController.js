@@ -10,6 +10,8 @@
 import { BaseController } from '../core/BaseController.js';
 import { ClaudeDiscovery } from '../../services/projects/discovery/index.js';
 import { NotFoundError, ValidationError } from '../../middleware/error-handler.middleware.js';
+import { CONTAINER } from '../../config/config.js';
+import containerManager from '../../services/container/core/index.js';
 
 /**
  * 项目控制器
@@ -203,6 +205,199 @@ export class ProjectController extends BaseController {
       });
 
       this._success(res, { isEmpty });
+    } catch (error) {
+      this._handleError(error, req, res, next);
+    }
+  }
+
+  /**
+   * 手动创建项目（添加现有路径）
+   * @param {Object} req - Express 请求对象
+   * @param {Object} res - Express 响应对象
+   * @param {Function} next - 下一个中间件
+   */
+  async createProject(req, res, next) {
+    try {
+      const userId = this._getUserId(req);
+      const { path } = req.body;
+
+      if (!path || typeof path !== 'string') {
+        throw new ValidationError('Path is required');
+      }
+
+      // 使用项目管理服务添加项目
+      const { addProjectManually } = await import('../../services/project/project-management/index.js');
+      const project = await addProjectManually(path.trim());
+
+      this._success(res, { project }, 'Project added successfully');
+    } catch (error) {
+      this._handleError(error, req, res, next);
+    }
+  }
+
+  /**
+   * 创建工作空间（现有或新建）
+   * @param {Object} req - Express 请求对象
+   * @param {Object} res - Express 响应对象
+   * @param {Function} next - 下一个中间件
+   */
+  async createWorkspace(req, res, next) {
+    try {
+      const userId = this._getUserId(req);
+      const { workspaceType, path: workspacePath, githubUrl, githubTokenId, newGithubToken } = req.body;
+
+      if (!workspaceType || !workspacePath) {
+        throw new ValidationError('workspaceType and path are required');
+      }
+
+      const cleanPath = workspacePath.trim();
+      const cleanGithubUrl = githubUrl?.trim();
+
+      // 容器模式：在容器中创建工作空间
+      if (CONTAINER.enabled) {
+        // 获取或创建用户容器
+        await containerManager.getOrCreateContainer(userId);
+
+        // 规范化项目名称：将 / 替换为 -（用于存储和显示）
+        const projectName = cleanPath.replace(/\//g, '-');
+        const containerPath = `${CONTAINER.paths.workspace}/${projectName}`;
+
+        if (workspaceType === 'new') {
+          // 创建新工作空间
+          try {
+            // 创建目录
+            await containerManager.execInContainer(userId, `mkdir -p "${containerPath}"`);
+
+            // 初始化 git 仓库
+            await containerManager.execInContainer(userId, `cd "${containerPath}" && git init`);
+
+            // 如果提供了 GitHub URL，克隆仓库
+            if (cleanGithubUrl) {
+              let cloneCommand = `git clone`;
+
+              // 添加认证信息
+              if (newGithubToken) {
+                // 使用一次性 token
+                const parsedUrl = new URL(cleanGithubUrl);
+                parsedUrl.username = 'oauth2';
+                parsedUrl.password = newGithubToken;
+                cloneCommand += ` ${parsedUrl.toString()} "${containerPath}/temp-repo"`;
+              } else if (githubTokenId) {
+                // 从数据库获取存储的 token（需要实现获取逻辑）
+                // 暂时跳过，直接克隆公开仓库
+                cloneCommand += ` ${cleanGithubUrl} "${containerPath}/temp-repo"`;
+              } else {
+                // 公开仓库
+                cloneCommand += ` ${cleanGithubUrl} "${containerPath}/temp-repo"`;
+              }
+
+              // 执行克隆
+              const { stream } = await containerManager.execInContainer(userId, cloneCommand);
+
+              // 等待克隆完成
+              await new Promise((resolve, reject) => {
+                let output = '';
+                let errorOutput = '';
+
+                stream.stdout.on('data', (d) => output += d.toString());
+                stream.stderr.on('data', (d) => errorOutput += d.toString());
+
+                stream.on('end', () => {
+                  if (errorOutput && !output) {
+                    reject(new Error(errorOutput));
+                  } else {
+                    resolve();
+                  }
+                });
+
+                stream.on('error', reject);
+              });
+
+              // 移动文件到目标位置
+              await containerManager.execInContainer(userId, `sh -c 'mv "${containerPath}/temp-repo"/.* "${containerPath}/" 2>/dev/null || true'`);
+              await containerManager.execInContainer(userId, `sh -c 'mv "${containerPath}/temp-repo"/* "${containerPath}/" 2>/dev/null || true'`);
+              await containerManager.execInContainer(userId, `rm -rf "${containerPath}/temp-repo"`);
+            }
+
+            // 返回项目信息
+            this._success(res, {
+              project: {
+                name: projectName,
+                path: cleanPath,
+                displayName: projectName,
+                fullPath: projectName,
+                isContainerProject: true,
+                sessions: [],
+                sessionMeta: { hasMore: false, total: 0 },
+                cursorSessions: [],
+                codexSessions: []
+              }
+            }, 'New workspace created successfully');
+
+          } catch (error) {
+            // 清理失败的创建
+            try {
+              await containerManager.execInContainer(userId, `rm -rf "${containerPath}"`);
+            } catch (cleanupError) {
+              console.error('Failed to clean up workspace:', cleanupError);
+            }
+            throw new ValidationError(`Failed to create workspace: ${error.message}`);
+          }
+
+        } else if (workspaceType === 'existing') {
+          // 添加现有工作空间（容器中已存在）
+          // 检查路径是否存在
+          const { stream } = await containerManager.execInContainer(userId, `ls -la "${containerPath}" 2>/dev/null || echo "NOT_FOUND"`);
+
+          await new Promise((resolve, reject) => {
+            let output = '';
+            stream.stdout.on('data', (d) => output += d.toString());
+            stream.on('end', () => {
+              if (output.includes('NOT_FOUND')) {
+                reject(new ValidationError('Workspace path does not exist in container'));
+              } else {
+                resolve();
+              }
+            });
+            stream.on('error', reject);
+          });
+
+          this._success(res, {
+            project: {
+              name: projectName,
+              path: cleanPath,
+              displayName: projectName,
+              fullPath: projectName,
+              isContainerProject: true,
+              sessions: [],
+              sessionMeta: { hasMore: false, total: 0 },
+              cursorSessions: [],
+              codexSessions: []
+            }
+          }, 'Existing workspace added successfully');
+        }
+
+      } else {
+        // 非容器模式：使用原来的逻辑
+        const { createWorkspace } = await import('../../services/workspace/index.js');
+        const result = await createWorkspace({
+          workspaceType,
+          path: cleanPath,
+          githubUrl: cleanGithubUrl,
+          githubTokenId,
+          newGithubToken,
+          userId
+        });
+
+        if (!result.success) {
+          throw new ValidationError(result.error || 'Failed to create workspace');
+        }
+
+        this._success(res, {
+          project: result.project
+        }, result.message || 'Workspace created successfully');
+      }
+
     } catch (error) {
       this._handleError(error, req, res, next);
     }
