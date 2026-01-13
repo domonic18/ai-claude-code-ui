@@ -21,6 +21,12 @@ const authController = new AuthController();
 router.get('/status', authController._asyncHandler(authController.getStatus));
 
 /**
+ * GET /api/auth/ws-token
+ * 获取 WebSocket 认证令牌（从 cookie 复制）
+ */
+router.get('/ws-token', authenticate(), authController._asyncHandler(authController.getWebSocketToken));
+
+/**
  * POST /api/auth/register
  * 用户注册（设置）- 仅在没有用户存在时才允许
  */

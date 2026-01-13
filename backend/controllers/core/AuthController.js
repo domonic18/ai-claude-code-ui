@@ -83,9 +83,17 @@ export class AuthController extends BaseController {
           console.error(`[AuthController] Failed to create container for user ${user.id}:`, err.message);
         });
 
+        // 设置 httpOnly cookie（行业最佳实践）
+        res.cookie('auth_token', token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+          maxAge: 365 * 24 * 60 * 60 * 1000, // 1年
+          path: '/'
+        });
+
         this._success(res, {
-          user: { id: user.id, username: user.username },
-          token
+          user: { id: user.id, username: user.username }
         }, 'Registration successful', 201);
       } catch (error) {
         db().prepare('ROLLBACK').run();
@@ -119,7 +127,7 @@ export class AuthController extends BaseController {
       }
 
       // 验证密码
-      const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+      const isValidPassword = await bcrypt.compare(password, user.password_hash);
 
       if (!isValidPassword) {
         throw new UnauthorizedError('Invalid username or password');
@@ -131,9 +139,22 @@ export class AuthController extends BaseController {
       // 更新最后登录时间
       User.updateLastLogin(user.id);
 
+      // 为用户创建容器（如果不存在）
+      containerManager.getOrCreateContainer(user.id).catch(err => {
+        console.error(`[AuthController] Failed to create container for user ${user.id}:`, err.message);
+      });
+
+      // 设置 httpOnly cookie（行业最佳实践）
+      res.cookie('auth_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 365 * 24 * 60 * 60 * 1000, // 1年
+        path: '/'
+      });
+
       this._success(res, {
-        user: { id: user.id, username: user.username },
-        token
+        user: { id: user.id, username: user.username }
       }, 'Login successful');
     } catch (error) {
       this._handleError(error, req, res, next);
@@ -194,7 +215,7 @@ export class AuthController extends BaseController {
       }
 
       // 验证当前密码
-      const isValidPassword = await bcrypt.compare(currentPassword, user.passwordHash);
+      const isValidPassword = await bcrypt.compare(currentPassword, user.password_hash);
 
       if (!isValidPassword) {
         throw new UnauthorizedError('Current password is incorrect');
@@ -214,15 +235,44 @@ export class AuthController extends BaseController {
   }
 
   /**
-   * 注销（令牌由客户端处理）
+   * 获取 WebSocket 认证令牌
+   * WebSocket 无法自动发送 cookie，需要提供 token
+   * @param {Object} req - Express 请求对象
+   * @param {Object} res - Express 响应对象
+   * @param {Function} next - 下一个中间件
+   */
+  async getWebSocketToken(req, res, next) {
+    try {
+      // 从 cookie 获取当前 token
+      const token = req.cookies?.auth_token;
+
+      if (!token) {
+        throw new UnauthorizedError('No authentication token found');
+      }
+
+      // 返回 token 用于 WebSocket 连接
+      this._success(res, { token });
+    } catch (error) {
+      this._handleError(error, req, res, next);
+    }
+  }
+
+  /**
+   * 注销
    * @param {Object} req - Express 请求对象
    * @param {Object} res - Express 响应对象
    * @param {Function} next - 下一个中间件
    */
   async logout(req, res, next) {
     try {
-      // JWT 是无状态的，客户端删除令牌即可
-      // 这里可以添加任何额外的注销逻辑（如清理缓存等）
+      // 清除 httpOnly cookie
+      res.clearCookie('auth_token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/'
+      });
+
       this._success(res, null, 'Logged out successfully');
     } catch (error) {
       this._handleError(error, req, res, next);

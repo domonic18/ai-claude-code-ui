@@ -10,6 +10,8 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import mime from 'mime-types';
+import fs from 'fs';
+import cookieParser from 'cookie-parser';
 import { FILES, SERVER } from './config.js';
 
 // 路由导入 - 新结构（按功能分组）
@@ -24,6 +26,7 @@ import mcpUtilsRoutes from '../routes/mcp-utils.js';
 
 // 中间件导入
 import { validateApiKey, authenticateToken } from '../middleware/auth.js';
+import { responseFormatter, responseHeaders } from '../middleware/response-formatter.middleware.js';
 
 /**
  * 使用中间件和路由配置 Express 应用
@@ -36,6 +39,13 @@ export function configureExpress(app, wss) {
 
     // CORS 中间件
     app.use(cors());
+
+    // Cookie 解析中间件（用于 httpOnly 认证）
+    app.use(cookieParser());
+
+    // 响应格式化中间件（必须在所有其他中间件之前）
+    app.use(responseFormatter);
+    app.use(responseHeaders);
 
     // 带有自定义类型检查的 JSON 主体解析器
     app.use(express.json({
@@ -136,7 +146,7 @@ export function configureExpress(app, wss) {
         const indexPath = path.join(process.cwd(), 'server', '../dist/index.html');
 
         // 检查 dist/index.html 是否存在（生产构建可用）
-        if (require('fs').existsSync(indexPath)) {
+        if (fs.existsSync(indexPath)) {
             // 为 HTML 设置无缓存头以防止 Service Worker 问题
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
             res.setHeader('Pragma', 'no-cache');

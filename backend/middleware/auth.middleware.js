@@ -338,8 +338,14 @@ function generateToken(user) {
  * @returns {Promise<Object>} 认证结果
  */
 async function _tryJwtAuth(req) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  // 优先从 cookie 读取 token（行业最佳实践：httpOnly cookie）
+  let token = req.cookies?.auth_token;
+
+  // 兼容旧的 Authorization header 方式（用于 WebSocket 等）
+  if (!token) {
+    const authHeader = req.headers['authorization'];
+    token = authHeader && authHeader.split(' ')[1];
+  }
 
   if (!token) {
     return { success: false };
