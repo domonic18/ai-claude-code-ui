@@ -104,8 +104,10 @@ function MainContent({
       try {
         const response = await api.get(`/taskmaster/prd/${encodeURIComponent(currentProject.name)}`);
         if (response.ok) {
-          const data = await response.json();
-          setExistingPRDs(data.prdFiles || []);
+          const responseData = await response.json();
+          // 后端返回 {success: true, data: {projectName, projectPath, prdFiles, ...}}
+          const data = responseData.data;
+          setExistingPRDs(data?.prdFiles || []);
         } else {
           setExistingPRDs([]);
         }
@@ -535,8 +537,10 @@ function MainContent({
                   if (currentProject?.name) {
                     api.get(`/taskmaster/prd/${encodeURIComponent(currentProject.name)}`)
                       .then(response => response.ok ? response.json() : Promise.reject())
-                      .then(data => {
-                        setExistingPRDs(data.prdFiles || []);
+                      .then(responseData => {
+                        // 后端返回 {success: true, data: {projectName, projectPath, prdFiles, ...}}
+                        const data = responseData.data;
+                        setExistingPRDs(data?.prdFiles || []);
                         if (showNotification) {
                           setPRDNotification('PRD saved successfully!');
                           setTimeout(() => setPRDNotification(null), 3000);
@@ -653,8 +657,10 @@ function MainContent({
             try {
               const response = await api.get(`/taskmaster/prd/${encodeURIComponent(currentProject.name)}`);
               if (response.ok) {
-                const data = await response.json();
-                setExistingPRDs(data.prdFiles || []);
+                const responseData = await response.json();
+                // 后端返回 {success: true, data: {projectName, projectPath, prdFiles, ...}}
+                const data = responseData.data;
+                setExistingPRDs(data?.prdFiles || []);
                 setPRDNotification('PRD saved successfully!');
                 setTimeout(() => setPRDNotification(null), 3000);
               }

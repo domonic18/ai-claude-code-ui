@@ -54,7 +54,8 @@ export const AuthProvider = ({ children }) => {
 
       if (response.ok) {
         const data = await response.json();
-        setHasCompletedOnboarding(data.hasCompletedOnboarding);
+        // 后端返回 {success: true, data: {hasCompletedOnboarding}}
+        setHasCompletedOnboarding(data.data.hasCompletedOnboarding);
       }
     } catch (error) {
       console.error('Error checking onboarding status:', error);
