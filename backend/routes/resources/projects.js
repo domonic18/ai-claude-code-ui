@@ -33,6 +33,12 @@ router.get('/:projectName', authenticate(), projectController._asyncHandler(proj
 router.get('/:projectName/sessions', authenticate(), projectController._asyncHandler(projectController.getProjectSessions));
 
 /**
+ * GET /api/projects/:projectName/sessions/:sessionId/messages
+ * 获取项目中特定会话的消息
+ */
+router.get('/:projectName/sessions/:sessionId/messages', authenticate(), projectController._asyncHandler(projectController.getSessionMessages));
+
+/**
  * PUT /api/projects/:projectName/rename
  * 重命名项目的显示名称
  */

@@ -105,6 +105,42 @@ export class ProjectController extends BaseController {
   }
 
   /**
+   * 获取项目会话的消息
+   * @param {Object} req - Express 请求对象
+   * @param {Object} res - Express 响应对象
+   * @param {Function} next - 下一个中间件
+   */
+  async getSessionMessages(req, res, next) {
+    try {
+      const userId = this._getUserId(req);
+      const { projectName, sessionId } = req.params; // 修复：使用 projectName 而不是 projectId
+      const { limit = 100, offset = 0 } = this._getPagination(req, { page: 1, limit: 100 });
+
+      console.log(`[ProjectController] Getting session messages for project: ${projectName}, session: ${sessionId}`);
+
+      // 动态导入容器会话服务
+      const { getSessionMessagesInContainer } = await import('../../services/container/file/container-sessions.js');
+
+      const result = await getSessionMessagesInContainer(userId, projectName, sessionId, limit, offset);
+
+      // 处理返回格式
+      if (result && result.messages) {
+        this._success(res, {
+          messages: result.messages,
+          hasMore: result.hasMore,
+          total: result.total,
+          offset: result.offset
+        });
+      } else {
+        // 兼容旧格式，直接返回消息数组
+        this._success(res, result.messages || []);
+      }
+    } catch (error) {
+      this._handleError(error, req, res, next);
+    }
+  }
+
+  /**
    * 重命名项目
    * @param {Object} req - Express 请求对象
    * @param {Object} res - Express 响应对象
