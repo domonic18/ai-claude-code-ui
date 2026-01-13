@@ -162,13 +162,13 @@ export const api = {
   user: {
     gitConfig: () => authenticatedFetch('/api/user/git-config'),
     updateGitConfig: (gitName, gitEmail) =>
-      authenticatedFetch('/api/user/git-config', {
+      authenticatedFetch('/api/users/git-config', {
         method: 'POST',
         body: JSON.stringify({ gitName, gitEmail }),
       }),
-    onboardingStatus: () => authenticatedFetch('/api/user/onboarding-status'),
+    onboardingStatus: () => authenticatedFetch('/api/users/onboarding-status'),
     completeOnboarding: () =>
-      authenticatedFetch('/api/user/complete-onboarding', {
+      authenticatedFetch('/api/users/complete-onboarding', {
         method: 'POST',
       }),
   },

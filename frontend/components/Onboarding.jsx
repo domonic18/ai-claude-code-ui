@@ -48,7 +48,7 @@ const Onboarding = ({ onComplete }) => {
 
   const loadGitConfig = async () => {
     try {
-      const response = await authenticatedFetch('/api/user/git-config');
+      const response = await authenticatedFetch('/api/users/git-config');
       if (response.ok) {
         const data = await response.json();
         if (data.gitName) setGitName(data.gitName);
@@ -199,7 +199,7 @@ const Onboarding = ({ onComplete }) => {
       setIsSubmitting(true);
       try {
         // Save git config to backend (which will also apply git config --global)
-        const response = await authenticatedFetch('/api/user/git-config', {
+        const response = await authenticatedFetch('/api/users/git-config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ gitName, gitEmail })
@@ -232,7 +232,7 @@ const Onboarding = ({ onComplete }) => {
     setError('');
 
     try {
-      const response = await authenticatedFetch('/api/user/complete-onboarding', {
+      const response = await authenticatedFetch('/api/users/complete-onboarding', {
         method: 'POST'
       });
 
