@@ -68,18 +68,32 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {
       const dirPath = lastSlash > 0 ? inputPath.substring(0, lastSlash) : '~';
 
       const response = await api.browseFilesystem(dirPath);
-      const data = await response.json();
 
-      if (data.suggestions) {
+      // Check content-type before parsing JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        setPathSuggestions([]);
+        setShowPathDropdown(false);
+        return;
+      }
+
+      const responseData = await response.json();
+
+      if (response.ok && responseData.data?.suggestions) {
         // Filter suggestions based on the input
-        const filtered = data.suggestions.filter(s =>
+        const filtered = responseData.data.suggestions.filter(s =>
           s.path.toLowerCase().startsWith(inputPath.toLowerCase())
         );
         setPathSuggestions(filtered.slice(0, 5));
         setShowPathDropdown(filtered.length > 0);
+      } else {
+        setPathSuggestions([]);
+        setShowPathDropdown(false);
       }
     } catch (error) {
       console.error('Error loading path suggestions:', error);
+      setPathSuggestions([]);
+      setShowPathDropdown(false);
     }
   };
 
@@ -109,6 +123,10 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {
   };
 
   const handleCreate = async () => {
+    console.log('[ProjectCreationWizard] handleCreate called');
+    console.log('[ProjectCreationWizard] workspaceType:', workspaceType);
+    console.log('[ProjectCreationWizard] workspacePath:', workspacePath);
+
     setIsCreating(true);
     setError(null);
 
@@ -117,6 +135,8 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {
         workspaceType,
         path: workspacePath.trim(),
       };
+
+      console.log('[ProjectCreationWizard] Sending payload:', payload);
 
       // Add GitHub info if creating new workspace with GitHub URL
       if (workspaceType === 'new' && githubUrl) {
@@ -129,8 +149,22 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {
         }
       }
 
+      console.log('[ProjectCreationWizard] Calling api.createWorkspace...');
       const response = await api.createWorkspace(payload);
+      console.log('[ProjectCreationWizard] Response received:', response.status, response.statusText);
+
+      // Check content-type before parsing JSON
+      const contentType = response.headers.get('content-type');
+      console.log('[ProjectCreationWizard] Response content-type:', contentType);
+
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('[ProjectCreationWizard] Non-JSON response:', text);
+        throw new Error('Server returned non-JSON response');
+      }
+
       const data = await response.json();
+      console.log('[ProjectCreationWizard] Response data:', data);
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create workspace');
@@ -143,7 +177,7 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {
 
       onClose();
     } catch (error) {
-      console.error('Error creating workspace:', error);
+      console.error('[ProjectCreationWizard] Error creating workspace:', error);
       setError(error.message || 'Failed to create workspace');
     } finally {
       setIsCreating(false);
