@@ -17,6 +17,7 @@ import { PathUtils } from '../../core/utils/path-utils.js';
 import { CONTAINER } from '../../../config/config.js';
 import { loadProjectConfig } from '../../project/config/index.js';
 import { generateDisplayName, extractProjectDirectory } from '../../project/utils/index.js';
+import { getProjectsInContainer } from '../../container/file/index.js';
 
 /**
  * Claude 项目发现器
@@ -51,7 +52,17 @@ export class ClaudeDiscovery extends BaseDiscovery {
     const { userId, containerMode = CONTAINER.enabled } = options;
 
     try {
-      const projectsRoot = this._getProjectsRoot(containerMode ? 'container' : 'native');
+      // 容器模式：使用容器的项目发现服务
+      if (containerMode) {
+        if (!userId) {
+          throw new Error('userId is required for container mode');
+        }
+        console.log(`[ClaudeDiscovery] Using container mode for user ${userId}`);
+        return await getProjectsInContainer(userId);
+      }
+
+      // 原生模式：直接访问文件系统
+      const projectsRoot = this._getProjectsRoot('native');
       const config = await loadProjectConfig();
       const projects = [];
       const existingProjects = new Set();
