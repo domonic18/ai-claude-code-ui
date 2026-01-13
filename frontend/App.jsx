@@ -292,8 +292,8 @@ function AppContent() {
       }
 
       const responseData = await response.json();
-      // Handle responseFormatter wrapping: {success: true, data: [...]}
-      const data = responseData.data ?? responseData;
+      // 后端返回 {success: true, data: [...], meta: {...}}
+      const data = responseData.data;
 
       // Always fetch Cursor sessions for each project so we can combine views
       for (let project of data) {

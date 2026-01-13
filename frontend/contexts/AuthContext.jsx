@@ -75,10 +75,8 @@ export const AuthProvider = ({ children }) => {
       const statusResponse = await api.auth.status();
       const statusData = await statusResponse.json();
 
-      // Handle both direct response and responseFormatter format
-      const needsSetupValue = statusData.data?.needsSetup ?? statusData.needsSetup ?? false;
-
-      if (needsSetupValue) {
+      // 后端返回 {success: true, data: {needsSetup, isAuthenticated}}
+      if (statusData.data?.needsSetup) {
         setNeedsSetup(true);
         setIsLoading(false);
         return;

@@ -95,8 +95,8 @@ export const TaskMasterProvider = ({ children }) => {
       }
       
       const responseData = await response.json();
-      // Handle responseFormatter wrapping: {success: true, data: [...]}
-      const projectsData = responseData.data ?? responseData;
+      // 后端返回 {success: true, data: [...], meta: {...}}
+      const projectsData = responseData.data;
 
       // Check if projectsData is an array
       if (!Array.isArray(projectsData)) {
