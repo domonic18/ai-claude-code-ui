@@ -27,6 +27,16 @@ const LoadingScreen = () => (
 const ProtectedRoute = ({ children }) => {
   const { user, isLoading, needsSetup, hasCompletedOnboarding, refreshOnboardingStatus } = useAuth();
 
+  // 调试日志
+  console.log('[ProtectedRoute] State:', {
+    isLoading,
+    needsSetup,
+    hasCompletedOnboarding,
+    user,
+    userIsNull: user === null,
+    userType: typeof user
+  });
+
   if (import.meta.env.VITE_IS_PLATFORM === 'true') {
     if (isLoading) {
       return <LoadingScreen />;
