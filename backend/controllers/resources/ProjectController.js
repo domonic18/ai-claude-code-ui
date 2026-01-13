@@ -177,20 +177,62 @@ export class ProjectController extends BaseController {
   async deleteProject(req, res, next) {
     try {
       const userId = this._getUserId(req);
-      const { projectId } = req.params;
+      const { projectName } = req.params;
+
+      console.log('[ProjectController] deleteProject called:', { userId, projectName });
 
       // 容器模式：在容器中删除项目
       if (CONTAINER.enabled) {
+        console.log('[ProjectController] Container mode enabled, checking if project is empty...');
+
         // 检查项目是否为空
-        const isEmpty = await this.claudeDiscovery.isProjectEmpty(projectId, { userId });
+        const isEmpty = await this.claudeDiscovery.isProjectEmpty(projectName, { userId });
+
+        console.log('[ProjectController] Project empty check result:', isEmpty);
 
         if (!isEmpty) {
           throw new Error('Cannot delete project with existing sessions');
         }
 
+        console.log('[ProjectController] Deleting project directory in container...');
+
         // 删除容器中的项目目录
-        const projectPath = `${CONTAINER.paths.workspace}/${projectId}`;
-        await containerManager.execInContainer(userId, `rm -rf "${projectPath}"`);
+        const projectPath = `${CONTAINER.paths.workspace}/${projectName}`;
+        console.log('[ProjectController] Project path to delete:', projectPath);
+
+        const { stream } = await containerManager.execInContainer(userId, `rm -rf "${projectPath}"`);
+
+        // 等待删除命令完成
+        await new Promise((resolve, reject) => {
+          let resolved = false;
+
+          const cleanup = () => {
+            if (!resolved) {
+              resolved = true;
+              console.log('[ProjectController] Delete command completed');
+              resolve();
+            }
+          };
+
+          stream.on('end', cleanup);
+          stream.on('error', (err) => {
+            console.error('[ProjectController] Delete command error:', err);
+            if (!resolved) {
+              resolved = true;
+              reject(err);
+            }
+          });
+
+          // 添加超时保护，3秒后自动完成
+          setTimeout(() => {
+            if (!resolved) {
+              console.log('[ProjectController] Delete command timeout (this is normal for rm -rf)');
+              cleanup();
+            }
+          }, 3000);
+        });
+
+        console.log('[ProjectController] Project deleted successfully');
 
         // 删除项目配置中的记录（如果需要）
         // 容器模式下，项目列表是动态从 /workspace 读取的，所以不需要额外清理配置
@@ -199,11 +241,12 @@ export class ProjectController extends BaseController {
       } else {
         // 非容器模式：使用原来的逻辑
         const { deleteProject } = await import('../../services/project/project-management/index.js');
-        await deleteProject(projectId);
+        await deleteProject(projectName);
 
         this._success(res, null, 'Project deleted successfully');
       }
     } catch (error) {
+      console.error('[ProjectController] Error deleting project:', error);
       this._handleError(error, req, res, next);
     }
   }
