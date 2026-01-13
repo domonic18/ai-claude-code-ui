@@ -100,6 +100,23 @@ function runContainerMigrations(database) {
         database.exec('CREATE INDEX IF NOT EXISTS idx_container_metrics_container_id ON container_metrics(container_id)');
         database.exec('CREATE INDEX IF NOT EXISTS idx_container_metrics_recorded_at ON container_metrics(recorded_at)');
     }
+
+    // 创建容器状态表（用于状态机持久化）
+    const containerStatesTable = database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='container_states'").get();
+    if (!containerStatesTable) {
+        console.log('运行迁移: 创建 container_states 表');
+        database.exec(`
+            CREATE TABLE IF NOT EXISTS container_states (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              user_id INTEGER NOT NULL UNIQUE,
+              state_data TEXT NOT NULL,
+              updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `);
+        database.exec('CREATE INDEX IF NOT EXISTS idx_container_states_user_id ON container_states(user_id)');
+        database.exec('CREATE INDEX IF NOT EXISTS idx_container_states_updated_at ON container_states(updated_at)');
+    }
 }
 
 /**

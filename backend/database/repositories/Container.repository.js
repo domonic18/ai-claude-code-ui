@@ -84,3 +84,71 @@ export const Container = {
         return rows;
     }
 };
+
+/**
+ * 容器状态仓库
+ * 用于状态机持久化
+ */
+export const ContainerState = {
+    /**
+     * 保存或更新状态机数据
+     * @param {number} userId - 用户 ID
+     * @param {string} stateData - 序列化的状态机数据
+     */
+    upsert(userId, stateData) {
+        const stmt = db().prepare(`
+            INSERT INTO container_states (user_id, state_data, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id) DO UPDATE SET
+                state_data = excluded.state_data,
+                updated_at = CURRENT_TIMESTAMP
+        `);
+        stmt.run(userId, stateData);
+    },
+
+    /**
+     * 根据用户 ID 获取状态数据
+     * @param {number} userId - 用户 ID
+     * @returns {Object|undefined}
+     */
+    getByUserId(userId) {
+        const row = db().prepare('SELECT * FROM container_states WHERE user_id = ?').get(userId);
+        return row;
+    },
+
+    /**
+     * 根据用户 ID 删除状态数据
+     * @param {number} userId - 用户 ID
+     */
+    deleteByUserId(userId) {
+        const stmt = db().prepare('DELETE FROM container_states WHERE user_id = ?');
+        stmt.run(userId);
+    },
+
+    /**
+     * 获取处于指定状态的所有用户
+     * @param {string} state - 状态名称
+     * @returns {Array} 用户 ID 数组
+     */
+    getUsersByState(state) {
+        const rows = db().prepare(`
+            SELECT user_id FROM container_states
+            WHERE json_extract(state_data, '$.currentState') = ?
+        `).all(state);
+        return rows.map(row => row.user_id);
+    },
+
+    /**
+     * 清理过期的状态记录
+     * @param {number} days - 天数
+     * @returns {number} 删除的记录数
+     */
+    cleanExpired(days = 7) {
+        const stmt = db().prepare(`
+            DELETE FROM container_states
+            WHERE updated_at < datetime('now', '-' || ? || ' days')
+        `);
+        const result = stmt.run(days);
+        return result.changes;
+    }
+};

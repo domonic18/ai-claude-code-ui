@@ -14,7 +14,7 @@ import { c } from './utils/logger.js';
 import { User } from './repositories/User.repository.js';
 import { ApiKey } from './repositories/ApiKey.repository.js';
 import { GitHubToken } from './repositories/GitHubToken.repository.js';
-import { Container } from './repositories/Container.repository.js';
+import { Container, ContainerState } from './repositories/Container.repository.js';
 import { Credential } from './repositories/Credential.repository.js';
 
 /**
@@ -47,6 +47,7 @@ export const repositories = {
     ApiKey,
     GitHubToken,
     Container,
+    ContainerState,
     Credential
 };
 
