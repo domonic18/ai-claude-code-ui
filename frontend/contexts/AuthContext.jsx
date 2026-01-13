@@ -43,6 +43,15 @@ export const AuthProvider = ({ children }) => {
   const checkOnboardingStatus = async () => {
     try {
       const response = await api.user.onboardingStatus();
+
+      // 检查 content-type，确保是 JSON 响应
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.warn('[AuthContext] onboarding-status returned non-JSON response');
+        setHasCompletedOnboarding(true);
+        return;
+      }
+
       if (response.ok) {
         const data = await response.json();
         setHasCompletedOnboarding(data.hasCompletedOnboarding);
