@@ -65,6 +65,7 @@ const LoginForm = () => {
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Enter your username"
+                autoComplete="username"
                 required
                 disabled={isLoading}
               />
@@ -81,6 +82,7 @@ const LoginForm = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Enter your password"
+                autoComplete="current-password"
                 required
                 disabled={isLoading}
               />

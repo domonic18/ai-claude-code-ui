@@ -428,6 +428,7 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {
                                 onChange={(e) => setNewGithubToken(e.target.value)}
                                 placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                                 className="w-full"
+                                autoComplete="off"
                               />
                               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                 This token will be used only for this operation
@@ -453,6 +454,7 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {
                               onChange={(e) => setNewGithubToken(e.target.value)}
                               placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (leave empty for public repos)"
                               className="w-full"
+                              autoComplete="off"
                             />
                             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                               No stored tokens available. You can add tokens in Settings → API Keys for easier reuse.
