@@ -94,7 +94,10 @@ export class AuthController extends BaseController {
         });
 
         this._success(res, {
-          user: { id: user.id, username: user.username }
+          id: user.id,
+          username: user.username,
+          createdAt: user.createdAt,
+          lastLoginAt: user.lastLoginAt
         }, 'Registration successful', 201);
       } catch (error) {
         db().prepare('ROLLBACK').run();
@@ -156,7 +159,10 @@ export class AuthController extends BaseController {
       });
 
       this._success(res, {
-        user: { id: user.id, username: user.username }
+        id: user.id,
+        username: user.username,
+        createdAt: user.createdAt,
+        lastLoginAt: user.lastLoginAt
       }, 'Login successful');
     } catch (error) {
       this._handleError(error, req, res, next);
