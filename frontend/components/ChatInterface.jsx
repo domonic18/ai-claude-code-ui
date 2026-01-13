@@ -2148,7 +2148,10 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
       if (!response.ok) {
         throw new Error('Failed to load session messages');
       }
-      const data = await response.json();
+      const responseData = await response.json();
+
+      // 后端返回 {success: true, data: {messages, hasMore, total}}
+      const data = responseData.data;
 
       // Extract token usage if present (Codex includes it in messages response)
       if (isInitialLoad && data.tokenUsage) {
@@ -3873,14 +3876,23 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
       try {
         const url = `/api/projects/${selectedProject.name}/sessions/${selectedSession.id}/token-usage`;
         const response = await authenticatedFetch(url);
+
         if (response.ok) {
-          const data = await response.json();
-          setTokenBudget(data);
+          // 检查响应是否是 JSON 格式
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            setTokenBudget(data);
+          } else {
+            // 后端不支持此 API，静默失败
+            setTokenBudget(null);
+          }
         } else {
           setTokenBudget(null);
         }
       } catch (error) {
-        console.error('Failed to fetch initial token usage:', error);
+        // token usage 是可选功能，静默失败
+        setTokenBudget(null);
       }
     };
 
