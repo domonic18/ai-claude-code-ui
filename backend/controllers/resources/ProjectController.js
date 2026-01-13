@@ -179,11 +179,30 @@ export class ProjectController extends BaseController {
       const userId = this._getUserId(req);
       const { projectId } = req.params;
 
-      // 使用项目管理服务删除
-      const { deleteProject } = await import('../../services/project/project-management/index.js');
-      await deleteProject(projectId);
+      // 容器模式：在容器中删除项目
+      if (CONTAINER.enabled) {
+        // 检查项目是否为空
+        const isEmpty = await this.claudeDiscovery.isProjectEmpty(projectId, { userId });
 
-      this._success(res, null, 'Project deleted successfully');
+        if (!isEmpty) {
+          throw new Error('Cannot delete project with existing sessions');
+        }
+
+        // 删除容器中的项目目录
+        const projectPath = `${CONTAINER.paths.workspace}/${projectId}`;
+        await containerManager.execInContainer(userId, `rm -rf "${projectPath}"`);
+
+        // 删除项目配置中的记录（如果需要）
+        // 容器模式下，项目列表是动态从 /workspace 读取的，所以不需要额外清理配置
+
+        this._success(res, null, 'Project deleted successfully');
+      } else {
+        // 非容器模式：使用原来的逻辑
+        const { deleteProject } = await import('../../services/project/project-management/index.js');
+        await deleteProject(projectId);
+
+        this._success(res, null, 'Project deleted successfully');
+      }
     } catch (error) {
       this._handleError(error, req, res, next);
     }
