@@ -4,6 +4,8 @@
  * 负责管理容器的完整生命周期，包括创建、启动、停止、
  * 销毁、容器获取和执行等操作。
  *
+ * 使用状态机模式管理容器状态，解决并发创建和竞态条件问题
+ *
  * @module container/core/ContainerLifecycle
  */
 
@@ -13,6 +15,8 @@ import { repositories } from '../../../database/db.js';
 import { getWorkspaceDir, CONTAINER } from '../../../config/config.js';
 import { ContainerConfigBuilder } from './ContainerConfig.js';
 import { ContainerHealthMonitor } from './ContainerHealth.js';
+import { ContainerStateMachine, ContainerState } from './ContainerStateMachine.js';
+import containerStateStore from './ContainerStateStore.js';
 
 const { Container } = repositories;
 
@@ -39,9 +43,8 @@ export class ContainerLifecycleManager {
     // 容器池缓存：userId -> containerInfo
     this.containers = new Map();
 
-    // 正在创建的容器：userId -> Promise<ContainerInfo>
-    // 用于避免并发创建请求导致的冲突
-    this.creating = new Map();
+    // 状态机缓存：userId -> stateMachine
+    this.stateMachines = new Map();
 
     // 子模块
     this.configBuilder = new ContainerConfigBuilder();
@@ -49,8 +52,71 @@ export class ContainerLifecycleManager {
   }
 
   /**
+   * 获取用户的状态机
+   * @private
+   * @param {number} userId - 用户 ID
+   * @returns {Promise<ContainerStateMachine>}
+   */
+  async _getStateMachine(userId) {
+    // 先检查缓存
+    if (this.stateMachines.has(userId)) {
+      return this.stateMachines.get(userId);
+    }
+
+    // 从存储获取或创建
+    const containerName = `claude-user-${userId}`;
+    const stateMachine = await containerStateStore.getOrCreate(userId, containerName);
+
+    // 缓存状态机
+    this.stateMachines.set(userId, stateMachine);
+
+    // 监听状态变化，自动保存
+    stateMachine.on('stateChanged', async (event) => {
+      console.log(`[Lifecycle] State changed for user ${userId}: ${event.from} -> ${event.to}`);
+      await containerStateStore.save(stateMachine);
+    });
+
+    return stateMachine;
+  }
+
+  /**
+   * 等待容器到达就绪状态
+   * @private
+   * @param {number} userId - 用户 ID
+   * @param {number} timeout - 超时时间（毫秒）
+   * @returns {Promise<ContainerStateMachine>}
+   */
+  async _waitForReady(userId, timeout = 120000) {
+    const stateMachine = await this._getStateMachine(userId);
+
+    // 如果已经就绪，直接返回
+    if (stateMachine.is(ContainerState.READY)) {
+      return stateMachine;
+    }
+
+    // 如果处于失败状态，抛出错误
+    if (stateMachine.is(ContainerState.FAILED)) {
+      throw new Error(`Container is in failed state: ${stateMachine.getError()?.message || 'Unknown error'}`);
+    }
+
+    // 等待到达稳定状态
+    await stateMachine.waitForStable({ timeout });
+
+    // 检查最终状态
+    if (stateMachine.is(ContainerState.READY)) {
+      return stateMachine;
+    }
+
+    if (stateMachine.is(ContainerState.FAILED)) {
+      throw new Error(`Container creation failed: ${stateMachine.getError()?.message || 'Unknown error'}`);
+    }
+
+    throw new Error(`Container not ready, current state: ${stateMachine.getState()}`);
+  }
+
+  /**
    * 获取或创建用户容器
-   * 使用数据库作为容器所有权的单一事实来源
+   * 使用状态机管理容器生命周期，确保线程安全和幂等性
    * @param {number} userId - 用户 ID
    * @param {object} userConfig - 用户配置
    * @returns {Promise<ContainerInfo>} 容器信息
@@ -58,98 +124,122 @@ export class ContainerLifecycleManager {
   async getOrCreateContainer(userId, userConfig = {}) {
     const containerName = `claude-user-${userId}`;
 
-    // 步骤 1：检查是否正在创建中（避免并发创建冲突）
-    if (this.creating.has(userId)) {
-      console.log(`[Lifecycle] Container creation in progress for user ${userId}, waiting...`);
-      return await this.creating.get(userId);
-    }
+    // 获取状态机
+    const stateMachine = await this._getStateMachine(userId);
 
-    // 步骤 2：检查内存缓存以快速访问
-    if (this.containers.has(userId)) {
-      const container = this.containers.get(userId);
-      const status = await this.healthMonitor.getContainerStatus(container.id);
-
-      if (status === 'running') {
-        // 更新最后活动时间
-        container.lastActive = new Date();
+    // 情况 1: 容器已就绪，返回容器信息
+    if (stateMachine.is(ContainerState.READY)) {
+      const containerInfo = this.containers.get(userId);
+      if (containerInfo) {
+        // 验证容器是否仍在运行
         try {
-          Container.updateLastActive(container.id);
+          const status = await this.healthMonitor.getContainerStatus(containerInfo.id);
+          if (status === 'running') {
+            // 更新最后活动时间
+            containerInfo.lastActive = new Date();
+            try {
+              Container.updateLastActive(containerInfo.id);
+            } catch (err) {
+              console.warn(`[Lifecycle] Failed to update last_active: ${err.message}`);
+            }
+            return containerInfo;
+          }
         } catch (err) {
-          console.warn(`[Lifecycle] Failed to update last_active: ${err.message}`);
+          // 容器可能已被删除，继续创建流程
+          console.warn(`[Lifecycle] Container check failed: ${err.message}`);
         }
-        return container;
-      }
-
-      // 容器未运行，从缓存中移除
-      this.containers.delete(userId);
-    }
-
-    // 步骤 3：检查数据库中是否有现有容器记录
-    const dbRecord = Container.getByUserId(userId);
-
-    // 步骤 4：从数据库记录验证容器状态
-    if (dbRecord) {
-      const existingContainer = this.docker.getContainer(dbRecord.container_id);
-      const containerInfo = await existingContainer.inspect();
-
-      if (containerInfo.State.Running) {
-        // 容器正在运行，缓存并返回它
-        console.log(`[Lifecycle] Found running container from database for user ${userId}: ${dbRecord.container_name}`);
-        const info = {
-          id: containerInfo.Id,
-          name: dbRecord.container_name,
-          userId,
-          status: 'running',
-          createdAt: new Date(containerInfo.Created),
-          lastActive: new Date(dbRecord.last_active)
-        };
-        this.containers.set(userId, info);
-
-        // 更新数据库中的 last_active
-        try {
-          Container.updateLastActive(containerInfo.Id);
-        } catch (err) {
-          console.warn(`[Lifecycle] Failed to update last_active: ${err.message}`);
-        }
-
-        return info;
-      } else {
-        // 容器存在但未运行，从 Docker 和数据库中删除它
-        console.log(`[Lifecycle] Removing stale container for user ${userId}: ${dbRecord.container_name}`);
-        await existingContainer.remove({ force: true }).catch(err => {
-          console.warn(`[Lifecycle] Failed to remove stale container: ${err.message}`);
-        });
-        Container.delete(dbRecord.container_id);
       }
     }
 
-    // 步骤 5：检查容器名称是否已被使用（数据不一致情况）
-    await this._removeOrphanedContainer(containerName);
+    // 情况 2: 容器正在创建/启动/健康检查中，等待完成
+    if ([ContainerState.CREATING, ContainerState.STARTING, ContainerState.HEALTH_CHECKING].includes(stateMachine.getState())) {
+      console.log(`[Lifecycle] Container ${stateMachine.getState()} in progress for user ${userId}, waiting...`);
 
-    // 步骤 6：创建新容器（使用 Promise 链跟踪创建状态）
-    const createPromise = this.createContainer(userId, userConfig);
-    this.creating.set(userId, createPromise);
+      try {
+        await this._waitForReady(userId);
+        return this.containers.get(userId);
+      } catch (error) {
+        // 等待失败，检查是否需要重试
+        if (stateMachine.is(ContainerState.FAILED)) {
+          // 清理失败状态并重试
+          console.log(`[Lifecycle] Previous creation failed for user ${userId}, resetting...`);
+          stateMachine.transitionTo(ContainerState.NON_EXISTENT);
+          await containerStateStore.save(stateMachine);
+          return this.getOrCreateContainer(userId, userConfig);
+        }
+        throw error;
+      }
+    }
+
+    // 情况 3: 容器处于失败状态，重置并重试
+    if (stateMachine.is(ContainerState.FAILED)) {
+      console.log(`[Lifecycle] Container in failed state for user ${userId}, resetting...`);
+      stateMachine.transitionTo(ContainerState.NON_EXISTENT);
+      await containerStateStore.save(stateMachine);
+    }
+
+    // 情况 4: 开始新的创建流程
+    return this._createContainerWithStateMachine(userId, userConfig, stateMachine);
+  }
+
+  /**
+   * 使用状态机创建容器
+   * @private
+   * @param {number} userId - 用户 ID
+   * @param {object} userConfig - 用户配置
+   * @param {ContainerStateMachine} stateMachine - 状态机实例
+   * @returns {Promise<ContainerInfo>}
+   */
+  async _createContainerWithStateMachine(userId, userConfig, stateMachine) {
+    const containerName = `claude-user-${userId}`;
 
     try {
-      const result = await createPromise;
-      return result;
-    } finally {
-      // 创建完成后移除创建状态，允许将来重新创建
-      this.creating.delete(userId);
+      // 转换到 CREATING 状态
+      stateMachine.transitionTo(ContainerState.CREATING);
+      await containerStateStore.save(stateMachine);
+
+      // 执行实际的容器创建
+      const containerInfo = await this._doCreateContainer(userId, userConfig);
+
+      // 转换到 STARTING 状态
+      stateMachine.transitionTo(ContainerState.STARTING);
+      await containerStateStore.save(stateMachine);
+
+      // 缓存容器信息
+      this.containers.set(userId, containerInfo);
+
+      // 启动健康检查
+      stateMachine.transitionTo(ContainerState.HEALTH_CHECKING);
+      await containerStateStore.save(stateMachine);
+
+      // 等待健康检查完成
+      await this.healthMonitor.waitForContainerReady(containerInfo.id);
+
+      // 转换到 READY 状态
+      stateMachine.transitionTo(ContainerState.READY);
+      await containerStateStore.save(stateMachine);
+
+      console.log(`[Lifecycle] Container ${containerName} is ready for user ${userId}`);
+      return containerInfo;
+
+    } catch (error) {
+      // 设置失败状态
+      stateMachine.setFailed(error);
+      await containerStateStore.save(stateMachine);
+
+      throw new Error(`Failed to create container for user ${userId}: ${error.message}`);
     }
   }
 
   /**
-   * 为用户创建新容器
+   * 执行实际的容器创建操作
+   * @private
    * @param {number} userId - 用户 ID
    * @param {object} userConfig - 用户配置
-   * @returns {Promise<ContainerInfo>} 容器信息
+   * @returns {Promise<ContainerInfo>}
    */
-  async createContainer(userId, userConfig = {}) {
+  async _doCreateContainer(userId, userConfig) {
     const containerName = `claude-user-${userId}`;
-
-    // 统一数据目录：所有用户数据都在 workspace/users/user_{id}/data 下
-    // 容器内统一挂载到 /workspace
     const userDataDir = path.join(this.config.dataDir, 'users', `user_${userId}`, 'data');
 
     try {
@@ -167,7 +257,10 @@ export class ContainerLifecycleManager {
         network: this.config.network
       });
 
-      // 3. 创建容器
+      // 3. 清理可能存在的孤立容器
+      await this._removeOrphanedContainerSync(containerName);
+
+      // 4. 创建容器
       const container = await new Promise((resolve, reject) => {
         this.docker.createContainer(containerConfig, (err, container) => {
           if (err) reject(err);
@@ -175,13 +268,10 @@ export class ContainerLifecycleManager {
         });
       });
 
-      // 4. 启动容器
+      // 5. 启动容器
       await container.start();
 
-      // 5. 等待容器准备就绪
-      await this.healthMonitor.waitForContainerReady(container.id);
-
-      // 6. 缓存容器信息
+      // 6. 构建容器信息
       const containerInfo = {
         id: container.id,
         name: containerName,
@@ -190,8 +280,6 @@ export class ContainerLifecycleManager {
         createdAt: new Date(),
         lastActive: new Date()
       };
-
-      this.containers.set(userId, containerInfo);
 
       // 7. 写入数据库
       try {
@@ -202,9 +290,71 @@ export class ContainerLifecycleManager {
       }
 
       return containerInfo;
+
     } catch (error) {
-      throw new Error(`Failed to create container for user ${userId}: ${error.message}${error.reason ? ' (' + error.reason + ')' : ''}`);
+      throw new Error(`Container creation failed: ${error.message}`);
     }
+  }
+
+  /**
+   * 同步删除孤立容器
+   * @private
+   * @param {string} containerName - 容器名称
+   * @returns {Promise<void>}
+   */
+  async _removeOrphanedContainerSync(containerName) {
+    try {
+      const existingContainer = this.docker.getContainer(containerName);
+      const info = await existingContainer.inspect();
+
+      // 如果容器正在运行，先停止
+      if (info.State.Running || info.State.Paused) {
+        await existingContainer.stop({ t: 5 }).catch(err => {
+          console.warn(`[Lifecycle] Failed to stop orphaned container: ${err.message}`);
+        });
+      }
+
+      // 删除容器
+      await existingContainer.remove({ force: true });
+
+      // 等待容器确实被删除
+      await this._waitForContainerRemoved(containerName, 10000);
+
+      console.log(`[Lifecycle] Removed orphaned container: ${containerName}`);
+
+    } catch (err) {
+      // 容器不存在或已删除，这是正常的
+      if (err.statusCode === 404) {
+        return;
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * 等待容器被删除
+   * @private
+   * @param {string} containerName - 容器名称
+   * @param {number} timeout - 超时时间（毫秒）
+   * @returns {Promise<void>}
+   */
+  async _waitForContainerRemoved(containerName, timeout = 10000) {
+    const start = Date.now();
+
+    while (Date.now() - start < timeout) {
+      try {
+        await this.docker.getContainer(containerName).inspect();
+        // 容器还在，继续等待
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (err) {
+        if (err.statusCode === 404) {
+          return; // 容器已删除
+        }
+        throw err;
+      }
+    }
+
+    throw new Error(`Timeout waiting for container ${containerName} to be removed`);
   }
 
   /**
@@ -387,27 +537,4 @@ export class ContainerLifecycleManager {
     return this.containers.get(userId);
   }
 
-  /**
-   * 移除孤立容器（如果在 Docker 中存在但在数据库中不存在）
-   * @param {string} containerName - 容器名称
-   * @returns {Promise<void>}
-   * @private
-   */
-  async _removeOrphanedContainer(containerName) {
-    try {
-      const existingContainer = this.docker.getContainer(containerName);
-      const containerInfo = await existingContainer.inspect();
-
-      // 容器在 Docker 中存在但在数据库中不存在 - 数据不一致
-      console.warn(`[Lifecycle] Found orphaned container ${containerName} in Docker, cleaning up`);
-      await existingContainer.remove({ force: true }).catch(err => {
-        console.warn(`[Lifecycle] Failed to remove orphaned container: ${err.message}`);
-      });
-    } catch (err) {
-      // 容器不存在，这是预期的
-      if (err.statusCode !== 404) {
-        console.warn(`[Lifecycle] Error checking for orphaned container: ${err.message}`);
-      }
-    }
-  }
 }
