@@ -94,14 +94,8 @@ export * from './projects/index.js';
 // 容器服务
 export * from './container/index.js';
 
-// Claude 服务
-export * from './claude/index.js';
-
-// Cursor 服务
-export * from './cursor/index.js';
-
-// OpenAI 服务
-export * from './openai/index.js';
-
 // 项目服务
 export * from './project/index.js';
+
+// 工作区服务
+export * from './workspace/index.js';

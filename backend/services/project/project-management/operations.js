@@ -13,7 +13,15 @@ import path from 'path';
 import os from 'os';
 import { loadProjectConfig, saveProjectConfig } from '../config/index.js';
 import { generateDisplayName } from '../utils/index.js';
-import { getSessions } from '../claude/index.js';
+import { NativeSessionManager } from '../../sessions/managers/NativeSessionManager.js';
+
+// 创建会话管理器实例
+const sessionManager = new NativeSessionManager();
+
+// Helper function to get sessions using new session manager
+async function getSessions(projectName, limit, offset) {
+  return await sessionManager.getSessions(projectName, limit, offset);
+}
 
 /**
  * 重命名项目的显示名称

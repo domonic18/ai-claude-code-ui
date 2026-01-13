@@ -7,3 +7,4 @@
 export { default as projects } from './projects.js';
 export { default as sessions } from './sessions.js';
 export { default as files } from './files.js';
+export { default as git } from './git.js';

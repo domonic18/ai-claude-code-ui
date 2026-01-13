@@ -5,3 +5,5 @@
  */
 
 export { default as commands } from './commands.js';
+export { default as system } from './system.js';
+export { default as uploads } from './uploads.js';
