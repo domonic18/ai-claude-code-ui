@@ -35,11 +35,8 @@ export class ProjectController extends BaseController {
       const userId = this._getUserId(req);
       const { sort = 'lastActivity', order = 'desc', limit = 50 } = req.query;
 
-      console.log('[ProjectController] getProjects - userId:', userId, 'containerMode:', req.containerMode);
-
       const projects = await this.claudeDiscovery.getProjects({
-        userId,
-        containerMode: req.containerMode
+        userId
       });
 
       // 应用分页和排序
@@ -63,8 +60,7 @@ export class ProjectController extends BaseController {
       const { projectId } = req.params;
 
       const projects = await this.claudeDiscovery.getProjects({
-        userId,
-        containerMode: req.containerMode
+        userId
       });
 
       const project = projects.find(p => p.name === projectId || p.id === projectId);
@@ -93,7 +89,6 @@ export class ProjectController extends BaseController {
 
       const result = await this.claudeDiscovery.getProjectSessions(projectId, {
         userId,
-        containerMode: req.containerMode,
         limit,
         offset
       });
@@ -168,8 +163,7 @@ export class ProjectController extends BaseController {
       const { projectId } = req.params;
 
       const isEmpty = await this.claudeDiscovery.isProjectEmpty(projectId, {
-        userId,
-        containerMode: req.containerMode
+        userId
       });
 
       this._success(res, { isEmpty });

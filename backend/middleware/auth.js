@@ -39,9 +39,15 @@ const authenticateToken = async (req, res, next) => {
     }
   }
 
-  // 正常的 OSS JWT 验证
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  // JWT 验证：优先从 cookie 读取（行业最佳实践：httpOnly cookie）
+  // 如果 cookie 中没有，再尝试从 Authorization header 读取（兼容性）
+  let token = req.cookies?.auth_token;
+
+  // 兼容旧的 Authorization header 方式（用于 WebSocket 等）
+  if (!token) {
+    const authHeader = req.headers['authorization'];
+    token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  }
 
   if (!token) {
     return res.status(401).json({ error: 'Access denied. No token provided.' });
