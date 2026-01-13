@@ -60,80 +60,72 @@ async function runImportTests() {
   );
   console.log();
 
-  // Test 2: Claude Services
-  console.log('Test Group 2: Claude Services');
+  // Test 2: Execution Services (New Architecture)
+  console.log('Test Group 2: Execution Services');
   await testImport(
-    'ClaudeSDK module',
-    () => import('../../services/claude/ClaudeSDK.js')
+    'ClaudeExecutor module',
+    () => import('../../services/execution/claude/ClaudeExecutor.js')
   );
   await testImport(
-    'Claude index (all exports)',
-    () => import('../../services/claude/index.js')
-  );
-  console.log();
-
-  // Test 3: Cursor Services
-  console.log('Test Group 3: Cursor Services');
-  await testImport(
-    'CursorService module',
-    () => import('../../services/cursor/CursorService.js')
+    'Claude execution index (all exports)',
+    () => import('../../services/execution/claude/index.js')
   );
   await testImport(
-    'Cursor index (all exports)',
-    () => import('../../services/cursor/index.js')
-  );
-  console.log();
-
-  // Test 4: OpenAI Services
-  console.log('Test Group 4: OpenAI Services');
-  await testImport(
-    'OpenAICodex module',
-    () => import('../../services/openai/OpenAICodex.js')
+    'CursorExecutor module',
+    () => import('../../services/execution/cursor/CursorExecutor.js')
   );
   await testImport(
-    'OpenAI index (all exports)',
-    () => import('../../services/openai/index.js')
+    'Cursor execution index (all exports)',
+    () => import('../../services/execution/cursor/index.js')
+  );
+  await testImport(
+    'CodexExecutor module',
+    () => import('../../services/execution/codex/CodexExecutor.js')
+  );
+  await testImport(
+    'Codex execution index (all exports)',
+    () => import('../../services/execution/codex/index.js')
+  );
+  await testImport(
+    'Execution engines',
+    () => import('../../services/execution/engines/index.js')
   );
   console.log();
 
-  // Test 5: Project Services
-  console.log('Test Group 5: Project Services');
-  await testImport(
-    'ProjectService module',
-    () => import('../../services/project/ProjectService.js')
-  );
+  // Test 3: Project Services
+  console.log('Test Group 3: Project Services');
   await testImport(
     'Project index (all exports)',
     () => import('../../services/project/index.js')
   );
   console.log();
 
-  // Test 6: Services Master Index
-  console.log('Test Group 6: Services Master Index');
+  // Test 4: Services Master Index
+  console.log('Test Group 4: Services Master Index');
   await testImport(
     'Services index (all services)',
     () => import('../../services/index.js')
   );
   console.log();
 
-  // Test 7: Database
-  console.log('Test Group 7: Database');
+  // Test 5: Database
+  console.log('Test Group 5: Database');
   await testImport(
     'Database module',
     () => import('../../database/db.js')
   );
   console.log();
 
-  // Test 8: Shared Constants
-  console.log('Test Group 8: Shared Constants');
+  // Test 6: Shared Constants
+  console.log('Test Group 6: Shared Constants');
   await testImport(
     'Model constants',
     () => import('../../../shared/modelConstants.js')
   );
   console.log();
 
-  // Test 9: Main Server Entry
-  console.log('Test Group 9: Main Server Entry');
+  // Test 7: Main Server Entry
+  console.log('Test Group 7: Main Server Entry');
   await testImport(
     'Server index (main entry)',
     () => import('../../index.js')
