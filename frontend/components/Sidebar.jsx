@@ -373,18 +373,34 @@ function Sidebar({
       return;
     }
 
+    console.log('[Sidebar] Deleting project:', projectName);
+
     try {
       const response = await api.deleteProject(projectName);
 
+      console.log('[Sidebar] Delete response:', { ok: response.ok, status: response.status });
+
       if (response.ok) {
+        console.log('[Sidebar] Project deleted successfully, calling onProjectDelete callback');
         // Call parent callback if provided
         if (onProjectDelete) {
+          console.log('[Sidebar] Calling onProjectDelete with:', projectName);
           onProjectDelete(projectName);
+        } else {
+          console.warn('[Sidebar] No onProjectDelete callback provided');
         }
       } else {
-        const error = await response.json();
-        console.error('Failed to delete project');
-        alert(error.error || 'Failed to delete project. Please try again.');
+        // Check content-type before parsing JSON
+        const contentType = response.headers.get('content-type');
+        console.log('[Sidebar] Delete failed, content-type:', contentType);
+        if (contentType && contentType.includes('application/json')) {
+          const error = await response.json();
+          console.error('Failed to delete project');
+          alert(error.error || 'Failed to delete project. Please try again.');
+        } else {
+          console.error('Failed to delete project - non-JSON response');
+          alert('Failed to delete project. Please try again.');
+        }
       }
     } catch (error) {
       console.error('Error deleting project:', error);
