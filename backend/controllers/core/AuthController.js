@@ -84,10 +84,11 @@ export class AuthController extends BaseController {
         });
 
         // 设置 httpOnly cookie（行业最佳实践）
+        // sameSite: 'lax' 允许跨端口 cookie（开发环境需要）
         res.cookie('auth_token', token, {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
+          sameSite: 'lax', // 使用 lax 以支持开发环境的跨端口请求
           maxAge: 365 * 24 * 60 * 60 * 1000, // 1年
           path: '/'
         });
@@ -145,10 +146,11 @@ export class AuthController extends BaseController {
       });
 
       // 设置 httpOnly cookie（行业最佳实践）
+      // sameSite: 'lax' 允许跨端口 cookie（开发环境需要）
       res.cookie('auth_token', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax', // 使用 lax 以支持开发环境的跨端口请求
         maxAge: 365 * 24 * 60 * 60 * 1000, // 1年
         path: '/'
       });

@@ -37,8 +37,13 @@ export function configureExpress(app, wss) {
     // 使 WebSocket 服务器对路由可用
     app.locals.wss = wss;
 
-    // CORS 中间件
-    app.use(cors());
+    // CORS 中间件 - 必须支持 credentials 以允许 cookie 认证
+    app.use(cors({
+        origin: ['http://localhost:5173', 'http://localhost:3001', 'http://192.168.8.106:5173'],
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization']
+    }));
 
     // Cookie 解析中间件（用于 httpOnly 认证）
     app.use(cookieParser());

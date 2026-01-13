@@ -35,6 +35,8 @@ export class ProjectController extends BaseController {
       const userId = this._getUserId(req);
       const { sort = 'lastActivity', order = 'desc', limit = 50 } = req.query;
 
+      console.log('[ProjectController] getProjects - userId:', userId, 'containerMode:', req.containerMode);
+
       const projects = await this.claudeDiscovery.getProjects({
         userId,
         containerMode: req.containerMode

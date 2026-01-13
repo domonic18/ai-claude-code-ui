@@ -51,6 +51,8 @@ export class ClaudeDiscovery extends BaseDiscovery {
   async getProjects(options = {}) {
     const { userId, containerMode = CONTAINER.enabled } = options;
 
+    console.log(`[ClaudeDiscovery] getProjects - userId: ${userId}, containerMode: ${containerMode}, CONTAINER.enabled: ${CONTAINER.enabled}`);
+
     try {
       // 容器模式：使用容器的项目发现服务
       if (containerMode) {
