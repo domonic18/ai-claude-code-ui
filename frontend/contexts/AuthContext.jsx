@@ -128,7 +128,8 @@ export const AuthProvider = ({ children }) => {
 
       if (response.ok) {
         // 使用 cookie 认证，token 已由后端设置到 cookie
-        setUser(data.data?.user ?? data.user);
+        // 后端返回 {success: true, data: {id, username, ...}}
+        setUser(data.data);
         return { success: true };
       } else {
         setError(data.error || 'Login failed');
@@ -151,7 +152,8 @@ export const AuthProvider = ({ children }) => {
 
       if (response.ok) {
         // 使用 cookie 认证，token 已由后端设置到 cookie
-        setUser(data.data?.user ?? data.user);
+        // 后端返回 {success: true, data: {id, username, ...}}
+        setUser(data.data);
         setNeedsSetup(false);
         return { success: true };
       } else {
