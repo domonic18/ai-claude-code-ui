@@ -50,14 +50,36 @@ export class ContainerHealthMonitor {
         if (info.State.Status === 'running') {
           // 检查健康端点（如果可用）
           if (info.Config.Healthcheck) {
-            if (info.State.Health && info.State.Health.Status === 'healthy') {
+            // 有健康检查配置
+            const health = info.State.Health;
+            // 如果健康状态为 null（StartPeriod 期间）或 starting，继续等待
+            // 如果状态为 healthy，准备就绪
+            // 如果状态为 unhealthy，抛出错误
+            if (!health) {
+              // StartPeriod 期间，健康状态尚未初始化，继续等待
+              console.log(`[HealthCheck] Container ${containerId.substring(0, 12)} is running, waiting for health check...`);
+            } else if (health.Status === 'healthy') {
+              console.log(`[HealthCheck] Container ${containerId.substring(0, 12)} is healthy`);
               return true;
+            } else if (health.Status === 'unhealthy') {
+              throw new Error(`Container ${containerId} is unhealthy`);
+            } else if (health.Status === 'starting') {
+              // 健康检查正在进行中，继续等待
+              console.log(`[HealthCheck] Container ${containerId.substring(0, 12)} health check starting...`);
             }
           } else {
+            // 没有健康检查，容器运行即视为准备就绪
             return true;
           }
+        } else if (info.State.Status === 'exited') {
+          // 容器已退出，抛出错误
+          throw new Error(`Container ${containerId} exited with code ${info.State.ExitCode}`);
         }
       } catch (error) {
+        // 如果是我们抛出的错误，直接抛出
+        if (error.message.includes('exited') || error.message.includes('unhealthy')) {
+          throw error;
+        }
         // 容器尚未准备就绪，继续等待
       }
 
