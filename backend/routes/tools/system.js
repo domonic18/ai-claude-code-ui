@@ -14,6 +14,7 @@ import express from 'express';
 import path from 'path';
 import { spawn } from 'child_process';
 import { authenticateToken } from '../../middleware/auth.js';
+import containerManager from '../../services/container/core/index.js';
 
 const router = express.Router();
 
