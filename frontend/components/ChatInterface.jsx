@@ -3691,7 +3691,9 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
     try {
       const response = await api.getFiles(selectedProject.name);
       if (response.ok) {
-        const files = await response.json();
+        const responseData = await response.json();
+        // 处理 responseFormatter 包装格式: {success: true, data: [...]}
+        const files = responseData.data ?? responseData;
         // Flatten the file tree to get all file paths
         const flatFiles = flattenFileTree(files);
         setFileList(flatFiles);
@@ -3703,6 +3705,13 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
 
   const flattenFileTree = (files, basePath = '') => {
     let result = [];
+
+    // 确保 files 是数组
+    if (!Array.isArray(files)) {
+      console.warn('[ChatInterface] flattenFileTree: files is not an array', files);
+      return result;
+    }
+
     for (const file of files) {
       const fullPath = basePath ? `${basePath}/${file.name}` : file.name;
       if (file.type === 'directory' && file.children) {

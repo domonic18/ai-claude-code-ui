@@ -81,16 +81,18 @@ function FileTree({ selectedProject }) {
     setLoading(true);
     try {
       const response = await api.getFiles(selectedProject.name);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ File fetch failed:', response.status, errorText);
         setFiles([]);
         return;
       }
-      
-      const data = await response.json();
-      setFiles(data);
+
+      const responseData = await response.json();
+      // 处理 responseFormatter 包装格式: {success: true, data: [...]}
+      const data = responseData.data ?? responseData;
+      setFiles(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('❌ Error fetching files:', error);
       setFiles([]);
