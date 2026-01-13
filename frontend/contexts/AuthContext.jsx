@@ -29,7 +29,6 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    console.log('[AuthContext] useEffect triggered, VITE_IS_PLATFORM:', import.meta.env.VITE_IS_PLATFORM);
     if (import.meta.env.VITE_IS_PLATFORM === 'true') {
       setUser({ username: 'platform-user' });
       setNeedsSetup(false);
@@ -38,7 +37,6 @@ export const AuthProvider = ({ children }) => {
       return;
     }
 
-    console.log('[AuthContext] Calling checkAuthStatus...');
     checkAuthStatus();
   }, []);
 
@@ -69,7 +67,6 @@ export const AuthProvider = ({ children }) => {
   };
 
   const checkAuthStatus = async () => {
-    console.log('[AuthContext] checkAuthStatus called, isLoading:', isLoading);
     try {
       setIsLoading(true);
       setError(null);
@@ -89,22 +86,17 @@ export const AuthProvider = ({ children }) => {
 
       // 使用 cookie 认证，直接尝试获取用户信息
       try {
-        console.log('[AuthContext] Fetching user from /api/auth/user...');
         const userResponse = await api.auth.user();
-        console.log('[AuthContext] User response status:', userResponse.status);
 
         if (userResponse.ok) {
           const userData = await userResponse.json();
-          console.log('[AuthContext] User data received:', userData);
-          const extractedUser = userData.data?.user ?? userData.user;
-          console.log('[AuthContext] Extracted user:', extractedUser);
-          setUser(extractedUser);
-          console.log('[AuthContext] setUser called');
+          // /api/auth/user 返回 {success: true, data: {id, username, ...}}
+          // 不像 login 返回 {success: true, data: {user: {...}}}
+          setUser(userData.data);
           setNeedsSetup(false);
           await checkOnboardingStatus();
         } else {
           // 未认证或 cookie 无效
-          console.warn('[AuthContext] User fetch failed:', userResponse.status);
           setUser(null);
         }
       } catch (error) {
