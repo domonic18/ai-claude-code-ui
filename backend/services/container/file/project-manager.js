@@ -61,7 +61,7 @@ export async function getProjectsInContainer(userId) {
         resolve([]);
       });
 
-      stream.on('end', () => {
+      stream.on('end', async () => {
         try {
           const projectList = [];
           const lines = output.trim().split('\n');
@@ -101,6 +101,35 @@ export async function getProjectsInContainer(userId) {
 
           console.log('[ProjectManager] Found projects in container:', projectList.length);
           console.log('[ProjectManager] Project data:', JSON.stringify(projectList, null, 2));
+
+          // 如果用户没有项目，创建默认工作区
+          if (projectList.length === 0) {
+            console.log('[ProjectManager] No projects found for user, creating default workspace');
+            const defaultProject = await createDefaultWorkspace(userId);
+            if (defaultProject) {
+              projectList.push(defaultProject);
+            }
+          }
+
+          // 加载每个项目的会话信息
+          for (const project of projectList) {
+            try {
+              console.log(`[ProjectManager] Loading sessions for project: ${project.name}`);
+              const sessionResult = await getSessionsInContainer(userId, project.name, 5, 0);
+              project.sessions = sessionResult.sessions || [];
+              project.sessionMeta = {
+                hasMore: sessionResult.hasMore,
+                total: sessionResult.total
+              };
+              console.log(`[ProjectManager] Loaded ${project.sessions.length} sessions for ${project.name} (total: ${sessionResult.total})`);
+            } catch (error) {
+              console.warn(`[ProjectManager] Could not load sessions for project ${project.name}:`, error.message);
+              // 保持空会话列表
+              project.sessions = [];
+              project.sessionMeta = { hasMore: false, total: 0 };
+            }
+          }
+
           resolve(projectList);
         } catch (parseError) {
           console.error('[ProjectManager] Error parsing projects:', parseError);
@@ -108,34 +137,6 @@ export async function getProjectsInContainer(userId) {
         }
       });
     });
-
-    // 如果用户没有项目，创建默认工作区
-    if (projects.length === 0) {
-      console.log('[ProjectManager] No projects found for user, creating default workspace');
-      const defaultProject = await createDefaultWorkspace(userId);
-      if (defaultProject) {
-        projects.push(defaultProject);
-      }
-    }
-
-    // 加载每个项目的会话信息
-    for (const project of projects) {
-      try {
-        console.log(`[ProjectManager] Loading sessions for project: ${project.name}`);
-        const sessionResult = await getSessionsInContainer(userId, project.name, 5, 0);
-        project.sessions = sessionResult.sessions || [];
-        project.sessionMeta = {
-          hasMore: sessionResult.hasMore,
-          total: sessionResult.total
-        };
-        console.log(`[ProjectManager] Loaded ${project.sessions.length} sessions for ${project.name} (total: ${sessionResult.total})`);
-      } catch (error) {
-        console.warn(`[ProjectManager] Could not load sessions for project ${project.name}:`, error.message);
-        // 保持空会话列表
-        project.sessions = [];
-        project.sessionMeta = { hasMore: false, total: 0 };
-      }
-    }
 
     return projects;
   } catch (error) {
