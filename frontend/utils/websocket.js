@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-export function useWebSocket() {
+export function useWebSocket(isEnabled = true) {
   const [ws, setWs] = useState(null);
   const [messages, setMessages] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -8,6 +8,11 @@ export function useWebSocket() {
   const wsRef = useRef(null);
 
   const connect = useCallback(async () => {
+    // 如果未启用，不连接
+    if (!isEnabled) {
+      return;
+    }
+
     // 清除之前的连接
     if (wsRef.current) {
       wsRef.current.close();
@@ -31,17 +36,20 @@ export function useWebSocket() {
         // 先尝试从服务器获取当前 token（用于 WebSocket 认证）
         let token;
         try {
-          const response = await fetch('/api/auth/ws-token');
+          const response = await fetch('/api/auth/ws-token', {
+            credentials: 'include' // 发送 cookie
+          });
           if (response.ok) {
             const data = await response.json();
             token = data.token;
           }
         } catch (error) {
-          console.warn('[WebSocket] Failed to get ws-token:', error);
+          // 静默跳过：用户未登录时不显示错误
+          return;
         }
 
         if (!token) {
-          console.warn('[WebSocket] No authentication token available, skipping connection');
+          // 静默跳过：用户未登录时不显示警告
           return;
         }
 
@@ -91,23 +99,14 @@ export function useWebSocket() {
     } catch (error) {
       console.error('[WebSocket] Error creating connection:', error);
     }
-  }, []);
+  }, [isEnabled]); // 依赖 isEnabled，当用户登录状态变化时重新连接
 
-  // 当 token 变化时重新连接
+  // 当 isEnabled 变化时重新连接
   useEffect(() => {
-    const handleTokenChange = () => {
-      console.log('[WebSocket] Token changed, reconnecting...');
-      connect();
-    };
-
-    // 监听 localStorage 的 token 变化
-    window.addEventListener('storage', handleTokenChange);
-
     // 初始连接
     connect();
 
     return () => {
-      window.removeEventListener('storage', handleTokenChange);
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }

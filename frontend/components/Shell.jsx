@@ -63,17 +63,20 @@ function Shell({ selectedProject, selectedSession, initialCommand, isPlainShell 
         // 获取 WebSocket token（从 cookie 复制）
         let token;
         try {
-          const response = await fetch('/api/auth/ws-token');
+          const response = await fetch('/api/auth/ws-token', {
+            credentials: 'include' // 发送 cookie
+          });
           if (response.ok) {
             const data = await response.json();
             token = data.token;
           }
         } catch (error) {
-          console.error('Failed to get ws-token for Shell:', error);
+          // 静默跳过：用户未登录时不显示错误
+          return;
         }
 
         if (!token) {
-          console.error('No authentication token available for Shell WebSocket connection');
+          // 静默跳过：用户未登录时不显示错误
           return;
         }
 

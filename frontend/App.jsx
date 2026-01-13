@@ -28,7 +28,7 @@ import Settings from './components/Settings';
 import QuickSettingsPanel from './components/QuickSettingsPanel';
 
 import { ThemeProvider } from './contexts/ThemeContext';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { TaskMasterProvider } from './contexts/TaskMasterContext';
 import { TasksSettingsProvider } from './contexts/TasksSettingsContext';
 import { WebSocketProvider, useWebSocketContext } from './contexts/WebSocketContext';
@@ -42,7 +42,8 @@ import { api, authenticatedFetch } from './utils/api';
 function AppContent() {
   const navigate = useNavigate();
   const { sessionId } = useParams();
-  
+  const { user } = useAuth(); // 获取用户信息
+
   const { updateAvailable, latestVersion, currentVersion, releaseInfo } = useVersionCheck('siteboon', 'claudecodeui');
   const [showVersionModal, setShowVersionModal] = useState(false);
   
@@ -117,17 +118,20 @@ function AppContent() {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    
+
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Fetch projects when user logs in
   useEffect(() => {
-    // Fetch projects on component mount
-    fetchProjects();
-  }, []);
+    if (user) {
+      console.log('[App] User logged in, fetching projects...');
+      fetchProjects();
+    }
+  }, [user]);
 
   // Auto-refresh projects periodically (useful for container mode where file watching is disabled)
   useEffect(() => {
@@ -280,8 +284,17 @@ function AppContent() {
     try {
       setIsLoadingProjects(true);
       const response = await api.projects();
-      const data = await response.json();
-      
+
+      if (!response.ok) {
+        console.error('Failed to fetch projects:', response.status, response.statusText);
+        setProjects([]);
+        return;
+      }
+
+      const responseData = await response.json();
+      // Handle responseFormatter wrapping: {success: true, data: [...]}
+      const data = responseData.data ?? responseData;
+
       // Always fetch Cursor sessions for each project so we can combine views
       for (let project of data) {
         try {
@@ -457,8 +470,16 @@ function AppContent() {
     // Refresh only the sessions for all projects, don't change selected state
     try {
       const response = await api.projects();
-      const freshProjects = await response.json();
-      
+
+      if (!response.ok) {
+        console.error('Failed to refresh projects:', response.status, response.statusText);
+        return;
+      }
+
+      const responseData = await response.json();
+      // Handle responseFormatter wrapping: {success: true, data: [...]}
+      const freshProjects = responseData.data ?? responseData;
+
       // Optimize to preserve object references and minimize re-renders
       setProjects(prevProjects => {
         // Check if projects data has actually changed

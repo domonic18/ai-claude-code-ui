@@ -45,7 +45,7 @@ export const TaskMasterProvider = ({ children }) => {
   const { messages } = useWebSocketContext();
   
   // Authentication context
-  const { user, token, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   
   // State
   const [projects, setProjects] = useState([]);
@@ -79,9 +79,9 @@ export const TaskMasterProvider = ({ children }) => {
   // Refresh projects with TaskMaster metadata
   const refreshProjects = useCallback(async () => {
     // Only make API calls if user is authenticated
-    if (!user || !token) {
+    if (!user) {
       setProjects([]);
-      setCurrentProjectState(null); // This might be the problem!
+      setCurrentProjectState(null);
       return;
     }
 
@@ -94,15 +94,17 @@ export const TaskMasterProvider = ({ children }) => {
         throw new Error(`Failed to fetch projects: ${response.status}`);
       }
       
-      const projectsData = await response.json();
-      
+      const responseData = await response.json();
+      // Handle responseFormatter wrapping: {success: true, data: [...]}
+      const projectsData = responseData.data ?? responseData;
+
       // Check if projectsData is an array
       if (!Array.isArray(projectsData)) {
         console.error('Projects API returned non-array data:', projectsData);
         setProjects([]);
         return;
       }
-      
+
       // Filter and enrich projects with TaskMaster data
       const enrichedProjects = projectsData.map(project => ({
         ...project,
@@ -127,7 +129,7 @@ export const TaskMasterProvider = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [user, token]); // Remove currentProject dependency to avoid infinite loops
+  }, [user]); // 只依赖 user
 
   // Set current project and load its TaskMaster details
   const setCurrentProject = useCallback(async (project) => {
@@ -148,7 +150,7 @@ export const TaskMasterProvider = ({ children }) => {
   // Refresh MCP server status
   const refreshMCPStatus = useCallback(async () => {
     // Only make API calls if user is authenticated
-    if (!user || !token) {
+    if (!user) {
       setMCPServerStatus(null);
       return;
     }
@@ -163,7 +165,7 @@ export const TaskMasterProvider = ({ children }) => {
     } finally {
       setIsLoadingMCP(false);
     }
-  }, [user, token]);
+  }, [user]); // 移除 token 依赖
 
   // Refresh tasks for current project - load real TaskMaster data
   const refreshTasks = useCallback(async () => {
@@ -174,7 +176,7 @@ export const TaskMasterProvider = ({ children }) => {
     }
 
     // Only make API calls if user is authenticated
-    if (!user || !token) {
+    if (!user) {
       setTasks([]);
       setNextTask(null);
       return;
@@ -212,31 +214,30 @@ export const TaskMasterProvider = ({ children }) => {
     } finally {
       setIsLoadingTasks(false);
     }
-  }, [currentProject, user, token]);
+  }, [currentProject, user]); // 移除 token 依赖
 
   // Load initial data on mount or when auth changes
   useEffect(() => {
-    if (!authLoading && user && token) {
+    // 只有用户登录后才加载数据
+    if (!authLoading && user) {
       refreshProjects();
       refreshMCPStatus();
-    } else {
-      console.log('Auth not ready or no user, skipping project load:', { authLoading, user: !!user, token: !!token });
     }
-  }, [refreshProjects, refreshMCPStatus, authLoading, user, token]);
+  }, [refreshProjects, refreshMCPStatus, authLoading, user]); // 移除 token 依赖
 
   // Clear errors when authentication changes
   useEffect(() => {
-    if (user && token) {
+    if (user) {
       clearError();
     }
-  }, [user, token, clearError]);
+  }, [user, clearError]); // 移除 token 依赖
 
   // Refresh tasks when current project changes
   useEffect(() => {
-    if (currentProject?.name && user && token) {
+    if (currentProject?.name && user) {
       refreshTasks();
     }
-  }, [currentProject?.name, user, token, refreshTasks]);
+  }, [currentProject?.name, user, refreshTasks]); // 移除 token 依赖
 
   // Handle WebSocket messages for TaskMaster updates
   useEffect(() => {
