@@ -746,11 +746,15 @@ router.get('/prd/:projectName', async (req, res) => {
                 }
             }
 
+            // 标准响应格式：{success: true, data: {...}}
             res.json({
-                projectName,
-                projectPath,
-                prdFiles: prdFiles.sort((a, b) => new Date(b.modified) - new Date(a.modified)),
-                timestamp: new Date().toISOString()
+                success: true,
+                data: {
+                    projectName,
+                    projectPath,
+                    prdFiles: prdFiles.sort((a, b) => new Date(b.modified) - new Date(a.modified)),
+                    timestamp: new Date().toISOString()
+                }
             });
 
         } catch (readError) {

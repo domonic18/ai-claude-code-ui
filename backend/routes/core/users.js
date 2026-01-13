@@ -27,10 +27,13 @@ router.get('/git-config', authenticateToken, async (req, res) => {
       }
     }
 
+    // 标准响应格式：{success: true, data: {...}}
     res.json({
       success: true,
-      gitName: gitConfig?.git_name || null,
-      gitEmail: gitConfig?.git_email || null
+      data: {
+        gitName: gitConfig?.git_name || null,
+        gitEmail: gitConfig?.git_email || null
+      }
     });
   } catch (error) {
     console.error('Error getting git config:', error);
@@ -64,10 +67,13 @@ router.post('/git-config', authenticateToken, async (req, res) => {
       console.error('Error applying git config:', gitError);
     }
 
+    // 标准响应格式：{success: true, data: {...}}
     res.json({
       success: true,
-      gitName,
-      gitEmail
+      data: {
+        gitName,
+        gitEmail
+      }
     });
   } catch (error) {
     console.error('Error updating git config:', error);
@@ -80,9 +86,12 @@ router.post('/complete-onboarding', authenticateToken, async (req, res) => {
     const userId = req.user.userId;
     User.completeOnboarding(userId);
 
+    // 标准响应格式：{success: true, data: {...}}
     res.json({
       success: true,
-      message: 'Onboarding completed successfully'
+      data: {
+        message: 'Onboarding completed successfully'
+      }
     });
   } catch (error) {
     console.error('Error completing onboarding:', error);
@@ -95,9 +104,12 @@ router.get('/onboarding-status', authenticateToken, async (req, res) => {
     const userId = req.user.userId;
     const hasCompleted = User.hasCompletedOnboarding(userId);
 
+    // 标准响应格式：{success: true, data: {...}}
     res.json({
       success: true,
-      hasCompletedOnboarding: hasCompleted
+      data: {
+        hasCompletedOnboarding: hasCompleted
+      }
     });
   } catch (error) {
     console.error('Error checking onboarding status:', error);
