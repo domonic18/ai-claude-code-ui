@@ -75,6 +75,11 @@ export const api = {
     authenticatedFetch(`/api/projects/${projectName}/sessions/${sessionId}`, {
       method: 'DELETE',
     }),
+  renameSession: (projectName, sessionId, summary) =>
+    authenticatedFetch(`/api/projects/${projectName}/sessions/${sessionId}/rename`, {
+      method: 'PUT',
+      body: JSON.stringify({ summary }),
+    }),
   deleteCodexSession: (sessionId) =>
     authenticatedFetch(`/api/codex/sessions/${sessionId}`, {
       method: 'DELETE',

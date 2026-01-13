@@ -340,6 +340,34 @@ function Sidebar({
     }
   };
 
+  const updateSessionSummary = async (projectName, sessionId, newSummary) => {
+    try {
+      console.log('[Sidebar] Updating session summary:', { projectName, sessionId, newSummary });
+
+      const response = await api.renameSession(projectName, sessionId, newSummary);
+
+      console.log('[Sidebar] Update summary response:', { ok: response.ok, status: response.status });
+
+      if (response.ok) {
+        console.log('[Sidebar] Session summary updated successfully');
+        // 关闭编辑状态
+        setEditingSession(null);
+        setEditingSessionName('');
+        // Refresh the sessions by calling onRefresh
+        if (onRefresh) {
+          onRefresh();
+        }
+      } else {
+        const errorData = await response.json();
+        console.error('[Sidebar] Failed to update session summary:', errorData);
+        alert(errorData.error || 'Failed to rename session. Please try again.');
+      }
+    } catch (error) {
+      console.error('[Sidebar] Error updating session summary:', error);
+      alert('Error renaming session. Please try again.');
+    }
+  };
+
   const deleteProject = async (projectName) => {
     if (!confirm('Are you sure you want to delete this empty project? This action cannot be undone.')) {
       return;
