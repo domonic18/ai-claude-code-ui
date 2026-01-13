@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, UserPlus } from 'lucide-react';
 
 const LoginForm = () => {
   const [username, setUsername] = useState('');
@@ -9,6 +9,11 @@ const LoginForm = () => {
   const [error, setError] = useState('');
   
   const { login } = useAuth();
+
+  const handleFirstTimeSetup = () => {
+    // Reload to trigger status check (cookie will be checked automatically)
+    window.location.reload();
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -84,6 +89,11 @@ const LoginForm = () => {
             {error && (
               <div className="p-3 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-800 rounded-md">
                 <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+                {error.includes('Invalid username or password') && (
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+                    If this is your first time, the system may need to be initialized. Please refresh the page.
+                  </p>
+                )}
               </div>
             )}
 
@@ -96,10 +106,18 @@ const LoginForm = () => {
             </button>
           </form>
 
-          <div className="text-center">
+          <div className="text-center space-y-2">
             <p className="text-sm text-muted-foreground">
               Enter your credentials to access Claude Code UI
             </p>
+            <button
+              type="button"
+              onClick={handleFirstTimeSetup}
+              className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center justify-center gap-1 mx-auto"
+            >
+              <UserPlus className="w-3 h-3" />
+              First time? Create an account
+            </button>
           </div>
         </div>
       </div>

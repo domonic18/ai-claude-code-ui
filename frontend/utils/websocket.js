@@ -28,9 +28,20 @@ export function useWebSocket() {
         wsUrl = `${protocol}//${window.location.host}/ws`;
       } else {
         // OSS mode: Connect to same host:port that served the page
-        const token = localStorage.getItem('auth-token');
+        // 先尝试从服务器获取当前 token（用于 WebSocket 认证）
+        let token;
+        try {
+          const response = await fetch('/api/auth/ws-token');
+          if (response.ok) {
+            const data = await response.json();
+            token = data.token;
+          }
+        } catch (error) {
+          console.warn('[WebSocket] Failed to get ws-token:', error);
+        }
+
         if (!token) {
-          console.warn('[WebSocket] No authentication token found, skipping connection');
+          console.warn('[WebSocket] No authentication token available, skipping connection');
           return;
         }
 

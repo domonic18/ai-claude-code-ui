@@ -3,7 +3,6 @@ import { api } from '../utils/api';
 
 const AuthContext = createContext({
   user: null,
-  token: null,
   login: () => {},
   register: () => {},
   logout: () => {},
@@ -24,7 +23,6 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('auth-token'));
   const [isLoading, setIsLoading] = useState(true);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(true);
@@ -68,34 +66,31 @@ export const AuthProvider = ({ children }) => {
       const statusResponse = await api.auth.status();
       const statusData = await statusResponse.json();
 
-      if (statusData.needsSetup) {
+      // Handle both direct response and responseFormatter format
+      const needsSetupValue = statusData.data?.needsSetup ?? statusData.needsSetup ?? false;
+
+      if (needsSetupValue) {
         setNeedsSetup(true);
         setIsLoading(false);
         return;
       }
 
-      // If we have a token, verify it
-      if (token) {
-        try {
-          const userResponse = await api.auth.user();
+      // 使用 cookie 认证，直接尝试获取用户信息
+      try {
+        const userResponse = await api.auth.user();
 
-          if (userResponse.ok) {
-            const userData = await userResponse.json();
-            setUser(userData.user);
-            setNeedsSetup(false);
-            await checkOnboardingStatus();
-          } else {
-            // Token is invalid
-            localStorage.removeItem('auth-token');
-            setToken(null);
-            setUser(null);
-          }
-        } catch (error) {
-          console.error('Token verification failed:', error);
-          localStorage.removeItem('auth-token');
-          setToken(null);
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          setUser(userData.data?.user ?? userData.user);
+          setNeedsSetup(false);
+          await checkOnboardingStatus();
+        } else {
+          // 未认证或 cookie 无效
           setUser(null);
         }
+      } catch (error) {
+        console.error('User fetch failed:', error);
+        setUser(null);
       }
     } catch (error) {
       console.error('[AuthContext] Auth status check failed:', error);
@@ -110,12 +105,19 @@ export const AuthProvider = ({ children }) => {
       setError(null);
       const response = await api.auth.login(username, password);
 
+      // Check if response is not JSON (e.g., HTML error page)
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const errorMessage = 'Server error. Please check the server logs.';
+        setError(errorMessage);
+        return { success: false, error: errorMessage };
+      }
+
       const data = await response.json();
 
       if (response.ok) {
-        setToken(data.token);
-        setUser(data.user);
-        localStorage.setItem('auth-token', data.token);
+        // 使用 cookie 认证，token 已由后端设置到 cookie
+        setUser(data.data?.user ?? data.user);
         return { success: true };
       } else {
         setError(data.error || 'Login failed');
@@ -137,10 +139,9 @@ export const AuthProvider = ({ children }) => {
       const data = await response.json();
 
       if (response.ok) {
-        setToken(data.token);
-        setUser(data.user);
+        // 使用 cookie 认证，token 已由后端设置到 cookie
+        setUser(data.data?.user ?? data.user);
         setNeedsSetup(false);
-        localStorage.setItem('auth-token', data.token);
         return { success: true };
       } else {
         setError(data.error || 'Registration failed');
@@ -154,22 +155,18 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
-    setToken(null);
+  const logout = async () => {
     setUser(null);
-    localStorage.removeItem('auth-token');
-    
-    // Optional: Call logout endpoint for logging
-    if (token) {
-      api.auth.logout().catch(error => {
-        console.error('Logout endpoint error:', error);
-      });
+    // 调用后端清除 cookie
+    try {
+      await api.auth.logout();
+    } catch (error) {
+      console.error('Logout endpoint error:', error);
     }
   };
 
   const value = {
     user,
-    token,
     login,
     register,
     logout,

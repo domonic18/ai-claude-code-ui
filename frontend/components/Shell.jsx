@@ -60,9 +60,20 @@ function Shell({ selectedProject, selectedSession, initialCommand, isPlainShell 
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         wsUrl = `${protocol}//${window.location.host}/shell`;
       } else {
-        const token = localStorage.getItem('auth-token');
+        // 获取 WebSocket token（从 cookie 复制）
+        let token;
+        try {
+          const response = await fetch('/api/auth/ws-token');
+          if (response.ok) {
+            const data = await response.json();
+            token = data.token;
+          }
+        } catch (error) {
+          console.error('Failed to get ws-token for Shell:', error);
+        }
+
         if (!token) {
-          console.error('No authentication token found for Shell WebSocket connection');
+          console.error('No authentication token available for Shell WebSocket connection');
           return;
         }
 

@@ -1,7 +1,7 @@
 // Utility function for authenticated API calls
+// 使用 cookie 认证，浏览器自动发送 cookie，无需手动设置 Authorization header
 export const authenticatedFetch = (url, options = {}) => {
   const isPlatform = import.meta.env.VITE_IS_PLATFORM === 'true';
-  const token = localStorage.getItem('auth-token');
 
   const defaultHeaders = {};
 
@@ -10,16 +10,13 @@ export const authenticatedFetch = (url, options = {}) => {
     defaultHeaders['Content-Type'] = 'application/json';
   }
 
-  if (!isPlatform && token) {
-    defaultHeaders['Authorization'] = `Bearer ${token}`;
-  }
-
   return fetch(url, {
     ...options,
     headers: {
       ...defaultHeaders,
       ...options.headers,
     },
+    credentials: 'include', // 确保发送 cookie
   });
 };
 
@@ -28,6 +25,7 @@ export const api = {
   // Auth endpoints (no token required)
   auth: {
     status: () => fetch('/api/auth/status'),
+    wsToken: () => authenticatedFetch('/api/auth/ws-token'),
     login: (username, password) => fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
