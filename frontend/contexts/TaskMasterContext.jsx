@@ -217,13 +217,15 @@ export const TaskMasterProvider = ({ children }) => {
   }, [currentProject, user]); // 移除 token 依赖
 
   // Load initial data on mount or when auth changes
+  // 注意：移除了 refreshProjects() 调用，因为 App.jsx 已经在用户登录时调用 fetchProjects
+  // 这里只需要刷新 MCP 状态
   useEffect(() => {
     // 只有用户登录后才加载数据
     if (!authLoading && user) {
-      refreshProjects();
+      // refreshProjects(); // 已移除 - 避免与 App.jsx 的 fetchProjects 重复调用
       refreshMCPStatus();
     }
-  }, [refreshProjects, refreshMCPStatus, authLoading, user]); // 移除 token 依赖
+  }, [refreshMCPStatus, authLoading, user]); // 移除 refreshProjects 依赖
 
   // Clear errors when authentication changes
   useEffect(() => {

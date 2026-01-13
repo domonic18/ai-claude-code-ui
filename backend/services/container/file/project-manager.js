@@ -14,6 +14,9 @@ import { CONTAINER } from '../../../config/config.js';
 /** 默认项目名称 */
 const DEFAULT_PROJECT_NAME = 'my-workspace';
 
+/** 正在创建默认项目的用户锁：userId -> Promise */
+const creatingDefaultWorkspace = new Map();
+
 /**
  * 从容器内获取项目列表
  * 在容器模式下，项目存储在 /workspace 下
@@ -104,10 +107,35 @@ export async function getProjectsInContainer(userId) {
 
           // 如果用户没有项目，创建默认工作区
           if (projectList.length === 0) {
-            console.log('[ProjectManager] No projects found for user, creating default workspace');
-            const defaultProject = await createDefaultWorkspace(userId);
-            if (defaultProject) {
-              projectList.push(defaultProject);
+            // 检查是否已有其他请求在创建默认项目（防止并发创建）
+            if (creatingDefaultWorkspace.has(userId)) {
+              console.log('[ProjectManager] Default workspace creation already in progress, waiting...');
+              try {
+                const defaultProject = await creatingDefaultWorkspace.get(userId);
+                if (defaultProject) {
+                  projectList.push(defaultProject);
+                }
+              } catch (error) {
+                console.error('[ProjectManager] Failed to wait for default workspace creation:', error);
+              }
+            } else {
+              // 只有第一个创建请求才打印这条日志
+              console.log('[ProjectManager] No projects found for user, creating default workspace');
+              // 创建默认工作区，并缓存 Promise 以防止并发创建
+              const createPromise = createDefaultWorkspace(userId);
+              creatingDefaultWorkspace.set(userId, createPromise);
+
+              try {
+                const defaultProject = await createPromise;
+                if (defaultProject) {
+                  projectList.push(defaultProject);
+                }
+              } catch (error) {
+                console.error('[ProjectManager] Failed to create default workspace:', error);
+              } finally {
+                // 清理锁，允许失败后重试
+                creatingDefaultWorkspace.delete(userId);
+              }
             }
           }
 
