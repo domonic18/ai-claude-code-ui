@@ -10,6 +10,7 @@ import containerManager from '../core/index.js';
 import { writeFileInContainer } from './file-operations.js';
 import { getSessionsInContainer } from './container-sessions.js';
 import { CONTAINER } from '../../../config/config.js';
+import { loadProjectConfig } from '../../project/config/index.js';
 
 /** 默认项目名称 */
 const DEFAULT_PROJECT_NAME = 'my-workspace';
@@ -69,6 +70,14 @@ export async function getProjectsInContainer(userId) {
           const projectList = [];
           const lines = output.trim().split('\n');
 
+          // 读取项目配置以获取自定义显示名称
+          let projectConfig = {};
+          try {
+            projectConfig = await loadProjectConfig();
+          } catch (configError) {
+            console.warn('[ProjectManager] Failed to load project config:', configError.message);
+          }
+
           console.log('[ProjectManager] Raw ls output:', JSON.stringify(output));
           console.log('[ProjectManager] Split lines:', lines.length);
 
@@ -89,10 +98,14 @@ export async function getProjectsInContainer(userId) {
 
             const decodedPath = projectName.replace(/-/g, '/');
 
+            // 优先使用自定义显示名称，否则使用项目名称
+            const customDisplayName = projectConfig[projectName]?.displayName;
+            const displayName = customDisplayName || projectName;
+
             projectList.push({
               name: projectName,
               path: decodedPath,
-              displayName: projectName,
+              displayName: displayName,
               fullPath: projectName,
               isContainerProject: true,
               sessions: [],
@@ -279,10 +292,19 @@ npm-debug.log*
 
     console.log('[ProjectManager] Default workspace created successfully');
 
+    // 检查是否有自定义显示名称
+    let displayName = 'My Workspace';
+    try {
+      const projectConfig = await loadProjectConfig();
+      displayName = projectConfig[DEFAULT_PROJECT_NAME]?.displayName || 'My Workspace';
+    } catch (configError) {
+      console.warn('[ProjectManager] Failed to load project config for default workspace:', configError.message);
+    }
+
     return {
       name: DEFAULT_PROJECT_NAME,
       path: DEFAULT_PROJECT_NAME,
-      displayName: 'My Workspace',
+      displayName: displayName,
       fullPath: DEFAULT_PROJECT_NAME,
       isContainerProject: true,
       sessions: [],
