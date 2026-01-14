@@ -10,7 +10,7 @@
 
 import path from 'path';
 import os from 'os';
-import { getProjects } from '../services/project/index.js';
+import { getProjects } from '../services/projects/index.js';
 import { isContainerModeEnabled } from '../config/config.js';
 
 /**

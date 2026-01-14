@@ -94,8 +94,5 @@ export * from './projects/index.js';
 // 容器服务
 export * from './container/index.js';
 
-// 项目服务
-export * from './project/index.js';
-
 // 工作区服务
 export * from './workspace/index.js';

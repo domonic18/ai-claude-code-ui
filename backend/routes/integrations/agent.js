@@ -5,7 +5,7 @@ import os from 'os';
 import { promises as fs } from 'fs';
 import crypto from 'crypto';
 import { repositories } from '../../database/db.js';
-import { addProjectManually } from '../../services/project/index.js';
+import { addProjectManually } from '../../services/projects/index.js';
 import { queryClaudeSDK } from '../../services/execution/claude/index.js';
 import { spawnCursor } from '../../services/execution/cursor/index.js';
 import { queryCodex } from '../../services/execution/codex/index.js';

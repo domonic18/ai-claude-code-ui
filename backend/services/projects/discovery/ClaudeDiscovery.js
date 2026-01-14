@@ -15,8 +15,8 @@ import { NativeSessionManager } from '../../sessions/managers/index.js';
 import { ContainerSessionManager } from '../../sessions/managers/index.js';
 import { PathUtils } from '../../core/utils/path-utils.js';
 import { CONTAINER } from '../../../config/config.js';
-import { loadProjectConfig } from '../../project/config/index.js';
-import { generateDisplayName, extractProjectDirectory } from '../../project/utils/index.js';
+import { loadProjectConfig } from '../config/index.js';
+import { generateDisplayName, extractProjectDirectory } from '../utils/index.js';
 import { getProjectsInContainer } from '../../container/file/index.js';
 
 /**

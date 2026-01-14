@@ -96,7 +96,7 @@ async function runImportTests() {
   console.log('Test Group 3: Project Services');
   await testImport(
     'Project index (all exports)',
-    () => import('../../services/project/index.js')
+    () => import('../../services/projects/index.js')
   );
   console.log();
 
