@@ -2,7 +2,7 @@
  * 容器会话读取模块
  *
  * 从 Docker 容器内读取 Claude Code 会话信息
- * 支持 CONTAINER_MODE=1 开关
+ * 项目现在完全基于容器化架构运行
  *
  * Session 存储位置：/workspace/.claude/projects/{projectName}/
  * 项目名称编码：my-workspace → -workspace-my-workspace

@@ -2,7 +2,7 @@
  * path-utils.js
  *
  * 统一的路径处理工具
- * 合并重复的路径处理逻辑，支持容器和非容器模式
+ * 完全基于容器化架构
  *
  * @module core/utils/path-utils
  */
@@ -23,58 +23,23 @@ const SDK_PATH_PREFIX = 'workspace';
 export class PathUtils {
   /**
    * 解析项目路径
-   * 根据容器模式和项目名称返回正确的项目路径
+   * 返回容器内的项目路径
    *
    * @param {string} projectName - 项目名称
-   * @param {Object} options - 选项
-   * @param {string} [options.userId] - 用户 ID（容器模式需要）
-   * @param {boolean} [options.containerMode] - 是否强制使用容器模式
-   * @returns {Promise<string>} 项目路径
+   * @returns {string} 容器内的项目路径
    */
-  static async resolveProjectPath(projectName, options = {}) {
-    const { containerMode } = options;
-    // userId 参数在当前实现中未使用，但保留在选项中以便未来扩展
-    void options.userId;
-
-    // 检查是否为容器模式
-    const isContainerMode = containerMode !== undefined
-      ? containerMode
-      : CONTAINER.enabled;
-
-    if (isContainerMode) {
-      // 容器模式：使用配置中的工作空间路径
-      return path.join(CONTAINER.paths.workspace, projectName);
-    } else {
-      // 主机模式：从会话文件中提取项目路径
-      const { extractProjectDirectory } = await import('../../project/index.js');
-      return await extractProjectDirectory(projectName);
-    }
+  static resolveProjectPath(projectName) {
+    return path.join(CONTAINER.paths.workspace, projectName);
   }
 
   /**
-   * 同步解析项目路径（不使用异步的 extractProjectDirectory）
+   * 同步解析项目路径
    *
    * @param {string} projectName - 项目名称
-   * @param {Object} options - 选项
-   * @param {boolean} [options.containerMode] - 是否强制使用容器模式
-   * @returns {string} 项目路径
+   * @returns {string} 容器内的项目路径
    */
-  static resolveProjectPathSync(projectName, options = {}) {
-    const { containerMode } = options;
-
-    // 检查是否为容器模式
-    const isContainerMode = containerMode !== undefined
-      ? containerMode
-      : CONTAINER.enabled;
-
-    if (isContainerMode) {
-      // 容器模式：使用配置中的工作空间路径
-      return path.join(CONTAINER.paths.workspace, projectName);
-    } else {
-      // 主机模式：返回项目名称（需要外部调用 extractProjectDirectory）
-      // 这里只提供一个回退方案
-      return projectName.replace(/-/g, '/');
-    }
+  static resolveProjectPathSync(projectName) {
+    return path.join(CONTAINER.paths.workspace, projectName);
   }
 
   /**
@@ -202,13 +167,7 @@ export class PathUtils {
    * @returns {string} 配置文件完整路径
    */
   static getProjectConfigPath(projectPath, configName) {
-    // 容器模式使用配置中的 Claude 配置路径
-    // 主机模式使用 ~/.claude/
-    const claudeDir = CONTAINER.enabled
-      ? CONTAINER.paths.claudeConfig
-      : path.join(process.env.HOME || '', '.claude');
-
-    return path.join(claudeDir, 'projects', this.encodeProjectName(projectPath), configName);
+    return path.join(CONTAINER.paths.claudeConfig, 'projects', this.encodeProjectName(projectPath), configName);
   }
 
   /**
@@ -220,11 +179,7 @@ export class PathUtils {
    */
   static getSessionFilePath(projectPath, sessionId) {
     const encodedProjectName = this.encodeProjectName(projectPath);
-    const claudeProjectsPath = CONTAINER.enabled
-      ? CONTAINER.paths.projects
-      : path.join(process.env.HOME || '', '.claude', 'projects');
-
-    return path.join(claudeProjectsPath, encodedProjectName, 'sessions', `${sessionId}.jsonl`);
+    return path.join(CONTAINER.paths.projects, encodedProjectName, 'sessions', `${sessionId}.jsonl`);
   }
 
   /**
@@ -235,11 +190,7 @@ export class PathUtils {
    */
   static getProjectStoragePath(projectPath) {
     const encodedProjectName = this.encodeProjectName(projectPath);
-    const claudeProjectsPath = CONTAINER.enabled
-      ? CONTAINER.paths.projects
-      : path.join(process.env.HOME || '', '.claude', 'projects');
-
-    return path.join(claudeProjectsPath, encodedProjectName);
+    return path.join(CONTAINER.paths.projects, encodedProjectName);
   }
 
   /**

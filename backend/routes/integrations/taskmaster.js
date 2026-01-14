@@ -16,10 +16,8 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import os from 'os';
-import { extractProjectDirectory } from '../../services/projects/index.js';
 import { detectTaskMasterMCPServer } from '../../utils/mcp-detector.js';
 import { broadcastTaskMasterProjectUpdate, broadcastTaskMasterTasksUpdate } from '../../utils/taskmaster-websocket.js';
-import { CONTAINER_MODE } from '../../config/config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -27,18 +25,14 @@ const __dirname = dirname(__filename);
 const router = express.Router();
 
 /**
- * 获取项目路径（支持容器模式和主机模式）
+ * 获取项目路径
+ * 项目现在完全在容器内管理
  * @param {string} projectName - 项目名称
- * @returns {Promise<string>} 项目路径
+ * @returns {string} 容器内的项目路径
  */
-async function getProjectPath(projectName) {
-  if (CONTAINER_MODE === '1') {
-    // 容器模式：项目路径为 /workspace/{projectName}
-    return `/workspace/${projectName}`;
-  } else {
-    // 主机模式：从会话文件中提取项目路径
-    return await extractProjectDirectory(projectName);
-  }
+function getProjectPath(projectName) {
+  // 容器模式：项目路径为 /workspace/{projectName}
+  return `/workspace/${projectName}`;
 }
 
 /**

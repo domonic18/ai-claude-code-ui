@@ -128,14 +128,11 @@ export const AUTH = {
 };
 
 /**
- * 容器模式配置
+ * 容器配置
+ *
+ * 注意：项目现在完全基于容器化运行，所有操作都在 Docker 容器中执行。
  */
-export const CONTAINER_MODE = process.env.CONTAINER_MODE || '0';
-
 export const CONTAINER = {
-  // 是否启用容器模式
-  enabled: CONTAINER_MODE === 'true' || CONTAINER_MODE === '1',
-
   // Docker 配置
   docker: {
     host: process.env.DOCKER_HOST || null,
@@ -167,7 +164,7 @@ export const CONTAINER = {
 
 /**
  * 容器资源限制配置
- * �用户层级定义 CPU、内存等资源限制
+ * 根据用户层级定义 CPU、内存等资源限制
  */
 export const RESOURCE_LIMITS = {
   free: {
@@ -290,13 +287,6 @@ export function getUserDataDir(userId) {
 }
 
 /**
- * 检查是否启用容器模式
- */
-export function isContainerModeEnabled() {
-  return CONTAINER.enabled;
-}
-
-/**
  * 检查是否为平台模式
  */
 export function isPlatformMode() {
@@ -344,8 +334,8 @@ export function getConfigSummary() {
       path: DATABASE.path,
     },
     container: {
-      enabled: CONTAINER.enabled,
       image: CONTAINER.image,
+      network: CONTAINER.network,
     },
     auth: {
       hasApiKey: !!AUTH.apiKey,
@@ -391,7 +381,7 @@ export const c = {
 export function logConfigStatus() {
   console.log(`${c.info('[CONFIG]')} ===== 配置状态 =====`);
   console.log(`${c.info('[CONFIG]')} 模式: ${c.bright(SERVER.isPlatform ? 'PLATFORM (单用户)' : 'STANDARD (多用户)')}`);
-  console.log(`${c.info('[CONFIG]')} 容器模式: ${CONTAINER.enabled ? c.ok('启用') : c.dim('禁用')}`);
+  console.log(`${c.info('[CONFIG]')} 容器模式: ${c.ok('启用 (容器化架构)')}`);
   console.log(`${c.info('[CONFIG]')} 数据库: ${c.dim(DATABASE.path)}`);
   console.log(`${c.info('[CONFIG]')} 端口: ${c.bright(SERVER.port)}`);
 
@@ -422,7 +412,6 @@ export default {
   getProjectRoot,
   getWorkspaceDir,
   getUserDataDir,
-  isContainerModeEnabled,
   isPlatformMode,
   getResourceLimits,
   validateConfig,
