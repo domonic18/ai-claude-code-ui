@@ -94,7 +94,8 @@ const VALID_TRANSITIONS = {
   [ContainerState.READY]: [
     ContainerState.STOPPING,
     ContainerState.REMOVING,
-    ContainerState.FAILED
+    ContainerState.FAILED,
+    ContainerState.NON_EXISTENT
   ],
   [ContainerState.STOPPING]: [
     ContainerState.DEAD,
