@@ -121,7 +121,7 @@ export class ProjectController extends BaseController {
       console.log(`[ProjectController] Getting session messages for project: ${projectName}, session: ${sessionId}`);
 
       // 动态导入容器会话服务
-      const { getSessionMessagesInContainer } = await import('../../services/container/file/container-sessions.js');
+      const { getSessionMessagesInContainer } = await import('../../services/sessions/container/ContainerSessions.js');
 
       const result = await getSessionMessagesInContainer(userId, projectName, sessionId, limit, offset);
 
@@ -181,70 +181,56 @@ export class ProjectController extends BaseController {
 
       console.log('[ProjectController] deleteProject called:', { userId, projectName });
 
-      // 容器模式：在容器中删除项目
-      if (CONTAINER.enabled) {
-        console.log('[ProjectController] Container mode enabled, checking if project is empty...');
+      // 检查项目是否为空
+      const isEmpty = await this.claudeDiscovery.isProjectEmpty(projectName, { userId });
 
-        // 检查项目是否为空
-        const isEmpty = await this.claudeDiscovery.isProjectEmpty(projectName, { userId });
+      console.log('[ProjectController] Project empty check result:', isEmpty);
 
-        console.log('[ProjectController] Project empty check result:', isEmpty);
+      if (!isEmpty) {
+        throw new Error('Cannot delete project with existing sessions');
+      }
 
-        if (!isEmpty) {
-          throw new Error('Cannot delete project with existing sessions');
-        }
+      console.log('[ProjectController] Deleting project directory in container...');
 
-        console.log('[ProjectController] Deleting project directory in container...');
+      // 删除容器中的项目目录
+      const projectPath = `${CONTAINER.paths.workspace}/${projectName}`;
+      console.log('[ProjectController] Project path to delete:', projectPath);
 
-        // 删除容器中的项目目录
-        const projectPath = `${CONTAINER.paths.workspace}/${projectName}`;
-        console.log('[ProjectController] Project path to delete:', projectPath);
+      const { stream } = await containerManager.execInContainer(userId, `rm -rf "${projectPath}"`);
 
-        const { stream } = await containerManager.execInContainer(userId, `rm -rf "${projectPath}"`);
+      // 等待删除命令完成
+      await new Promise((resolve, reject) => {
+        let resolved = false;
 
-        // 等待删除命令完成
-        await new Promise((resolve, reject) => {
-          let resolved = false;
+        const cleanup = () => {
+          if (!resolved) {
+            resolved = true;
+            console.log('[ProjectController] Delete command completed');
+            resolve();
+          }
+        };
 
-          const cleanup = () => {
-            if (!resolved) {
-              resolved = true;
-              console.log('[ProjectController] Delete command completed');
-              resolve();
-            }
-          };
-
-          stream.on('end', cleanup);
-          stream.on('error', (err) => {
-            console.error('[ProjectController] Delete command error:', err);
-            if (!resolved) {
-              resolved = true;
-              reject(err);
-            }
-          });
-
-          // 添加超时保护，3秒后自动完成
-          setTimeout(() => {
-            if (!resolved) {
-              console.log('[ProjectController] Delete command timeout (this is normal for rm -rf)');
-              cleanup();
-            }
-          }, 3000);
+        stream.on('end', cleanup);
+        stream.on('error', (err) => {
+          console.error('[ProjectController] Delete command error:', err);
+          if (!resolved) {
+            resolved = true;
+            reject(err);
+          }
         });
 
-        console.log('[ProjectController] Project deleted successfully');
+        // 添加超时保护，3秒后自动完成
+        setTimeout(() => {
+          if (!resolved) {
+            console.log('[ProjectController] Delete command timeout (this is normal for rm -rf)');
+            cleanup();
+          }
+        }, 3000);
+      });
 
-        // 删除项目配置中的记录（如果需要）
-        // 容器模式下，项目列表是动态从 /workspace 读取的，所以不需要额外清理配置
+      console.log('[ProjectController] Project deleted successfully');
 
-        this._success(res, null, 'Project deleted successfully');
-      } else {
-        // 非容器模式：使用原来的逻辑
-        const { deleteProject } = await import('../../services/project/project-management/index.js');
-        await deleteProject(projectName);
-
-        this._success(res, null, 'Project deleted successfully');
-      }
+      this._success(res, null, 'Project deleted successfully');
     } catch (error) {
       console.error('[ProjectController] Error deleting project:', error);
       this._handleError(error, req, res, next);
@@ -493,16 +479,11 @@ export class ProjectController extends BaseController {
       }
 
       // 容器模式：在容器中更新会话摘要
-      if (CONTAINER.enabled) {
-        const { updateSessionSummaryInContainer } = await import('../../services/container/file/container-sessions.js');
-        const success = await updateSessionSummaryInContainer(userId, projectName, sessionId, trimmedSummary);
+      const { updateSessionSummaryInContainer } = await import('../../services/sessions/container/ContainerSessions.js');
+      const success = await updateSessionSummaryInContainer(userId, projectName, sessionId, trimmedSummary);
 
-        if (!success) {
-          throw new NotFoundError('Session', sessionId);
-        }
-      } else {
-        // 非容器模式：暂不支持
-        throw new Error('Session rename is only supported in container mode');
+      if (!success) {
+        throw new NotFoundError('Session', sessionId);
       }
 
       this._success(res, {
@@ -526,16 +507,11 @@ export class ProjectController extends BaseController {
       const { projectName, sessionId } = req.params;
 
       // 容器模式：在容器中删除会话
-      if (CONTAINER.enabled) {
-        const { deleteSessionInContainer } = await import('../../services/container/file/container-sessions.js');
-        const success = await deleteSessionInContainer(userId, projectName, sessionId);
+      const { deleteSessionInContainer } = await import('../../services/sessions/container/ContainerSessions.js');
+      const success = await deleteSessionInContainer(userId, projectName, sessionId);
 
-        if (!success) {
-          throw new NotFoundError('Session', sessionId);
-        }
-      } else {
-        // 非容器模式：暂不支持
-        throw new Error('Session deletion is only supported in container mode');
+      if (!success) {
+        throw new NotFoundError('Session', sessionId);
       }
 
       this._success(res, {
