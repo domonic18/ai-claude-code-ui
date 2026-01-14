@@ -15,6 +15,12 @@ const xtermStyles = `
   .xterm-screen:focus {
     outline: none !important;
   }
+  .xterm {
+    z-index: 1;
+  }
+  .xterm-link-layer {
+    z-index: 2;
+  }
 `;
 
 if (typeof document !== 'undefined') {
@@ -34,12 +40,14 @@ function Shell({ selectedProject, selectedSession, initialCommand, isPlainShell 
   const [isRestarting, setIsRestarting] = useState(false);
   const [lastSessionId, setLastSessionId] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [userDisconnected, setUserDisconnected] = useState(false); // 跟踪用户是否主动断开
 
   const selectedProjectRef = useRef(selectedProject);
   const selectedSessionRef = useRef(selectedSession);
   const initialCommandRef = useRef(initialCommand);
   const isPlainShellRef = useRef(isPlainShell);
   const onProcessCompleteRef = useRef(onProcessComplete);
+  const isConnectingRef = useRef(false); // 使用 ref 跟踪连接状态，避免状态更新延迟问题
 
   useEffect(() => {
     selectedProjectRef.current = selectedProject;
@@ -50,7 +58,14 @@ function Shell({ selectedProject, selectedSession, initialCommand, isPlainShell 
   });
 
   const connectWebSocket = useCallback(async () => {
-    if (isConnecting || isConnected) return;
+    if (isConnectingRef.current || isConnected) {
+      console.log('[Shell] Already connecting or connected, skipping');
+      return;
+    }
+
+    // 立即设置连接标志
+    isConnectingRef.current = true;
+    setIsConnecting(true);
 
     try {
       const isPlatform = import.meta.env.VITE_IS_PLATFORM === 'true';
@@ -82,11 +97,15 @@ function Shell({ selectedProject, selectedSession, initialCommand, isPlainShell 
           }
         } catch (error) {
           console.error('[Shell] Error fetching ws-token:', error);
+          setIsConnecting(false);
+          isConnectingRef.current = false;
           return;
         }
 
         if (!token) {
           console.log('[Shell] No token available, aborting connection');
+          setIsConnecting(false);
+          isConnectingRef.current = false;
           return;
         }
 
@@ -99,11 +118,13 @@ function Shell({ selectedProject, selectedSession, initialCommand, isPlainShell 
       ws.current = new WebSocket(wsUrl);
 
       ws.current.onopen = () => {
+        console.log('[Shell] WebSocket opened');
         setIsConnected(true);
         setIsConnecting(false);
+        isConnectingRef.current = false;
 
         setTimeout(() => {
-          if (fitAddon.current && terminal.current) {
+          if (fitAddon.current && terminal.current && ws.current) {
             fitAddon.current.fit();
 
             ws.current.send(JSON.stringify({
@@ -155,6 +176,7 @@ function Shell({ selectedProject, selectedSession, initialCommand, isPlainShell 
         console.log('[Shell] WebSocket closed:', event.code, event.reason);
         setIsConnected(false);
         setIsConnecting(false);
+        isConnectingRef.current = false;
 
         if (terminal.current) {
           terminal.current.clear();
@@ -166,20 +188,37 @@ function Shell({ selectedProject, selectedSession, initialCommand, isPlainShell 
         console.error('[Shell] WebSocket error:', error);
         setIsConnected(false);
         setIsConnecting(false);
+        isConnectingRef.current = false;
       };
     } catch (error) {
       setIsConnected(false);
       setIsConnecting(false);
+      isConnectingRef.current = false;
     }
-  }, [isConnecting, isConnected]);
+  }, [isConnected]);
 
   const connectToShell = useCallback(() => {
-    if (!isInitialized || isConnected || isConnecting) return;
-    setIsConnecting(true);
+    // 使用 ref 检查，避免状态更新延迟
+    if (!isInitialized || isConnected || isConnectingRef.current) {
+      console.log('[Shell] connectToShell: cannot connect', {
+        isInitialized,
+        isConnected,
+        isConnectingRef: isConnectingRef.current
+      });
+      return;
+    }
+    // 清除用户主动断开的标志
+    setUserDisconnected(false);
+    console.log('[Shell] connectToShell: starting connection');
     connectWebSocket();
-  }, [isInitialized, isConnected, isConnecting, connectWebSocket]);
+  }, [isInitialized, isConnected, connectWebSocket]);
 
   const disconnectFromShell = useCallback(() => {
+    // 标记用户主动断开
+    setUserDisconnected(true);
+    // 重置连接状态 ref
+    isConnectingRef.current = false;
+
     if (ws.current) {
       ws.current.close();
       ws.current = null;
@@ -213,6 +252,10 @@ function Shell({ selectedProject, selectedSession, initialCommand, isPlainShell 
 
   const restartShell = () => {
     setIsRestarting(true);
+    // 清除用户主动断开的标志
+    setUserDisconnected(false);
+    // 重置连接状态 ref
+    isConnectingRef.current = false;
 
     if (ws.current) {
       ws.current.close();
@@ -388,9 +431,12 @@ function Shell({ selectedProject, selectedSession, initialCommand, isPlainShell 
   }, [selectedProject?.path || selectedProject?.fullPath, isRestarting]);
 
   useEffect(() => {
+    // 如果用户主动断开了连接，不要自动重连
+    if (userDisconnected) return;
+
     if (!autoConnect || !isInitialized || isConnecting || isConnected) return;
     connectToShell();
-  }, [autoConnect, isInitialized, isConnecting, isConnected, connectToShell]);
+  }, [autoConnect, isInitialized, isConnecting, isConnected, connectToShell, userDisconnected]);
 
   if (!selectedProject) {
     return (
@@ -470,13 +516,32 @@ function Shell({ selectedProject, selectedSession, initialCommand, isPlainShell 
         <div ref={terminalRef} className="h-full w-full focus:outline-none" style={{ outline: 'none' }} />
 
         {!isInitialized && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-90">
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-90 z-50">
             <div className="text-white">Loading terminal...</div>
           </div>
         )}
 
+        {/* 调试：显示状态信息 */}
+        {true && (
+          <div className="absolute top-4 left-4 bg-yellow-500 text-black px-2 py-1 rounded text-xs z-50 font-mono">
+            States: userDisconnected={String(userDisconnected)}, isInitialized={String(isInitialized)}, isConnected={String(isConnected)}, isConnecting={String(isConnecting)}, showBtn={String(isInitialized && !isConnected && !isConnecting)}
+          </div>
+        )}
+
+        {/* 测试：强制显示按钮 */}
+        {true && (
+          <div className="absolute bottom-4 left-4 z-50">
+            <button
+              onClick={connectToShell}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
+            >
+              TEST: Connect
+            </button>
+          </div>
+        )}
+
         {isInitialized && !isConnected && !isConnecting && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-90 p-4">
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-90 p-4 z-40">
             <div className="text-center max-w-sm w-full">
               <button
                 onClick={connectToShell}

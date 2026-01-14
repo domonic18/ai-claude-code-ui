@@ -226,13 +226,19 @@ async function handleContainerShell(ws, data, ptySessionsMap) {
         // 而是依赖 ptySessionsMap 来让主处理器路由消息
         // 这样可以避免多个消息处理器冲突
 
-        // 处理 WebSocket 关闭
+        // 处理 WebSocket 关闭 - 保持会话存活以支持重连
         ws.on('close', () => {
-            console.log('[Container Shell] WebSocket closed');
-            if (currentSession && currentSession.kill) {
-                currentSession.kill();
+            console.log('[Container Shell] WebSocket closed, keeping session alive');
+            // 设置超时以在一段时间后清理会话
+            if (!currentSession.timeoutId) {
+                currentSession.timeoutId = setTimeout(() => {
+                    console.log('[Container Shell] Session timeout, cleaning up:', ptySessionKey);
+                    if (currentSession.kill) {
+                        currentSession.kill();
+                    }
+                    ptySessionsMap.delete(ptySessionKey);
+                }, PTY_SESSION_TIMEOUT);
             }
-            ptySessionsMap.delete(ptySessionKey);
         });
 
         // 返回会话键，以便主处理器可以引用此会话
@@ -284,10 +290,64 @@ export function handleShellConnection(ws, ptySessionsMap) {
                 // 容器模式：使用容器 shell 处理器
                 if (isContainerProject) {
                     console.log('[INFO] Container mode: Starting shell in container for project:', projectPath);
-                    // 调用容器 shell 处理器并获取会话键
-                    const containerSessionKey = await handleContainerShell(ws, data, ptySessionsMap);
-                    if (containerSessionKey) {
+
+                    // 获取用户 ID
+                    const userId = ws.user?.userId || ws.user?.id;
+                    if (!userId) {
+                        console.error('[Container] No userId found in ws.user');
+                        ws.send(JSON.stringify({
+                            type: 'output',
+                            data: `\r\n\x1b[31mError: User authentication required\x1b[0m\r\n`
+                        }));
+                        return;
+                    }
+
+                    // 生成会话键
+                    const commandSuffix = isPlainShell && initialCommand
+                        ? `_cmd_${Buffer.from(initialCommand).toString('base64').slice(0, 16)}`
+                        : '';
+                    const containerSessionKey = `container_${userId}_${projectPath}_${sessionId || 'default'}${commandSuffix}`;
+
+                    // 检查是否已有现有会话
+                    const existingSession = ptySessionsMap.get(containerSessionKey);
+                    if (existingSession) {
+                        console.log('[Container] Reconnecting to existing session:', containerSessionKey);
+
+                        // 清除超时定时器
+                        if (existingSession.timeoutId) {
+                            clearTimeout(existingSession.timeoutId);
+                            existingSession.timeoutId = null;
+                        }
+
+                        // 更新 WebSocket 引用
+                        existingSession.ws = ws;
                         ptySessionKey = containerSessionKey;
+
+                        // 发送重新连接消息
+                        ws.send(JSON.stringify({
+                            type: 'output',
+                            data: `\x1b[36m[Reconnected to existing session]\x1b[0m\r\n`
+                        }));
+
+                        // 发送缓冲的历史输出
+                        if (existingSession.buffer && existingSession.buffer.length > 0) {
+                            console.log(`[Container] Sending ${existingSession.buffer.length} buffered messages`);
+                            existingSession.buffer.forEach(bufferedData => {
+                                ws.send(JSON.stringify({
+                                    type: 'output',
+                                    data: bufferedData
+                                }));
+                            });
+                        }
+
+                        return;
+                    }
+
+                    // 没有现有会话，创建新的
+                    console.log('[Container] No existing session, creating new one');
+                    const newSessionKey = await handleContainerShell(ws, data, ptySessionsMap);
+                    if (newSessionKey) {
+                        ptySessionKey = newSessionKey;
                         console.log('[Shell] Container session key:', ptySessionKey);
                     }
                     return;
