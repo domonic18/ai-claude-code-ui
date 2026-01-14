@@ -535,13 +535,13 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents', autoR
       
       if (savedSettings) {
         const settings = JSON.parse(savedSettings);
-        setAllowedTools(settings.allowedTools || []);
+        setAllowedTools(settings.allowedTools && settings.allowedTools.length > 0 ? settings.allowedTools : commonTools);
         setDisallowedTools(settings.disallowedTools || []);
         setSkipPermissions(settings.skipPermissions || false);
         setProjectSortOrder(settings.projectSortOrder || 'name');
       } else {
         // Set defaults
-        setAllowedTools([]);
+        setAllowedTools(commonTools);
         setDisallowedTools([]);
         setSkipPermissions(false);
         setProjectSortOrder('name');
