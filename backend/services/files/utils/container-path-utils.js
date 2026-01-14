@@ -125,6 +125,9 @@ export function buildContainerPath(safePath, options = {}) {
     console.log('[PathUtils] Normalized projectPath to:', normalizedProjectPath);
   }
 
+  // 处理当前目录 '.' 的情况，移除它以避免路径中出现 /./
+  const processedSafePath = (safePath === '.' || safePath === './') ? '' : safePath;
+
   // 使用配置中的路径规范
   // 注意：容器项目代码直接在 /workspace 下，不在 .claude/projects 下
   // .claude/projects 是 SDK 自动管理会话文件的元数据目录
@@ -136,7 +139,11 @@ export function buildContainerPath(safePath, options = {}) {
     basePath = hostPathToContainerPath(normalizedProjectPath);
   }
 
-  const result = `${basePath}/${safePath}`.replace(/\/+/g, '/');
+  // 构建最终路径，如果 processedSafePath 为空则不添加 /
+  const result = processedSafePath
+    ? `${basePath}/${processedSafePath}`.replace(/\/+/g, '/')
+    : basePath.replace(/\/+/g, '/');
+
   console.log('[PathUtils] Final container path:', result);
 
   return result;

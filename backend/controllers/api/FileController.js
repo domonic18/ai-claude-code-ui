@@ -204,6 +204,49 @@ export class FileController extends BaseController {
       this._handleError(error, req, res, next);
     }
   }
+
+  /**
+   * 提供文件内容（用于图像等二进制文件）
+   * @param {Object} req - Express 请求对象
+   * @param {Object} res - Express 响应对象
+   * @param {Function} next - 下一个中间件
+   */
+  async serveFileContent(req, res, next) {
+    try {
+      const userId = this._getUserId(req);
+      const { path: filePath } = req.query;
+      const { projectName } = req.params;
+
+      if (!filePath) {
+        throw new ValidationError('filePath is required');
+      }
+
+      const result = await this.fileOpsService.readFile(filePath, {
+        userId,
+        projectPath: projectName,
+        isContainerProject: true,
+        containerMode: req.containerMode
+      });
+
+      // Detect content type based on file extension
+      const ext = filePath.split('.').pop()?.toLowerCase();
+      const contentTypes = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'svg': 'image/svg+xml',
+        'webp': 'image/webp',
+        'ico': 'image/x-icon'
+      };
+
+      const contentType = contentTypes[ext] || 'application/octet-stream';
+      res.setHeader('Content-Type', contentType);
+      res.send(result.content);
+    } catch (error) {
+      this._handleError(error, req, res, next);
+    }
+  }
 }
 
 export default FileController;
