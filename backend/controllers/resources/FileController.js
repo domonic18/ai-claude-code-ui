@@ -33,10 +33,17 @@ export class FileController extends BaseController {
   async readFile(req, res, next) {
     try {
       const userId = this._getUserId(req);
-      const { filePath } = req.params;
+      const { filePath } = req.query;
+      const { projectName } = req.params;
+
+      if (!filePath) {
+        throw new ValidationError('filePath is required');
+      }
 
       const result = await this.fileOpsService.readFile(filePath, {
         userId,
+        projectPath: projectName,
+        isContainerProject: true,
         containerMode: req.containerMode
       });
 
@@ -55,8 +62,12 @@ export class FileController extends BaseController {
   async writeFile(req, res, next) {
     try {
       const userId = this._getUserId(req);
-      const { filePath } = req.params;
-      const { content } = req.body;
+      const { filePath, content } = req.body;
+      const { projectName } = req.params;
+
+      if (!filePath) {
+        throw new ValidationError('filePath is required');
+      }
 
       if (content === undefined) {
         throw new ValidationError('File content is required');
@@ -64,6 +75,8 @@ export class FileController extends BaseController {
 
       const result = await this.fileOpsService.writeFile(filePath, content, {
         userId,
+        projectPath: projectName,
+        isContainerProject: true,
         containerMode: req.containerMode
       });
 
@@ -82,11 +95,13 @@ export class FileController extends BaseController {
   async getFileTree(req, res, next) {
     try {
       const userId = this._getUserId(req);
-      const { dirPath = '.' } = req.params;
+      const { projectName } = req.params;
       const { depth = 3, showHidden = false } = req.query;
 
-      const tree = await this.fileOpsService.getFileTree(dirPath, {
+      const tree = await this.fileOpsService.getFileTree('.', {
         userId,
+        projectPath: projectName,
+        isContainerProject: true,
         containerMode: req.containerMode,
         depth: parseInt(depth, 10),
         includeHidden: showHidden === 'true' || showHidden === true

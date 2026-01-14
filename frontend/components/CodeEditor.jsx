@@ -305,8 +305,10 @@ function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded 
           throw new Error(`Failed to load file: ${response.status} ${response.statusText}`);
         }
 
-        const data = await response.json();
-        setContent(data.content);
+        const responseData = await response.json();
+        // 处理 responseFormatter 包装格式: {success: true, data: {content: "...", path: "..."}}
+        const data = responseData.data ?? responseData;
+        setContent(data.content || '');
       } catch (error) {
         console.error('Error loading file:', error);
         setContent(`// Error loading file: ${error.message}\n// File: ${file.name}\n// Path: ${file.path}`);
