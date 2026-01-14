@@ -16,7 +16,7 @@ import { FILES, SERVER } from './config.js';
 
 // 路由导入 - 新结构（按功能分组）
 import { auth, settings, users } from '../routes/core/index.js';
-import { projects, sessions, files, git } from '../routes/resources/index.js';
+import { projects, sessions, files, git } from '../routes/api/index.js';
 import { claude, cursor, codex, mcp, taskmaster, agent } from '../routes/integrations/index.js';
 import { commands, system, uploads } from '../routes/tools/index.js';
 

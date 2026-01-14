@@ -5,7 +5,7 @@
  *
  * 按功能分组的路由结构：
  * - core: 核心认证和设置路由
- * - resources: 项目、会话、文件等资源路由
+ * - api: 项目、会话、文件等 API 路由
  * - integrations: Claude 等 AI 集成路由
  * - tools: 命令行工具路由
  */
@@ -13,8 +13,8 @@
 // 核心路由
 export * from './core/index.js';
 
-// 资源路由
-export * from './resources/index.js';
+// API 路由
+export * from './api/index.js';
 
 // 集成路由
 export * from './integrations/index.js';

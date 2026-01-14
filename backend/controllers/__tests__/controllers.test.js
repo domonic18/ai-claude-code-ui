@@ -15,7 +15,7 @@ import {
   ProjectController,
   SessionController,
   FileController
-} from '../resources/index.js';
+} from '../api/index.js';
 import {
   ClaudeController
 } from '../integrations/index.js';
