@@ -7,6 +7,5 @@
 // 会话管理器
 export {
   BaseSessionManager,
-  NativeSessionManager,
   ContainerSessionManager
 } from './managers/index.js';

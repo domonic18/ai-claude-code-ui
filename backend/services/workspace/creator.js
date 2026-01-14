@@ -7,7 +7,7 @@
  */
 
 import { promises as fs } from 'fs';
-import { addProjectManually } from '../project/index.js';
+import { addProjectManually } from '../projects/index.js';
 import {
   validateExistingWorkspace,
   validateNewWorkspace

@@ -11,7 +11,7 @@ import { BaseDiscovery } from './BaseDiscovery.js';
 import { ContainerSessionManager } from '../../sessions/managers/index.js';
 import { CONTAINER } from '../../../config/config.js';
 import { loadProjectConfig } from '../config/index.js';
-import { getProjectsInContainer } from '../../container/file/index.js';
+import { getProjectsInContainer } from '../managers/ContainerProjectManager.js';
 
 /**
  * Claude 项目发现器
