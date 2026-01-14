@@ -12,10 +12,49 @@
 function filterSDKOptions(options) {
   const sdkOptions = { ...options };
 
+  // 从 toolsSettings 提取配置（如果存在）
+  const settings = options.toolsSettings || {};
+  if (settings.allowedTools && settings.allowedTools.length > 0) {
+    sdkOptions.allowedTools = settings.allowedTools;
+  }
+  if (settings.disallowedTools && settings.disallowedTools.length > 0) {
+    sdkOptions.disallowedTools = settings.disallowedTools;
+  }
+
   // 移除不需要传给 SDK 的字段
   delete sdkOptions.userId;
   delete sdkOptions.isContainerProject;
   delete sdkOptions.projectPath;
+  delete sdkOptions.toolsSettings;
+
+  // 设置默认工具，如果最终没有配置任何工具
+  if (!sdkOptions.allowedTools || sdkOptions.allowedTools.length === 0) {
+    sdkOptions.allowedTools = [
+      'Bash(git log:*)',
+      'Bash(git diff:*)',
+      'Bash(git status:*)',
+      'Write',
+      'Read',
+      'Edit',
+      'Glob',
+      'Grep',
+      'MultiEdit',
+      'Task',
+      'TodoWrite',
+      'TodoRead',
+      'WebFetch',
+      'WebSearch'
+    ];
+    console.log('[ScriptBuilder] Setting default allowedTools');
+  }
+
+  // 处理权限模式
+  // 如果前端指定了 skipPermissions，或者在容器模式下且没有明确指定 permissionMode
+  if (settings.skipPermissions || !sdkOptions.permissionMode || sdkOptions.permissionMode === 'default') {
+    sdkOptions.permissionMode = 'bypassPermissions';
+    console.log('[ScriptBuilder] Setting permissionMode: bypassPermissions (reason:', 
+      settings.skipPermissions ? 'skipPermissions' : (sdkOptions.permissionMode || 'default'), ')');
+  }
 
   // 处理 resume 参数：
   // - 如果有 sessionId 且 resume 为 true，将 resume 设置为 sessionId
@@ -39,17 +78,6 @@ function filterSDKOptions(options) {
 }
 
 /**
- * 转义命令字符串
- * @param {string} command - 原始命令
- * @returns {string} 转义后的命令
- */
-function escapeCommand(command) {
-  return command
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "\\'");
-}
-
-/**
  * 生成 SDK 执行脚本
  * @param {string} command - 用户命令
  * @param {object} options - SDK 选项
@@ -58,16 +86,16 @@ function escapeCommand(command) {
 export function buildSDKScript(command, options) {
   // 提取 sessionId 以便在脚本中使用
   const sessionId = options.sessionId || '';
-  
+
   // 过滤并处理 options
   const sdkOptions = filterSDKOptions(options);
-  
-  // 使用 base64 编码来避免转义问题
+
+  // 使用 base64 编码来避免转义问题（包括 options 和 command）
   const optionsJson = JSON.stringify(sdkOptions);
   const optionsBase64 = Buffer.from(optionsJson).toString('base64');
-  
-  // 转义命令
-  const escapedCommand = escapeCommand(command);
+
+  // 对命令也使用 base64 编码，避免特殊字符问题
+  const commandBase64 = Buffer.from(command, 'utf-8').toString('base64');
 
   // 生成脚本模板
   return `cd /app && node --input-type=module -e '
@@ -85,8 +113,11 @@ async function execute() {
     const optionsJson = Buffer.from("${optionsBase64}", "base64").toString("utf-8");
     const options = JSON.parse(optionsJson);
 
+    // 从 base64 解码命令
+    const command = Buffer.from("${commandBase64}", "base64").toString("utf-8");
+
     console.error("[SDK] Options:", JSON.stringify(options, null, 2));
-    console.error("[SDK] Command:", "${escapedCommand}");
+    console.error("[SDK] Command:", command);
 
     // 重要：设置 SDK 的工作目录环境变量
     // SDK 使用 HOME 或 USERPROFILE 等环境变量来确定配置文件位置
@@ -97,11 +128,19 @@ async function execute() {
       process.env.HOME = projectDir;
       // 也设置其他可能的环境变量
       process.env.USERPROFILE = projectDir;
+
+      // 切换到项目目录，确保工具在正确的位置执行
+      console.error("[SDK] Changing CWD to:", projectDir);
+      try {
+        process.chdir(projectDir);
+      } catch (chdirError) {
+        console.error("[SDK] Failed to change directory:", chdirError.message);
+      }
     }
 
     // Claude SDK 接受一个对象参数：{ prompt, options }
     const result = query({
-      prompt: "${escapedCommand}",
+      prompt: command,
       options: options
     });
     console.error("[SDK] Query started, waiting for chunks...");
@@ -113,13 +152,13 @@ async function execute() {
       console.error("[SDK] Chunk type:", typeof chunk);
       console.error("[SDK] Chunk keys:", Object.keys(chunk || {}).join(", "));
       console.error("[SDK] Full chunk:", JSON.stringify(chunk, null, 2));
-      
+
       // 输出 chunk 到 stdout 供前端接收
       console.log(JSON.stringify({
         type: "content",
         chunk: chunk
       }));
-      
+
       if (chunk.sessionId) {
         console.error("[SDK] Session ID from chunk:", chunk.sessionId);
       }

@@ -48,11 +48,31 @@ export function mapCliOptionsToSDK(options = {}) {
     skipPermissions: false
   };
 
+  // 默认工具列表
+  const defaultTools = [
+    'Bash(git log:*)',
+    'Bash(git diff:*)',
+    'Bash(git status:*)',
+    'Write',
+    'Read',
+    'Edit',
+    'Glob',
+    'Grep',
+    'MultiEdit',
+    'Task',
+    'TodoWrite',
+    'TodoRead',
+    'WebFetch',
+    'WebSearch'
+  ];
+
   // 处理工具权限
   if (settings.skipPermissions && permissionMode !== 'plan') {
     sdkOptions.permissionMode = 'bypassPermissions';
   } else {
-    let allowedTools = [...(settings.allowedTools || [])];
+    let allowedTools = (settings.allowedTools && settings.allowedTools.length > 0) 
+      ? [...settings.allowedTools] 
+      : [...defaultTools];
 
     // 添加计划模式默认工具
     if (permissionMode === 'plan') {
