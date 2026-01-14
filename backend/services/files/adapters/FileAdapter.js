@@ -1,10 +1,10 @@
 /**
- * ContainerFileAdapter.js
+ * FileAdapter.js
  *
- * 容器文件操作适配器
+ * 文件操作适配器
  * 在 Docker 容器中执行文件操作
  *
- * @module files/adapters/ContainerFileAdapter
+ * @module files/adapters/FileAdapter
  */
 
 import { BaseFileAdapter } from './BaseFileAdapter.js';
@@ -13,18 +13,18 @@ import { CONTAINER } from '../../../config/config.js';
 import { PathUtils } from '../../core/utils/path-utils.js';
 
 /**
- * 容器文件操作适配器
+ * 文件操作适配器
  * 在用户专属的 Docker 容器中执行文件操作
  */
-export class ContainerFileAdapter extends BaseFileAdapter {
+export class FileAdapter extends BaseFileAdapter {
   /**
    * 构造函数
    * @param {Object} config - 适配器配置
    */
   constructor(config = {}) {
     super({
-      name: 'ContainerFileAdapter',
-      version: '1.0.0',
+      name: 'FileAdapter',
+      version: '2.0.0',
       ...config
     });
     this.adapterType = 'container';
@@ -74,7 +74,7 @@ export class ContainerFileAdapter extends BaseFileAdapter {
         );
       }
 
-      console.log('[ContainerFileAdapter] readFile:', { filePath, cleanPath, containerPath });
+      console.log('[FileAdapter] readFile:', { filePath, cleanPath, containerPath });
 
       // 验证路径安全性
       if (containerPath.includes('..')) {
@@ -586,7 +586,7 @@ export class ContainerFileAdapter extends BaseFileAdapter {
 
       // 验证每个部分是否有效
       if (parts.length === 0 || parts.some(part => part === '' || !this._isValidFileName(part))) {
-        console.log('[ContainerFileAdapter] Skipping invalid path:', relativePath, '->', parts);
+        console.log('[FileAdapter] Skipping invalid path:', relativePath, '->', parts);
         continue; // 跳过无效路径
       }
 
@@ -630,4 +630,4 @@ export class ContainerFileAdapter extends BaseFileAdapter {
   }
 }
 
-export default ContainerFileAdapter;
+export default FileAdapter;

@@ -7,8 +7,7 @@
 // 文件适配器
 export {
   BaseFileAdapter,
-  NativeFileAdapter,
-  ContainerFileAdapter
+  FileAdapter
 } from './adapters/index.js';
 
 // 文件操作服务

@@ -8,8 +8,7 @@ import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   BaseFileAdapter,
-  NativeFileAdapter,
-  ContainerFileAdapter
+  FileAdapter
 } from '../adapters/index.js';
 
 // Mock container manager
@@ -164,42 +163,22 @@ describe('BaseFileAdapter', () => {
   });
 });
 
-describe('NativeFileAdapter', () => {
+describe('FileAdapter', () => {
   let adapter;
 
   before(() => {
-    adapter = new NativeFileAdapter();
+    adapter = new FileAdapter();
   });
 
   it('should have correct adapter type', () => {
-    assert.equal(adapter.name, 'NativeFileAdapter');
-    assert.equal(adapter.getType(), 'native');
-  });
-
-  it('should get adapter info', () => {
-    const info = adapter.getInfo();
-
-    assert.equal(info.name, 'NativeFileAdapter');
-    assert.equal(info.type, 'native');
-  });
-});
-
-describe('ContainerFileAdapter', () => {
-  let adapter;
-
-  before(() => {
-    adapter = new ContainerFileAdapter();
-  });
-
-  it('should have correct adapter type', () => {
-    assert.equal(adapter.name, 'ContainerFileAdapter');
+    assert.equal(adapter.name, 'FileAdapter');
     assert.equal(adapter.getType(), 'container');
   });
 
   it('should get adapter info', () => {
     const info = adapter.getInfo();
 
-    assert.equal(info.name, 'ContainerFileAdapter');
+    assert.equal(info.name, 'FileAdapter');
     assert.equal(info.type, 'container');
   });
 

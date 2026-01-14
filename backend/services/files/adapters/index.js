@@ -5,5 +5,4 @@
  */
 
 export { BaseFileAdapter } from './BaseFileAdapter.js';
-export { NativeFileAdapter } from './NativeFileAdapter.js';
-export { ContainerFileAdapter } from './ContainerFileAdapter.js';
+export { FileAdapter } from './FileAdapter.js';
