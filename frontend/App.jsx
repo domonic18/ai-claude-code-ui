@@ -280,9 +280,11 @@ function AppContent() {
     }
   }, [messages, selectedProject, selectedSession, activeSessions]);
 
-  const fetchProjects = async () => {
+  const fetchProjects = async (isRetry = false) => {
     try {
-      setIsLoadingProjects(true);
+      if (!isRetry) {
+        setIsLoadingProjects(true);
+      }
       const response = await api.projects();
 
       if (!response.ok) {
@@ -294,6 +296,17 @@ function AppContent() {
       const responseData = await response.json();
       // 后端返回 {success: true, data: [...], meta: {...}}
       const data = responseData.data;
+
+      // 容器模式自动重试：如果返回空列表且是首次加载（不是用户手动刷新）
+      // 自动重试几次，因为容器可能还在初始化中
+      if (!isRetry && data.length === 0 && user) {
+        console.log('[App] No projects found, container may be initializing. Scheduling retry...');
+        setTimeout(() => {
+          console.log('[App] Retrying project fetch...');
+          fetchProjects(true);
+        }, 2000); // 2秒后重试
+        return;
+      }
 
       // Always fetch Cursor sessions for each project so we can combine views
       for (let project of data) {
