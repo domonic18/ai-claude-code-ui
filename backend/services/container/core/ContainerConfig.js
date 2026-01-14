@@ -32,6 +32,17 @@ export class ContainerConfigBuilder {
     return {
       name: name,
       Image: image,
+      // 关键配置：启用 TTY 和 stdin 以支持交互式 shell attach
+      // 这是使用 container.attach() 获取可写流的必要条件
+      Tty: true,
+      OpenStdin: true,
+      AttachStdin: true,
+      AttachStdout: true,
+      AttachStderr: true,
+      // 容器主命令：交互式 shell
+      // 这样 container.attach() 可以获取到可写的 shell 流
+      // 每个用户有独立的容器，所以不会有多用户冲突
+      Cmd: ['/bin/sh', '-c', 'exec /bin/sh -i 2>&1'],
       Env: this._buildEnvironment(userId, tier),
       HostConfig: {
         // 单一挂载点：所有数据统一在 /workspace 下

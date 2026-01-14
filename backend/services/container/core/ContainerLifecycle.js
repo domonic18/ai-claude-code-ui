@@ -470,6 +470,50 @@ export class ContainerLifecycleManager {
   }
 
   /**
+   * 附加到容器的交互式 shell
+   * 使用 container.attach() 而不是 exec.start() 来获得可写的 Duplex 流
+   * 这对于交互式 shell 是必需的，因为 exec.start() 返回只读流
+   *
+   * @param {number} userId - 用户 ID
+   * @param {object} options - 附加选项
+   * @param {string} options.workingDir - 工作目录
+   * @param {number} options.cols - 终端列数
+   * @param {number} options.rows - 终端行数
+   * @returns {Promise<object>} { stream, container, containerId }
+   */
+  async attachToContainerShell(userId, options = {}) {
+    const containerInfo = await this.getOrCreateContainer(userId);
+    const container = this.docker.getContainer(containerInfo.id);
+    const { workingDir = CONTAINER.paths.workspace } = options;
+
+    // 使用 container.attach() 获取可写的 Duplex 流
+    // hijack: true 是关键 - 它升级连接到 WebSocket 类协议
+    return new Promise((resolve, reject) => {
+      container.attach({
+        stream: true,
+        stdin: true,
+        stdout: true,
+        stderr: true,
+        hijack: true,
+        logs: false
+      }, (err, stream) => {
+        if (err) {
+          reject(new Error(`Failed to attach to container: ${err.message}`));
+          return;
+        }
+
+        // hijack 模式返回的是原始双向流，不使用 Docker 多路复用格式
+        // 可以直接读取和写入
+        resolve({
+          stream,
+          container,
+          containerId: containerInfo.id
+        });
+      });
+    });
+  }
+
+  /**
    * 从数据库加载容器到内存缓存
    * 在启动时调用以从数据库恢复容器状态
    * @returns {Promise<void>}

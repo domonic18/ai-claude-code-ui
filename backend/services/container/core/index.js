@@ -82,6 +82,7 @@ class ContainerManager {
       'startContainer',
       'destroyContainer',
       'execInContainer',
+      'attachToContainerShell',
       'loadContainersFromDatabase',
       'getAllContainers',
       'getContainerByUserId'
