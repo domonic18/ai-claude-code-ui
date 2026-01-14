@@ -301,8 +301,8 @@ export class ProjectController extends BaseController {
       const cleanPath = workspacePath.trim();
       const cleanGithubUrl = githubUrl?.trim();
 
-      // 容器模式：在容器中创建工作空间
-      if (CONTAINER.enabled) {
+      // 在容器中创建工作空间
+      {
         // 获取或创建用户容器
         await containerManager.getOrCreateContainer(userId);
 
@@ -424,26 +424,6 @@ export class ProjectController extends BaseController {
             }
           }, 'Existing workspace added successfully');
         }
-
-      } else {
-        // 非容器模式：使用原来的逻辑
-        const { createWorkspace } = await import('../../services/workspace/index.js');
-        const result = await createWorkspace({
-          workspaceType,
-          path: cleanPath,
-          githubUrl: cleanGithubUrl,
-          githubTokenId,
-          newGithubToken,
-          userId
-        });
-
-        if (!result.success) {
-          throw new ValidationError(result.error || 'Failed to create workspace');
-        }
-
-        this._success(res, {
-          project: result.project
-        }, result.message || 'Workspace created successfully');
       }
 
     } catch (error) {
