@@ -1,0 +1,329 @@
+/**
+ * 容器项目管理模块
+ *
+ * 提供容器内的项目管理功能，包括列出项目和创建默认工作区。
+ * 支持从容器内读取会话信息。
+ *
+ * @module projects/managers/ContainerProjectManager
+ */
+
+import { PassThrough } from 'stream';
+import containerManager from '../../container/core/index.js';
+import { writeFileInContainer } from '../../files/utils/container-ops.js';
+import { getSessionsInContainer } from '../../sessions/container/ContainerSessions.js';
+import { CONTAINER } from '../../../config/config.js';
+import { loadProjectConfig } from '../config/index.js';
+
+/** 默认项目名称 */
+const DEFAULT_PROJECT_NAME = 'my-workspace';
+
+/** 正在创建默认项目的用户锁：userId -> Promise */
+const creatingDefaultWorkspace = new Map();
+
+/**
+ * 从容器内获取项目列表
+ * 在容器模式下，项目存储在 /workspace 下
+ * 如果用户没有项目，自动创建默认工作区
+ * @param {number} userId - 用户 ID
+ * @returns {Promise<Array>} 项目列表
+ */
+export async function getProjectsInContainer(userId) {
+  console.log('[ContainerProjectManager] getProjectsInContainer - userId:', userId);
+
+  try {
+    // 获取容器（设置短超时，避免长时间阻塞前端请求）
+    // 如果容器正在创建中，快速返回空列表，让前端通过轮询获取
+    let container;
+    try {
+      container = await containerManager.getOrCreateContainer(userId, {}, { wait: true, timeout: 5000 });
+      console.log('[ContainerProjectManager] Container:', container.id, container.name);
+    } catch (error) {
+      // 容器未就绪，返回空列表让前端继续轮询
+      console.log('[ContainerProjectManager] Container not ready yet, returning empty list:', error.message);
+      return [];
+    }
+
+    // 根据文档设计，项目直接在 /workspace 下，不在 .claude/projects 下
+    // 我们需要从 /workspace 列出所有目录，排除 .claude 等系统目录
+    const workspacePath = CONTAINER.paths.workspace;
+
+    // 列出容器中的项目目录（排除 .claude 等系统目录）
+    // 使用单个命令完成：列出目录 + 过滤 + 验证
+    const { stream } = await containerManager.execInContainer(
+      userId,
+      `for item in "${workspacePath}"/*; do [ -d "$item" ] && basename "$item"; done 2>/dev/null | grep -v "^\\.claude$" || echo ""`
+    );
+
+    // 收集输出
+    const projects = await new Promise((resolve, reject) => {
+      const stdout = new PassThrough();
+      const stderr = new PassThrough();
+      let output = '';
+
+      // 使用 Docker 的 demuxStream 分离 stdout/stderr，这会移除 8 字节协议头
+      containerManager.docker.modem.demuxStream(stream, stdout, stderr);
+
+      stdout.on('data', (chunk) => {
+        output += chunk.toString();
+      });
+
+      stderr.on('data', (chunk) => {
+        console.error('[ContainerProjectManager] STDERR:', chunk.toString());
+      });
+
+      stream.on('error', (err) => {
+        console.error('[ContainerProjectManager] Error listing projects:', err);
+        resolve([]);
+      });
+
+      stream.on('end', async () => {
+        try {
+          const projectList = [];
+          const lines = output.trim().split('\n');
+
+          // 读取项目配置以获取自定义显示名称
+          let projectConfig = {};
+          try {
+            projectConfig = await loadProjectConfig();
+          } catch (configError) {
+            console.warn('[ContainerProjectManager] Failed to load project config:', configError.message);
+          }
+
+          console.log('[ContainerProjectManager] Raw ls output:', JSON.stringify(output));
+          console.log('[ContainerProjectManager] Split lines:', lines.length);
+
+          for (const line of lines) {
+            let projectName = line.trim();
+
+            // 从项目名称中清理控制字符（移除所有控制字符 ASCII 0-31, 127）
+            projectName = projectName
+              .replace(/[\x00-\x1f\x7f]/g, '')
+              .trim();
+
+            // 跳过空行和隐藏目录（以 . 开头）
+            if (!projectName || projectName === '' || projectName.startsWith('.')) {
+              console.log('[ContainerProjectManager] Skipping hidden/empty:', projectName);
+              continue;
+            }
+
+            const decodedPath = projectName.replace(/-/g, '/');
+
+            // 优先使用自定义显示名称，否则使用项目名称
+            const customDisplayName = projectConfig[projectName]?.displayName;
+            const displayName = customDisplayName || projectName;
+
+            projectList.push({
+              name: projectName,
+              path: decodedPath,
+              displayName: displayName,
+              fullPath: projectName,
+              isContainerProject: true,
+              sessions: [],
+              sessionMeta: { hasMore: false, total: 0 },
+              cursorSessions: [],
+              codexSessions: []
+            });
+          }
+
+          console.log('[ContainerProjectManager] Found projects in container:', projectList.length);
+          console.log('[ContainerProjectManager] Project data:', JSON.stringify(projectList, null, 2));
+
+          // 如果用户没有项目，创建默认工作区
+          if (projectList.length === 0) {
+            // 检查是否已有其他请求在创建默认项目（防止并发创建）
+            if (creatingDefaultWorkspace.has(userId)) {
+              console.log('[ContainerProjectManager] Default workspace creation already in progress, waiting...');
+              try {
+                const defaultProject = await creatingDefaultWorkspace.get(userId);
+                if (defaultProject) {
+                  projectList.push(defaultProject);
+                }
+              } catch (error) {
+                console.error('[ContainerProjectManager] Failed to wait for default workspace creation:', error);
+              }
+            } else {
+              // 只有第一个创建请求才打印这条日志
+              console.log('[ContainerProjectManager] No projects found for user, creating default workspace');
+              // 创建默认工作区，并缓存 Promise 以防止并发创建
+              const createPromise = createDefaultWorkspace(userId);
+              creatingDefaultWorkspace.set(userId, createPromise);
+
+              try {
+                const defaultProject = await createPromise;
+                if (defaultProject) {
+                  projectList.push(defaultProject);
+                }
+              } catch (error) {
+                console.error('[ContainerProjectManager] Failed to create default workspace:', error);
+              } finally {
+                // 清理锁，允许失败后重试
+                creatingDefaultWorkspace.delete(userId);
+              }
+            }
+          }
+
+          // 加载每个项目的会话信息
+          for (const project of projectList) {
+            try {
+              console.log(`[ContainerProjectManager] Loading sessions for project: ${project.name}`);
+              const sessionResult = await getSessionsInContainer(userId, project.name, 5, 0);
+              project.sessions = sessionResult.sessions || [];
+              project.sessionMeta = {
+                hasMore: sessionResult.hasMore,
+                total: sessionResult.total
+              };
+              console.log(`[ContainerProjectManager] Loaded ${project.sessions.length} sessions for ${project.name} (total: ${sessionResult.total})`);
+            } catch (error) {
+              console.warn(`[ContainerProjectManager] Could not load sessions for project ${project.name}:`, error.message);
+              // 保持空会话列表
+              project.sessions = [];
+              project.sessionMeta = { hasMore: false, total: 0 };
+            }
+          }
+
+          resolve(projectList);
+        } catch (parseError) {
+          console.error('[ContainerProjectManager] Error parsing projects:', parseError);
+          reject(new Error(`Failed to parse projects: ${parseError.message}`));
+        }
+      });
+    });
+
+    return projects;
+  } catch (error) {
+    console.error('[ContainerProjectManager] Failed to get projects in container:', error);
+    throw new Error(`Failed to get projects in container: ${error.message}`);
+  }
+}
+
+/**
+ * 创建默认工作区
+ * @param {number} userId - 用户 ID
+ * @returns {Promise<object|null>} 默认项目信息
+ */
+async function createDefaultWorkspace(userId) {
+  // 根据文档设计：
+  // - 项目代码目录：/workspace/my-workspace/ （实际的项目代码）
+  // - 用户级配置：/workspace/.claude/ （~/.claude/，所有项目共享）
+  // - 项目级配置：/workspace/my-workspace/.claude/ （项目特定，覆盖用户级）
+  // 项目直接在 /workspace 下，不在 .claude/ 下
+  const projectPath = `${CONTAINER.paths.workspace}/${DEFAULT_PROJECT_NAME}`;
+
+  console.log('[ContainerProjectManager] Creating default workspace at:', projectPath);
+
+  try {
+    // 创建默认项目目录 - 使用 containerManager.execInContainer 确保命令执行完成
+    const createDirResult = await containerManager.execInContainer(
+      userId,
+      `mkdir -p "${projectPath}"`
+    );
+
+    // 等待命令完成
+    await new Promise((resolve) => {
+      createDirResult.stream.on('end', resolve);
+    });
+    console.log('[ContainerProjectManager] Directory created:', projectPath);
+
+    // 初始化为 git 仓库
+    const gitResult = await containerManager.execInContainer(
+      userId,
+      `cd "${projectPath}" && git init`
+    );
+
+    await new Promise((resolve) => {
+      gitResult.stream.on('end', resolve);
+    });
+
+    // 创建 README 文件
+    const readmeContent = `# My Workspace
+
+Welcome to your Claude Code workspace! This is your default project where you can start coding.
+
+## Getting Started
+
+- Use the chat interface to ask Claude to help you with coding tasks
+- Use the file explorer to browse and edit files
+- Use the terminal to run commands
+
+## Tips
+
+- You can create additional workspaces from the projects menu
+- All your work is automatically saved in the container
+- Ask Claude to help you set up new projects or debug issues
+
+Happy coding!
+`;
+    await writeFileInContainer(userId, 'README.md', readmeContent, {
+      projectPath: DEFAULT_PROJECT_NAME,
+      isContainerProject: true
+    });
+
+    // 创建 .gitignore
+    const gitignoreContent = `# Dependencies
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+`;
+    await writeFileInContainer(userId, '.gitignore', gitignoreContent, {
+      projectPath: DEFAULT_PROJECT_NAME,
+      isContainerProject: true
+    });
+
+    // 创建 package.json
+    const packageJson = {
+      name: 'my-workspace',
+      version: '1.0.0',
+      description: 'My Claude Code workspace',
+      scripts: {
+        test: 'echo "Error: no test specified" && exit 1'
+      },
+      keywords: [],
+      author: '',
+      license: 'ISC'
+    };
+    await writeFileInContainer(userId, 'package.json', JSON.stringify(packageJson, null, 2), {
+      projectPath: DEFAULT_PROJECT_NAME,
+      isContainerProject: true
+    });
+
+    console.log('[ContainerProjectManager] Default workspace created successfully');
+
+    // 检查是否有自定义显示名称
+    let displayName = 'My Workspace';
+    try {
+      const projectConfig = await loadProjectConfig();
+      displayName = projectConfig[DEFAULT_PROJECT_NAME]?.displayName || 'My Workspace';
+    } catch (configError) {
+      console.warn('[ContainerProjectManager] Failed to load project config for default workspace:', configError.message);
+    }
+
+    return {
+      name: DEFAULT_PROJECT_NAME,
+      path: DEFAULT_PROJECT_NAME,
+      displayName: displayName,
+      fullPath: DEFAULT_PROJECT_NAME,
+      isContainerProject: true,
+      sessions: [],
+      sessionMeta: { hasMore: false, total: 0 },
+      cursorSessions: [],
+      codexSessions: []
+    };
+  } catch (createError) {
+    console.error('[ContainerProjectManager] Failed to create default workspace:', createError);
+    return null;
+  }
+}
