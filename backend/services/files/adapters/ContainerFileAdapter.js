@@ -50,20 +50,44 @@ export class ContainerFileAdapter extends BaseFileAdapter {
     } = options;
 
     try {
-      // 验证路径
-      const validation = this._validatePath(filePath, options);
-      if (!validation.valid) {
-        throw new Error(validation.error);
+      // 清理路径中的 ./ 和 //
+      let cleanPath = filePath.replace(/\/\.\//g, '/').replace(/\/+/g, '/');
+
+      let containerPath;
+
+      // 检查是否是绝对路径（以 /workspace 开头）
+      if (cleanPath.startsWith('/workspace')) {
+        // 已经是绝对路径，直接使用
+        containerPath = cleanPath;
+      } else {
+        // 相对路径，需要构建完整路径
+        // 移除开头的斜杠（如果有）
+        if (cleanPath.startsWith('/')) {
+          cleanPath = cleanPath.substring(1);
+        }
+
+        // 验证路径
+        const validation = this._validatePath(cleanPath, options);
+        if (!validation.valid) {
+          throw new Error(validation.error);
+        }
+
+        // 构建容器路径
+        containerPath = this._buildContainerPath(
+          validation.safePath,
+          { projectPath, isContainerProject }
+        );
+      }
+
+      console.log('[ContainerFileAdapter] readFile:', { filePath, cleanPath, containerPath });
+
+      // 验证路径安全性
+      if (containerPath.includes('..')) {
+        throw new Error('Path traversal detected');
       }
 
       // 获取或创建容器
       await containerManager.getOrCreateContainer(userId);
-
-      // 构建容器路径
-      const containerPath = this._buildContainerPath(
-        validation.safePath,
-        { projectPath, isContainerProject }
-      );
 
       // 执行 cat 命令读取文件
       const { stream } = await containerManager.execInContainer(
@@ -120,10 +144,38 @@ export class ContainerFileAdapter extends BaseFileAdapter {
     } = options;
 
     try {
-      // 验证路径
-      const validation = this._validatePath(filePath, options);
-      if (!validation.valid) {
-        throw new Error(validation.error);
+      // 清理路径中的 ./ 和 //
+      let cleanPath = filePath.replace(/\/\.\//g, '/').replace(/\/+/g, '/');
+
+      let containerPath;
+
+      // 检查是否是绝对路径（以 /workspace 开头）
+      if (cleanPath.startsWith('/workspace')) {
+        // 已经是绝对路径，直接使用
+        containerPath = cleanPath;
+      } else {
+        // 相对路径，需要构建完整路径
+        // 移除开头的斜杠（如果有）
+        if (cleanPath.startsWith('/')) {
+          cleanPath = cleanPath.substring(1);
+        }
+
+        // 验证路径
+        const validation = this._validatePath(cleanPath, options);
+        if (!validation.valid) {
+          throw new Error(validation.error);
+        }
+
+        // 构建容器路径
+        containerPath = this._buildContainerPath(
+          validation.safePath,
+          { projectPath, isContainerProject }
+        );
+      }
+
+      // 验证路径安全性
+      if (containerPath.includes('..')) {
+        throw new Error('Path traversal detected');
       }
 
       // 验证文件大小
@@ -134,12 +186,6 @@ export class ContainerFileAdapter extends BaseFileAdapter {
 
       // 获取或创建容器
       await containerManager.getOrCreateContainer(userId);
-
-      // 构建容器路径
-      const containerPath = this._buildContainerPath(
-        validation.safePath,
-        { projectPath, isContainerProject }
-      );
 
       // 如果目录不存在则创建
       const dirPath = containerPath.substring(0, containerPath.lastIndexOf('/'));
@@ -518,30 +564,104 @@ export class ContainerFileAdapter extends BaseFileAdapter {
     const tree = [];
     const processedPaths = new Set();
 
+    // 预先收集所有路径，用于判断是文件还是目录
+    const allPaths = new Set(lines);
+
+    /**
+     * 清理文件名中的控制字符和非打印字符
+     * @private
+     * @param {string} name - 文件名
+     * @returns {string} 清理后的文件名
+     */
+    const cleanFileName = (name) => {
+      // 移除所有控制字符和非打印字符 (ASCII 0-31, 127)
+      let cleaned = name.replace(/[\x00-\x1f\x7f]/g, '').trim();
+      // 移除 Unicode 替换字符 U+FFFD
+      cleaned = cleaned.replace(/\uFFFD/g, '').trim();
+      // 移除其他非打印 Unicode 字符
+      cleaned = cleaned.replace(/[\u2000-\u200F\u2028-\u202F\u205F\u3000]/g, '').trim();
+      return cleaned;
+    };
+
+    /**
+     * 验证文件名是否有效
+     * @private
+     * @param {string} name - 文件名
+     * @returns {boolean} 是否有效
+     */
+    const isValidFileName = (name) => {
+      if (!name || name.length === 0) return false;
+      // 检查是否只包含有效字符（字母、数字、中文、常见符号）
+      const validPattern = /^[\w\u4e00-\u9fa5\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af\u0400-\u04ff\u0370-\u03ff\u0590-\u05ff\u0600-\u06ff\u0750-\u077f .,_+-@#()[\]{}$%'`=~!&]+$/;
+      if (!validPattern.test(name)) return false;
+      // 必须包含至少一个字母或数字或中文字符（不能只有符号）
+      const hasContent = /[\w\u4e00-\u9fa5\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af\u0400-\u04ff\u0370-\u03ff\u0590-\u05ff\u0600-\u06ff\u0750-\u077f]/.test(name);
+      if (!hasContent) return false;
+      // 不能包含替换字符
+      return !name.includes('\ufffd');
+    };
+
+    /**
+     * 检查是否为隐藏文件/目录
+     * @private
+     * @param {string} name - 文件名
+     * @returns {boolean} 是否为隐藏文件
+     */
+    const isHiddenFile = (name) => {
+      return name.startsWith('.');
+    };
+
+    /**
+     * 判断路径是否为目录
+     * @private
+     * @param {string} fullPath - 完整路径
+     * @returns {boolean} 是否为目录
+     */
+    const isDirectory = (fullPath) => {
+      // 检查是否有其他路径以这个路径开头（后面跟着斜杠）
+      for (const path of allPaths) {
+        if (path !== fullPath && path.startsWith(fullPath + '/')) {
+          return true;
+        }
+      }
+      return false;
+    };
+
     for (const line of lines) {
-      // 跳过空行和以点开头的隐藏文件/目录
+      // 跳过空行
       if (!line || line.trim() === '') {
         continue;
       }
 
       const relativePath = line.replace(basePath + '/', '').replace(basePath, '');
 
+      // 跳过隐藏文件/目录（路径的任何部分以点开头）
+      const pathParts = relativePath.split('/');
+      if (pathParts.some(part => isHiddenFile(part))) {
+        continue;
+      }
+
       if (processedPaths.has(relativePath)) {
         continue;
       }
       processedPaths.add(relativePath);
 
-      const parts = relativePath.split('/').filter(Boolean); // 过滤空字符串
-      if (parts.length === 0) {
-        continue; // 跳过空路径
+      const parts = relativePath.split('/').filter(Boolean).map(cleanFileName);
+
+      // 验证每个部分是否有效
+      if (parts.length === 0 || parts.some(part => part === '' || !isValidFileName(part))) {
+        console.log('[ContainerFileAdapter] Skipping invalid path:', relativePath, '->', parts);
+        continue; // 跳过无效路径
       }
 
       let currentLevel = tree;
 
       for (let i = 0; i < parts.length; i++) {
         const part = parts[i];
-        const isLast = i === parts.length - 1;
-        const isDir = !isLast;
+        // 构建到当前部分的完整路径
+        const pathSoFar = `${basePath}/${parts.slice(0, i + 1).join('/')}`;
+        // 判断是否为目录
+        const isDir = isDirectory(pathSoFar);
 
         let existing = currentLevel.find(item => item.name === part);
 
@@ -549,7 +669,7 @@ export class ContainerFileAdapter extends BaseFileAdapter {
           existing = {
             name: part,
             type: isDir ? 'directory' : 'file',
-            path: `${basePath}/${parts.slice(0, i + 1).join('/')}`
+            path: pathSoFar
           };
 
           if (isDir) {
@@ -566,8 +686,6 @@ export class ContainerFileAdapter extends BaseFileAdapter {
         if (isDir) {
           // 确保 currentLevel 始终是一个数组
           currentLevel = existing.children || tree;
-        } else {
-          break;
         }
       }
     }

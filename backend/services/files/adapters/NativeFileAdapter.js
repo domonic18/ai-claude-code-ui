@@ -272,15 +272,78 @@ export class NativeFileAdapter extends BaseFileAdapter {
     const entries = await fs.readdir(dirPath, { withFileTypes: true });
     const result = [];
 
+    /**
+     * 清理文件名中的控制字符和非打印字符
+     * @private
+     * @param {string} name - 文件名
+     * @returns {string} 清理后的文件名
+     */
+    const cleanFileName = (name) => {
+      // 移除所有控制字符和非打印字符 (ASCII 0-31, 127)
+      let cleaned = name.replace(/[\x00-\x1f\x7f]/g, '').trim();
+      // 移除 Unicode 替换字符 U+FFFD
+      cleaned = cleaned.replace(/\uFFFD/g, '').trim();
+      // 移除其他非打印 Unicode 字符
+      cleaned = cleaned.replace(/[\u2000-\u200F\u2028-\u202F\u205F\u3000]/g, '').trim();
+      return cleaned;
+    };
+
+    /**
+     * 验证文件名是否有效
+     * @private
+     * @param {string} name - 文件名
+     * @returns {boolean} 是否有效
+     */
+    const isValidFileName = (name) => {
+      if (!name || name.length === 0) return false;
+      // 检查是否只包含有效字符（字母、数字、中文、常见符号）
+      const validPattern = /^[\w\u4e00-\u9fa5\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af\u0400-\u04ff\u0370-\u03ff\u0590-\u05ff\u0600-\u06ff\u0750-\u077f .,_+-@#()[\]{}$%'`=~!&]+$/;
+      if (!validPattern.test(name)) return false;
+      // 必须包含至少一个字母或数字或中文字符（不能只有符号）
+      const hasContent = /[\w\u4e00-\u9fa5\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af\u0400-\u04ff\u0370-\u03ff\u0590-\u05ff\u0600-\u06ff\u0750-\u077f]/.test(name);
+      if (!hasContent) return false;
+      // 不能包含替换字符
+      return !name.includes('\ufffd');
+    };
+
+    /**
+     * 检查是否为隐藏文件/目录
+     * @private
+     * @param {string} name - 文件名
+     * @returns {boolean} 是否为隐藏文件
+     */
+    const isHiddenFile = (name) => {
+      return name.startsWith('.');
+    };
+
     for (const entry of entries) {
-      // 跳过排除的目录
-      if (entry.isDirectory() && excludedDirs.includes(entry.name)) {
+      const cleanName = cleanFileName(entry.name);
+
+      // 跳过清理后为空的文件名（乱码文件）
+      if (!cleanName) {
+        console.log('[NativeFileAdapter] Skipping empty filename after cleaning:', entry.name);
         continue;
       }
 
-      const fullPath = path.join(dirPath, entry.name);
+      // 验证文件名是否有效
+      if (!isValidFileName(cleanName)) {
+        console.log('[NativeFileAdapter] Skipping invalid filename:', entry.name, '->', cleanName);
+        continue;
+      }
+
+      // 跳过隐藏文件/目录（以点开头）
+      if (isHiddenFile(cleanName)) {
+        continue;
+      }
+
+      // 跳过排除的目录
+      if (entry.isDirectory() && excludedDirs.includes(cleanName)) {
+        continue;
+      }
+
+      const fullPath = path.join(dirPath, cleanName);
       const item = {
-        name: entry.name,
+        name: cleanName,
         type: entry.isDirectory() ? 'directory' : 'file',
         path: fullPath
       };
