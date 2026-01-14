@@ -119,9 +119,12 @@ export class ContainerLifecycleManager {
    * 使用状态机管理容器生命周期，确保线程安全和幂等性
    * @param {number} userId - 用户 ID
    * @param {object} userConfig - 用户配置
+   * @param {object} options - 选项
+   * @param {number} options.timeout - 等待超时时间（毫秒），默认 120000
+   * @param {boolean} options.wait - 是否等待容器就绪，默认 true
    * @returns {Promise<ContainerInfo>} 容器信息
    */
-  async getOrCreateContainer(userId, userConfig = {}) {
+  async getOrCreateContainer(userId, userConfig = {}, options = {}) {
     const containerName = `claude-user-${userId}`;
 
     // 获取状态机
@@ -158,10 +161,16 @@ export class ContainerLifecycleManager {
 
     // 情况 2: 容器正在创建/启动/健康检查中，等待完成
     if ([ContainerState.CREATING, ContainerState.STARTING, ContainerState.HEALTH_CHECKING].includes(stateMachine.getState())) {
+      // 如果设置了不等待，立即抛出错误让调用方处理
+      if (options.wait === false) {
+        console.log(`[Lifecycle] Container ${stateMachine.getState()} in progress for user ${userId}, not waiting (wait=false)`);
+        throw new Error(`Container is ${stateMachine.getState()}, not ready yet`);
+      }
+
       console.log(`[Lifecycle] Container ${stateMachine.getState()} in progress for user ${userId}, waiting...`);
 
       try {
-        await this._waitForReady(userId);
+        await this._waitForReady(userId, options.timeout);
         return this.containers.get(userId);
       } catch (error) {
         // 等待失败，检查是否需要重试
@@ -170,7 +179,7 @@ export class ContainerLifecycleManager {
           console.log(`[Lifecycle] Previous creation failed for user ${userId}, resetting...`);
           stateMachine.transitionTo(ContainerState.NON_EXISTENT);
           await containerStateStore.save(stateMachine);
-          return this.getOrCreateContainer(userId, userConfig);
+          return this.getOrCreateContainer(userId, userConfig, options);
         }
         throw error;
       }
