@@ -1,10 +1,10 @@
 /**
- * ContainerExecutionEngine.js
+ * ExecutionEngine.js
  *
- * 容器执行引擎
+ * 执行引擎
  * 在 Docker 容器中执行 Claude SDK 调用
  *
- * @module execution/engines/ContainerExecutionEngine
+ * @module execution/engines/ExecutionEngine
  */
 
 import { BaseExecutionEngine } from './BaseExecutionEngine.js';
@@ -16,18 +16,18 @@ import { createSession, updateSession } from '../../container/claude/SessionMana
 import { CONTAINER } from '../../../config/config.js';
 
 /**
- * 容器执行引擎
+ * 执行引擎
  * 在用户专属的 Docker 容器中执行 Claude SDK 调用
  */
-export class ContainerExecutionEngine extends BaseExecutionEngine {
+export class ExecutionEngine extends BaseExecutionEngine {
   /**
    * 构造函数
    * @param {Object} config - 引擎配置
    */
   constructor(config = {}) {
     super({
-      name: 'ContainerExecutionEngine',
-      version: '1.0.0',
+      name: 'ExecutionEngine',
+      version: '2.0.0',
       ...config
     });
     this.engineType = 'container';
@@ -197,4 +197,4 @@ export class ContainerExecutionEngine extends BaseExecutionEngine {
   }
 }
 
-export default ContainerExecutionEngine;
+export default ExecutionEngine;

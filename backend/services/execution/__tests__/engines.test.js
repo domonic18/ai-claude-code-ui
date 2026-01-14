@@ -4,12 +4,11 @@
  * 执行引擎单元测试
  */
 
-import { describe, it, before, after } from 'node:test';
+import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   BaseExecutionEngine,
-  NativeExecutionEngine,
-  ContainerExecutionEngine
+  ExecutionEngine
 } from '../engines/index.js';
 
 // Mock WebSocket writer
@@ -121,44 +120,15 @@ describe('BaseExecutionEngine', () => {
   });
 });
 
-describe('NativeExecutionEngine', () => {
+describe('ExecutionEngine', () => {
   let engine;
 
   before(() => {
-    engine = new NativeExecutionEngine();
+    engine = new ExecutionEngine();
   });
 
   it('should have correct engine type', () => {
-    assert.equal(engine.name, 'NativeExecutionEngine');
-    assert.equal(engine.getType(), 'native');
-  });
-
-  it('should have empty active sessions initially', () => {
-    assert.equal(engine.getActiveSessions().length, 0);
-  });
-
-  it('should validate options correctly', () => {
-    // Native engine doesn't require userId
-    const result = engine._validateOptions({ model: 'sonnet' });
-    assert.equal(result.valid, true);
-  });
-
-  it('should get engine info', () => {
-    const info = engine.getInfo();
-    assert.equal(info.name, 'NativeExecutionEngine');
-    assert.equal(info.type, 'native');
-  });
-});
-
-describe('ContainerExecutionEngine', () => {
-  let engine;
-
-  before(() => {
-    engine = new ContainerExecutionEngine();
-  });
-
-  it('should have correct engine type', () => {
-    assert.equal(engine.name, 'ContainerExecutionEngine');
+    assert.equal(engine.name, 'ExecutionEngine');
     assert.equal(engine.getType(), 'container');
   });
 
@@ -167,7 +137,7 @@ describe('ContainerExecutionEngine', () => {
   });
 
   it('should validate options correctly', () => {
-    // Container engine requires userId
+    // ExecutionEngine requires userId
     let result = engine._validateOptions({});
     assert.equal(result.valid, false);
     assert.ok(result.errors.includes('userId is required'));
@@ -179,7 +149,7 @@ describe('ContainerExecutionEngine', () => {
 
   it('should get engine info', () => {
     const info = engine.getInfo();
-    assert.equal(info.name, 'ContainerExecutionEngine');
+    assert.equal(info.name, 'ExecutionEngine');
     assert.equal(info.type, 'container');
   });
 

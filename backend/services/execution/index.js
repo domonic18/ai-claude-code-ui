@@ -7,8 +7,7 @@
 // 执行引擎
 export {
   BaseExecutionEngine,
-  NativeExecutionEngine,
-  ContainerExecutionEngine
+  ExecutionEngine
 } from './engines/index.js';
 
 // Claude 执行器
