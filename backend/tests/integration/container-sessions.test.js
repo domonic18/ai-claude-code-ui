@@ -4,8 +4,8 @@
  * 测试从 Docker 容器中加载会话信息的功能
  */
 
-import { getSessionsInContainer, getSessionFilesInfo } from '../../services/container/file/container-sessions.js';
-import { getProjectsInContainer } from '../../services/container/file/project-manager.js';
+import { getSessionsInContainer, getSessionFilesInfo } from '../../services/sessions/container/ContainerSessions.js';
+import { getProjectsInContainer } from '../../services/projects/managers/ContainerProjectManager.js';
 
 const testUserId = 1; // 使用用户 1
 
