@@ -59,7 +59,6 @@ function Shell({ selectedProject, selectedSession, initialCommand, isPlainShell 
 
   const connectWebSocket = useCallback(async () => {
     if (isConnectingRef.current || isConnected) {
-      console.log('[Shell] Already connecting or connected, skipping');
       return;
     }
 
@@ -69,13 +68,11 @@ function Shell({ selectedProject, selectedSession, initialCommand, isPlainShell 
 
     try {
       const isPlatform = import.meta.env.VITE_IS_PLATFORM === 'true';
-      console.log('[Shell] Connecting to shell, isPlatform:', isPlatform);
       let wsUrl;
 
       if (isPlatform) {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         wsUrl = `${protocol}//${window.location.host}/shell`;
-        console.log('[Shell] Platform mode, wsUrl:', wsUrl);
       } else {
         // 获取 WebSocket token（从 cookie 复制）
         let token;
@@ -200,16 +197,10 @@ function Shell({ selectedProject, selectedSession, initialCommand, isPlainShell 
   const connectToShell = useCallback(() => {
     // 使用 ref 检查，避免状态更新延迟
     if (!isInitialized || isConnected || isConnectingRef.current) {
-      console.log('[Shell] connectToShell: cannot connect', {
-        isInitialized,
-        isConnected,
-        isConnectingRef: isConnectingRef.current
-      });
       return;
     }
     // 清除用户主动断开的标志
     setUserDisconnected(false);
-    console.log('[Shell] connectToShell: starting connection');
     connectWebSocket();
   }, [isInitialized, isConnected, connectWebSocket]);
 
@@ -518,25 +509,6 @@ function Shell({ selectedProject, selectedSession, initialCommand, isPlainShell 
         {!isInitialized && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-90 z-50">
             <div className="text-white">Loading terminal...</div>
-          </div>
-        )}
-
-        {/* 调试：显示状态信息 */}
-        {true && (
-          <div className="absolute top-4 left-4 bg-yellow-500 text-black px-2 py-1 rounded text-xs z-50 font-mono">
-            States: userDisconnected={String(userDisconnected)}, isInitialized={String(isInitialized)}, isConnected={String(isConnected)}, isConnecting={String(isConnecting)}, showBtn={String(isInitialized && !isConnected && !isConnecting)}
-          </div>
-        )}
-
-        {/* 测试：强制显示按钮 */}
-        {true && (
-          <div className="absolute bottom-4 left-4 z-50">
-            <button
-              onClick={connectToShell}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
-            >
-              TEST: Connect
-            </button>
           </div>
         )}
 
