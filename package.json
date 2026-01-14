@@ -1,5 +1,5 @@
 {
-  "name": "@siteboon/claude-code-ui",
+  "name": "@domonic18/claude-code-ui",
   "version": "1.13.6",
   "description": "A web-based UI for Claude Code CLI",
   "type": "module",
@@ -17,10 +17,10 @@
   "homepage": "https://claudecodeui.siteboon.ai",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/siteboon/claudecodeui.git"
+    "url": "git+https://github.com/domonic18/ai-claude-code-ui.git"
   },
   "bugs": {
-    "url": "https://github.com/siteboon/claudecodeui/issues"
+    "url": "https://github.com/domonic18/ai-claude-code-ui/issues"
   },
   "scripts": {
     "dev": "concurrently --kill-others \"npm run server\" \"npm run client\"",
@@ -45,7 +45,7 @@
     "ui",
     "mobile"
   ],
-  "author": "Claude Code UI Contributors",
+  "author": "domonic18",
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.29",
