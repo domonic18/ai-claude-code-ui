@@ -145,10 +145,15 @@ export class ContainerLifecycleManager {
             return containerInfo;
           }
         } catch (err) {
-          // 容器可能已被删除，继续创建流程
-          console.warn(`[Lifecycle] Container check failed: ${err.message}`);
+          // 容器可能已被删除，重置状态并重新创建
+          console.warn(`[Lifecycle] Container check failed: ${err.message}, resetting state to NON_EXISTENT`);
         }
       }
+
+      // 状态为 READY 但容器不在缓存中或未运行，重置状态
+      console.log(`[Lifecycle] Container state is READY but container not available, resetting to NON_EXISTENT`);
+      stateMachine.transitionTo(ContainerState.NON_EXISTENT);
+      await containerStateStore.save(stateMachine);
     }
 
     // 情况 2: 容器正在创建/启动/健康检查中，等待完成
