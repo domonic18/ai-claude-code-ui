@@ -5,5 +5,4 @@
  */
 
 export { BaseSessionManager } from './BaseSessionManager.js';
-export { NativeSessionManager } from './NativeSessionManager.js';
 export { ContainerSessionManager } from './ContainerSessionManager.js';
