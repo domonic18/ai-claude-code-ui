@@ -10,7 +10,7 @@ import containerManager from '../core/index.js';
 import { writeFileInContainer } from './file-operations.js';
 import { getSessionsInContainer } from './container-sessions.js';
 import { CONTAINER } from '../../../config/config.js';
-import { loadProjectConfig } from '../../project/config/index.js';
+import { loadProjectConfig } from '../../projects/config/index.js';
 
 /** 默认项目名称 */
 const DEFAULT_PROJECT_NAME = 'my-workspace';
