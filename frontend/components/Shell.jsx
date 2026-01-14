@@ -54,36 +54,48 @@ function Shell({ selectedProject, selectedSession, initialCommand, isPlainShell 
 
     try {
       const isPlatform = import.meta.env.VITE_IS_PLATFORM === 'true';
+      console.log('[Shell] Connecting to shell, isPlatform:', isPlatform);
       let wsUrl;
 
       if (isPlatform) {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         wsUrl = `${protocol}//${window.location.host}/shell`;
+        console.log('[Shell] Platform mode, wsUrl:', wsUrl);
       } else {
         // 获取 WebSocket token（从 cookie 复制）
         let token;
         try {
+          console.log('[Shell] Fetching ws-token from /api/auth/ws-token');
           const response = await fetch('/api/auth/ws-token', {
             credentials: 'include' // 发送 cookie
           });
+          console.log('[Shell] ws-token response status:', response.status);
           if (response.ok) {
             const data = await response.json();
-            token = data.token;
+            // 后端返回 {success: true, data: {token: "..."}}
+            token = data.data?.token;
+            console.log('[Shell] Got token, length:', token?.length);
+          } else {
+            console.log('[Shell] ws-token response not ok:', response.status);
+            const errorText = await response.text();
+            console.log('[Shell] Error response:', errorText);
           }
         } catch (error) {
-          // 静默跳过：用户未登录时不显示错误
+          console.error('[Shell] Error fetching ws-token:', error);
           return;
         }
 
         if (!token) {
-          // 静默跳过：用户未登录时不显示错误
+          console.log('[Shell] No token available, aborting connection');
           return;
         }
 
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         wsUrl = `${protocol}//${window.location.host}/shell?token=${encodeURIComponent(token)}`;
+        console.log('[Shell] Non-platform mode, wsUrl:', wsUrl.substring(0, 50) + '...');
       }
 
+      console.log('[Shell] Creating WebSocket with URL:', wsUrl.substring(0, 80) + '...');
       ws.current = new WebSocket(wsUrl);
 
       ws.current.onopen = () => {
@@ -140,6 +152,7 @@ function Shell({ selectedProject, selectedSession, initialCommand, isPlainShell 
       };
 
       ws.current.onclose = (event) => {
+        console.log('[Shell] WebSocket closed:', event.code, event.reason);
         setIsConnected(false);
         setIsConnecting(false);
 
@@ -150,6 +163,7 @@ function Shell({ selectedProject, selectedSession, initialCommand, isPlainShell 
       };
 
       ws.current.onerror = (error) => {
+        console.error('[Shell] WebSocket error:', error);
         setIsConnected(false);
         setIsConnecting(false);
       };
