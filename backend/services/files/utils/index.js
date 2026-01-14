@@ -22,5 +22,7 @@ export {
   readFileInContainer,
   writeFileInContainer,
   getFileStatsInContainer,
-  deleteFileInContainer
+  deleteFileInContainer,
+  fileExistsInContainer,
+  createDirectoryInContainer
 } from './container-ops.js';

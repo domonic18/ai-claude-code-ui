@@ -25,7 +25,9 @@ export {
   readFileInContainer,
   writeFileInContainer,
   getFileStatsInContainer,
-  deleteFileInContainer
+  deleteFileInContainer,
+  fileExistsInContainer,
+  createDirectoryInContainer
 } from './utils/index.js';
 
 // 文件常量

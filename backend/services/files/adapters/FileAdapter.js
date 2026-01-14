@@ -11,6 +11,7 @@ import { BaseFileAdapter } from './BaseFileAdapter.js';
 import containerManager from '../../container/core/index.js';
 import { CONTAINER } from '../../../config/config.js';
 import { PathUtils } from '../../core/utils/path-utils.js';
+import { PassThrough } from 'stream';
 
 /**
  * 文件操作适配器
@@ -90,17 +91,21 @@ export class FileAdapter extends BaseFileAdapter {
         `cat "${containerPath}"`
       );
 
+      // 使用 demuxStream 来正确处理 Docker 的多路复用协议，移除 8 字节协议头
+      const stdout = new PassThrough();
+      const stderr = new PassThrough();
+      containerManager.docker.modem.demuxStream(stream, stdout, stderr);
+
       return new Promise((resolve, reject) => {
         let content = '';
         let errorOutput = '';
 
-        stream.on('data', (chunk) => {
-          const output = chunk.toString();
-          if (output.includes('No such file') || output.includes('cannot access')) {
-            errorOutput += output;
-          } else {
-            content += output;
-          }
+        stdout.on('data', (chunk) => {
+          content += chunk.toString('utf8');
+        });
+
+        stderr.on('data', (chunk) => {
+          errorOutput += chunk.toString('utf8');
         });
 
         stream.on('error', (err) => {
@@ -108,11 +113,26 @@ export class FileAdapter extends BaseFileAdapter {
         });
 
         stream.on('end', () => {
-          if (errorOutput) {
+          if (errorOutput && (errorOutput.includes('No such file') || errorOutput.includes('cannot access'))) {
             reject(new Error(`File not found: ${filePath}`));
           } else {
+            // Trim trailing whitespace
+            let trimmedContent = content.replace(/\s+$/, '');
+
+            // Strip UTF-8 BOM (U+FEFF) if present at the start of content
+            const charCode = trimmedContent.charCodeAt(0);
+            if (charCode === 0xFEFF || trimmedContent.startsWith('\uFEFF')) {
+              trimmedContent = trimmedContent.slice(1);
+              console.log('[FileAdapter] BOM detected and stripped for file:', filePath);
+            }
+
+            // Log for debugging
+            if (trimmedContent.length > 0 && trimmedContent.charCodeAt(0) > 127) {
+              console.log('[FileAdapter] First char code:', trimmedContent.charCodeAt(0), 'File:', filePath);
+            }
+
             resolve({
-              content: content.replace(/\s+$/, ''),
+              content: trimmedContent,
               path: containerPath
             });
           }
@@ -295,10 +315,15 @@ export class FileAdapter extends BaseFileAdapter {
 
       const { stream } = await containerManager.execInContainer(userId, command);
 
+      // 使用 demuxStream 移除 8 字节协议头
+      const stdout = new PassThrough();
+      const stderr = new PassThrough();
+      containerManager.docker.modem.demuxStream(stream, stdout, stderr);
+
       return new Promise((resolve, reject) => {
         let output = '';
 
-        stream.on('data', (chunk) => {
+        stdout.on('data', (chunk) => {
           output += chunk.toString();
         });
 
@@ -348,10 +373,15 @@ export class FileAdapter extends BaseFileAdapter {
         `stat -c "%F|%s|%Y|%A" "${containerPath}"`
       );
 
+      // 使用 demuxStream 移除 8 字节协议头
+      const stdout = new PassThrough();
+      const stderr = new PassThrough();
+      containerManager.docker.modem.demuxStream(stream, stdout, stderr);
+
       return new Promise((resolve, reject) => {
         let output = '';
 
-        stream.on('data', (chunk) => {
+        stdout.on('data', (chunk) => {
           output += chunk.toString();
         });
 
@@ -536,15 +566,27 @@ export class FileAdapter extends BaseFileAdapter {
   _buildContainerPath(safePath, options = {}) {
     const { projectPath = '', isContainerProject = false } = options;
 
+    // 处理当前目录 '.' 的情况，移除它以避免路径中出现 /./
+    const processedSafePath = (safePath === '.' || safePath === './') ? '' : safePath;
+
     if (isContainerProject && projectPath) {
       // 容器项目：项目代码在 /workspace 下
-      return `${CONTAINER.paths.workspace}/${projectPath}/${safePath}`.replace(/\/+/g, '/');
+      const path = processedSafePath
+        ? `${CONTAINER.paths.workspace}/${projectPath}/${processedSafePath}`
+        : `${CONTAINER.paths.workspace}/${projectPath}`;
+      return path.replace(/\/+/g, '/');
     } else if (projectPath) {
       // 会话项目：使用 .claude/projects
-      return `${CONTAINER.paths.projects}/${PathUtils.encodeProjectName(projectPath)}/${safePath}`.replace(/\/+/g, '/');
+      const path = processedSafePath
+        ? `${CONTAINER.paths.projects}/${PathUtils.encodeProjectName(projectPath)}/${processedSafePath}`
+        : `${CONTAINER.paths.projects}/${PathUtils.encodeProjectName(projectPath)}`;
+      return path.replace(/\/+/g, '/');
     } else {
       // 默认：workspace
-      return `${CONTAINER.paths.workspace}/${safePath}`.replace(/\/+/g, '/');
+      const path = processedSafePath
+        ? `${CONTAINER.paths.workspace}/${processedSafePath}`
+        : CONTAINER.paths.workspace;
+      return path.replace(/\/+/g, '/');
     }
   }
 
