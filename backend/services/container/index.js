@@ -45,7 +45,9 @@ export {
   writeFileInContainer,
   getFileTreeInContainer,
   getFileStatsInContainer,
-  deleteFileInContainer
+  deleteFileInContainer,
+  fileExistsInContainer,
+  createDirectoryInContainer
 } from '../files/utils/index.js';
 
 // 从 projects/managers 模块导出项目管理函数（已迁移）
