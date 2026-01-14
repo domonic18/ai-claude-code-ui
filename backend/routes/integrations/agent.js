@@ -925,7 +925,10 @@ router.post('/', validateExternalApiKey, async (req, res) => {
     // Register the project (or use existing registration)
     let project;
     try {
-      project = await addProjectManually(finalProjectPath);
+      // 容器模式：从路径提取项目名称并注册
+      // 如果是完整路径，取最后一部分作为项目名
+      const projectName = path.basename(finalProjectPath);
+      project = await addProjectManually(req.user.userId, projectName);
       console.log('📦 Project registered:', project);
     } catch (error) {
       // If project already exists, that's fine - continue with the existing registration

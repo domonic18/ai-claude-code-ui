@@ -18,6 +18,7 @@ import { dirname } from 'path';
 import os from 'os';
 import { detectTaskMasterMCPServer } from '../../utils/mcp-detector.js';
 import { broadcastTaskMasterProjectUpdate, broadcastTaskMasterTasksUpdate } from '../../utils/taskmaster-websocket.js';
+import { CONTAINER } from '../../config/config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -354,29 +355,28 @@ router.get('/detect/:projectName', async (req, res) => {
 
 /**
  * GET /api/taskmaster/detect-all
- * 检测所有已知项目的 TaskMaster 配置
- * 此端点与现有的项目系统一起工作
+ * 检测所有已知项目的 TaskMaster 配置（容器模式）
  */
 router.get('/detect-all', async (req, res) => {
     try {
-        // 从项目模块导入 getProjects
-        const { getProjects } = await import('../projects.js');
-        const projects = await getProjects();
+        // 从认证中间件获取 userId
+        const userId = req.user?.userId;
+        if (!userId) {
+            return res.status(401).json({
+                error: 'User ID required',
+                code: 'USER_ID_REQUIRED'
+            });
+        }
+
+        // 使用容器模式的项目发现
+        const { getProjectsInContainer } = await import('../projects.js');
+        const projects = await getProjectsInContainer(userId);
 
         // 并行运行所有项目的检测
         const detectionPromises = projects.map(async (project) => {
             try {
-                // 如果可用，使用项目的 fullPath，否则提取目录
-                let projectPath;
-                if (project.fullPath) {
-                    projectPath = project.fullPath;
-                } else {
-                    try {
-                        projectPath = await getProjectPath(project.name);
-                    } catch (error) {
-                        throw new Error(`Failed to extract project directory: ${error.message}`);
-                    }
-                }
+                // 容器模式下的项目路径：/workspace/{projectName}
+                const projectPath = `${CONTAINER.paths.workspace}/${project.name}`;
 
                 const [taskMasterResult, mcpResult] = await Promise.all([
                     detectTaskMasterFolder(projectPath),
