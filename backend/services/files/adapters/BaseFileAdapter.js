@@ -8,6 +8,22 @@
  */
 
 import { IFileOperations } from '../../core/interfaces/IFileOperations.js';
+import {
+  cleanFileName,
+  isValidFileName,
+  isHiddenFile,
+  isDirectory,
+  normalizePath,
+  createTreeNode,
+  readStreamOutput,
+  standardizeError as standardizeErrorUtil
+} from '../utils/file-utils.js';
+import {
+  FILE_SIZE_LIMITS,
+  ERROR_TYPES,
+  ERROR_MESSAGES,
+  FILE_TREE_CONFIG
+} from '../constants.js';
 
 /**
  * 抽象文件适配器基类
@@ -26,6 +42,8 @@ export class BaseFileAdapter extends IFileOperations {
     super();
     this.name = config.name || 'BaseAdapter';
     this.version = config.version || '1.0.0';
+    this.maxFileSize = config.maxFileSize || FILE_SIZE_LIMITS.MAX_SIZE;
+    this.excludedDirs = config.excludedDirs || FILE_TREE_CONFIG.DEFAULT_EXCLUDED_DIRS;
   }
 
   /**
@@ -128,16 +146,22 @@ export class BaseFileAdapter extends IFileOperations {
    * @returns {Object} { valid: boolean, error: string|null, safePath: string }
    */
   _validatePath(filePath, options = {}) {
-    const { PathValidator } = options.validators || {};
-
     // 基本路径验证
     if (!filePath || typeof filePath !== 'string') {
-      return { valid: false, error: 'File path must be a non-empty string', safePath: '' };
+      return {
+        valid: false,
+        error: ERROR_MESSAGES[ERROR_TYPES.INVALID_PATH].replace('{path}', filePath || 'empty'),
+        safePath: ''
+      };
     }
 
     // 检查路径遍历
     if (filePath.includes('..')) {
-      return { valid: false, error: 'Path traversal detected', safePath: '' };
+      return {
+        valid: false,
+        error: ERROR_MESSAGES[ERROR_TYPES.PATH_TRAVERSAL].replace('{path}', filePath),
+        safePath: ''
+      };
     }
 
     return { valid: true, error: null, safePath: filePath };
@@ -150,11 +174,7 @@ export class BaseFileAdapter extends IFileOperations {
    * @returns {string} 标准化后的路径
    */
   _normalizePath(filePath) {
-    // 移除开头的斜杠（如果有）
-    let normalized = filePath.replace(/^\/+/, '');
-    // 移除结尾的斜杠
-    normalized = normalized.replace(/\/+$/, '');
-    return normalized;
+    return normalizePath(filePath);
   }
 
   /**
@@ -173,15 +193,19 @@ export class BaseFileAdapter extends IFileOperations {
    * 验证文件大小
    * @protected
    * @param {string} content - 文件内容
-   * @param {number} maxSize - 最大大小
+   * @param {number} maxSize - 最大大小（可选，默认使用实例配置）
    * @returns {Object} { valid: boolean, error: string|null }
    */
-  _validateFileSize(content, maxSize) {
+  _validateFileSize(content, maxSize = this.maxFileSize) {
     const contentSize = Buffer.byteLength(content, 'utf8');
     if (contentSize > maxSize) {
+      const sizeMB = (contentSize / 1024 / 1024).toFixed(2);
+      const maxSizeMB = (maxSize / 1024 / 1024).toFixed(2);
       return {
         valid: false,
-        error: `File too large: ${contentSize} bytes (max ${maxSize})`
+        error: ERROR_MESSAGES[ERROR_TYPES.FILE_TOO_LARGE]
+          .replace('{size}', sizeMB)
+          .replace('{maxSize}', maxSizeMB)
       };
     }
     return { valid: true, error: null };
@@ -192,16 +216,25 @@ export class BaseFileAdapter extends IFileOperations {
    * @protected
    * @param {Error} error - 原始错误
    * @param {string} operation - 操作名称
-   * @returns {Object} 标准化错误对象
+   * @param {Object} context - 额外上下文
+   * @returns {Error} 标准化错误对象
    */
-  _standardizeError(error, operation) {
-    return {
-      type: 'file_operation_error',
-      operation,
-      message: error.message || 'Unknown error occurred',
+  _standardizeError(error, operation, context = {}) {
+    return standardizeErrorUtil(error, operation, {
       adapter: this.name,
-      timestamp: new Date().toISOString()
-    };
+      ...context
+    });
+  }
+
+  /**
+   * 处理流式命令输出
+   * @protected
+   * @param {Object} stream - 命令输出流
+   * @param {Object} options - 选项
+   * @returns {Promise<string>} 输出内容
+   */
+  async _readStreamOutput(stream, options = {}) {
+    return readStreamOutput(stream, options);
   }
 
   /**
@@ -212,8 +245,61 @@ export class BaseFileAdapter extends IFileOperations {
     return {
       name: this.name,
       version: this.version,
-      type: this.getType()
+      type: this.getType(),
+      maxFileSize: this.maxFileSize,
+      excludedDirs: this.excludedDirs
     };
+  }
+
+  /**
+   * 清理文件名（暴露给子类使用）
+   * @protected
+   * @param {string} name - 原始文件名
+   * @returns {string} 清理后的文件名
+   */
+  _cleanFileName(name) {
+    return cleanFileName(name);
+  }
+
+  /**
+   * 验证文件名是否有效（暴露给子类使用）
+   * @protected
+   * @param {string} name - 文件名
+   * @returns {boolean} 是否有效
+   */
+  _isValidFileName(name) {
+    return isValidFileName(name);
+  }
+
+  /**
+   * 检查是否为隐藏文件（暴露给子类使用）
+   * @protected
+   * @param {string} name - 文件名
+   * @returns {boolean} 是否为隐藏文件
+   */
+  _isHiddenFile(name) {
+    return isHiddenFile(name);
+  }
+
+  /**
+   * 判断路径是否为目录（暴露给子类使用）
+   * @protected
+   * @param {string} fullPath - 完整路径
+   * @param {Set<string>} allPaths - 所有路径集合
+   * @returns {boolean} 是否为目录
+   */
+  _isDirectory(fullPath, allPaths) {
+    return isDirectory(fullPath, allPaths);
+  }
+
+  /**
+   * 创建文件树节点（暴露给子类使用）
+   * @protected
+   * @param {Object} options - 节点配置
+   * @returns {Object} 文件树节点
+   */
+  _createTreeNode(options) {
+    return createTreeNode(options);
   }
 }
 

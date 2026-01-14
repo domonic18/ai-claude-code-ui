@@ -10,6 +10,14 @@
 import containerManager from '../core/index.js';
 import { CONTAINER } from '../../../config/config.js';
 import { PathValidator } from '../../core/utils/path-utils.js';
+import {
+  cleanFileName,
+  isValidFileName,
+  isHiddenFile,
+  isDirectory,
+  readStreamOutput,
+  standardizeError
+} from '../../files/utils/file-utils.js';
 
 /**
  * 容器文件适配器
@@ -313,21 +321,7 @@ export class FileAdapter {
    * @returns {Promise<string>}
    */
   async _readCommandOutput(stream) {
-    return new Promise((resolve, reject) => {
-      let output = '';
-
-      stream.on('data', (chunk) => {
-        output += chunk.toString();
-      });
-
-      stream.on('error', (err) => {
-        reject(err);
-      });
-
-      stream.on('end', () => {
-        resolve(output);
-      });
-    });
+    return readStreamOutput(stream);
   }
 
   /**
@@ -339,66 +333,6 @@ export class FileAdapter {
    */
   _buildFileTree(paths, basePath) {
     const tree = [];
-
-    /**
-     * 清理文件名中的控制字符和非打印字符
-     * @private
-     * @param {string} name - 文件名
-     * @returns {string} 清理后的文件名
-     */
-    const cleanFileName = (name) => {
-      // 移除所有控制字符和非打印字符 (ASCII 0-31, 127)
-      let cleaned = name.replace(/[\x00-\x1f\x7f]/g, '').trim();
-      // 移除 Unicode 替换字符 U+FFFD
-      cleaned = cleaned.replace(/\uFFFD/g, '').trim();
-      // 移除其他非打印 Unicode 字符
-      cleaned = cleaned.replace(/[\u2000-\u200F\u2028-\u202F\u205F\u3000]/g, '').trim();
-      return cleaned;
-    };
-
-    /**
-     * 验证文件名是否有效
-     * @private
-     * @param {string} name - 文件名
-     * @returns {boolean} 是否有效
-     */
-    const isValidFileName = (name) => {
-      if (!name || name.length === 0) return false;
-      // 检查是否只包含有效字符（字母、数字、中文、常见符号）
-      const validPattern = /^[\w\u4e00-\u9fa5\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af\u0400-\u04ff\u0370-\u03ff\u0590-\u05ff\u0600-\u06ff\u0750-\u077f .,_+-@#()[\]{}$%'`=~!&]+$/;
-      if (!validPattern.test(name)) return false;
-      // 必须包含至少一个字母或数字或中文字符（不能只有符号）
-      const hasContent = /[\w\u4e00-\u9fa5\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af\u0400-\u04ff\u0370-\u03ff\u0590-\u05ff\u0600-\u06ff\u0750-\u077f]/.test(name);
-      if (!hasContent) return false;
-      // 不能包含替换字符
-      return !name.includes('\ufffd');
-    };
-
-    /**
-     * 检查是否为隐藏文件/目录
-     * @private
-     * @param {string} name - 文件名
-     * @returns {boolean} 是否为隐藏文件
-     */
-    const isHiddenFile = (name) => {
-      return name.startsWith('.');
-    };
-
-    /**
-     * 判断路径是否为目录
-     * @private
-     * @param {string} fullPath - 完整路径
-     * @returns {boolean} 是否为目录
-     */
-    const isDirectory = (fullPath) => {
-      // 检查是否有其他路径以这个路径开头（后面跟着斜杠）
-      for (const path of paths) {
-        if (path !== fullPath && path.startsWith(fullPath + '/')) {
-          return true;
-        }
-      }
-      return false;
-    };
 
     for (const fullPath of paths) {
       // 跳过空行
@@ -433,7 +367,7 @@ export class FileAdapter {
 
         // 构建完整路径用于判断类型
         const fullPathForCheck = `${basePath}/${currentPath}`;
-        const isDir = isDirectory(fullPathForCheck);
+        const isDir = isDirectory(fullPathForCheck, new Set(paths));
 
         let existingNode = currentLevel.find(node => node.name === part);
 
@@ -496,17 +430,10 @@ export class FileAdapter {
    * @returns {Error} 标准化的错误
    */
   _standardizeError(error, operation) {
-    const standardizedError = new Error(
-      error.message || `${operation} failed in container`
-    );
-
-    standardizedError.type = 'container_file_error';
-    standardizedError.operation = operation;
-    standardizedError.userId = this.userId;
-    standardizedError.timestamp = new Date().toISOString();
-    standardizedError.originalError = error;
-
-    return standardizedError;
+    return standardizeError(error, operation, {
+      userId: this.userId,
+      type: 'container_file_error'
+    });
   }
 }
 

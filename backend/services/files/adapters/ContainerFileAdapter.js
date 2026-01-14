@@ -13,11 +13,6 @@ import { CONTAINER } from '../../../config/config.js';
 import { PathUtils } from '../../core/utils/path-utils.js';
 
 /**
- * 最大文件大小 (50MB)
- */
-const MAX_FILE_SIZE = 50 * 1024 * 1024;
-
-/**
  * 容器文件操作适配器
  * 在用户专属的 Docker 容器中执行文件操作
  */
@@ -179,7 +174,7 @@ export class ContainerFileAdapter extends BaseFileAdapter {
       }
 
       // 验证文件大小
-      const sizeValidation = this._validateFileSize(content, MAX_FILE_SIZE);
+      const sizeValidation = this._validateFileSize(content);
       if (!sizeValidation.valid) {
         throw new Error(sizeValidation.error);
       }
@@ -567,65 +562,6 @@ export class ContainerFileAdapter extends BaseFileAdapter {
     // 预先收集所有路径，用于判断是文件还是目录
     const allPaths = new Set(lines);
 
-    /**
-     * 清理文件名中的控制字符和非打印字符
-     * @private
-     * @param {string} name - 文件名
-     * @returns {string} 清理后的文件名
-     */
-    const cleanFileName = (name) => {
-      // 移除所有控制字符和非打印字符 (ASCII 0-31, 127)
-      let cleaned = name.replace(/[\x00-\x1f\x7f]/g, '').trim();
-      // 移除 Unicode 替换字符 U+FFFD
-      cleaned = cleaned.replace(/\uFFFD/g, '').trim();
-      // 移除其他非打印 Unicode 字符
-      cleaned = cleaned.replace(/[\u2000-\u200F\u2028-\u202F\u205F\u3000]/g, '').trim();
-      return cleaned;
-    };
-
-    /**
-     * 验证文件名是否有效
-     * @private
-     * @param {string} name - 文件名
-     * @returns {boolean} 是否有效
-     */
-    const isValidFileName = (name) => {
-      if (!name || name.length === 0) return false;
-      // 检查是否只包含有效字符（字母、数字、中文、常见符号）
-      const validPattern = /^[\w\u4e00-\u9fa5\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af\u0400-\u04ff\u0370-\u03ff\u0590-\u05ff\u0600-\u06ff\u0750-\u077f .,_+-@#()[\]{}$%'`=~!&]+$/;
-      if (!validPattern.test(name)) return false;
-      // 必须包含至少一个字母或数字或中文字符（不能只有符号）
-      const hasContent = /[\w\u4e00-\u9fa5\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af\u0400-\u04ff\u0370-\u03ff\u0590-\u05ff\u0600-\u06ff\u0750-\u077f]/.test(name);
-      if (!hasContent) return false;
-      // 不能包含替换字符
-      return !name.includes('\ufffd');
-    };
-
-    /**
-     * 检查是否为隐藏文件/目录
-     * @private
-     * @param {string} name - 文件名
-     * @returns {boolean} 是否为隐藏文件
-     */
-    const isHiddenFile = (name) => {
-      return name.startsWith('.');
-    };
-
-    /**
-     * 判断路径是否为目录
-     * @private
-     * @param {string} fullPath - 完整路径
-     * @returns {boolean} 是否为目录
-     */
-    const isDirectory = (fullPath) => {
-      // 检查是否有其他路径以这个路径开头（后面跟着斜杠）
-      for (const path of allPaths) {
-        if (path !== fullPath && path.startsWith(fullPath + '/')) {
-          return true;
-        }
-      }
-      return false;
-    };
 
     for (const line of lines) {
       // 跳过空行
@@ -637,7 +573,7 @@ export class ContainerFileAdapter extends BaseFileAdapter {
 
       // 跳过隐藏文件/目录（路径的任何部分以点开头）
       const pathParts = relativePath.split('/');
-      if (pathParts.some(part => isHiddenFile(part))) {
+      if (pathParts.some(part => this._isHiddenFile(part))) {
         continue;
       }
 
@@ -646,10 +582,10 @@ export class ContainerFileAdapter extends BaseFileAdapter {
       }
       processedPaths.add(relativePath);
 
-      const parts = relativePath.split('/').filter(Boolean).map(cleanFileName);
+      const parts = relativePath.split('/').filter(Boolean).map(name => this._cleanFileName(name));
 
       // 验证每个部分是否有效
-      if (parts.length === 0 || parts.some(part => part === '' || !isValidFileName(part))) {
+      if (parts.length === 0 || parts.some(part => part === '' || !this._isValidFileName(part))) {
         console.log('[ContainerFileAdapter] Skipping invalid path:', relativePath, '->', parts);
         continue; // 跳过无效路径
       }
@@ -661,7 +597,7 @@ export class ContainerFileAdapter extends BaseFileAdapter {
         // 构建到当前部分的完整路径
         const pathSoFar = `${basePath}/${parts.slice(0, i + 1).join('/')}`;
         // 判断是否为目录
-        const isDir = isDirectory(pathSoFar);
+        const isDir = this._isDirectory(pathSoFar, allPaths);
 
         let existing = currentLevel.find(item => item.name === part);
 
