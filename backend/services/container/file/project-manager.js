@@ -29,8 +29,17 @@ export async function getProjectsInContainer(userId) {
   console.log('[ProjectManager] getProjectsInContainer - userId:', userId);
 
   try {
-    const container = await containerManager.getOrCreateContainer(userId);
-    console.log('[ProjectManager] Container:', container.id, container.name);
+    // 获取容器（设置短超时，避免长时间阻塞前端请求）
+    // 如果容器正在创建中，快速返回空列表，让前端通过轮询获取
+    let container;
+    try {
+      container = await containerManager.getOrCreateContainer(userId, {}, { wait: true, timeout: 5000 });
+      console.log('[ProjectManager] Container:', container.id, container.name);
+    } catch (error) {
+      // 容器未就绪，返回空列表让前端继续轮询
+      console.log('[ProjectManager] Container not ready yet, returning empty list:', error.message);
+      return [];
+    }
 
     // 根据文档设计，项目直接在 /workspace 下，不在 .claude/projects 下
     // 我们需要从 /workspace 列出所有目录，排除 .claude 等系统目录
@@ -84,10 +93,9 @@ export async function getProjectsInContainer(userId) {
           for (const line of lines) {
             let projectName = line.trim();
 
-            // 从项目名称中清理控制字符
+            // 从项目名称中清理控制字符（移除所有控制字符 ASCII 0-31, 127）
             projectName = projectName
-              .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '')
-              .replace(/[\r\n]/g, '')
+              .replace(/[\x00-\x1f\x7f]/g, '')
               .trim();
 
             // 跳过空行和隐藏目录（以 . 开头）
