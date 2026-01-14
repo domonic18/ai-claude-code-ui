@@ -8,6 +8,12 @@
  */
 
 /**
+ * 容器文件操作大小限制
+ */
+export const MAX_FILE_SIZE = 10 * 1024 * 1024;  // 读取操作的最大文件大小（10MB）
+export const MAX_TREE_DEPTH = 10;             // 文件树遍历的最大深度
+
+/**
  * 文件大小限制（字节）
  */
 export const FILE_SIZE_LIMITS = {
