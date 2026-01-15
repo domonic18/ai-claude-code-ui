@@ -13,6 +13,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { CLAUDE_MODELS, CURSOR_MODELS, CODEX_MODELS } from '../../../../shared/modelConstants';
+import type { TokenBudget } from './TokenDisplay';
 
 export interface ModelOption {
   /** Model identifier */
@@ -40,6 +41,8 @@ interface ModelSelectorProps {
   disabled?: boolean;
   /** Compact display */
   compact?: boolean;
+  /** Token budget data for badge display */
+  tokenBudget?: TokenBudget | null;
 }
 
 /**
@@ -51,12 +54,24 @@ export function ModelSelector({
   onModelSelect,
   disabled = false,
   compact = false,
+  tokenBudget,
 }: ModelSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Find current model
   const currentModel = models.find(m => m.id === selectedModel) || models[0];
+
+  // Calculate token percentage for badge
+  const tokenPercentage = React.useMemo(() => {
+    if (tokenBudget?.percentage !== undefined) {
+      return tokenBudget.percentage;
+    }
+    if (tokenBudget?.total && tokenBudget?.used !== undefined) {
+      return Math.round((tokenBudget.used / tokenBudget.total) * 100);
+    }
+    return null;
+  }, [tokenBudget]);
 
   /**
    * Group models by provider
@@ -109,7 +124,7 @@ export function ModelSelector({
 
   // Full version with dropdown
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative flex items-center gap-3" ref={dropdownRef}>
       <button
         type="button"
         onClick={() => !disabled && setIsOpen(!isOpen)}
@@ -132,6 +147,23 @@ export function ModelSelector({
           </svg>
         )}
       </button>
+
+      {/* Token budget badge */}
+      {tokenPercentage !== null && (
+        <div
+          className={`flex items-center justify-center w-10 h-10 rounded-full border-2 text-xs font-bold transition-colors
+            ${tokenPercentage >= 90
+              ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400'
+              : tokenPercentage >= 70
+              ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400'
+              : 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400'
+            }
+          `}
+          title={`Token usage: ${tokenPercentage}%`}
+        >
+          {tokenPercentage}%
+        </div>
+      )}
 
       {/* Dropdown */}
       {isOpen && !disabled && (

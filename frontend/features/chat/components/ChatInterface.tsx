@@ -18,7 +18,6 @@ import {
   ChatInput,
   StreamingIndicator,
   ThinkingProcess,
-  TokenDisplay,
   ModelSelector,
 } from './index';
 import {
@@ -649,28 +648,47 @@ export function ChatInterface({
         </div>
       )}
 
-      {/* Token display */}
-      {tokenBudget && (
-        <div className="px-4 pb-2">
-          <TokenDisplay budget={tokenBudget} compact={false} />
-        </div>
-      )}
-
       {/* Input area */}
       <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700">
         {/* Model selector toolbar */}
-        <div className="flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-gray-800/50">
-          <ModelSelector
-            selectedModel={selectedModel}
-            onModelSelect={handleModelSelect}
-          />
+        <div className="flex items-center justify-between max-w-4xl mx-auto px-4 py-2 bg-gray-50 dark:bg-gray-800/50">
+          <div className="flex items-center gap-3">
+            <ModelSelector
+              selectedModel={selectedModel}
+              onModelSelect={handleModelSelect}
+              tokenBudget={tokenBudget}
+            />
+
+            {/* Cancel button when loading */}
+            {isLoading && ws && (
+              <button
+                type="button"
+                onClick={() => {
+                  // Send abort message via WebSocket
+                  sendMessage?.({
+                    type: 'abort',
+                    sessionId: currentSessionId,
+                  });
+                  setIsLoading(false);
+                  resetStream();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded transition-colors"
+              >
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+                <span className="hidden sm:inline">Stop</span>
+              </button>
+            )}
+          </div>
+
           <div className="text-xs text-gray-500 dark:text-gray-400">
             {selectedProject?.name || 'No project selected'}
           </div>
         </div>
 
         {/* Input */}
-        <div className="p-4">
+        <div className="max-w-4xl mx-auto p-4">
           <ChatInput
           value={input}
           onChange={handleInputChangeWithCommands}
