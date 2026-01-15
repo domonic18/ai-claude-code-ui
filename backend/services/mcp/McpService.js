@@ -162,17 +162,17 @@ export class McpService {
     try {
       const server = await this.getServer(id, userId);
 
-      // TODO: 实现实际的连接测试
-      // 这里需要根据服务器类型执行不同的测试逻辑
       console.log(`[McpService] Testing MCP server "${server.name}" (${server.type})`);
 
-      return {
-        success: true,
-        status: 'connected',
-        message: `MCP server "${server.name}" is responding`,
-        serverName: server.name,
-        serverType: server.type
-      };
+      // 动态导入McpClient
+      const { McpClient } = await import('./McpClient.js');
+      const client = new McpClient(server);
+
+      const result = await client.test();
+
+      console.log(`[McpService] Test result for "${server.name}":`, result);
+
+      return result;
     } catch (error) {
       console.error(`[McpService] Error testing server ${id}:`, error);
       return {
@@ -193,23 +193,23 @@ export class McpService {
     try {
       const server = await this.getServer(id, userId);
 
-      // TODO: 实现实际的工具发现
-      // 这里需要连接到 MCP 服务器并获取其工具列表
       console.log(`[McpService] Discovering tools for MCP server "${server.name}" (${server.type})`);
 
-      return {
-        success: true,
-        serverName: server.name,
-        serverType: server.type,
-        tools: [],
-        resources: [],
-        prompts: []
-      };
+      // 动态导入McpClient
+      const { McpClient } = await import('./McpClient.js');
+      const client = new McpClient(server);
+
+      const result = await client.discoverTools();
+
+      console.log(`[McpService] Discovery result for "${server.name}":`, result);
+
+      return result;
     } catch (error) {
       console.error(`[McpService] Error discovering tools for server ${id}:`, error);
       return {
         success: false,
-        error: error.message
+        error: error.message,
+        tools: []
       };
     }
   }
