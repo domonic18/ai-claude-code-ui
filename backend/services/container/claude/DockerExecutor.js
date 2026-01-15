@@ -7,6 +7,7 @@
 import containerManager from '../core/index.js';
 import { buildSDKScript } from './ScriptBuilder.js';
 import { processOutput } from './MessageTransformer.js';
+import { setSessionStream, getSession } from './SessionManager.js';
 
 /**
  * 检查 stderr 是否包含真正的错误
@@ -74,7 +75,10 @@ export async function executeInContainer(userId, command, options, writer, sessi
         }
       }
     );
-    
+
+    // 保存 stream 对象到会话，以便后续可以终止进程
+    setSessionStream(sessionId, stream);
+
     console.log('[DockerExecutor] Execution started, stream:', !!stream, 'exec:', !!exec);
 
     // 收集输出
@@ -134,6 +138,16 @@ export async function executeInContainer(userId, command, options, writer, sessi
       // 监听流结束
       stream.on('end', () => {
         clearTimeout(timeout);
+        
+        // 检查会话是否被中止
+        const session = getSession(sessionId);
+        if (!session && dataCount > 0) {
+          // 如果会话在 Map 中找不到，且已经有数据产生，可能是被 abortSession 删除了
+          console.log(`[DockerExecutor] Stream ended for session ${sessionId}, session seems to have been aborted`);
+          resolve({ output: stdoutChunks.join(''), sessionId, aborted: true });
+          return;
+        }
+
         const stdoutOutput = stdoutChunks.join('');
         const stderrOutput = stderrChunks.join('');
         

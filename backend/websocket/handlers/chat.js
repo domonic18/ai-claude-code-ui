@@ -85,7 +85,7 @@ export function handleChatConnection(ws, connectedClients) {
                     success = abortCodexSession(data.sessionId);
                 } else {
                     // Claude SDK - 容器模式
-                    success = abortClaudeSDKSessionInContainer(data.sessionId);
+                    success = await abortClaudeSDKSessionInContainer(data.sessionId);
                 }
 
                 writer.send({
