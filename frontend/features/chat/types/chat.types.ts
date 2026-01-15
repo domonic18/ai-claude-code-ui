@@ -135,10 +135,10 @@ export interface ChatMessageProps {
   index: number;
   /** Previous message for grouping */
   prevMessage?: ChatMessage;
-  /** Whether to create diff view */
-  createDiff?: boolean;
-  /** Handler for opening files */
-  onFileOpen?: (filePath: string) => void;
+  /** Function to create diff view for file edits */
+  createDiff?: (oldStr: string, newStr: string) => any[];
+  /** Handler for opening files with optional diff data */
+  onFileOpen?: (filePath: string, diffData?: any) => void;
   /** Handler for showing settings */
   onShowSettings?: () => void;
   /** Whether to auto expand tools */
