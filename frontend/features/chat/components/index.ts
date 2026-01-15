@@ -4,6 +4,7 @@
  * Export all chat-related components.
  */
 
+export { default as ChatInterface } from './ChatInterface';
 export { default as ChatMessage } from './ChatMessage';
 export { default as ChatMessageList } from './ChatMessageList';
 export { default as ChatInput } from './ChatInput';
