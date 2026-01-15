@@ -162,11 +162,17 @@ export function ChatInput({
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault();
-          onCommandSelect?.(commands[Math.min(selectedCommandIndex + 1, commands.length - 1)], Math.min(selectedCommandIndex + 1, commands.length - 1));
+          if (commands.length > 0) {
+            const nextIndex = Math.min(selectedCommandIndex + 1, commands.length - 1);
+            onCommandSelect?.(commands[nextIndex], nextIndex, true);
+          }
           break;
         case 'ArrowUp':
           e.preventDefault();
-          onCommandSelect?.(commands[Math.max(selectedCommandIndex - 1, 0)], Math.max(selectedCommandIndex - 1, 0));
+          if (commands.length > 0) {
+            const prevIndex = Math.max(selectedCommandIndex - 1, 0);
+            onCommandSelect?.(commands[prevIndex], prevIndex, true);
+          }
           break;
         case 'Enter':
           e.preventDefault();
@@ -189,11 +195,17 @@ export function ChatInput({
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault();
-          onFileSelect?.(fileReferences[Math.min(selectedFileIndex + 1, fileReferences.length - 1)], Math.min(selectedFileIndex + 1, fileReferences.length - 1));
+          if (fileReferences.length > 0) {
+            const nextIndex = Math.min(selectedFileIndex + 1, fileReferences.length - 1);
+            onFileSelect?.(fileReferences[nextIndex], nextIndex, true);
+          }
           break;
         case 'ArrowUp':
           e.preventDefault();
-          onFileSelect?.(fileReferences[Math.max(selectedFileIndex - 1, 0)], Math.max(selectedFileIndex - 1, 0));
+          if (fileReferences.length > 0) {
+            const prevIndex = Math.max(selectedFileIndex - 1, 0);
+            onFileSelect?.(fileReferences[prevIndex], prevIndex, true);
+          }
           break;
         case 'Enter':
           e.preventDefault();

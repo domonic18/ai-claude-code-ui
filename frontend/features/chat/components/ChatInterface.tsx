@@ -308,7 +308,7 @@ export function ChatInterface({
     const slashMatch = textBeforeCursor.match(slashPattern);
 
     if (slashMatch) {
-      const slashPos = (slashMatch.index || 0) + slashMatch[1].length;
+      const slashPos = (slashMatch.index !== undefined ? slashMatch.index : 0) + slashMatch[1].length;
       const query = slashMatch[2];
 
       setSlashPositionValue(slashPos);
