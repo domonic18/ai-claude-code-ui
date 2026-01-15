@@ -279,7 +279,7 @@ function renderStyledToolResult(
   return (
     <details
       id={`tool-result-${toolId}`}
-      defaultOpen={true}
+      open
       className="relative mt-4 group/details"
     >
       <summary className="flex items-center gap-2 cursor-pointer hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors duration-200 p-2.5 rounded-lg">
