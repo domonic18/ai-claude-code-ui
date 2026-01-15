@@ -77,6 +77,13 @@ export function useFileReferences({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [atPosition, setAtPosition] = useState(-1);
 
+  // Reset selected index when menu opens or query changes
+  useEffect(() => {
+    if (showMenu) {
+      setSelectedIndex(0);
+    }
+  }, [showMenu, query]);
+
   /**
    * Load files from project
    */
@@ -166,9 +173,12 @@ export function useFileReferences({
    * Handle file selection
    */
   const handleFileSelect = useCallback((file: FileReference, index: number, isHover?: boolean) => {
-    if (!isHover) {
-      onFileReference?.(file);
+    if (isHover) {
+      setSelectedIndex(index);
+      return;
     }
+    
+    onFileReference?.(file);
   }, [onFileReference]);
 
   return {

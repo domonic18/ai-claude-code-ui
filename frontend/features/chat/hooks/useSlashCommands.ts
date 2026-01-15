@@ -79,6 +79,13 @@ export function useSlashCommands({
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [slashPosition, setSlashPosition] = useState(-1);
 
+  // Reset selected index when menu opens or query changes
+  useEffect(() => {
+    if (showMenu) {
+      setSelectedIndex(0);
+    }
+  }, [showMenu, query]);
+
   // Load commands from API
   useEffect(() => {
     const fetchCommands = async () => {

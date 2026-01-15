@@ -113,7 +113,7 @@ export function ChatInput({
     if (projectName && typeof window !== 'undefined') {
       const draft = localStorage.getItem(STORAGE_KEYS.DRAFT_INPUT(projectName));
       if (draft && !value) {
-        onChange(draft);
+        onChange(draft, draft.length);
       }
     }
   }, [projectName, onChange]);
@@ -476,13 +476,13 @@ export function ChatInput({
               const beforeCommand = value.slice(0, slashPosition);
               const afterCommand = value.slice(slashPosition + 1 + commandQuery.length);
               const newInput = `${beforeCommand}${command.name} ${afterCommand}`;
+              const newPos = slashPosition + command.name.length + 1; // +1 for space
 
-              onChange(newInput);
+              onChange(newInput, newPos);
 
               // Move cursor after command name and space
               setTimeout(() => {
                 if (textareaRef.current) {
-                  const newPos = slashPosition + command.name.length + 1; // +1 for space
                   textareaRef.current.setSelectionRange(newPos, newPos);
                   textareaRef.current.focus();
                 }
@@ -511,13 +511,13 @@ export function ChatInput({
               const beforeFile = value.slice(0, atPosition);
               const afterFile = value.slice(cursorPosition);
               const newInput = `${beforeFile}@${file.relativePath} ${afterFile}`;
+              const newPos = atPosition + file.relativePath.length + 2;
 
-              onChange(newInput);
+              onChange(newInput, newPos);
 
               // Move cursor after file reference
               setTimeout(() => {
                 if (textareaRef.current) {
-                  const newPos = atPosition + file.relativePath.length + 2;
                   textareaRef.current.setSelectionRange(newPos, newPos);
                   textareaRef.current.focus();
                 }
