@@ -664,10 +664,11 @@ export function ChatInterface({
               <button
                 type="button"
                 onClick={() => {
-                  // Send abort message via WebSocket
+                  // Send abort-session message via WebSocket
                   sendMessage?.({
-                    type: 'abort',
+                    type: 'abort-session',
                     sessionId: currentSessionId,
+                    provider: 'claude',
                   });
                   setIsLoading(false);
                   resetStream();
