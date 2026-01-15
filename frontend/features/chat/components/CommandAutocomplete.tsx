@@ -166,7 +166,7 @@ export function CommandAutocomplete({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-mono text-sm font-medium text-gray-900 dark:text-white">
-                  /{command.name}
+                  {command.name}
                 </span>
                 {command.type === 'built-in' && (
                   <span className="px-1.5 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded">
