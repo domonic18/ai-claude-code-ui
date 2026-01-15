@@ -661,7 +661,7 @@ export const ChatMessage = memo(function ChatMessage({
           {message.isToolUse && message.toolName ? (
             (() => {
               // Handle minimized tools (Grep, Glob)
-              if (MINIMIZED_TOOLS.includes(message.toolName)) {
+              if (MINIMIZED_TOOLS.includes(message.toolName as any)) {
                 return renderMinimizedTool(message);
               }
 
