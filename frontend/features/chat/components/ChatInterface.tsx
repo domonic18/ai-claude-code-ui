@@ -363,12 +363,126 @@ export function ChatInterface({
     setShowFileMenuValue(false);
   }, [setShowFileMenuValue]);
 
-  // Sync session ID
+  // Ref to track which session's messages have been loaded
+  const loadedSessionRef = useRef<string | null>(null);
+
+  // Sync session ID and clear loaded session ref when session changes
   useEffect(() => {
     if (selectedSession?.id) {
       setCurrentSessionId(selectedSession.id);
+    } else {
+      // Clear loaded session ref when no session selected (new chat)
+      loadedSessionRef.current = null;
     }
   }, [selectedSession?.id]);
+
+  // Load session messages when session or project changes
+  useEffect(() => {
+    const loadSessionMessages = async () => {
+      if (!selectedProject?.name || !selectedSession?.id) {
+        return;
+      }
+
+      // Skip loading if we already loaded this session
+      if (loadedSessionRef.current === selectedSession.id) {
+        return;
+      }
+
+      try {
+        console.log(`[ChatInterface] Loading messages for session ${selectedSession.id}...`);
+
+        const response = await authenticatedFetch(
+          `/api/projects/${selectedProject.name}/sessions/${selectedSession.id}/messages`
+        );
+        if (!response.ok) {
+          console.error('Failed to load session messages:', response.status);
+          return;
+        }
+
+        const responseData = await response.json();
+        const rawMessages = responseData.data?.messages || [];
+
+        console.log(`[ChatInterface] Raw messages from API:`, rawMessages.length, rawMessages);
+
+        // Convert API messages to ChatMessage format
+        // API returns messages in format: {message: {role: "user/assistant", content: "..." }}
+        const convertedMessages: ChatMessage[] = [];
+
+        for (const msg of rawMessages) {
+          if (!msg.message) continue;
+
+          const role = msg.message.role;
+          const content = msg.message.content;
+
+          // Handle user messages
+          if (role === 'user') {
+            let textContent = '';
+            if (typeof content === 'string') {
+              textContent = content;
+            } else if (Array.isArray(content)) {
+              // Extract text parts from content array
+              const textParts = content.filter((part: any) => part.type === 'text').map((part: any) => part.text);
+              textContent = textParts.join('\n');
+            }
+
+            // Skip empty messages
+            if (textContent.trim()) {
+              convertedMessages.push({
+                id: msg.id || `msg-${Date.now()}-${Math.random()}`,
+                type: 'user',
+                content: textContent,
+                timestamp: msg.timestamp || Date.now(),
+              });
+            }
+          }
+          // Handle assistant messages
+          else if (role === 'assistant') {
+            if (typeof content === 'string') {
+              convertedMessages.push({
+                id: msg.id || `msg-${Date.now()}-${Math.random()}`,
+                type: 'assistant',
+                content: content,
+                timestamp: msg.timestamp || Date.now(),
+              });
+            } else if (Array.isArray(content)) {
+              // Handle complex content with tool_use
+              for (const part of content) {
+                if (part.type === 'text') {
+                  convertedMessages.push({
+                    id: msg.id || `msg-${Date.now()}-${Math.random()}`,
+                    type: 'assistant',
+                    content: part.text,
+                    timestamp: msg.timestamp || Date.now(),
+                  });
+                } else if (part.type === 'tool_use') {
+                  // Tool use message
+                  convertedMessages.push({
+                    id: msg.id || `msg-${Date.now()}-${Math.random()}`,
+                    type: 'assistant',
+                    content: '',
+                    timestamp: msg.timestamp || Date.now(),
+                    toolUse: {
+                      name: part.name,
+                      input: part.input,
+                      id: part.id,
+                    },
+                  });
+                }
+              }
+            }
+          }
+        }
+
+        setMessages(convertedMessages);
+        loadedSessionRef.current = selectedSession.id;
+        console.log(`[ChatInterface] Loaded ${convertedMessages.length} messages for session ${selectedSession.id}`);
+      } catch (error) {
+        console.error('Error loading session messages:', error);
+      }
+    };
+
+    loadSessionMessages();
+  }, [selectedProject?.name, selectedSession?.id]);
 
   // Update provider from session
   useEffect(() => {
@@ -402,10 +516,23 @@ export function ChatInterface({
         onSetTokenBudget?.(budget);
       },
       onSetTasks: setTasks,
+      // Streaming callbacks
+      completeStream: () => {
+        completeStream();
+      },
+      resetStream: () => {
+        resetStream();
+      },
+      updateStreamContent: (content) => {
+        updateStreamContent(content);
+      },
+      updateStreamThinking: (thinking) => {
+        updateStreamThinking(thinking);
+      },
       getCurrentSessionId: () => currentSessionId,
       getSelectedProjectName: () => selectedProject?.name,
     });
-  }, [wsMessages, currentSessionId, selectedProject]);
+  }, [wsMessages, currentSessionId, selectedProject, addMessage, updateMessage, completeStream, resetStream, updateStreamContent, updateStreamThinking]);
 
   /**
    * Create diff for Edit tool
