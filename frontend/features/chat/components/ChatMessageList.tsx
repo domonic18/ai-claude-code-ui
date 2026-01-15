@@ -9,7 +9,7 @@
  * - Empty state
  */
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, memo, useCallback } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { useChatScroll } from '../hooks';
 import type { ChatMessage as ChatMessageType } from '../types';
@@ -47,7 +47,7 @@ interface ChatMessageListProps {
  *
  * Renders a scrollable list of chat messages with auto-scroll behavior.
  */
-export function ChatMessageList({
+export const ChatMessageList = memo(function ChatMessageList({
   messages,
   isStreaming = false,
   autoExpandTools = false,

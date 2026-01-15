@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
+import ErrorBoundary from './components/common/ErrorBoundary'
 import './index.css'
 import 'katex/dist/katex.min.css'
 
@@ -16,5 +17,11 @@ if ('serviceWorker' in navigator) {
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <App />
+  <ErrorBoundary
+    onError={(error, errorInfo) => {
+      console.error('Global error:', error, errorInfo);
+    }}
+  >
+    <App />
+  </ErrorBoundary>
 )
