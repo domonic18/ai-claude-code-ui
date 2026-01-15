@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { ModelSelector } from './index';
+import TokenUsagePie from '../../../components/TokenUsagePie';
 
 export interface ChatToolbarProps {
   /** Selected model */
@@ -68,6 +69,14 @@ export function ChatToolbar({
           onModelSelect={onModelSelect}
           tokenBudget={tokenBudget}
         />
+
+        {/* Token usage pie chart */}
+        {tokenBudget && (
+          <TokenUsagePie
+            used={tokenBudget?.used || 0}
+            total={tokenBudget?.total || 160000}
+          />
+        )}
 
         {/* Cancel button when loading */}
         {isLoading && ws && (
