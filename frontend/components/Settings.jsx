@@ -11,7 +11,7 @@ import CredentialsSettings from './CredentialsSettings';
 import GitSettings from './GitSettings';
 import TasksSettings from './TasksSettings';
 import LoginModal from './LoginModal';
-import { authenticatedFetch } from '../utils/api';
+import { authenticatedFetch, api } from '../utils/api';
 
 // New settings components
 import AgentListItem from './settings/AgentListItem';
@@ -211,93 +211,79 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents', autoR
   // MCP API functions
   const fetchMcpServers = async () => {
     try {
-      // Try to read directly from config files for complete details
-      const configResponse = await authenticatedFetch('/api/mcp/config/read');
-
-      if (configResponse.ok) {
-        const configData = await configResponse.json();
-        if (configData.success && configData.servers) {
-          setMcpServers(configData.servers);
-          return;
-        }
-      }
-
-      // Fallback to Claude CLI
-      const cliResponse = await authenticatedFetch('/api/mcp/cli/list');
-
-      if (cliResponse.ok) {
-        const cliData = await cliResponse.json();
-        if (cliData.success && cliData.servers) {
-          // Convert CLI format to our format
-          const servers = cliData.servers.map(server => ({
-            id: server.name,
-            name: server.name,
-            type: server.type,
-            scope: 'user',
-            config: {
-              command: server.command || '',
-              args: server.args || [],
-              env: server.env || {},
-              url: server.url || '',
-              headers: server.headers || {},
-              timeout: 30000
-            },
-            created: new Date().toISOString(),
-            updated: new Date().toISOString()
-          }));
-          setMcpServers(servers);
-          return;
-        }
-      }
-
-      // Final fallback to direct config reading
-      const response = await authenticatedFetch('/api/mcp/servers?scope=user');
+      const response = await api.user.mcpServers.getAll();
 
       if (response.ok) {
         const data = await response.json();
-        setMcpServers(data.servers || []);
+        if (data.success && data.data) {
+          // Transform data format to match existing structure
+          const servers = data.data.map(server => ({
+            id: server.id,
+            name: server.name,
+            type: server.type,
+            enabled: server.enabled,
+            scope: 'user',
+            config: server.config || {},
+            created: server.created_at,
+            updated: server.updated_at
+          }));
+          setMcpServers(servers);
+        } else {
+          setMcpServers([]);
+        }
       } else {
-        console.error('Failed to fetch MCP servers');
+        console.error('Failed to fetch MCP servers from API');
+        setMcpServers([]);
       }
     } catch (error) {
       console.error('Error fetching MCP servers:', error);
+      setMcpServers([]);
     }
   };
 
   const saveMcpServer = async (serverData) => {
     try {
       if (editingMcpServer) {
-        // For editing, remove old server and add new one
-        await deleteMcpServer(editingMcpServer.id, 'user');
-      }
-
-      // Use Claude CLI to add the server
-      const response = await authenticatedFetch('/api/mcp/cli/add', {
-        method: 'POST',
-        body: JSON.stringify({
+        // Update existing server
+        const response = await api.user.mcpServers.update(editingMcpServer.id, {
           name: serverData.name,
           type: serverData.type,
-          scope: serverData.scope,
-          projectPath: serverData.projectPath,
-          command: serverData.config?.command,
-          args: serverData.config?.args || [],
-          url: serverData.config?.url,
-          headers: serverData.config?.headers || {},
-          env: serverData.config?.env || {}
-        })
-      });
+          config: serverData.config,
+          enabled: serverData.enabled !== undefined ? serverData.enabled : true
+        });
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          await fetchMcpServers(); // Refresh the list
-          return true;
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            await fetchMcpServers(); // Refresh the list
+            return true;
+          } else {
+            throw new Error(result.error || 'Failed to update server');
+          }
         } else {
-          throw new Error(result.error || 'Failed to save server via Claude CLI');
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to update server');
         }
       } else {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to save server');
+        // Create new server
+        const response = await api.user.mcpServers.create({
+          name: serverData.name,
+          type: serverData.type,
+          config: serverData.config
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            await fetchMcpServers(); // Refresh the list
+            return true;
+          } else {
+            throw new Error(result.error || 'Failed to create server');
+          }
+        } else {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to create server');
+        }
       }
     } catch (error) {
       console.error('Error saving MCP server:', error);
@@ -307,10 +293,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents', autoR
 
   const deleteMcpServer = async (serverId, scope = 'user') => {
     try {
-      // Use Claude CLI to remove the server with proper scope
-      const response = await authenticatedFetch(`/api/mcp/cli/remove/${serverId}?scope=${scope}`, {
-        method: 'DELETE'
-      });
+      const response = await api.user.mcpServers.delete(serverId);
 
       if (response.ok) {
         const result = await response.json();
@@ -332,13 +315,15 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents', autoR
 
   const testMcpServer = async (serverId, scope = 'user') => {
     try {
-      const response = await authenticatedFetch(`/api/mcp/servers/${serverId}/test?scope=${scope}`, {
-        method: 'POST'
-      });
+      const response = await api.user.mcpServers.test(serverId);
 
       if (response.ok) {
         const data = await response.json();
-        return data.testResult;
+        if (data.success && data.data) {
+          return data.data;
+        } else {
+          throw new Error(data.error || 'Test failed');
+        }
       } else {
         const error = await response.json();
         throw new Error(error.error || 'Failed to test server');
@@ -352,13 +337,15 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents', autoR
 
   const discoverMcpTools = async (serverId, scope = 'user') => {
     try {
-      const response = await authenticatedFetch(`/api/mcp/servers/${serverId}/tools?scope=${scope}`, {
-        method: 'POST'
-      });
+      const response = await api.user.mcpServers.discoverTools(serverId);
 
       if (response.ok) {
         const data = await response.json();
-        return data.toolsResult;
+        if (data.success && data.data) {
+          return data.data;
+        } else {
+          throw new Error(data.error || 'Discovery failed');
+        }
       } else {
         const error = await response.json();
         throw new Error(error.error || 'Failed to discover tools');
@@ -529,56 +516,88 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents', autoR
 
   const loadSettings = async () => {
     try {
-      
-      // Load Claude settings from localStorage
-      const savedSettings = localStorage.getItem('claude-settings');
-      
-      if (savedSettings) {
-        const settings = JSON.parse(savedSettings);
-        setAllowedTools(settings.allowedTools && settings.allowedTools.length > 0 ? settings.allowedTools : commonTools);
-        setDisallowedTools(settings.disallowedTools || []);
-        setSkipPermissions(settings.skipPermissions || false);
-        setProjectSortOrder(settings.projectSortOrder || 'name');
-      } else {
-        // Set defaults
+      // Load Claude settings from API
+      try {
+        const claudeResponse = await api.user.settings.get('claude');
+        if (claudeResponse.ok) {
+          const claudeData = await claudeResponse.json();
+          if (claudeData.success && claudeData.data) {
+            const settings = claudeData.data;
+            setAllowedTools(settings.allowed_tools && settings.allowed_tools.length > 0 ? settings.allowed_tools : commonTools);
+            setDisallowedTools(settings.disallowed_tools || []);
+            setSkipPermissions(settings.skip_permissions || false);
+          } else {
+            // Set defaults if API returns empty data
+            setAllowedTools(commonTools);
+            setDisallowedTools([]);
+            setSkipPermissions(false);
+          }
+        } else {
+          // Fallback to defaults on error
+          console.warn('Failed to load Claude settings from API, using defaults');
+          setAllowedTools(commonTools);
+          setDisallowedTools([]);
+          setSkipPermissions(false);
+        }
+      } catch (error) {
+        console.error('Error loading Claude settings:', error);
         setAllowedTools(commonTools);
         setDisallowedTools([]);
         setSkipPermissions(false);
-        setProjectSortOrder('name');
       }
-      
-      // Load Cursor settings from localStorage
-      const savedCursorSettings = localStorage.getItem('cursor-tools-settings');
 
-      if (savedCursorSettings) {
-        const cursorSettings = JSON.parse(savedCursorSettings);
-        setCursorAllowedCommands(cursorSettings.allowedCommands || []);
-        setCursorDisallowedCommands(cursorSettings.disallowedCommands || []);
-        setCursorSkipPermissions(cursorSettings.skipPermissions || false);
-      } else {
-        // Set Cursor defaults
+      // Load Cursor settings from API
+      try {
+        const cursorResponse = await api.user.settings.get('cursor');
+        if (cursorResponse.ok) {
+          const cursorData = await cursorResponse.json();
+          if (cursorData.success && cursorData.data) {
+            const settings = cursorData.data;
+            setCursorAllowedCommands(settings.allowed_tools || []);
+            setCursorDisallowedCommands(settings.disallowed_tools || []);
+            setCursorSkipPermissions(settings.skip_permissions || false);
+          } else {
+            setCursorAllowedCommands([]);
+            setCursorDisallowedCommands([]);
+            setCursorSkipPermissions(false);
+          }
+        } else {
+          setCursorAllowedCommands([]);
+          setCursorDisallowedCommands([]);
+          setCursorSkipPermissions(false);
+        }
+      } catch (error) {
+        console.error('Error loading Cursor settings:', error);
         setCursorAllowedCommands([]);
         setCursorDisallowedCommands([]);
         setCursorSkipPermissions(false);
       }
 
-      // Load Codex settings from localStorage
-      const savedCodexSettings = localStorage.getItem('codex-settings');
-
-      if (savedCodexSettings) {
-        const codexSettings = JSON.parse(savedCodexSettings);
-        setCodexPermissionMode(codexSettings.permissionMode || 'default');
-      } else {
+      // Load Codex settings from API
+      try {
+        const codexResponse = await api.user.settings.get('codex');
+        if (codexResponse.ok) {
+          const codexData = await codexResponse.json();
+          if (codexData.success && codexData.data) {
+            setCodexPermissionMode(codexData.data.permission_mode || 'default');
+          } else {
+            setCodexPermissionMode('default');
+          }
+        } else {
+          setCodexPermissionMode('default');
+        }
+      } catch (error) {
+        console.error('Error loading Codex settings:', error);
         setCodexPermissionMode('default');
       }
 
-      // Load MCP servers from API
+      // Load MCP servers from new API
       await fetchMcpServers();
 
-      // Load Cursor MCP servers
+      // Load Cursor MCP servers (keep existing for now)
       await fetchCursorMcpServers();
 
-      // Load Codex MCP servers
+      // Load Codex MCP servers (keep existing for now)
       await fetchCodexMcpServers();
     } catch (error) {
       console.error('Error loading tool settings:', error);
@@ -714,41 +733,62 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents', autoR
     }
   };
 
-  const saveSettings = () => {
+  const saveSettings = async () => {
     setIsSaving(true);
     setSaveStatus(null);
-    
+
     try {
-      // Save Claude settings
-      const claudeSettings = {
-        allowedTools,
-        disallowedTools,
-        skipPermissions,
-        projectSortOrder,
-        lastUpdated: new Date().toISOString()
-      };
-      
-      // Save Cursor settings
-      const cursorSettings = {
-        allowedCommands: cursorAllowedCommands,
-        disallowedCommands: cursorDisallowedCommands,
-        skipPermissions: cursorSkipPermissions,
-        lastUpdated: new Date().toISOString()
-      };
+      // Save Claude settings to API
+      try {
+        const claudeResponse = await api.user.settings.update('claude', {
+          allowedTools,
+          disallowedTools,
+          skipPermissions
+        });
 
-      // Save Codex settings
-      const codexSettings = {
-        permissionMode: codexPermissionMode,
-        lastUpdated: new Date().toISOString()
-      };
+        if (!claudeResponse.ok) {
+          const error = await claudeResponse.json();
+          throw new Error(error.error || 'Failed to save Claude settings');
+        }
+      } catch (error) {
+        console.error('Error saving Claude settings:', error);
+        throw new Error('Failed to save Claude settings: ' + error.message);
+      }
 
-      // Save to localStorage
-      localStorage.setItem('claude-settings', JSON.stringify(claudeSettings));
-      localStorage.setItem('cursor-tools-settings', JSON.stringify(cursorSettings));
-      localStorage.setItem('codex-settings', JSON.stringify(codexSettings));
+      // Save Cursor settings to API
+      try {
+        const cursorResponse = await api.user.settings.update('cursor', {
+          allowedTools: cursorAllowedCommands,
+          disallowedTools: cursorDisallowedCommands,
+          skipPermissions: cursorSkipPermissions
+        });
+
+        if (!cursorResponse.ok) {
+          const error = await cursorResponse.json();
+          throw new Error(error.error || 'Failed to save Cursor settings');
+        }
+      } catch (error) {
+        console.error('Error saving Cursor settings:', error);
+        throw new Error('Failed to save Cursor settings: ' + error.message);
+      }
+
+      // Save Codex settings to API
+      try {
+        const codexResponse = await api.user.settings.update('codex', {
+          permissionMode: codexPermissionMode
+        });
+
+        if (!codexResponse.ok) {
+          const error = await codexResponse.json();
+          throw new Error(error.error || 'Failed to save Codex settings');
+        }
+      } catch (error) {
+        console.error('Error saving Codex settings:', error);
+        throw new Error('Failed to save Codex settings: ' + error.message);
+      }
 
       setSaveStatus('success');
-      
+
       setTimeout(() => {
         onClose();
       }, 1000);

@@ -176,6 +176,97 @@ export const api = {
       authenticatedFetch('/api/users/complete-onboarding', {
         method: 'POST',
       }),
+
+    // User Settings API
+    settings: {
+      // Get all settings for all providers
+      getAll: () => authenticatedFetch('/api/users/settings'),
+
+      // Get settings for a specific provider
+      get: (provider = 'claude') =>
+        authenticatedFetch(`/api/users/settings/${provider}`),
+
+      // Update settings for a specific provider
+      update: (provider = 'claude', settings) =>
+        authenticatedFetch(`/api/users/settings/${provider}`, {
+          method: 'PUT',
+          body: JSON.stringify(settings),
+        }),
+
+      // Get default settings for a provider
+      getDefaults: (provider = 'claude') =>
+        authenticatedFetch(`/api/users/settings/${provider}/defaults`),
+
+      // Get SDK config for a provider
+      getSdkConfig: (provider = 'claude') =>
+        authenticatedFetch(`/api/users/settings/${provider}/sdk-config`),
+
+      // Reset settings to defaults
+      reset: (provider = 'claude') =>
+        authenticatedFetch(`/api/users/settings/${provider}/reset`, {
+          method: 'POST',
+        }),
+    },
+
+    // MCP Servers API
+    mcpServers: {
+      // Get all MCP servers for the user
+      getAll: () => authenticatedFetch('/api/users/mcp-servers'),
+
+      // Get enabled MCP servers
+      getEnabled: () => authenticatedFetch('/api/users/mcp-servers/enabled'),
+
+      // Get SDK config for MCP servers
+      getSdkConfig: () => authenticatedFetch('/api/users/mcp-servers/sdk-config'),
+
+      // Get a single MCP server
+      get: (id) => authenticatedFetch(`/api/users/mcp-servers/${id}`),
+
+      // Create a new MCP server
+      create: (server) =>
+        authenticatedFetch('/api/users/mcp-servers', {
+          method: 'POST',
+          body: JSON.stringify(server),
+        }),
+
+      // Update an MCP server
+      update: (id, server) =>
+        authenticatedFetch(`/api/users/mcp-servers/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify(server),
+        }),
+
+      // Delete an MCP server
+      delete: (id) =>
+        authenticatedFetch(`/api/users/mcp-servers/${id}`, {
+          method: 'DELETE',
+        }),
+
+      // Test an MCP server connection
+      test: (id) =>
+        authenticatedFetch(`/api/users/mcp-servers/${id}/test`, {
+          method: 'POST',
+        }),
+
+      // Discover tools from an MCP server
+      discoverTools: (id) =>
+        authenticatedFetch(`/api/users/mcp-servers/${id}/tools`, {
+          method: 'GET',
+        }),
+
+      // Toggle MCP server enabled status
+      toggle: (id) =>
+        authenticatedFetch(`/api/users/mcp-servers/${id}/toggle`, {
+          method: 'POST',
+        }),
+
+      // Validate MCP server configuration
+      validate: (server) =>
+        authenticatedFetch('/api/users/mcp-servers/validate', {
+          method: 'POST',
+          body: JSON.stringify(server),
+        }),
+    },
   },
 
   // Generic GET method for any endpoint
