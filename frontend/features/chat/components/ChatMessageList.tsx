@@ -9,7 +9,7 @@
  * - Empty state
  */
 
-import React, { useEffect, useMemo, memo } from 'react';
+import { useEffect, useMemo, memo } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { useChatScroll } from '../hooks';
 import type { ChatMessage as ChatMessageType } from '../types';
@@ -59,6 +59,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   const {
     scrollContainerRef,
     messagesEndRef,
+    isUserScrolledUp,
     scrollToBottom,
   } = useChatScroll({
     autoScrollToBottom,
@@ -113,13 +114,28 @@ export const ChatMessageList = memo(function ChatMessageList({
   }
 
   return (
-    <div
-      ref={scrollContainerRef}
-      className="flex-1 overflow-y-auto px-4 sm:px-6 py-4"
-      role="log"
-      aria-label="Chat messages"
-      aria-live="polite"
-    >
+    <>
+      {/* Scroll to bottom button - fixed position */}
+      {isUserScrolledUp && messages.length > 0 && (
+        <button
+          onClick={() => scrollToBottom('smooth')}
+          className="fixed bottom-20 right-8 z-50 w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:ring-offset-gray-800"
+          title="滚动到底部"
+          type="button"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+          </svg>
+        </button>
+      )}
+
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto px-4 sm:px-6 py-4"
+        role="log"
+        aria-label="Chat messages"
+        aria-live="polite"
+      >
       {/* Show indicator if messages are hidden */}
       {messages.length > visibleMessageCount && (
         <div className="text-center py-2 text-xs text-gray-500 dark:text-gray-400">
@@ -161,6 +177,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       {/* Scroll anchor */}
       <div ref={messagesEndRef} className="h-1" />
     </div>
+  </>
   );
 });
 
