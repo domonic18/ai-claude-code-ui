@@ -1,13 +1,21 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import path from 'path'
 
 export default defineConfig(({ command, mode }) => {
   // Load env file based on `mode` in the current working directory.
   const env = loadEnv(mode, process.cwd(), '')
-  
-  
+
+
   return {
     plugins: [react()],
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './frontend'),
+        '@/features': path.resolve(__dirname, './frontend/features'),
+        '@/shared': path.resolve(__dirname, './frontend/shared'),
+      },
+    },
     server: {
       port: parseInt(env.VITE_PORT) || 5173,
       proxy: {
@@ -24,7 +32,7 @@ export default defineConfig(({ command, mode }) => {
     },
     build: {
       outDir: 'dist',
-      chunkSizeWarningLimit: 1000,
+      chunkSizeWarningLimit: 500,
       rollupOptions: {
         output: {
           manualChunks: {
@@ -39,8 +47,12 @@ export default defineConfig(({ command, mode }) => {
               '@codemirror/lang-python',
               '@codemirror/theme-one-dark'
             ],
-            'vendor-xterm': ['@xterm/xterm', '@xterm/addon-fit', '@xterm/addon-clipboard', '@xterm/addon-webgl']
-          }
+            'vendor-xterm': ['@xterm/xterm', '@xterm/addon-fit', '@xterm/addon-clipboard', '@xterm/addon-webgl'],
+            'vendor-markdown': ['react-markdown', 'rehype-katex', 'remark-gfm', 'remark-math', 'katex']
+          },
+          chunkFileNames: 'assets/[name]-[hash].js',
+          entryFileNames: 'assets/[name]-[hash].js',
+          assetFileNames: 'assets/[name]-[hash].[ext]'
         }
       }
     }
