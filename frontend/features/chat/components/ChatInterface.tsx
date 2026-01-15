@@ -189,7 +189,6 @@ export function ChatInterface({
 
   // Command system integration
   const {
-    commands,
     filteredCommands,
     frequentCommands,
     showMenu: showCommandMenu,
@@ -209,7 +208,6 @@ export function ChatInterface({
 
   // File reference system integration
   const {
-    files: fileReferences,
     filteredFiles: filteredFileReferences,
     showMenu: showFileMenu,
     query: fileQuery,

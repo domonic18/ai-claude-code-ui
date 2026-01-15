@@ -102,7 +102,6 @@ export function ChatInput({
 }: ChatInputComponentProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isFocused, setIsFocused] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
 
   // Load draft from localStorage on mount
@@ -140,7 +139,6 @@ export function ChatInput({
     }
 
     textarea.style.height = `${newHeight}px`;
-    setIsExpanded(scrollHeight > lineHeight * 2);
   }, [value, minRows, maxRows]);
 
   // Focus textarea on mount
