@@ -14,6 +14,7 @@ import React, { useState, useEffect, useRef, memo } from 'react';
 import ClaudeLogo from '../../../components/ClaudeLogo.jsx';
 import CursorLogo from '../../../components/CursorLogo.jsx';
 import CodexLogo from '../../../components/CodexLogo.jsx';
+import TodoList from '../../../components/TodoList';
 import MarkdownRenderer from './MarkdownRenderer';
 import type { ChatMessageProps, ChatMessage as ChatMessageType } from '../types';
 import { MINIMIZED_TOOLS } from '../constants';
@@ -382,6 +383,7 @@ function renderTodoIndicator(input: any) {
         </svg>
         <span className="font-medium">Update todo list</span>
       </div>
+      <TodoList todos={input.todos} />
     </div>
   );
 }
