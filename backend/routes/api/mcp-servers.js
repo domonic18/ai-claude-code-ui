@@ -58,8 +58,14 @@ router.post('/mcp-servers', authenticate(), validate({
  * PUT /api/users/mcp-servers/:id
  * 更新MCP服务器
  */
-router.put('/mcp-servers/:id', authenticate(),
-  mcpServerController._asyncHandler(mcpServerController.updateServer));
+router.put('/mcp-servers/:id', authenticate(), validate({
+  body: {
+    name: { type: 'string', optional: true },
+    type: { type: 'string', optional: true },
+    config: { type: 'object', optional: true },
+    enabled: { type: 'boolean', optional: true }
+  }
+}), mcpServerController._asyncHandler(mcpServerController.updateServer));
 
 /**
  * DELETE /api/users/mcp-servers/:id

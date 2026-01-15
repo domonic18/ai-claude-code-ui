@@ -9,7 +9,7 @@
 
 import express from 'express';
 import { UserSettingsController } from '../../controllers/api/index.js';
-import { authenticate } from '../../middleware/index.js';
+import { authenticate, validate } from '../../middleware/index.js';
 
 const router = express.Router();
 const userSettingsController = new UserSettingsController();
@@ -32,8 +32,13 @@ router.get('/settings/:provider', authenticate(),
  * PUT /api/users/settings/:provider
  * 更新用户指定提供商的设置
  */
-router.put('/settings/:provider', authenticate(),
-  userSettingsController._asyncHandler(userSettingsController.updateSettings));
+router.put('/settings/:provider', authenticate(), validate({
+  body: {
+    allowedTools: { type: 'array', optional: true },
+    disallowedTools: { type: 'array', optional: true },
+    skipPermissions: { type: 'boolean', optional: true }
+  }
+}), userSettingsController._asyncHandler(userSettingsController.updateSettings));
 
 /**
  * GET /api/users/settings/:provider/defaults
