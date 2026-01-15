@@ -16,6 +16,8 @@ import { ApiKey } from './repositories/ApiKey.repository.js';
 import { GitHubToken } from './repositories/GitHubToken.repository.js';
 import { Container, ContainerState } from './repositories/Container.repository.js';
 import { Credential } from './repositories/Credential.repository.js';
+import { UserSettings } from './repositories/UserSettings.repository.js';
+import { McpServer } from './repositories/McpServer.repository.js';
 
 /**
  * 初始化数据库
@@ -48,7 +50,9 @@ export const repositories = {
     GitHubToken,
     Container,
     ContainerState,
-    Credential
+    Credential,
+    UserSettings,
+    McpServer
 };
 
 // 导出连接相关函数

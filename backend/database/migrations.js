@@ -46,6 +46,9 @@ export function runMigrations() {
         // 创建容器相关表
         runContainerMigrations(database);
 
+        // 创建用户设置和 MCP 服务表
+        runUserSettingsMigrations(database);
+
         console.log('数据库迁移成功完成');
     } catch (error) {
         console.error('运行迁移错误:', error.message);
@@ -116,6 +119,26 @@ function runContainerMigrations(database) {
         `);
         database.exec('CREATE INDEX IF NOT EXISTS idx_container_states_user_id ON container_states(user_id)');
         database.exec('CREATE INDEX IF NOT EXISTS idx_container_states_updated_at ON container_states(updated_at)');
+    }
+}
+
+/**
+ * 运行用户设置和 MCP 服务相关表的迁移
+ * @param {Database} database - 数据库实例
+ */
+function runUserSettingsMigrations(database) {
+    // 检查 user_settings 表是否存在
+    const userSettingsTable = database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='user_settings'").get();
+    if (!userSettingsTable) {
+        console.log('运行迁移: 创建 user_settings 和 user_mcp_servers 表');
+
+        // 执行迁移脚本
+        const migrationSQL = fs.readFileSync(path.join(__dirname, 'migrations/005_add_user_settings_and_mcp.sql'), 'utf8');
+        database.exec(migrationSQL);
+
+        console.log('迁移 005 执行完成: 用户设置和 MCP 服务表已创建');
+    } else {
+        console.log('user_settings 表已存在，跳过迁移 005');
     }
 }
 
