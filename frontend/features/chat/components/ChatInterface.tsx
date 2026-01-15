@@ -33,6 +33,25 @@ import { getChatService } from '../services';
 import { handleWebSocketMessage, type WebSocketMessage } from '../services/websocketHandler';
 import type { ChatMessage, FileAttachment } from '../types';
 import { STORAGE_KEYS } from '../constants';
+
+/**
+ * Convert frontend model ID to backend model format
+ *
+ * Examples:
+ * - 'claude-sonnet' -> 'sonnet'
+ * - 'claude-opus' -> 'opus'
+ * - 'claude-custom' -> 'custom' (uses ANTHROPIC_MODEL env var)
+ * - 'claude-haiku' -> 'haiku'
+ */
+function convertModelIdToBackend(modelId: string): string {
+  // Remove provider prefix and return the value
+  // e.g., 'claude-sonnet' -> 'sonnet', 'claude-custom' -> 'custom'
+  const parts = modelId.split('-');
+  if (parts.length > 1) {
+    return parts.slice(1).join('-');
+  }
+  return modelId;
+}
 import type { SlashCommand } from '../hooks/useSlashCommands';
 import type { FileReference } from '../hooks/useFileReferences';
 
@@ -536,12 +555,19 @@ export function ChatInterface({
       // Create temporary session ID if needed
       const sessionId = currentSessionId || `temp-${Date.now()}`;
 
+      // Convert frontend model ID to backend format
+      const backendModel = convertModelIdToBackend(selectedModel);
+
+      // Send message in the format expected by the backend
       sendMessage({
-        type: 'chat',
-        content,
-        files: files.map(f => ({ name: f.name, type: f.type, data: f.data })),
-        sessionId,
-        provider,
+        type: 'claude-command',
+        command: content,
+        options: {
+          projectPath: selectedProject?.name,
+          sessionId,
+          model: backendModel,
+          resume: !!currentSessionId,
+        },
       });
 
       onSessionProcessing?.(sessionId);
@@ -552,6 +578,8 @@ export function ChatInterface({
     currentSessionId,
     attachedFiles,
     provider,
+    selectedProject,
+    selectedModel,
     sendMessage,
     ws,
     addMessage,
