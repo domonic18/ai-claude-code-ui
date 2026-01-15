@@ -9,7 +9,7 @@
  * - Empty state
  */
 
-import React, { useEffect, useMemo, memo, useCallback } from 'react';
+import React, { useEffect, useMemo, memo } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { useChatScroll } from '../hooks';
 import type { ChatMessage as ChatMessageType } from '../types';
@@ -134,7 +134,6 @@ export const ChatMessageList = memo(function ChatMessageList({
       {/* Render messages */}
       {displayMessages.map((message, index) => {
         const prevMessage = index > 0 ? displayMessages[index - 1] : undefined;
-
         return (
           <ChatMessage
             key={message.id || index}
@@ -168,6 +167,6 @@ export const ChatMessageList = memo(function ChatMessageList({
       <div ref={messagesEndRef} className="h-1" />
     </div>
   );
-}
+});
 
 export default ChatMessageList;

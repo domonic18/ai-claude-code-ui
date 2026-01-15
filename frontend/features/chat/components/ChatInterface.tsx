@@ -20,17 +20,17 @@ import {
   ThinkingProcess,
   TokenDisplay,
   ModelSelector,
-} from './components';
+} from './index';
 import {
   useChatMessages,
   useChatScroll,
   useMessageStream,
   useSlashCommands,
   useFileReferences,
-} from './hooks';
-import { getChatService } from './services';
+} from '../hooks';
+import { getChatService } from '../services';
 import { handleWebSocketMessage, type WebSocketMessage } from '../services/websocketHandler';
-import type { ChatMessage, FileAttachment } from './types';
+import type { ChatMessage, FileAttachment } from '../types';
 import { STORAGE_KEYS } from '../constants';
 import type { SlashCommand } from '../hooks/useSlashCommands';
 import type { FileReference } from '../hooks/useFileReferences';

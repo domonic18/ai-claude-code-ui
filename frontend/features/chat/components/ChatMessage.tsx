@@ -16,7 +16,8 @@ import CursorLogo from '../../../components/CursorLogo.jsx';
 import CodexLogo from '../../../components/CodexLogo.jsx';
 import MarkdownRenderer from './MarkdownRenderer';
 import type { ChatMessageProps, ChatMessage as ChatMessageType } from '../types';
-import { formatUsageLimitText, MINIMIZED_TOOLS } from '../utils';
+import { MINIMIZED_TOOLS } from '../constants';
+import { formatUsageLimitText } from '../utils';
 
 /**
  * Get provider from localStorage
