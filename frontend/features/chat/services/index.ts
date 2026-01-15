@@ -5,3 +5,4 @@
  */
 
 export * from './chatService';
+export * from './websocketHandler';
