@@ -16,7 +16,7 @@ import { FILES, SERVER } from './config.js';
 
 // 路由导入 - 新结构（按功能分组）
 import { auth, settings, users } from '../routes/core/index.js';
-import { projects, sessions, files, git } from '../routes/api/index.js';
+import { projects, sessions, files, git, userSettings, mcpServers } from '../routes/api/index.js';
 import { claude, cursor, codex, mcp, taskmaster, agent } from '../routes/integrations/index.js';
 import { commands, system, uploads } from '../routes/tools/index.js';
 
@@ -27,6 +27,7 @@ import mcpUtilsRoutes from '../routes/mcp-utils.js';
 // 中间件导入
 import { validateApiKey, authenticateToken } from '../middleware/auth.js';
 import { responseFormatter, responseHeaders } from '../middleware/response-formatter.middleware.js';
+import { errorHandler, notFoundHandler } from '../middleware/error-handler.middleware.js';
 
 /**
  * 使用中间件和路由配置 Express 应用
@@ -87,6 +88,8 @@ export function configureExpress(app, wss) {
     // ===== 核心路由 =====
     app.use('/api/settings', authenticateToken, settings);
     app.use('/api/users', authenticateToken, users);
+    app.use('/api/users', authenticateToken, userSettings);
+    app.use('/api/users', authenticateToken, mcpServers);
 
     // ===== 资源路由 =====
     app.use('/api/projects', authenticateToken, projects);
@@ -162,4 +165,12 @@ export function configureExpress(app, wss) {
             res.redirect(`http://localhost:${SERVER.vitePort}`);
         }
     });
+
+    // ===== 错误处理中间件 =====
+    // 必须在所有路由之后注册
+    // 404 处理
+    app.use('/api', notFoundHandler);
+
+    // 全局错误处理（必须最后注册）
+    app.use(errorHandler);
 }
