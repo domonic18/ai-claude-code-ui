@@ -26,6 +26,7 @@ import MainContent from './components/MainContent';
 import MobileNav from './components/MobileNav';
 import Settings from './components/Settings';
 import QuickSettingsPanel from './components/QuickSettingsPanel';
+import TestRefactoredChat from './components/TestRefactoredChat';
 
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -1026,6 +1027,9 @@ function App() {
                   <Routes>
                     <Route path="/" element={<AppContent />} />
                     <Route path="/session/:sessionId" element={<AppContent />} />
+                    {/* 测试路由：访问重构后的 ChatInterface */}
+                    <Route path="/test-refactored" element={<TestRefactoredChat />} />
+                    <Route path="/test-refactored/session/:sessionId" element={<TestRefactoredChat />} />
                   </Routes>
                 </Router>
               </ProtectedRoute>
