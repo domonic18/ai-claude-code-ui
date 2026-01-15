@@ -49,6 +49,12 @@ export interface MessageHandlerCallbacks {
   onSetTasks?: (tasks: any[]) => void;
   onUpdateTask?: (taskId: string, updates: any) => void;
 
+  // Streaming state
+  completeStream?: () => void;
+  resetStream?: () => void;
+  updateStreamContent?: (content: string) => void;
+  updateStreamThinking?: (thinking: string) => void;
+
   // Current state
   getCurrentSessionId: () => string | null;
   getSelectedProjectName: () => string | undefined;
@@ -271,6 +277,10 @@ function handleClaudeResponse(message: WebSocketMessage, callbacks: MessageHandl
 function handleClaudeOutput(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
   const cleaned = String(message.data || '');
   if (cleaned.trim()) {
+    // Update streaming content for the StreamingIndicator component
+    callbacks.updateStreamContent?.(cleaned);
+
+    // Also add to message list
     callbacks.onAddMessage({
       id: `assistant-${Date.now()}`,
       type: 'assistant',
@@ -300,6 +310,9 @@ function handleClaudeInteractivePrompt(message: WebSocketMessage, callbacks: Mes
  * Handle claude-error message
  */
 function handleClaudeError(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
+  callbacks.onSetLoading(false);
+  callbacks.completeStream?.();
+
   callbacks.onAddMessage({
     id: `error-${Date.now()}`,
     type: 'error',
@@ -443,6 +456,8 @@ function handleClaudeComplete(
   // Update UI state if this is the current session OR if we don't have a session ID yet
   if (completedSessionId === currentSessionId || !currentSessionId) {
     callbacks.onSetLoading(false);
+    // Complete the streaming state
+    callbacks.completeStream?.();
   }
 
   // Mark session as inactive and not processing
@@ -554,6 +569,7 @@ function handleCodexComplete(
 
   if (completedSessionId === currentSessionId) {
     callbacks.onSetLoading(false);
+    callbacks.completeStream?.();
   }
 
   if (completedSessionId) {
@@ -576,6 +592,7 @@ function handleSessionAborted(
 
   if (abortedSessionId === currentSessionId) {
     callbacks.onSetLoading(false);
+    callbacks.resetStream?.();
   }
 
   if (abortedSessionId) {

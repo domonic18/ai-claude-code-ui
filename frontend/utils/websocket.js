@@ -143,13 +143,19 @@ export function useWebSocket(isEnabled = true) {
     };
   }, [isEnabled, connect]);
 
-  const sendMessage = (message) => {
-    if (ws && isConnected) {
-      ws.send(JSON.stringify(message));
+  const sendMessage = useCallback((message) => {
+    // Use wsRef.current instead of ws state because state updates are async
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(message));
+      console.log('[WebSocket] Sent message:', message.type);
     } else {
-      console.warn('[WebSocket] Cannot send message: not connected');
+      console.warn('[WebSocket] Cannot send message: not connected. State:', {
+        wsState: ws?.readyState,
+        wsRefState: wsRef.current?.readyState,
+        isConnected
+      });
     }
-  };
+  }, [isConnected, ws]);
 
   return {
     ws,
