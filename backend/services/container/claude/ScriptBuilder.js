@@ -1,19 +1,53 @@
 /**
  * Claude SDK 脚本生成器
- * 
+ *
  * 负责生成在容器内执行的 Node.js 脚本。
  */
+
+import { UserSettingsService } from '../../settings/UserSettingsService.js';
 
 /**
  * 过滤 SDK 选项，移除不需要传给 SDK 的字段
  * @param {object} options - 原始选项
- * @returns {object} 过滤后的选项
+ * @param {number} userId - 用户 ID
+ * @returns {Promise<object>} 过滤后的选项
  */
-function filterSDKOptions(options) {
+async function filterSDKOptions(options, userId) {
   const sdkOptions = { ...options };
 
-  // 从 toolsSettings 提取配置（如果存在）
+  // 获取用户设置（优先使用数据库中的设置）
+  let userSettings = null;
+  try {
+    userSettings = await UserSettingsService.getSettings(userId, 'claude');
+    console.log('[ScriptBuilder] Loaded user settings for user:', userId);
+  } catch (error) {
+    console.warn('[ScriptBuilder] Failed to load user settings, using defaults:', error.message);
+  }
+
+  // 合并用户设置和前端传入的设置
+  // 优先级：前端传入 > 用户设置 > 默认值
   const settings = options.toolsSettings || {};
+
+  // 如果用户设置存在且前端没有覆盖，则使用用户设置
+  if (userSettings) {
+    // allowedTools: 只有在前端没有传入时才使用用户设置
+    if (!settings.allowedTools && userSettings.allowed_tools && userSettings.allowed_tools.length > 0) {
+      sdkOptions.allowedTools = userSettings.allowed_tools;
+      console.log('[ScriptBuilder] Using user settings for allowedTools:', userSettings.allowed_tools);
+    }
+    // disallowedTools: 只有在前端没有传入时才使用用户设置
+    if (!settings.disallowedTools && userSettings.disallowed_tools && userSettings.disallowed_tools.length > 0) {
+      sdkOptions.disallowedTools = userSettings.disallowed_tools;
+      console.log('[ScriptBuilder] Using user settings for disallowedTools:', userSettings.disallowed_tools);
+    }
+    // skipPermissions: 只有在前端没有传入时才使用用户设置
+    if (settings.skipPermissions === undefined && userSettings.skip_permissions !== undefined) {
+      settings.skipPermissions = userSettings.skip_permissions;
+      console.log('[ScriptBuilder] Using user settings for skipPermissions:', userSettings.skip_permissions);
+    }
+  }
+
+  // 从 toolsSettings 提取配置（如果存在，包括前端传入和用户设置）
   if (settings.allowedTools && settings.allowedTools.length > 0) {
     sdkOptions.allowedTools = settings.allowedTools;
   }
@@ -52,7 +86,7 @@ function filterSDKOptions(options) {
   // 如果前端指定了 skipPermissions，或者在容器模式下且没有明确指定 permissionMode
   if (settings.skipPermissions || !sdkOptions.permissionMode || sdkOptions.permissionMode === 'default') {
     sdkOptions.permissionMode = 'bypassPermissions';
-    console.log('[ScriptBuilder] Setting permissionMode: bypassPermissions (reason:', 
+    console.log('[ScriptBuilder] Setting permissionMode: bypassPermissions (reason:',
       settings.skipPermissions ? 'skipPermissions' : (sdkOptions.permissionMode || 'default'), ')');
   }
 
@@ -81,14 +115,15 @@ function filterSDKOptions(options) {
  * 生成 SDK 执行脚本
  * @param {string} command - 用户命令
  * @param {object} options - SDK 选项
- * @returns {string} 完整的 Node.js 执行脚本
+ * @param {number} userId - 用户 ID
+ * @returns {Promise<string>} 完整的 Node.js 执行脚本
  */
-export function buildSDKScript(command, options) {
+export async function buildSDKScript(command, options, userId) {
   // 提取 sessionId 以便在脚本中使用
   const sessionId = options.sessionId || '';
 
-  // 过滤并处理 options
-  const sdkOptions = filterSDKOptions(options);
+  // 过滤并处理 options（现在是异步的）
+  const sdkOptions = await filterSDKOptions(options, userId);
 
   // 使用 base64 编码来避免转义问题（包括 options 和 command）
   const optionsJson = JSON.stringify(sdkOptions);

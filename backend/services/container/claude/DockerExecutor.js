@@ -41,9 +41,9 @@ export async function executeInContainer(userId, command, options, writer, sessi
   console.log('[DockerExecutor] cwd:', options.cwd);
 
   try {
-    // 构建 SDK 脚本
+    // 构建 SDK 脚本（传递 userId 以加载用户设置）
     console.log('[DockerExecutor] Building SDK script...');
-    const sdkScript = buildSDKScript(command, options);
+    const sdkScript = await buildSDKScript(command, options, userId);
     console.log('[DockerExecutor] Script length:', sdkScript.length);
 
     // 记录环境变量状态
