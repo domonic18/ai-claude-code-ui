@@ -267,7 +267,7 @@ export function ChatInterface({
     setShowMenu: setShowCommandMenuValue,
     handleCommandSelect,
   } = useSlashCommands({
-    selectedProject: selectedProject?.name,
+    selectedProject: selectedProject || null,
     onCommandExecute: handleCommandExecute,
     authenticatedFetch,
   });

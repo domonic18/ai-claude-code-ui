@@ -31,6 +31,8 @@ interface ChatMessageListProps {
   onFileOpen?: (filePath: string, diffData?: any) => void;
   /** Callback for showing settings */
   onShowSettings?: () => void;
+  /** Function to create diff view for file edits */
+  createDiff?: (oldStr: string, newStr: string) => any[];
   /** Auto-scroll configuration */
   autoScrollToBottom?: boolean;
   /** Number of messages to display initially */

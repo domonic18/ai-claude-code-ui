@@ -269,7 +269,7 @@ function renderDefaultInput(toolInput: string) {
 // ============================================================================
 
 /**
- * Render tool result with styled container
+ * Render tool result with styled container and collapsible functionality
  */
 function renderStyledToolResult(
   content: string,
@@ -277,34 +277,15 @@ function renderStyledToolResult(
   toolId?: string
 ) {
   return (
-    <div
+    <details
       id={`tool-result-${toolId}`}
-      className={`relative mt-4 p-4 rounded-lg border backdrop-blur-sm scroll-mt-4 ${
-        isError
-          ? 'bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/20 dark:to-rose-950/20 border-red-200/60 dark:border-red-800/60'
-          : 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 border-green-200/60 dark:border-green-800/60'
-      }`}>
-      {/* Decorative gradient overlay */}
-      <div className={`absolute inset-0 rounded-lg opacity-50 ${
-        isError
-          ? 'bg-gradient-to-br from-red-500/5 to-rose-500/5 dark:from-red-400/5 dark:to-rose-400/5'
-          : 'bg-gradient-to-br from-green-500/5 to-emerald-500/5 dark:from-green-400/5 dark:to-emerald-400/5'
-      }`}></div>
-
-      <div className="relative flex items-center gap-2.5 mb-3">
-        <div className={`w-6 h-6 rounded-lg flex items-center justify-center shadow-md ${
-          isError
-            ? 'bg-gradient-to-br from-red-500 to-rose-600 dark:from-red-400 dark:to-rose-500 shadow-red-500/20'
-            : 'bg-gradient-to-br from-green-500 to-emerald-600 dark:from-green-400 dark:to-emerald-500 shadow-green-500/20'
-        }`}>
-          <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            {isError ? (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-            ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-            )}
-          </svg>
-        </div>
+      defaultOpen={true}
+      className="relative mt-4 group/details"
+    >
+      <summary className="flex items-center gap-2 cursor-pointer hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors duration-200 p-2.5 rounded-lg">
+        <svg className="w-4 h-4 transition-transform duration-200 group-open/details:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
         <span className={`text-sm font-semibold ${
           isError
             ? 'text-red-800 dark:text-red-200'
@@ -312,19 +293,48 @@ function renderStyledToolResult(
         }`}>
           {isError ? 'Tool Error' : 'Tool Result'}
         </span>
-      </div>
+      </summary>
+      <div
+        className={`relative mt-2 p-4 rounded-lg border backdrop-blur-sm scroll-mt-4 ${
+          isError
+            ? 'bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/20 dark:to-rose-950/20 border-red-200/60 dark:border-red-800/60'
+            : 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 border-green-200/60 dark:border-green-800/60'
+        }`}>
+        {/* Decorative gradient overlay */}
+        <div className={`absolute inset-0 rounded-lg opacity-50 ${
+          isError
+            ? 'bg-gradient-to-br from-red-500/5 to-rose-500/5 dark:from-red-400/5 dark:to-rose-400/5'
+            : 'bg-gradient-to-br from-green-500/5 to-emerald-500/5 dark:from-green-400/5 dark:to-emerald-400/5'
+        }`}></div>
 
-      <div className={`relative text-sm ${
-        isError
-          ? 'text-red-900 dark:text-red-100'
-          : 'text-green-900 dark:text-green-100'
-      }`}>
-        <MarkdownRenderer
-          content={content}
-          className="prose prose-sm max-w-none dark:prose-invert"
-        />
+        <div className="relative flex items-center gap-2.5 mb-3">
+          <div className={`w-6 h-6 rounded-lg flex items-center justify-center shadow-md ${
+            isError
+              ? 'bg-gradient-to-br from-red-500 to-rose-600 dark:from-red-400 dark:to-rose-500 shadow-red-500/20'
+              : 'bg-gradient-to-br from-green-500 to-emerald-600 dark:from-green-400 dark:to-emerald-500 shadow-green-500/20'
+          }`}>
+            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {isError ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              )}
+            </svg>
+          </div>
+        </div>
+
+        <div className={`relative text-sm ${
+          isError
+            ? 'text-red-900 dark:text-red-100'
+            : 'text-green-900 dark:text-green-100'
+        }`}>
+          <MarkdownRenderer
+            content={content}
+            className="prose prose-sm max-w-none dark:prose-invert"
+          />
+        </div>
       </div>
-    </div>
+    </details>
   );
 }
 
