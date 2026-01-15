@@ -31,6 +31,11 @@ function TestRefactoredChat() {
   const [selectedSession, setSelectedSession] = useState(null);
   const [projects, setProjects] = useState([]);
 
+  // 调试面板位置状态
+  const [panelPosition, setPanelPosition] = useState({ x: 16, y: 16 }); // bottom-4 right-4 = 16px
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
   // Fetch projects when user logs in
   useEffect(() => {
     if (user) {
@@ -139,6 +144,44 @@ function TestRefactoredChat() {
     console.log('[TestRefactored] Token budget:', budget);
   }, []);
 
+  // 拖拽处理函数
+  const handleMouseDown = useCallback((e) => {
+    // 只有点击头部时才能拖动
+    if (e.target.closest('.drag-handle')) {
+      setIsDragging(true);
+      const panel = e.currentTarget;
+      const rect = panel.getBoundingClientRect();
+      setDragOffset({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      });
+    }
+  }, []);
+
+  const handleMouseMove = useCallback((e) => {
+    if (isDragging) {
+      const x = e.clientX - dragOffset.x;
+      const y = e.clientY - dragOffset.y;
+      setPanelPosition({ x, y });
+    }
+  }, [isDragging, dragOffset]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // 添加全局鼠标事件监听
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, handleMouseMove, handleMouseUp]);
+
   return (
     <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* 测试环境横幅 */}
@@ -183,9 +226,9 @@ function TestRefactoredChat() {
 
       {/* 项目选择器 */}
       {user && projects.length > 0 && (
-        <div className="bg-purple-100 dark:bg-purple-900/30 px-4 py-2 text-sm border-b border-purple-200 dark:border-purple-800 flex items-center justify-between">
+        <div className="bg-purple-100 dark:bg-purple-900/30 px-4 py-2 text-sm border-b border-purple-200 dark:border-purple-800 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-4">
-            <span className="font-semibold text-purple-800 dark:text-purple-200">📁 项目选择:</span>
+            <span className="font-semibold text-purple-800 dark:text-purple-200">📁 项目:</span>
             <select
               value={selectedProject?.name || ''}
               onChange={(e) => {
@@ -212,6 +255,87 @@ function TestRefactoredChat() {
           >
             刷新项目
           </button>
+        </div>
+      )}
+
+      {/* 会话选择器 */}
+      {user && selectedProject && (
+        <div className="bg-indigo-100 dark:bg-indigo-900/30 px-4 py-2 text-sm border-b border-indigo-200 dark:border-indigo-800 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-4 flex-1 min-w-0">
+            <span className="font-semibold text-indigo-800 dark:text-indigo-200 flex-shrink-0">💬 会话:</span>
+            <select
+              value={selectedSession?.id || ''}
+              onChange={(e) => {
+                const sessionId = e.target.value;
+                if (sessionId) {
+                  // Find session in Claude sessions
+                  let session = selectedProject.sessions?.find(s => s.id === sessionId);
+                  if (session) {
+                    setSelectedSession({ ...session, __provider: 'claude' });
+                    navigate(`/test-refactored/session/${sessionId}`);
+                    return;
+                  }
+                  // Find session in Cursor sessions
+                  const cSession = selectedProject.cursorSessions?.find(s => s.id === sessionId);
+                  if (cSession) {
+                    setSelectedSession({ ...cSession, __provider: 'cursor' });
+                    navigate(`/test-refactored/session/${sessionId}`);
+                    return;
+                  }
+                } else {
+                  setSelectedSession(null);
+                }
+              }}
+              className="px-3 py-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 flex-1 min-w-0"
+            >
+              <option value="">-- 新建会话 --</option>
+              {selectedProject.sessions?.length > 0 && (
+                <optgroup label="Claude 会话">
+                  {selectedProject.sessions.map(session => {
+                    // Parse date safely
+                    let dateStr = 'Unknown';
+                    try {
+                      const date = new Date(session.createdAt || session.timestamp || session.modifiedAt || Date.now());
+                      if (!isNaN(date.getTime())) {
+                        dateStr = date.toLocaleDateString();
+                      }
+                    } catch (e) {
+                      dateStr = 'Unknown';
+                    }
+                    return (
+                      <option key={session.id} value={session.id}>
+                        {session.title || session.id.slice(0, 8)} ({dateStr})
+                      </option>
+                    );
+                  })}
+                </optgroup>
+              )}
+              {selectedProject.cursorSessions?.length > 0 && (
+                <optgroup label="Cursor 会话">
+                  {selectedProject.cursorSessions.map(session => {
+                    // Parse date safely
+                    let dateStr = 'Unknown';
+                    try {
+                      const date = new Date(session.createdAt || session.timestamp || session.modifiedAt || Date.now());
+                      if (!isNaN(date.getTime())) {
+                        dateStr = date.toLocaleDateString();
+                      }
+                    } catch (e) {
+                      dateStr = 'Unknown';
+                    }
+                    return (
+                      <option key={session.id} value={session.id}>
+                        {session.title || session.id.slice(0, 8)} ({dateStr})
+                      </option>
+                    );
+                  })}
+                </optgroup>
+              )}
+            </select>
+          </div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">
+            {selectedProject.sessions?.length || 0} 个 Claude 会话, {selectedProject.cursorSessions?.length || 0} 个 Cursor 会话
+          </div>
         </div>
       )}
 
@@ -244,15 +368,74 @@ function TestRefactoredChat() {
       </div>
 
       {/* 调试信息面板 */}
-      <div className="fixed bottom-4 right-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-4 text-xs max-w-sm">
-        <h3 className="font-bold mb-2 text-gray-900 dark:text-white">🔍 调试信息</h3>
-        <div className="space-y-1 text-gray-700 dark:text-gray-300">
+      <div
+        onMouseDown={handleMouseDown}
+        className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg text-xs max-w-sm max-h-96 overflow-y-auto"
+        style={{
+          position: 'fixed',
+          left: `${panelPosition.x}px`,
+          top: `${panelPosition.y}px`,
+          cursor: isDragging ? 'grabbing' : 'auto',
+          userSelect: isDragging ? 'none' : 'auto',
+          zIndex: 9999,
+        }}
+      >
+        {/* 可拖动的标题栏 */}
+        <div className="drag-handle bg-gray-100 dark:bg-gray-700 px-4 py-2 border-b border-gray-200 dark:border-gray-600 cursor-grab active:cursor-grabbing flex items-center justify-between">
+          <h3 className="font-bold text-gray-900 dark:text-white">🔍 调试信息</h3>
+          <div className="flex items-center gap-1">
+            <span className="text-gray-500 dark:text-gray-400 text-xs">拖动移动</span>
+            <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+            </svg>
+          </div>
+        </div>
+
+        <div className="p-4 space-y-1 text-gray-700 dark:text-gray-300">
           <p>组件: <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">ChatInterface.tsx</code></p>
           <p>用户: {user ? '✅ 已登录' : '❌ 未登录'}</p>
           <p>项目数: {projects.length}</p>
           <p>当前项目: {selectedProject ? selectedProject.name : '未选择'}</p>
-          <p>当前会话: {selectedSession ? selectedSession.id : '未选择'}</p>
+          <p>会话数: {selectedProject ? (selectedProject.sessions?.length || 0) + ' Claude, ' + (selectedProject.cursorSessions?.length || 0) + ' Cursor' : '-'}</p>
+          <p>当前会话: {selectedSession ? (selectedSession.title || selectedSession.id.slice(0, 8)) : '未选择'}</p>
+          <p>Provider: {selectedSession?.__provider || 'claude'}</p>
           <p>WebSocket: {ws ? '✅ 已连接' : '❌ 未连接'}</p>
+          <p>消息数: {messages.length}</p>
+        </div>
+        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600 px-4 pb-4">
+          <p className="font-semibold text-gray-900 dark:text-white mb-2">📋 快速操作:</p>
+          <div className="space-y-1">
+            <button
+              onClick={() => {
+                setSelectedSession(null);
+                console.log('[TestRefactored] Cleared session - ready for new conversation');
+              }}
+              className="w-full px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors text-left"
+            >
+              🆕 新建会话测试
+            </button>
+            <button
+              onClick={() => {
+                console.log('[TestRefactored] Current state:', {
+                  projects: projects.length,
+                  selectedProject: selectedProject?.name,
+                  selectedSession: selectedSession?.id,
+                  messages: messages.length
+                });
+              }}
+              className="w-full px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-left"
+            >
+              📊 打印状态到控制台
+            </button>
+            <button
+              onClick={() => {
+                setPanelPosition({ x: 16, y: 16 });
+              }}
+              className="w-full px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors text-left"
+            >
+              🔄 重置位置
+            </button>
+          </div>
         </div>
       </div>
     </div>
