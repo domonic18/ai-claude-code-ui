@@ -63,6 +63,8 @@ export interface ChatMessage {
   toolResultTimestamp?: Date;
   /** Whether to minimize tool display */
   minimizeTool?: boolean;
+  /** Exit code for command execution */
+  exitCode?: number;
 }
 
 /**
