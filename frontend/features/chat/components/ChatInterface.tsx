@@ -88,7 +88,7 @@ interface ChatInterfaceProps {
   /** Set of currently processing sessions */
   processingSessions?: Set<string>;
   /** Callback to replace temporary session ID */
-  onReplaceTemporarySession?: (tempId: string, realId: string) => void;
+  onReplaceTemporarySession?: (realSessionId: string) => void;
   /** Callback to navigate to session */
   onNavigateToSession?: (sessionId: string) => void;
   /** Callback to show settings */
@@ -243,13 +243,13 @@ export function ChatInterface({
           onShowAllTasks?.();
           break;
         default:
-          console.warn('Unknown built-in command:', command.name);
+          // For unhandled built-in commands, they will be inserted into input
+          // by handleCommandSelectWrapper - no action needed here
+          break;
       }
-    } else {
-      // Custom commands - insert into input
-      const commandText = command.data?.template || `/${command.name} `;
-      setInput(commandText);
     }
+    // Note: Custom commands are handled by handleCommandSelectWrapper
+    // which inserts the command into the input
   }, [selectedProject, onShowSettings, onShowAllTasks]);
 
   // Command system integration
@@ -296,24 +296,22 @@ export function ChatInterface({
   });
 
   // Handle input change with command and file reference detection
-  const handleInputChangeWithCommands = useCallback((value: string) => {
+  const handleInputChangeWithCommands = useCallback((value: string, cursorPos: number) => {
     setInput(value);
 
-    // Detect slash command
-    const lastSlashIndex = value.lastIndexOf('/');
-    const beforeSlash = value.slice(0, lastSlashIndex);
-    const isValidSlash = lastSlashIndex >= 0 && (beforeSlash === '' || beforeSlash.endsWith(' '));
+    // Detect slash command at cursor position
+    const textBeforeCursor = value.slice(0, cursorPos);
 
-    if (isValidSlash) {
-      const query = value.slice(lastSlashIndex + 1);
+    // Find the last slash before cursor that could start a command
+    // Slash is valid if it's at the start or preceded by whitespace
+    const slashPattern = /(^|\s)\/(\S*)$/;
+    const slashMatch = textBeforeCursor.match(slashPattern);
 
-      // Check if query contains space (command ended)
-      if (query.includes(' ')) {
-        setShowCommandMenuValue(false);
-        return;
-      }
+    if (slashMatch) {
+      const slashPos = (slashMatch.index || 0) + slashMatch[1].length;
+      const query = slashMatch[2];
 
-      setSlashPositionValue(lastSlashIndex);
+      setSlashPositionValue(slashPos);
       setCommandQuery(query);
       setSelectedCommandIndex(0);
       setShowCommandMenuValue(true);
@@ -323,24 +321,21 @@ export function ChatInterface({
       setShowCommandMenuValue(false);
     }
 
-    // Detect file reference (@ symbol)
-    const lastAtIndex = value.lastIndexOf('@');
-    const beforeAt = value.slice(0, lastAtIndex);
-    const isValidAt = lastAtIndex >= 0 && (beforeAt === '' || beforeAt.endsWith(' '));
-
-    if (isValidAt) {
-      const query = value.slice(lastAtIndex + 1);
-
-      // Check if query contains space (reference ended)
-      if (query.includes(' ')) {
+    // Detect file reference (@ symbol) at cursor position
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+    
+    if (lastAtIndex !== -1) {
+      const textAfterAt = textBeforeCursor.slice(lastAtIndex + 1);
+      
+      // Check if there's a space after the @ symbol (which would end the file reference)
+      if (!textAfterAt.includes(' ')) {
+        setAtPositionValue(lastAtIndex);
+        setFileQuery(textAfterAt);
+        setSelectedFileIndex(0);
+        setShowFileMenuValue(true);
+      } else {
         setShowFileMenuValue(false);
-        return;
       }
-
-      setAtPositionValue(lastAtIndex);
-      setFileQuery(query);
-      setSelectedFileIndex(0);
-      setShowFileMenuValue(true);
     } else {
       setShowFileMenuValue(false);
     }
@@ -348,16 +343,10 @@ export function ChatInterface({
 
   // Handle command selection from menu
   const handleCommandSelectWrapper = useCallback((command: SlashCommand, index: number, isHover?: boolean) => {
-    handleCommandSelect(command, index);
-    if (!isHover) {
-      // Insert command into input
-      const beforeCommand = input.slice(0, slashPosition);
-      const afterCommand = input.slice(slashPosition + 1 + commandQuery.length);
-      const newInput = `${beforeCommand}/${command.name} ${afterCommand}`;
-      setInput(newInput);
-      setShowCommandMenuValue(false);
-    }
-  }, [input, slashPosition, commandQuery, handleCommandSelect, setInput, setShowCommandMenuValue]);
+    // ChatInput component handles the input update, we just need to track history
+    // Call handleCommandSelect to update command usage history
+    handleCommandSelect(command, index, isHover);
+  }, [handleCommandSelect]);
 
   // Handle command menu close
   const handleCommandMenuClose = useCallback(() => {
@@ -366,7 +355,7 @@ export function ChatInterface({
 
   // Handle file selection from menu
   const handleFileSelectWrapper = useCallback((file: FileReference, index: number, isHover?: boolean) => {
-    handleFileSelect(file, index);
+    handleFileSelect(file, index, isHover);
     if (!isHover) {
       // Insert file reference into input
       const beforeFile = input.slice(0, atPosition);

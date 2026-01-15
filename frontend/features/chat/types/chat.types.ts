@@ -174,7 +174,7 @@ export interface ChatInputProps {
   /** Current input value */
   value: string;
   /** Input change handler */
-  onChange: (value: string) => void;
+  onChange: (value: string, cursorPosition: number) => void;
   /** Send message handler */
   onSend: () => void;
   /** File attachments */

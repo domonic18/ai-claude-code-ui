@@ -383,7 +383,7 @@ export function ChatInput({
             const pos = e.target.selectionStart;
             setCursorPosition(pos);
             // Then call parent's onChange (which handles command/file detection)
-            onChange(e.target.value);
+            onChange(e.target.value, pos);
           }}
           onKeyDown={handleKeyDown}
           onFocus={handleFocus}
@@ -462,15 +462,15 @@ export function ChatInput({
             } else {
               // Execute command - insert into input
               const beforeCommand = value.slice(0, slashPosition);
-              const afterCommand = value.slice(cursorPosition);
-              const newInput = `${beforeCommand}${command.name} ${afterCommand}`;
+              const afterCommand = value.slice(slashPosition + 1 + commandQuery.length);
+              const newInput = `${beforeCommand}/${command.name} ${afterCommand}`;
 
               onChange(newInput);
 
-              // Move cursor after command name
+              // Move cursor after command name and space
               setTimeout(() => {
                 if (textareaRef.current) {
-                  const newPos = slashPosition + command.name.length + 1;
+                  const newPos = slashPosition + command.name.length + 2; // +2 for '/' and space
                   textareaRef.current.setSelectionRange(newPos, newPos);
                   textareaRef.current.focus();
                 }
