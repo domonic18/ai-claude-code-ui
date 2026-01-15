@@ -71,12 +71,10 @@ export function ChatToolbar({
         />
 
         {/* Token usage pie chart */}
-        {tokenBudget && (
-          <TokenUsagePie
-            used={tokenBudget?.used || 0}
-            total={tokenBudget?.total || 160000}
-          />
-        )}
+        <TokenUsagePie
+          used={tokenBudget?.used ?? 0}
+          total={tokenBudget?.total ?? 160000}
+        />
 
         {/* Cancel button when loading */}
         {isLoading && ws && (
