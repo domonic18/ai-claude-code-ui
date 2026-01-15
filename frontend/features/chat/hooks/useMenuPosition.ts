@@ -7,8 +7,8 @@
 import { useMemo, RefObject } from 'react';
 
 export interface MenuPosition {
-  top?: number;
-  left?: number;
+  top: number;
+  left: number;
   bottom?: number;
   right?: number;
 }
@@ -37,7 +37,7 @@ export function useMenuPosition(
 
   const getPosition = useMemo((): MenuPosition => {
     if (!anchorRef.current || !isOpen) {
-      return { top: 0, left: 0 };
+      return { top: 0, left: 0, bottom: 0 };
     }
 
     const rect = anchorRef.current.getBoundingClientRect();
@@ -47,6 +47,7 @@ export function useMenuPosition(
     if (isMobile) {
       // Mobile: position menu above the anchor
       return {
+        top: 0,
         bottom: window.innerHeight - rect.top + offset,
         left: 16,
         right: 16,

@@ -1,14 +1,13 @@
 /**
  * ChatInterface Component (Refactored)
  *
- * Main chat interface component that orchestrates all chat functionality.
- * This is the refactored version using the new modular architecture.
+ * Main chat interface component using modular architecture.
+ * This component now delegates to specialized hooks for better separation of concerns.
  *
  * Responsibilities:
  * - Orchestrate chat sub-components
  * - Manage WebSocket communication
  * - Coordinate session state
- * - Handle file operations
  * - Process WebSocket messages
  */
 
@@ -18,41 +17,22 @@ import {
   ChatInput,
   StreamingIndicator,
   ThinkingProcess,
-  ModelSelector,
 } from './index';
 import {
   useChatMessages,
-  useChatScroll,
   useMessageStream,
   useSlashCommands,
   useFileReferences,
+  useModelSelection,
+  useCommandExecutor,
+  useInputHandler,
+  useSessionLoader,
 } from '../hooks';
-import { convertSessionMessages } from '../utils/messageConversion';
+import { ChatToolbar } from './ChatToolbar';
 import { getChatService } from '../services';
-import { handleWebSocketMessage, type WebSocketMessage } from '../services/websocketHandler';
+import { handleWebSocketMessage } from '../services/websocketHandler';
 import type { ChatMessage, FileAttachment } from '../types';
-import { STORAGE_KEYS } from '../constants';
-
-/**
- * Convert frontend model ID to backend model format
- *
- * Examples:
- * - 'claude-sonnet' -> 'sonnet'
- * - 'claude-opus' -> 'opus'
- * - 'claude-custom' -> 'custom' (uses ANTHROPIC_MODEL env var)
- * - 'claude-haiku' -> 'haiku'
- */
-function convertModelIdToBackend(modelId: string): string {
-  // Remove provider prefix and return the value
-  // e.g., 'claude-sonnet' -> 'sonnet', 'claude-custom' -> 'custom'
-  const parts = modelId.split('-');
-  if (parts.length > 1) {
-    return parts.slice(1).join('-');
-  }
-  return modelId;
-}
-import type { SlashCommand } from '../hooks/useSlashCommands';
-import type { FileReference } from '../hooks/useFileReferences';
+import { calculateDiff } from '../utils/diffUtils';
 
 interface ChatInterfaceProps {
   /** Selected project */
@@ -116,7 +96,7 @@ interface ChatInterfaceProps {
 /**
  * ChatInterface Component
  *
- * Main orchestrator for chat functionality using modular components.
+ * Main orchestrator for chat functionality using modular components and hooks.
  */
 export function ChatInterface({
   selectedProject,
@@ -150,29 +130,11 @@ export function ChatInterface({
   const [attachedFiles, setAttachedFiles] = useState<FileAttachment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState(selectedSession?.id || null);
-  const [provider, setProvider] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('selected-provider') || 'claude';
-    }
-    return 'claude';
-  });
   const [tasks, setTasks] = useState<any[]>([]);
   const [tokenBudget, setTokenBudget] = useState<any>(null);
-  const [selectedModel, setSelectedModel] = useState('claude-sonnet-4');
 
-  /**
-   * Handle model selection
-   */
-  const handleModelSelect = useCallback((modelId: string) => {
-    setSelectedModel(modelId);
-    // Save to localStorage
-    localStorage.setItem('selected-model', modelId);
-    // Update provider based on model
-    const provider = modelId.startsWith('claude') ? 'claude' :
-                     modelId.startsWith('gpt') ? 'openai' : 'claude';
-    setProvider(provider);
-    localStorage.setItem('selected-provider', provider);
-  }, []);
+  // Use model selection hook
+  const { selectedModel, handleModelSelect } = useModelSelection();
 
   // Hooks
   const {
@@ -217,40 +179,13 @@ export function ChatInterface({
     });
   }, []);
 
-  // Command execution handler
-  const handleCommandExecute = useCallback((command: SlashCommand) => {
-    // Track command usage for history
-    const historyKey = STORAGE_KEYS.COMMAND_HISTORY(selectedProject?.name || 'default');
-    const history = JSON.parse(localStorage.getItem(historyKey) || '[]');
-    const existingIndex = history.findIndex((c: any) => c.name === command.name);
-
-    if (existingIndex >= 0) {
-      history.splice(existingIndex, 1);
-    }
-    history.unshift({ ...command, lastUsed: Date.now() });
-    localStorage.setItem(historyKey, JSON.stringify(history.slice(0, 20)));
-
-    // Handle built-in commands
-    if (command.type === 'built-in') {
-      switch (command.name) {
-        case 'help':
-          onShowSettings?.();
-          break;
-        case 'clear':
-          setMessages([]);
-          break;
-        case 'tasks':
-          onShowAllTasks?.();
-          break;
-        default:
-          // For unhandled built-in commands, they will be inserted into input
-          // by handleCommandSelectWrapper - no action needed here
-          break;
-      }
-    }
-    // Note: Custom commands are handled by handleCommandSelectWrapper
-    // which inserts the command into the input
-  }, [selectedProject, onShowSettings, onShowAllTasks]);
+  // Use command executor hook
+  const { handleCommandExecute } = useCommandExecutor({
+    selectedProject,
+    onShowSettings,
+    onShowAllTasks,
+    onSetMessages: setMessages,
+  });
 
   // Command system integration
   const {
@@ -290,150 +225,57 @@ export function ChatInterface({
     selectedProject: selectedProject?.name,
     authenticatedFetch,
     onFileReference: (file) => {
-      // File reference callback - could be used for tracking
       console.log('File referenced:', file);
     },
   });
 
-  // Handle input change with command and file reference detection
-  const handleInputChangeWithCommands = useCallback((value: string, cursorPos: number) => {
-    setInput(value);
+  // Use input handler hook
+  const {
+    handleInputChangeWithCommands,
+    handleCommandSelectWrapper,
+    handleCommandMenuClose,
+    handleFileSelectWrapper,
+    handleFileMenuClose,
+  } = useInputHandler({
+    commandMenu: {
+      setSlashPosition: setSlashPositionValue,
+      setQuery: setCommandQuery,
+      setSelectedIndex: setSelectedCommandIndex,
+      setShowMenu: setShowCommandMenuValue,
+      handleCommandSelect,
+    },
+    fileMenu: {
+      setAtPosition: setAtPositionValue,
+      setQuery: setFileQuery,
+      setSelectedIndex: setSelectedFileIndex,
+      setShowMenu: setShowFileMenuValue,
+      handleFileSelect,
+    },
+    setInput,
+  });
 
-    // Detect slash command at cursor position
-    const textBeforeCursor = value.slice(0, cursorPos);
+  // Use session loader hook
+  useSessionLoader({
+    selectedProject,
+    selectedSession,
+    authenticatedFetch,
+    onSetMessages: setMessages,
+  });
 
-    // Find the last slash before cursor that could start a command
-    // Slash is valid if it's at the start or preceded by whitespace
-    const slashPattern = /(^|\s)\/(\S*)$/;
-    const slashMatch = textBeforeCursor.match(slashPattern);
-
-    if (slashMatch) {
-      const slashPos = (slashMatch.index !== undefined ? slashMatch.index : 0) + slashMatch[1].length;
-      const query = slashMatch[2];
-
-      setSlashPositionValue(slashPos);
-      setCommandQuery(query);
-      setSelectedCommandIndex(0);
-      setShowCommandMenuValue(true);
-      setShowFileMenuValue(false);
-      return;
-    } else {
-      setShowCommandMenuValue(false);
-    }
-
-    // Detect file reference (@ symbol) at cursor position
-    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
-    
-    if (lastAtIndex !== -1) {
-      const textAfterAt = textBeforeCursor.slice(lastAtIndex + 1);
-      
-      // Check if there's a space after the @ symbol (which would end the file reference)
-      if (!textAfterAt.includes(' ')) {
-        setAtPositionValue(lastAtIndex);
-        setFileQuery(textAfterAt);
-        setSelectedFileIndex(0);
-        setShowFileMenuValue(true);
-      } else {
-        setShowFileMenuValue(false);
-      }
-    } else {
-      setShowFileMenuValue(false);
-    }
-  }, [setInput, setSlashPositionValue, setCommandQuery, setSelectedCommandIndex, setShowCommandMenuValue, setAtPositionValue, setFileQuery, setSelectedFileIndex, setShowFileMenuValue]);
-
-  // Handle command selection from menu
-  const handleCommandSelectWrapper = useCallback((command: SlashCommand, index: number, isHover?: boolean) => {
-    // ChatInput component handles the input update, we just need to track history
-    // Call handleCommandSelect to update command usage history
-    handleCommandSelect(command, index, isHover);
-  }, [handleCommandSelect]);
-
-  // Handle command menu close
-  const handleCommandMenuClose = useCallback(() => {
-    setShowCommandMenuValue(false);
-  }, [setShowCommandMenuValue]);
-
-  // Handle file selection from menu
-  const handleFileSelectWrapper = useCallback((file: FileReference, index: number, isHover?: boolean) => {
-    handleFileSelect(file, index, isHover);
-    if (!isHover) {
-      // Insert file reference into input
-      const beforeFile = input.slice(0, atPosition);
-      const afterFile = input.slice(atPosition + 1 + fileQuery.length);
-      const newInput = `${beforeFile}@${file.relativePath} ${afterFile}`;
-      setInput(newInput);
-      setShowFileMenuValue(false);
-    }
-  }, [input, atPosition, fileQuery, handleFileSelect, setInput, setShowFileMenuValue]);
-
-  // Handle file menu close
-  const handleFileMenuClose = useCallback(() => {
-    setShowFileMenuValue(false);
-  }, [setShowFileMenuValue]);
-
-  // Ref to track which session's messages have been loaded
-  const loadedSessionRef = useRef<string | null>(null);
-
-  // Sync session ID and clear loaded session ref when session changes
+  // Sync session ID when session changes
   useEffect(() => {
     if (selectedSession?.id) {
       setCurrentSessionId(selectedSession.id);
-    } else {
-      // Clear loaded session ref when no session selected (new chat)
-      loadedSessionRef.current = null;
     }
   }, [selectedSession?.id]);
 
-  // Load session messages when session or project changes
-  useEffect(() => {
-    const loadSessionMessages = async () => {
-      if (!selectedProject?.name || !selectedSession?.id) {
-        return;
-      }
-
-      // Skip loading if we already loaded this session
-      if (loadedSessionRef.current === selectedSession.id) {
-        return;
-      }
-
-      try {
-        console.log(`[ChatInterface] Loading messages for session ${selectedSession.id}...`);
-
-        const response = await authenticatedFetch(
-          `/api/projects/${selectedProject.name}/sessions/${selectedSession.id}/messages`
-        );
-        if (!response.ok) {
-          console.error('Failed to load session messages:', response.status);
-          return;
-        }
-
-        const responseData = await response.json();
-        const rawMessages = responseData.data?.messages || [];
-
-        console.log(`[ChatInterface] Raw messages from API:`, rawMessages.length, rawMessages);
-
-        // Convert API messages to ChatMessage format using the conversion utility
-        // This handles tool result attachment, HTML entity decoding, and message filtering
-        const convertedMessages = convertSessionMessages(rawMessages);
-
-        setMessages(convertedMessages);
-        loadedSessionRef.current = selectedSession.id;
-        console.log(`[ChatInterface] Loaded ${convertedMessages.length} messages for session ${selectedSession.id}`);
-      } catch (error) {
-        console.error('Error loading session messages:', error);
-      }
-    };
-
-    loadSessionMessages();
-  }, [selectedProject?.name, selectedSession?.id]);
-
   // Update provider from session
   useEffect(() => {
+    const provider = localStorage.getItem('selected-provider') || 'claude';
     if (selectedSession?.__provider && selectedSession.__provider !== provider) {
-      setProvider(selectedSession.__provider);
       localStorage.setItem('selected-provider', selectedSession.__provider);
     }
-  }, [selectedSession, provider]);
+  }, [selectedSession]);
 
   // Handle WebSocket messages
   useEffect(() => {
@@ -478,35 +320,6 @@ export function ChatInterface({
   }, [wsMessages, currentSessionId, selectedProject, addMessage, updateMessage, completeStream, resetStream, updateStreamContent, updateStreamThinking]);
 
   /**
-   * Create diff for Edit tool
-   */
-  const createDiff = useCallback((oldStr: string, newStr: string) => {
-    const oldLines = oldStr.split('\n');
-    const newLines = newStr.split('\n');
-    const diffs: Array<{ type: 'removed' | 'added'; content: string }> = [];
-
-    // Simple line-by-line diff
-    const maxLines = Math.max(oldLines.length, newLines.length);
-    for (let i = 0; i < maxLines; i++) {
-      const oldLine = oldLines[i];
-      const newLine = newLines[i];
-
-      if (oldLine === newLine) {
-        continue;
-      }
-
-      if (oldLine !== undefined) {
-        diffs.push({ type: 'removed', content: oldLine });
-      }
-      if (newLine !== undefined) {
-        diffs.push({ type: 'added', content: newLine });
-      }
-    }
-
-    return diffs;
-  }, []);
-
-  /**
    * Handle send message
    */
   const handleSend = useCallback(async () => {
@@ -544,7 +357,7 @@ export function ChatInterface({
       const sessionId = currentSessionId || `temp-${Date.now()}`;
 
       // Convert frontend model ID to backend format
-      const backendModel = convertModelIdToBackend(selectedModel);
+      const backendModel = selectedModel.split('-').slice(1).join('-');
 
       // Send message in the format expected by the backend
       sendMessage({
@@ -565,11 +378,10 @@ export function ChatInterface({
     isLoading,
     currentSessionId,
     attachedFiles,
-    provider,
-    selectedProject,
     selectedModel,
-    sendMessage,
+    selectedProject,
     ws,
+    sendMessage,
     addMessage,
     startStream,
     onSessionActive,
@@ -577,10 +389,10 @@ export function ChatInterface({
   ]);
 
   /**
-   * Handle input change
+   * Create diff for Edit tool
    */
-  const handleInputChange = useCallback((value: string) => {
-    setInput(value);
+  const createDiff = useCallback((oldStr: string, newStr: string) => {
+    return calculateDiff(oldStr, newStr);
   }, []);
 
   /**
@@ -639,43 +451,19 @@ export function ChatInterface({
 
       {/* Input area */}
       <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700">
-        {/* Model selector toolbar */}
-        <div className="flex items-center justify-between max-w-4xl mx-auto px-4 py-2 bg-gray-50 dark:bg-gray-800/50">
-          <div className="flex items-center gap-3">
-            <ModelSelector
-              selectedModel={selectedModel}
-              onModelSelect={handleModelSelect}
-              tokenBudget={tokenBudget}
-            />
-
-            {/* Cancel button when loading */}
-            {isLoading && ws && (
-              <button
-                type="button"
-                onClick={() => {
-                  // Send abort-session message via WebSocket
-                  sendMessage?.({
-                    type: 'abort-session',
-                    sessionId: currentSessionId,
-                    provider: 'claude',
-                  });
-                  setIsLoading(false);
-                  resetStream();
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded transition-colors"
-              >
-                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-                <span className="hidden sm:inline">Stop</span>
-              </button>
-            )}
-          </div>
-
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            {selectedProject?.name || 'No project selected'}
-          </div>
-        </div>
+        {/* Model selector toolbar - use modular component */}
+        <ChatToolbar
+          selectedModel={selectedModel}
+          onModelSelect={handleModelSelect}
+          tokenBudget={tokenBudget}
+          isLoading={isLoading}
+          ws={ws}
+          currentSessionId={currentSessionId}
+          sendMessage={sendMessage}
+          onSetLoading={setIsLoading}
+          onResetStream={resetStream}
+          selectedProject={selectedProject}
+        />
 
         {/* Input */}
         <div className="max-w-4xl mx-auto p-4">
@@ -693,7 +481,7 @@ export function ChatInterface({
           projectName={selectedProject?.name}
           placeholder={
             selectedProject
-              ? `Message ${provider} about ${selectedProject.name}...`
+              ? `Message about ${selectedProject.name}...`
               : 'Select a project to start chatting...'
           }
           // Command system props
@@ -711,7 +499,9 @@ export function ChatInterface({
           fileQuery={fileQuery}
           selectedFileIndex={selectedFileIndex}
           atPosition={atPosition}
-          onFileSelect={handleFileSelectWrapper}
+          onFileSelect={(file, index, isHover) => {
+            handleFileSelectWrapper(file, index, input, atPosition, fileQuery, isHover);
+          }}
           onFileMenuClose={handleFileMenuClose}
           filesLoading={filesLoading}
           authenticatedFetch={authenticatedFetch}

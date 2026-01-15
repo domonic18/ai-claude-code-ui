@@ -1,24 +1,20 @@
 /**
- * ChatInput Component
+ * ChatInput Component (Refactored)
  *
- * Handles user input with support for:
- * - Multi-line text input with auto-resize
- * - File attachments (images)
- * - Keyboard shortcuts (Ctrl+Enter to send)
- * - Draft persistence
- * - File drop zone
- * - Slash command autocomplete
- * - File reference (@ symbol)
+ * Handles user input with modular hooks and components.
+ * This component now uses specialized hooks for keyboard handling and menu positioning.
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { CommandAutocomplete } from './CommandAutocomplete';
 import { FileReferenceMenu } from './FileReferenceMenu';
+import { FileAttachmentsPreview } from './FileAttachmentsPreview';
+import { useMenuPosition, useKeyboardHandler } from '../hooks';
 import type { SlashCommand } from '../hooks/useSlashCommands';
 import type { FileReference } from '../hooks/useFileReferences';
 import type { ChatInputProps, FileAttachment } from '../types';
-import { MAX_FILE_SIZE, ALLOWED_FILE_TYPES, STORAGE_KEYS } from '../constants';
+import { MAX_FILE_SIZE, STORAGE_KEYS } from '../constants';
 
 interface ChatInputComponentProps extends Omit<ChatInputProps, 'files' | 'onAddFile' | 'onRemoveFile'> {
   /** Attached files */
@@ -65,6 +61,7 @@ interface ChatInputComponentProps extends Omit<ChatInputProps, 'files' | 'onAddF
  * ChatInput Component
  *
  * A multi-line text input with file attachment support and slash commands.
+ * Refactored to use modular hooks for keyboard handling and menu positioning.
  */
 export function ChatInput({
   value = '',
@@ -153,91 +150,25 @@ export function ChatInput({
     }
   }, [disabled]);
 
-  /**
-   * Handle keyboard events
-   */
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Handle command menu navigation
-    if (commandMenuOpen) {
-      switch (e.key) {
-        case 'ArrowDown':
-          e.preventDefault();
-          if (commands.length > 0) {
-            const nextIndex = Math.min(selectedCommandIndex + 1, commands.length - 1);
-            onCommandSelect?.(commands[nextIndex], nextIndex, true);
-          }
-          break;
-        case 'ArrowUp':
-          e.preventDefault();
-          if (commands.length > 0) {
-            const prevIndex = Math.max(selectedCommandIndex - 1, 0);
-            onCommandSelect?.(commands[prevIndex], prevIndex, true);
-          }
-          break;
-        case 'Enter':
-          e.preventDefault();
-          if (selectedCommandIndex >= 0 && selectedCommandIndex < commands.length) {
-            onCommandSelect?.(commands[selectedCommandIndex], selectedCommandIndex);
-          }
-          break;
-        case 'Escape':
-          e.preventDefault();
-          onCommandMenuClose?.();
-          break;
-        default:
-          return;
-      }
-      return;
-    }
-
-    // Handle file menu navigation
-    if (fileMenuOpen) {
-      switch (e.key) {
-        case 'ArrowDown':
-          e.preventDefault();
-          if (fileReferences.length > 0) {
-            const nextIndex = Math.min(selectedFileIndex + 1, fileReferences.length - 1);
-            onFileSelect?.(fileReferences[nextIndex], nextIndex, true);
-          }
-          break;
-        case 'ArrowUp':
-          e.preventDefault();
-          if (fileReferences.length > 0) {
-            const prevIndex = Math.max(selectedFileIndex - 1, 0);
-            onFileSelect?.(fileReferences[prevIndex], prevIndex, true);
-          }
-          break;
-        case 'Enter':
-          e.preventDefault();
-          if (selectedFileIndex >= 0 && selectedFileIndex < fileReferences.length) {
-            onFileSelect?.(fileReferences[selectedFileIndex], selectedFileIndex);
-          }
-          break;
-        case 'Escape':
-          e.preventDefault();
-          onFileMenuClose?.();
-          break;
-        default:
-          return;
-      }
-      return;
-    }
-
-    // Send on Enter (unless Shift+Enter for new line)
-    if (e.key === 'Enter' && !e.shiftKey) {
-      if (sendByCtrlEnter) {
-        if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-          onSend();
-        }
-      } else {
-        if (!(e.ctrlKey || e.metaKey)) {
-          e.preventDefault();
-          onSend();
-        }
-      }
-    }
-  }, [sendByCtrlEnter, onSend, commandMenuOpen, commands, selectedCommandIndex, onCommandSelect, onCommandMenuClose, fileMenuOpen, fileReferences, selectedFileIndex, onFileSelect, onFileMenuClose]);
+  // Use keyboard handler hook
+  const { handleKeyDown } = useKeyboardHandler({
+    sendByCtrlEnter,
+    onSend,
+    commandMenu: commandMenuOpen ? {
+      isOpen: commandMenuOpen,
+      commands,
+      selectedIndex: selectedCommandIndex,
+      onSelect: onCommandSelect || (() => {}),
+      onClose: onCommandMenuClose || (() => {}),
+    } : undefined,
+    fileMenu: fileMenuOpen ? {
+      isOpen: fileMenuOpen,
+      files: fileReferences,
+      selectedIndex: selectedFileIndex,
+      onSelect: onFileSelect || (() => {}),
+      onClose: onFileMenuClose || (() => {}),
+    } : undefined,
+  });
 
   /**
    * Handle focus change
@@ -297,80 +228,30 @@ export function ChatInput({
     onRemoveFile?.(fileName);
   }, [onRemoveFile]);
 
-  // Calculate command menu position
-  const commandMenuPosition = React.useMemo(() => {
-    if (!textareaRef.current || !commandMenuOpen) {
-      return { top: 0, left: 0 };
-    }
+  // Use menu position hook for command menu
+  const commandMenuPosition = useMenuPosition(
+    textareaRef,
+    commandMenuOpen,
+    { menuHeight: 300, offset: 0 }
+  );
 
-    const rect = textareaRef.current.getBoundingClientRect();
-    return {
-      top: rect.top,
-      left: rect.left,
-      bottom: window.innerHeight - rect.top,
-    };
-  }, [commandMenuOpen]);
-
-  // Calculate file menu position
-  const fileMenuPosition = React.useMemo(() => {
-    if (!textareaRef.current || !fileMenuOpen) {
-      return { top: 0, left: 0 };
-    }
-
-    const rect = textareaRef.current.getBoundingClientRect();
-    return {
-      top: rect.top,
-      left: rect.left,
-      bottom: window.innerHeight - rect.top,
-    };
-  }, [fileMenuOpen]);
+  // Use menu position hook for file menu
+  const fileMenuPosition = useMenuPosition(
+    textareaRef,
+    fileMenuOpen,
+    { menuHeight: 300, offset: 0 }
+  );
 
   const canSend = value.trim().length > 0 && !isLoading && !disabled;
 
   return (
     <div className="relative">
-      {/* File attachments preview */}
+      {/* File attachments preview - use modular component */}
       {files.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-2 p-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-          {files.map((file) => (
-            <div key={file.name} className="relative group">
-              {file.data ? (
-                <img
-                  src={file.data}
-                  alt={file.name}
-                  className="w-20 h-20 object-cover rounded"
-                />
-              ) : (
-                <div className="w-20 h-20 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center">
-                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-              )}
-              {file.uploadProgress !== undefined && file.uploadProgress < 100 && (
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                  <div className="text-white text-xs">{file.uploadProgress}%</div>
-                </div>
-              )}
-              {file.error && (
-                <div className="absolute inset-0 bg-red-500/50 flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </div>
-              )}
-              <button
-                onClick={() => handleRemoveFile(file.name)}
-                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                type="button"
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          ))}
-        </div>
+        <FileAttachmentsPreview
+          files={files}
+          onRemoveFile={handleRemoveFile}
+        />
       )}
 
       {/* Input container */}
