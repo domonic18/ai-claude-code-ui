@@ -46,64 +46,72 @@ export class AuthController extends BaseController {
    * @param {Function} next - 下一个中间件
    */
   async register(req, res, next) {
+    // Track transaction state to avoid double-rollback
+    let transactionActive = false;
+
     try {
       const { username, password } = req.body;
 
       // 验证输入
       this._validateCredentials(username, password);
 
+      // 检查用户名是否已存在（多用户支持）
+      const existingUser = User.getByUsername(username);
+      if (existingUser) {
+        throw new ValidationError('Username already exists. Please choose a different username.');
+      }
+
       // 使用事务防止竞态条件
       db().prepare('BEGIN').run();
+      transactionActive = true;
 
-      try {
-        // 检查是否已有用户
-        const hasUsers = User.hasUsers();
-        if (hasUsers) {
-          db().prepare('ROLLBACK').run();
-          throw new ValidationError('User already exists. This is a single-user system.');
-        }
+      // 哈希密码
+      const saltRounds = 12;
+      const passwordHash = await bcrypt.hash(password, saltRounds);
 
-        // 哈希密码
-        const saltRounds = 12;
-        const passwordHash = await bcrypt.hash(password, saltRounds);
+      // 创建用户
+      const user = User.create(username, passwordHash);
 
-        // 创建用户
-        const user = User.create(username, passwordHash);
+      // 生成令牌
+      const token = generateToken(user);
 
-        // 生成令牌
-        const token = generateToken(user);
+      // 更新最后登录时间
+      User.updateLastLogin(user.id);
 
-        // 更新最后登录时间
-        User.updateLastLogin(user.id);
+      db().prepare('COMMIT').run();
+      transactionActive = false;
 
-        db().prepare('COMMIT').run();
+      // 在后台为用户创建容器
+      containerManager.getOrCreateContainer(user.id).catch(err => {
+        console.error(`[AuthController] Failed to create container for user ${user.id}:`, err.message);
+      });
 
-        // 在后台为用户创建容器
-        containerManager.getOrCreateContainer(user.id).catch(err => {
-          console.error(`[AuthController] Failed to create container for user ${user.id}:`, err.message);
-        });
+      // 设置 httpOnly cookie（行业最佳实践）
+      // sameSite: 'lax' 允许跨端口 cookie（开发环境需要）
+      res.cookie('auth_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax', // 使用 lax 以支持开发环境的跨端口请求
+        maxAge: 365 * 24 * 60 * 60 * 1000, // 1年
+        path: '/'
+      });
 
-        // 设置 httpOnly cookie（行业最佳实践）
-        // sameSite: 'lax' 允许跨端口 cookie（开发环境需要）
-        res.cookie('auth_token', token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax', // 使用 lax 以支持开发环境的跨端口请求
-          maxAge: 365 * 24 * 60 * 60 * 1000, // 1年
-          path: '/'
-        });
-
-        this._success(res, {
-          id: user.id,
-          username: user.username,
-          createdAt: user.createdAt,
-          lastLoginAt: user.lastLoginAt
-        }, 'Registration successful', 201);
-      } catch (error) {
-        db().prepare('ROLLBACK').run();
-        throw error;
-      }
+      this._success(res, {
+        id: user.id,
+        username: user.username,
+        createdAt: user.createdAt,
+        lastLoginAt: user.lastLoginAt
+      }, 'Registration successful', 201);
     } catch (error) {
+      // Only rollback if transaction is still active
+      if (transactionActive) {
+        try {
+          db().prepare('ROLLBACK').run();
+        } catch (rollbackError) {
+          // Ignore rollback errors (transaction may already be closed)
+          console.error('[AuthController] Rollback error:', rollbackError.message);
+        }
+      }
       this._handleError(error, req, res, next);
     }
   }
