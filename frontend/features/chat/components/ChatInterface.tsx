@@ -28,6 +28,7 @@ import {
   useSlashCommands,
   useFileReferences,
 } from '../hooks';
+import { convertSessionMessages } from '../utils/messageConversion';
 import { getChatService } from '../services';
 import { handleWebSocketMessage, type WebSocketMessage } from '../services/websocketHandler';
 import type { ChatMessage, FileAttachment } from '../types';
@@ -404,74 +405,9 @@ export function ChatInterface({
 
         console.log(`[ChatInterface] Raw messages from API:`, rawMessages.length, rawMessages);
 
-        // Convert API messages to ChatMessage format
-        // API returns messages in format: {message: {role: "user/assistant", content: "..." }}
-        const convertedMessages: ChatMessage[] = [];
-
-        for (const msg of rawMessages) {
-          if (!msg.message) continue;
-
-          const role = msg.message.role;
-          const content = msg.message.content;
-
-          // Handle user messages
-          if (role === 'user') {
-            let textContent = '';
-            if (typeof content === 'string') {
-              textContent = content;
-            } else if (Array.isArray(content)) {
-              // Extract text parts from content array
-              const textParts = content.filter((part: any) => part.type === 'text').map((part: any) => part.text);
-              textContent = textParts.join('\n');
-            }
-
-            // Skip empty messages
-            if (textContent.trim()) {
-              convertedMessages.push({
-                id: msg.id || `msg-${Date.now()}-${Math.random()}`,
-                type: 'user',
-                content: textContent,
-                timestamp: msg.timestamp || Date.now(),
-              });
-            }
-          }
-          // Handle assistant messages
-          else if (role === 'assistant') {
-            if (typeof content === 'string') {
-              convertedMessages.push({
-                id: msg.id || `msg-${Date.now()}-${Math.random()}`,
-                type: 'assistant',
-                content: content,
-                timestamp: msg.timestamp || Date.now(),
-              });
-            } else if (Array.isArray(content)) {
-              // Handle complex content with tool_use
-              for (const part of content) {
-                if (part.type === 'text') {
-                  convertedMessages.push({
-                    id: msg.id || `msg-${Date.now()}-${Math.random()}`,
-                    type: 'assistant',
-                    content: part.text,
-                    timestamp: msg.timestamp || Date.now(),
-                  });
-                } else if (part.type === 'tool_use') {
-                  // Tool use message
-                  convertedMessages.push({
-                    id: msg.id || `msg-${Date.now()}-${Math.random()}`,
-                    type: 'assistant',
-                    content: '',
-                    timestamp: msg.timestamp || Date.now(),
-                    toolUse: {
-                      name: part.name,
-                      input: part.input,
-                      id: part.id,
-                    },
-                  });
-                }
-              }
-            }
-          }
-        }
+        // Convert API messages to ChatMessage format using the conversion utility
+        // This handles tool result attachment, HTML entity decoding, and message filtering
+        const convertedMessages = convertSessionMessages(rawMessages);
 
         setMessages(convertedMessages);
         loadedSessionRef.current = selectedSession.id;

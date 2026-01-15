@@ -211,7 +211,7 @@ export function MarkdownRenderer({
 
   // Configure plugins
   const remarkPlugins = useMemo(() => {
-    const plugins = [remarkGfm];
+    const plugins: any[] = [remarkGfm];
     if (enableMath) {
       plugins.push(remarkMath);
     }

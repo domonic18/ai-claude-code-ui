@@ -28,7 +28,11 @@ export interface ChatMessage {
   /** Tool input parameters */
   toolInput?: string;
   /** Tool result/output */
-  toolResult?: string;
+  toolResult?: string | {
+    content: string;
+    isError?: boolean;
+    toolUseResult?: any;
+  };
   /** Tool ID for tracking */
   toolId?: string;
   /** Whether tool result is currently streamed */
@@ -43,8 +47,22 @@ export interface ChatMessage {
   files?: Array<FileAttachment>;
   /** Thinking process content */
   thinking?: string;
+  /** Whether this is a thinking message */
+  isThinking?: boolean;
+  /** Whether this message is currently streaming */
+  isStreaming?: boolean;
+  /** Whether this is an interactive prompt */
+  isInteractivePrompt?: boolean;
   /** Raw parameters for display */
   rawParameters?: any;
+  /** Tool call ID for matching results */
+  toolCallId?: string;
+  /** Tool error status (deprecated - use toolResult.isError instead) */
+  toolError?: boolean;
+  /** Tool result timestamp */
+  toolResultTimestamp?: Date;
+  /** Whether to minimize tool display */
+  minimizeTool?: boolean;
 }
 
 /**
