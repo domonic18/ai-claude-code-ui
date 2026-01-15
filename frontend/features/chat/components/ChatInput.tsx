@@ -463,14 +463,14 @@ export function ChatInput({
               // Execute command - insert into input
               const beforeCommand = value.slice(0, slashPosition);
               const afterCommand = value.slice(slashPosition + 1 + commandQuery.length);
-              const newInput = `${beforeCommand}/${command.name} ${afterCommand}`;
+              const newInput = `${beforeCommand}${command.name} ${afterCommand}`;
 
               onChange(newInput);
 
               // Move cursor after command name and space
               setTimeout(() => {
                 if (textareaRef.current) {
-                  const newPos = slashPosition + command.name.length + 2; // +2 for '/' and space
+                  const newPos = slashPosition + command.name.length + 1; // +1 for space
                   textareaRef.current.setSelectionRange(newPos, newPos);
                   textareaRef.current.focus();
                 }
