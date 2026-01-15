@@ -126,6 +126,11 @@ export function handleWebSocketMessage(
   }
 
   switch (message.type) {
+    case 'session-start':
+      // Session initialization message - just acknowledge it
+      console.log('📝 Session started:', message.sessionId);
+      return true;
+
     case 'session-created':
       return handleSessionCreated(message, callbacks, currentSessionId);
 
@@ -246,24 +251,51 @@ function handleTodoWrite(message: WebSocketMessage, callbacks: MessageHandlerCal
 function handleClaudeResponse(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
   const messageData = message.data?.message || message.data;
 
-  if (messageData && typeof messageData === 'object' && messageData.type) {
+  if (messageData && typeof messageData === 'object') {
     // Handle Cursor streaming format (content_block_delta / content_block_stop)
     if (messageData.type === 'content_block_delta' && messageData.delta?.text) {
       const decodedText = decodeHtmlEntities(messageData.delta.text);
-      // This would be handled by the streaming buffer in the component
-      // For now, add as a regular message
-      callbacks.onAddMessage({
-        id: `assistant-${Date.now()}`,
-        type: 'assistant',
-        content: decodedText,
-        timestamp: Date.now(),
-        isStreaming: true
-      });
+      callbacks.updateStreamContent?.(decodedText);
       return true;
     }
 
     if (messageData.type === 'content_block_stop') {
-      // Mark streaming as complete
+      callbacks.completeStream?.();
+      return true;
+    }
+
+    // Handle standard Claude SDK format with content array
+    // Note: message structure may be {type: 'assistant', content: [...]}
+    // or {type: 'message', role: 'assistant', content: [...]}
+    const isAssistantMessage =
+      messageData.type === 'assistant' ||
+      (messageData.type === 'message' && messageData.role === 'assistant');
+
+    if (isAssistantMessage && Array.isArray(messageData.content)) {
+      // Extract text from content blocks
+      const textBlocks = messageData.content
+        .filter((block: any) => block?.type === 'text' && block?.text)
+        .map((block: any) => decodeHtmlEntities(block.text));
+
+      if (textBlocks.length > 0) {
+        const fullText = textBlocks.join('\n');
+        callbacks.updateStreamContent?.(fullText);
+
+        // Also add as message for permanence
+        callbacks.onAddMessage({
+          id: `assistant-${Date.now()}`,
+          type: 'assistant',
+          content: fullText,
+          timestamp: Date.now(),
+          isStreaming: true
+        });
+        return true;
+      }
+    }
+
+    // Handle thinking content
+    if (messageData.type === 'thinking' && messageData.thinking) {
+      callbacks.updateStreamThinking?.(messageData.thinking);
       return true;
     }
   }
