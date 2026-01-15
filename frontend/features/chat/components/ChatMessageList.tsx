@@ -31,11 +31,6 @@ interface ChatMessageListProps {
   onFileOpen?: (filePath: string, diffData?: any) => void;
   /** Callback for showing settings */
   onShowSettings?: () => void;
-  /** Function to create diff for Edit tool */
-  createDiff?: (oldStr: string, newStr: string) => Array<{
-    type: 'removed' | 'added';
-    content: string;
-  }>;
   /** Auto-scroll configuration */
   autoScrollToBottom?: boolean;
   /** Number of messages to display initially */
@@ -56,7 +51,6 @@ export const ChatMessageList = memo(function ChatMessageList({
   selectedProject,
   onFileOpen,
   onShowSettings,
-  createDiff,
   autoScrollToBottom = true,
   visibleMessageCount = 100,
 }: ChatMessageListProps) {
@@ -140,7 +134,6 @@ export const ChatMessageList = memo(function ChatMessageList({
             message={message}
             index={index}
             prevMessage={prevMessage}
-            createDiff={createDiff}
             onFileOpen={onFileOpen}
             onShowSettings={onShowSettings}
             autoExpandTools={autoExpandTools}

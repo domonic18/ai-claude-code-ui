@@ -18,6 +18,7 @@ import MarkdownRenderer from './MarkdownRenderer';
 import type { ChatMessageProps, ChatMessage as ChatMessageType } from '../types';
 import { MINIMIZED_TOOLS } from '../constants';
 import { formatUsageLimitText } from '../utils';
+import { calculateDiff, type DiffLine } from '../utils/diffUtils';
 
 // ============================================================================
 // Utility Functions
@@ -110,14 +111,13 @@ function renderReadInput(input: any, onFileOpen?: (filePath: string) => void) {
  */
 function renderEditInput(
   input: any,
-  createDiff?: (oldStr: string, newStr: string) => any[],
-  onFileOpen?: (filePath: string) => void
+  onFileOpen?: (filePath: string, diffData?: any) => void
 ) {
   if (!input?.file_path || input?.old_string === undefined || input?.new_string === undefined) {
     return null;
   }
 
-  const diffs = createDiff?.(input.old_string, input.new_string) || [];
+  const diffs = calculateDiff(input.old_string, input.new_string);
 
   return (
     <details className="relative mt-3 group/details" open>
@@ -130,7 +130,7 @@ function renderEditInput(
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            onFileOpen?.(input.file_path);
+            onFileOpen?.(input.file_path, { old_string: input.old_string, new_string: input.new_string });
           }}
           className="ml-2 px-2 py-0.5 rounded bg-white/60 dark:bg-gray-800/60 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 font-mono text-xs"
         >
@@ -141,7 +141,7 @@ function renderEditInput(
         <div className="bg-white dark:bg-gray-900/50 border border-gray-200/60 dark:border-gray-700/60 rounded-lg overflow-hidden shadow-sm">
           <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-800/80 dark:to-gray-800/40 border-b border-gray-200/60 dark:border-gray-700/60 backdrop-blur-sm">
             <button
-              onClick={() => onFileOpen?.(input.file_path)}
+              onClick={() => onFileOpen?.(input.file_path, { old_string: input.old_string, new_string: input.new_string })}
               className="text-xs font-mono text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 truncate cursor-pointer font-medium transition-colors"
             >
               {input.file_path}
@@ -151,7 +151,7 @@ function renderEditInput(
             </span>
           </div>
           <div className="text-xs font-mono">
-            {diffs.map((diffLine: any, i: number) => (
+            {diffs.map((diffLine: DiffLine, i: number) => (
               <div key={i} className="flex">
                 <span className={`w-8 text-center border-r ${
                   diffLine.type === 'removed'
@@ -177,10 +177,13 @@ function renderEditInput(
 }
 
 /**
- * Render Write tool input
+ * Render Write tool input with diff view
  */
 function renderWriteInput(input: any, onFileOpen?: (filePath: string, diffData?: any) => void) {
   if (!input?.file_path || input?.content === undefined) return null;
+
+  // Calculate diff for new file (empty old content)
+  const diffs = calculateDiff('', input.content);
 
   return (
     <details className="relative mt-3 group/details" open>
@@ -216,8 +219,25 @@ function renderWriteInput(input: any, onFileOpen?: (filePath: string, diffData?:
               New File
             </span>
           </div>
-          <div className="text-xs font-mono p-4 whitespace-pre-wrap break-words max-h-96 overflow-y-auto bg-green-50/50 dark:bg-green-900/10 text-gray-800 dark:text-gray-200">
-            {input.content}
+          <div className="text-xs font-mono">
+            {diffs.map((diffLine: DiffLine, i: number) => (
+              <div key={i} className="flex">
+                <span className={`w-8 text-center border-r ${
+                  diffLine.type === 'removed'
+                    ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800'
+                    : 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800'
+                }`}>
+                  {diffLine.type === 'removed' ? '-' : '+'}
+                </span>
+                <span className={`px-2 py-0.5 flex-1 whitespace-pre-wrap ${
+                  diffLine.type === 'removed'
+                    ? 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200'
+                    : 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200'
+                }`}>
+                  {diffLine.content}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -362,7 +382,6 @@ function renderTodoIndicator(input: any) {
 
 interface FullToolMessageProps {
   message: ChatMessageType;
-  createDiff?: (oldStr: string, newStr: string) => any[];
   onFileOpen?: (filePath: string, diffData?: any) => void;
   onShowSettings?: () => void;
   autoExpandTools?: boolean;
@@ -373,7 +392,6 @@ interface FullToolMessageProps {
  */
 function renderFullToolMessage({
   message,
-  createDiff,
   onFileOpen,
   onShowSettings,
 }: FullToolMessageProps) {
@@ -390,7 +408,7 @@ function renderFullToolMessage({
       case 'Read':
         return renderReadInput(input, onFileOpen);
       case 'Edit':
-        return renderEditInput(input, createDiff, onFileOpen);
+        return renderEditInput(input, onFileOpen);
       case 'Write':
         return renderWriteInput(input, onFileOpen);
       default:
@@ -521,7 +539,6 @@ export const ChatMessage = memo(function ChatMessage({
   message,
   index,
   prevMessage,
-  createDiff,
   onFileOpen,
   onShowSettings,
   autoExpandTools = false,
@@ -679,7 +696,6 @@ export const ChatMessage = memo(function ChatMessage({
               // Handle full tool messages
               return renderFullToolMessage({
                 message,
-                createDiff,
                 onFileOpen,
                 onShowSettings,
                 autoExpandTools,
