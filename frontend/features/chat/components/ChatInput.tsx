@@ -7,10 +7,16 @@
  * - Keyboard shortcuts (Ctrl+Enter to send)
  * - Draft persistence
  * - File drop zone
+ * - Slash command autocomplete
+ * - File reference (@ symbol)
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
+import { CommandAutocomplete } from './CommandAutocomplete';
+import { FileReferenceMenu } from './FileReferenceMenu';
+import type { SlashCommand } from '../hooks/useSlashCommands';
+import type { FileReference } from '../hooks/useFileReferences';
 import type { ChatInputProps, FileAttachment } from '../types';
 import { MAX_FILE_SIZE, ALLOWED_FILE_TYPES, STORAGE_KEYS } from '../constants';
 
@@ -29,12 +35,34 @@ interface ChatInputComponentProps extends Omit<ChatInputProps, 'files' | 'onAddF
   minRows?: number;
   /** Maximum rows for textarea */
   maxRows?: number;
+  /** Command system props */
+  commands?: SlashCommand[];
+  frequentCommands?: SlashCommand[];
+  commandMenuOpen?: boolean;
+  commandQuery?: string;
+  selectedCommandIndex?: number;
+  slashPosition?: number;
+  onCommandSelect?: (command: SlashCommand, index: number, isHover?: boolean) => void;
+  onCommandMenuClose?: () => void;
+  /** File reference system props */
+  fileReferences?: FileReference[];
+  fileMenuOpen?: boolean;
+  fileQuery?: string;
+  selectedFileIndex?: number;
+  atPosition?: number;
+  onFileSelect?: (file: FileReference, index: number, isHover?: boolean) => void;
+  onFileMenuClose?: () => void;
+  filesLoading?: boolean;
+  /** Authenticated fetch function */
+  authenticatedFetch?: (url: string, options?: RequestInit) => Promise<Response>;
+  /** Selected project */
+  selectedProject?: { name: string; path: string } | null;
 }
 
 /**
  * ChatInput Component
  *
- * A multi-line text input with file attachment support.
+ * A multi-line text input with file attachment support and slash commands.
  */
 export function ChatInput({
   value = '',
@@ -52,10 +80,31 @@ export function ChatInput({
   minRows = 1,
   maxRows = 10,
   projectName = '',
+  // Command system props
+  commands = [],
+  frequentCommands = [],
+  commandMenuOpen = false,
+  commandQuery = '',
+  selectedCommandIndex = -1,
+  slashPosition = -1,
+  onCommandSelect,
+  onCommandMenuClose,
+  // File reference system props
+  fileReferences = [],
+  fileMenuOpen = false,
+  fileQuery = '',
+  selectedFileIndex = -1,
+  atPosition = -1,
+  onFileSelect,
+  onFileMenuClose,
+  filesLoading = false,
+  authenticatedFetch,
+  selectedProject,
 }: ChatInputComponentProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [cursorPosition, setCursorPosition] = useState(0);
 
   // Load draft from localStorage on mount
   useEffect(() => {
@@ -65,7 +114,7 @@ export function ChatInput({
         onChange(draft);
       }
     }
-  }, [projectName]);
+  }, [projectName, onChange]);
 
   // Save draft to localStorage
   useEffect(() => {
@@ -79,10 +128,8 @@ export function ChatInput({
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    // Reset height to auto to calculate scrollHeight
     textarea.style.height = 'auto';
 
-    // Calculate new height
     const lineHeight = parseInt(window.getComputedStyle(textarea).lineHeight);
     const minHeight = lineHeight * minRows;
     const maxHeight = lineHeight * maxRows;
@@ -102,29 +149,123 @@ export function ChatInput({
     if (textareaRef.current && !disabled) {
       textareaRef.current.focus();
     }
-  }, []);
+  }, [disabled]);
 
   /**
    * Handle keyboard events
    */
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Handle command menu navigation
+    if (commandMenuOpen) {
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          onCommandSelect?.(commands[Math.min(selectedCommandIndex + 1, commands.length - 1)], Math.min(selectedCommandIndex + 1, commands.length - 1));
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          onCommandSelect?.(commands[Math.max(selectedCommandIndex - 1, 0)], Math.max(selectedCommandIndex - 1, 0));
+          break;
+        case 'Enter':
+          e.preventDefault();
+          if (selectedCommandIndex >= 0 && selectedCommandIndex < commands.length) {
+            onCommandSelect?.(commands[selectedCommandIndex], selectedCommandIndex);
+          }
+          break;
+        case 'Escape':
+          e.preventDefault();
+          onCommandMenuClose?.();
+          break;
+        default:
+          return;
+      }
+      return;
+    }
+
+    // Handle file menu navigation
+    if (fileMenuOpen) {
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          onFileSelect?.(fileReferences[Math.min(selectedFileIndex + 1, fileReferences.length - 1)], Math.min(selectedFileIndex + 1, fileReferences.length - 1));
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          onFileSelect?.(fileReferences[Math.max(selectedFileIndex - 1, 0)], Math.max(selectedFileIndex - 1, 0));
+          break;
+        case 'Enter':
+          e.preventDefault();
+          if (selectedFileIndex >= 0 && selectedFileIndex < fileReferences.length) {
+            onFileSelect?.(fileReferences[selectedFileIndex], selectedFileIndex);
+          }
+          break;
+        case 'Escape':
+          e.preventDefault();
+          onFileMenuClose?.();
+          break;
+        default:
+          return;
+      }
+      return;
+    }
+
     // Send on Enter (unless Shift+Enter for new line)
     if (e.key === 'Enter' && !e.shiftKey) {
       if (sendByCtrlEnter) {
-        // Don't send on Enter, require Ctrl+Enter
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
           onSend();
         }
       } else {
-        // Send on Enter (Ctrl+Enter or Shift+Enter for new line)
         if (!(e.ctrlKey || e.metaKey)) {
           e.preventDefault();
           onSend();
         }
       }
     }
-  }, [sendByCtrlEnter, onSend]);
+  }, [sendByCtrlEnter, onSend, commandMenuOpen, commands, selectedCommandIndex, onCommandSelect, onCommandMenuClose, fileMenuOpen, fileReferences, selectedFileIndex, onFileSelect, onFileMenuClose]);
+
+  /**
+   * Handle input change and detect slash command
+   */
+  const handleInputChange = useCallback((newValue: string) => {
+    onChange(newValue);
+
+    // Get current cursor position
+    const textarea = textareaRef.current;
+    if (textarea) {
+      const pos = textarea.selectionStart;
+      setCursorPosition(pos);
+
+      // Check for slash command
+      const textBeforeCursor = newValue.slice(0, pos);
+      const lastSlashIndex = textBeforeCursor.lastIndexOf('/');
+
+      if (lastSlashIndex !== -1) {
+        // Check if slash is at start of line or after space
+        const beforeSlash = textBeforeCursor.slice(0, lastSlashIndex);
+        const isValidSlash = beforeSlash === '' || beforeSlash.endsWith(' ');
+
+        if (isValidSlash) {
+          // Extract command query (text after slash)
+          const query = textBeforeCursor.slice(lastSlashIndex + 1);
+
+          // Check if query contains space (command ended)
+          if (query.includes(' ')) {
+            onCommandMenuClose?.();
+            return;
+          }
+
+          // Update command query
+          // This would be handled by parent component through a callback
+          return;
+        }
+      }
+    }
+
+    // No valid slash command
+    onCommandMenuClose?.();
+  }, [onChange, onCommandSelect, onCommandMenuClose]);
 
   /**
    * Handle focus change
@@ -144,20 +285,17 @@ export function ChatInput({
    */
   const onDrop = useCallback((acceptedFiles: File[]) => {
     acceptedFiles.forEach(file => {
-      // Validate file size
       if (file.size > maxFileSize) {
         console.error(`File ${file.name} exceeds maximum size of ${maxFileSize} bytes`);
         return;
       }
 
-      // Create file attachment
       const attachment: FileAttachment = {
         name: file.name,
         size: file.size,
         type: file.type,
       };
 
-      // For images, create preview
       if (file.type.startsWith('image/')) {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -181,11 +319,25 @@ export function ChatInput({
   });
 
   /**
-   * Remove file attachment
+   * Handle remove file
    */
   const handleRemoveFile = useCallback((fileName: string) => {
     onRemoveFile?.(fileName);
   }, [onRemoveFile]);
+
+  // Calculate command menu position
+  const commandMenuPosition = React.useMemo(() => {
+    if (!textareaRef.current || !commandMenuOpen) {
+      return { top: 0, left: 0 };
+    }
+
+    const rect = textareaRef.current.getBoundingClientRect();
+    return {
+      top: rect.top,
+      left: rect.left,
+      bottom: window.innerHeight - rect.top,
+    };
+  }, [commandMenuOpen]);
 
   const canSend = value.trim().length > 0 && !isLoading && !disabled;
 
@@ -252,7 +404,7 @@ export function ChatInput({
         <textarea
           ref={textareaRef}
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={handleFocus}
           onBlur={handleBlur}
@@ -268,19 +420,19 @@ export function ChatInput({
           type="button"
           onClick={onSend}
           disabled={!canSend}
-          className="flex-shrink-0 p-2 rounded-full transition-colors ${
-            canSend
-              ? 'bg-blue-600 hover:bg-blue-700 text-white'
-              : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-          }`}
+          className="flex-shrink-0 p-2 rounded-full transition-colors"
         >
           {isLoading ? (
-            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
+          ) : canSend ? (
+            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
           ) : (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
             </svg>
           )}
@@ -317,6 +469,78 @@ export function ChatInput({
         </label>
       </div>
 
+      {/* Command autocomplete menu */}
+      {authenticatedFetch && selectedProject && (
+        <CommandAutocomplete
+          commands={commands}
+          frequentCommands={frequentCommands}
+          isOpen={commandMenuOpen}
+          selectedIndex={selectedCommandIndex}
+          onSelect={(command, index, isHover) => {
+            if (isHover) {
+              onCommandSelect?.(command, index, true);
+            } else {
+              // Execute command - insert into input
+              const beforeCommand = value.slice(0, slashPosition);
+              const afterCommand = value.slice(cursorPosition);
+              const newInput = `${beforeCommand}${command.name} ${afterCommand}`;
+
+              onChange(newInput);
+
+              // Move cursor after command name
+              setTimeout(() => {
+                if (textareaRef.current) {
+                  const newPos = slashPosition + command.name.length + 1;
+                  textareaRef.current.setSelectionRange(newPos, newPos);
+                  textareaRef.current.focus();
+                }
+              }, 0);
+
+              onCommandSelect?.(command, index);
+            }
+          }}
+          onClose={onCommandMenuClose || (() => {})}
+          position={commandMenuPosition}
+          query={commandQuery}
+        />
+      )}
+
+      {/* File reference menu */}
+      {authenticatedFetch && selectedProject && (
+        <FileReferenceMenu
+          files={fileReferences}
+          isOpen={fileMenuOpen}
+          selectedIndex={selectedFileIndex}
+          onSelect={(file, index, isHover) => {
+            if (isHover) {
+              onFileSelect?.(file, index, true);
+            } else {
+              // Insert file reference into input
+              const beforeFile = value.slice(0, atPosition);
+              const afterFile = value.slice(cursorPosition);
+              const newInput = `${beforeFile}@${file.relativePath} ${afterFile}`;
+
+              onChange(newInput);
+
+              // Move cursor after file reference
+              setTimeout(() => {
+                if (textareaRef.current) {
+                  const newPos = atPosition + file.relativePath.length + 2;
+                  textareaRef.current.setSelectionRange(newPos, newPos);
+                  textareaRef.current.focus();
+                }
+              }, 0);
+
+              onFileSelect?.(file, index);
+            }
+          }}
+          onClose={onFileMenuClose || (() => {})}
+          position={commandMenuPosition}
+          query={fileQuery}
+          isLoading={filesLoading}
+        />
+      )}
+
       {/* Hint text */}
       <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
         {sendByCtrlEnter ? (
@@ -324,6 +548,10 @@ export function ChatInput({
         ) : (
           <>Press <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">Enter</kbd> to send, <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">Shift+Enter</kbd> for new line</>
         )}
+        {selectedProject && !sendByCtrlEnter && (
+          <span>, type <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">/</kbd> for commands or <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">@</kbd> for files
+        </span>
+      )}
       </div>
     </div>
   );

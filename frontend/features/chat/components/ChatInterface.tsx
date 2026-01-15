@@ -9,6 +9,7 @@
  * - Manage WebSocket communication
  * - Coordinate session state
  * - Handle file operations
+ * - Process WebSocket messages
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
@@ -17,15 +18,22 @@ import {
   ChatInput,
   StreamingIndicator,
   ThinkingProcess,
+  TokenDisplay,
+  ModelSelector,
 } from './components';
 import {
   useChatMessages,
   useChatScroll,
   useMessageStream,
+  useSlashCommands,
+  useFileReferences,
 } from './hooks';
 import { getChatService } from './services';
+import { handleWebSocketMessage, type WebSocketMessage } from '../services/websocketHandler';
 import type { ChatMessage, FileAttachment } from './types';
 import { STORAGE_KEYS } from '../constants';
+import type { SlashCommand } from '../hooks/useSlashCommands';
+import type { FileReference } from '../hooks/useFileReferences';
 
 interface ChatInterfaceProps {
   /** Selected project */
@@ -42,6 +50,8 @@ interface ChatInterfaceProps {
   ws?: WebSocket | null;
   /** Send message via WebSocket */
   sendMessage?: (message: any) => void;
+  /** WebSocket messages from parent */
+  wsMessages?: any[];
   /** Initial messages (from parent) */
   messages?: ChatMessage[];
   /** Callback for opening files */
@@ -80,6 +90,8 @@ interface ChatInterfaceProps {
   onTaskClick?: (taskId: string) => void;
   /** Callback to show all tasks */
   onShowAllTasks?: () => void;
+  /** Set token budget */
+  onSetTokenBudget?: (budget: any) => void;
 }
 
 /**
@@ -92,6 +104,7 @@ export function ChatInterface({
   selectedSession,
   ws,
   sendMessage,
+  wsMessages = [],
   messages: externalMessages,
   onFileOpen,
   onInputFocusChange,
@@ -111,6 +124,7 @@ export function ChatInterface({
   externalMessageUpdate,
   onTaskClick,
   onShowAllTasks,
+  onSetTokenBudget,
 }: ChatInterfaceProps) {
   // State
   const [input, setInput] = useState('');
@@ -123,6 +137,23 @@ export function ChatInterface({
     }
     return 'claude';
   });
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [tokenBudget, setTokenBudget] = useState<any>(null);
+  const [selectedModel, setSelectedModel] = useState('claude-sonnet-4');
+
+  /**
+   * Handle model selection
+   */
+  const handleModelSelect = useCallback((modelId: string) => {
+    setSelectedModel(modelId);
+    // Save to localStorage
+    localStorage.setItem('selected-model', modelId);
+    // Update provider based on model
+    const provider = modelId.startsWith('claude') ? 'claude' :
+                     modelId.startsWith('gpt') ? 'openai' : 'claude';
+    setProvider(provider);
+    localStorage.setItem('selected-provider', provider);
+  }, []);
 
   // Hooks
   const {
@@ -155,6 +186,183 @@ export function ChatInterface({
     }
   }, [selectedProject]);
 
+  // Authenticated fetch function for API calls
+  const authenticatedFetch = useCallback(async (url: string, options?: RequestInit) => {
+    const token = localStorage.getItem('auth_token');
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...options?.headers,
+        Authorization: token ? `Bearer ${token}` : '',
+      },
+    });
+  }, []);
+
+  // Command execution handler
+  const handleCommandExecute = useCallback((command: SlashCommand) => {
+    // Track command usage for history
+    const historyKey = STORAGE_KEYS.COMMAND_HISTORY(selectedProject?.name || 'default');
+    const history = JSON.parse(localStorage.getItem(historyKey) || '[]');
+    const existingIndex = history.findIndex((c: any) => c.name === command.name);
+
+    if (existingIndex >= 0) {
+      history.splice(existingIndex, 1);
+    }
+    history.unshift({ ...command, lastUsed: Date.now() });
+    localStorage.setItem(historyKey, JSON.stringify(history.slice(0, 20)));
+
+    // Handle built-in commands
+    if (command.type === 'built-in') {
+      switch (command.name) {
+        case 'help':
+          onShowSettings?.();
+          break;
+        case 'clear':
+          setMessages([]);
+          break;
+        case 'tasks':
+          onShowAllTasks?.();
+          break;
+        default:
+          console.warn('Unknown built-in command:', command.name);
+      }
+    } else {
+      // Custom commands - insert into input
+      const commandText = command.data?.template || `/${command.name} `;
+      setInput(commandText);
+    }
+  }, [selectedProject, onShowSettings, onShowAllTasks]);
+
+  // Command system integration
+  const {
+    commands,
+    filteredCommands,
+    frequentCommands,
+    showMenu: showCommandMenu,
+    query: commandQuery,
+    selectedIndex: selectedCommandIndex,
+    slashPosition,
+    setQuery: setCommandQuery,
+    setSelectedIndex: setSelectedCommandIndex,
+    setSlashPosition: setSlashPositionValue,
+    setShowMenu: setShowCommandMenuValue,
+    handleCommandSelect,
+  } = useSlashCommands({
+    selectedProject: selectedProject?.name,
+    onCommandExecute: handleCommandExecute,
+    authenticatedFetch,
+  });
+
+  // File reference system integration
+  const {
+    files: fileReferences,
+    filteredFiles: filteredFileReferences,
+    showMenu: showFileMenu,
+    query: fileQuery,
+    selectedIndex: selectedFileIndex,
+    atPosition,
+    isLoading: filesLoading,
+    setQuery: setFileQuery,
+    setSelectedIndex: setSelectedFileIndex,
+    setAtPosition: setAtPositionValue,
+    setShowMenu: setShowFileMenuValue,
+    handleFileSelect,
+  } = useFileReferences({
+    selectedProject: selectedProject?.name,
+    authenticatedFetch,
+    onFileReference: (file) => {
+      // File reference callback - could be used for tracking
+      console.log('File referenced:', file);
+    },
+  });
+
+  // Handle input change with command and file reference detection
+  const handleInputChangeWithCommands = useCallback((value: string) => {
+    setInput(value);
+
+    // Detect slash command
+    const lastSlashIndex = value.lastIndexOf('/');
+    const beforeSlash = value.slice(0, lastSlashIndex);
+    const isValidSlash = lastSlashIndex >= 0 && (beforeSlash === '' || beforeSlash.endsWith(' '));
+
+    if (isValidSlash) {
+      const query = value.slice(lastSlashIndex + 1);
+
+      // Check if query contains space (command ended)
+      if (query.includes(' ')) {
+        setShowCommandMenuValue(false);
+        return;
+      }
+
+      setSlashPositionValue(lastSlashIndex);
+      setCommandQuery(query);
+      setSelectedCommandIndex(0);
+      setShowCommandMenuValue(true);
+      setShowFileMenuValue(false);
+      return;
+    } else {
+      setShowCommandMenuValue(false);
+    }
+
+    // Detect file reference (@ symbol)
+    const lastAtIndex = value.lastIndexOf('@');
+    const beforeAt = value.slice(0, lastAtIndex);
+    const isValidAt = lastAtIndex >= 0 && (beforeAt === '' || beforeAt.endsWith(' '));
+
+    if (isValidAt) {
+      const query = value.slice(lastAtIndex + 1);
+
+      // Check if query contains space (reference ended)
+      if (query.includes(' ')) {
+        setShowFileMenuValue(false);
+        return;
+      }
+
+      setAtPositionValue(lastAtIndex);
+      setFileQuery(query);
+      setSelectedFileIndex(0);
+      setShowFileMenuValue(true);
+    } else {
+      setShowFileMenuValue(false);
+    }
+  }, [setInput, setSlashPositionValue, setCommandQuery, setSelectedCommandIndex, setShowCommandMenuValue, setAtPositionValue, setFileQuery, setSelectedFileIndex, setShowFileMenuValue]);
+
+  // Handle command selection from menu
+  const handleCommandSelectWrapper = useCallback((command: SlashCommand, index: number, isHover?: boolean) => {
+    handleCommandSelect(command, index);
+    if (!isHover) {
+      // Insert command into input
+      const beforeCommand = input.slice(0, slashPosition);
+      const afterCommand = input.slice(slashPosition + 1 + commandQuery.length);
+      const newInput = `${beforeCommand}/${command.name} ${afterCommand}`;
+      setInput(newInput);
+      setShowCommandMenuValue(false);
+    }
+  }, [input, slashPosition, commandQuery, handleCommandSelect, setInput, setShowCommandMenuValue]);
+
+  // Handle command menu close
+  const handleCommandMenuClose = useCallback(() => {
+    setShowCommandMenuValue(false);
+  }, [setShowCommandMenuValue]);
+
+  // Handle file selection from menu
+  const handleFileSelectWrapper = useCallback((file: FileReference, index: number, isHover?: boolean) => {
+    handleFileSelect(file, index);
+    if (!isHover) {
+      // Insert file reference into input
+      const beforeFile = input.slice(0, atPosition);
+      const afterFile = input.slice(atPosition + 1 + fileQuery.length);
+      const newInput = `${beforeFile}@${file.relativePath} ${afterFile}`;
+      setInput(newInput);
+      setShowFileMenuValue(false);
+    }
+  }, [input, atPosition, fileQuery, handleFileSelect, setInput, setShowFileMenuValue]);
+
+  // Handle file menu close
+  const handleFileMenuClose = useCallback(() => {
+    setShowFileMenuValue(false);
+  }, [setShowFileMenuValue]);
+
   // Sync session ID
   useEffect(() => {
     if (selectedSession?.id) {
@@ -169,6 +377,35 @@ export function ChatInterface({
       localStorage.setItem('selected-provider', selectedSession.__provider);
     }
   }, [selectedSession, provider]);
+
+  // Handle WebSocket messages
+  useEffect(() => {
+    if (wsMessages.length === 0) return;
+
+    const latestMessage = wsMessages[wsMessages.length - 1];
+
+    // Handle the message using our WebSocket handler service
+    handleWebSocketMessage(latestMessage, {
+      onAddMessage: addMessage,
+      onUpdateMessage: updateMessage,
+      onSetMessages: setMessages,
+      onSetLoading: setIsLoading,
+      onSetSessionId: setCurrentSessionId,
+      onReplaceTemporarySession: onReplaceTemporarySession,
+      onNavigateToSession: onNavigateToSession,
+      onSessionActive: onSessionActive,
+      onSessionInactive: onSessionInactive,
+      onSessionProcessing: onSessionProcessing,
+      onSessionNotProcessing: onSessionNotProcessing,
+      onSetTokenBudget: (budget) => {
+        setTokenBudget(budget);
+        onSetTokenBudget?.(budget);
+      },
+      onSetTasks: setTasks,
+      getCurrentSessionId: () => currentSessionId,
+      getSelectedProjectName: () => selectedProject?.name,
+    });
+  }, [wsMessages, currentSessionId, selectedProject]);
 
   /**
    * Create diff for Edit tool
@@ -321,11 +558,31 @@ export function ChatInterface({
         </div>
       )}
 
+      {/* Token display */}
+      {tokenBudget && (
+        <div className="px-4 pb-2">
+          <TokenDisplay budget={tokenBudget} compact={false} />
+        </div>
+      )}
+
       {/* Input area */}
-      <div className="flex-shrink-0 p-4 border-t border-gray-200 dark:border-gray-700">
-        <ChatInput
+      <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700">
+        {/* Model selector toolbar */}
+        <div className="flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-gray-800/50">
+          <ModelSelector
+            selectedModel={selectedModel}
+            onModelSelect={handleModelSelect}
+          />
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            {selectedProject?.name || 'No project selected'}
+          </div>
+        </div>
+
+        {/* Input */}
+        <div className="p-4">
+          <ChatInput
           value={input}
-          onChange={handleInputChange}
+          onChange={handleInputChangeWithCommands}
           onSend={handleSend}
           files={attachedFiles}
           onAddFile={handleAddFile}
@@ -340,7 +597,28 @@ export function ChatInterface({
               ? `Message ${provider} about ${selectedProject.name}...`
               : 'Select a project to start chatting...'
           }
+          // Command system props
+          commands={filteredCommands}
+          frequentCommands={frequentCommands}
+          commandMenuOpen={showCommandMenu}
+          commandQuery={commandQuery}
+          selectedCommandIndex={selectedCommandIndex}
+          slashPosition={slashPosition}
+          onCommandSelect={handleCommandSelectWrapper}
+          onCommandMenuClose={handleCommandMenuClose}
+          // File reference system props
+          fileReferences={filteredFileReferences}
+          fileMenuOpen={showFileMenu}
+          fileQuery={fileQuery}
+          selectedFileIndex={selectedFileIndex}
+          atPosition={atPosition}
+          onFileSelect={handleFileSelectWrapper}
+          onFileMenuClose={handleFileMenuClose}
+          filesLoading={filesLoading}
+          authenticatedFetch={authenticatedFetch}
+          selectedProject={selectedProject}
         />
+        </div>
       </div>
     </div>
   );
