@@ -12,6 +12,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { CLAUDE_MODELS, CURSOR_MODELS, CODEX_MODELS } from '../../../../shared/modelConstants';
 
 export interface ModelOption {
   /** Model identifier */
@@ -45,7 +46,7 @@ interface ModelSelectorProps {
  * ModelSelector Component
  */
 export function ModelSelector({
-  selectedModel = 'claude-sonnet-4',
+  selectedModel = `claude-${CLAUDE_MODELS.DEFAULT}`,
   models = DEFAULT_MODELS,
   onModelSelect,
   disabled = false,
@@ -191,60 +192,30 @@ export function ModelSelector({
 }
 
 /**
- * Default model options
+ * Convert shared model constants to ModelOption format
  */
 const DEFAULT_MODELS: ModelOption[] = [
   // Claude models
-  {
-    id: 'claude-opus-4',
-    name: 'Claude Opus 4',
+  ...CLAUDE_MODELS.OPTIONS.map(opt => ({
+    id: `claude-${opt.value}`,
+    name: opt.label,
     provider: 'Claude',
-    contextWindow: 200000,
-    maxTokens: 8192,
-    description: 'Most powerful model for complex tasks',
-  },
-  {
-    id: 'claude-sonnet-4',
-    name: 'Claude Sonnet 4',
-    provider: 'Claude',
-    contextWindow: 200000,
-    maxTokens: 8192,
-    description: 'Balanced performance and speed',
-  },
-  {
-    id: 'claude-haiku-4',
-    name: 'Claude Haiku 4',
-    provider: 'Claude',
-    contextWindow: 200000,
-    maxTokens: 8192,
-    description: 'Fastest model for simple tasks',
-  },
+    description: opt.value === 'custom' ? 'Custom model from ANTHROPIC_MODEL env var' : undefined,
+  })),
 
-  // OpenAI models
-  {
-    id: 'gpt-4-turbo',
-    name: 'GPT-4 Turbo',
-    provider: 'OpenAI',
-    contextWindow: 128000,
-    maxTokens: 4096,
-    description: 'Latest GPT-4 with vision support',
-  },
-  {
-    id: 'gpt-4',
-    name: 'GPT-4',
-    provider: 'OpenAI',
-    contextWindow: 8192,
-    maxTokens: 8192,
-    description: 'Original GPT-4 model',
-  },
-  {
-    id: 'gpt-3.5-turbo',
-    name: 'GPT-3.5 Turbo',
-    provider: 'OpenAI',
-    contextWindow: 16385,
-    maxTokens: 4096,
-    description: 'Fast and cost-effective',
-  },
+  // Cursor models
+  ...CURSOR_MODELS.OPTIONS.map(opt => ({
+    id: `cursor-${opt.value}`,
+    name: opt.label,
+    provider: 'Cursor',
+  })),
+
+  // Codex models
+  ...CODEX_MODELS.OPTIONS.map(opt => ({
+    id: `codex-${opt.value}`,
+    name: opt.label,
+    provider: 'Codex',
+  })),
 ];
 
 export default ModelSelector;
