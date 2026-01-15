@@ -226,48 +226,6 @@ export function ChatInput({
   }, [sendByCtrlEnter, onSend, commandMenuOpen, commands, selectedCommandIndex, onCommandSelect, onCommandMenuClose, fileMenuOpen, fileReferences, selectedFileIndex, onFileSelect, onFileMenuClose]);
 
   /**
-   * Handle input change and detect slash command
-   */
-  const handleInputChange = useCallback((newValue: string) => {
-    onChange(newValue);
-
-    // Get current cursor position
-    const textarea = textareaRef.current;
-    if (textarea) {
-      const pos = textarea.selectionStart;
-      setCursorPosition(pos);
-
-      // Check for slash command
-      const textBeforeCursor = newValue.slice(0, pos);
-      const lastSlashIndex = textBeforeCursor.lastIndexOf('/');
-
-      if (lastSlashIndex !== -1) {
-        // Check if slash is at start of line or after space
-        const beforeSlash = textBeforeCursor.slice(0, lastSlashIndex);
-        const isValidSlash = beforeSlash === '' || beforeSlash.endsWith(' ');
-
-        if (isValidSlash) {
-          // Extract command query (text after slash)
-          const query = textBeforeCursor.slice(lastSlashIndex + 1);
-
-          // Check if query contains space (command ended)
-          if (query.includes(' ')) {
-            onCommandMenuClose?.();
-            return;
-          }
-
-          // Update command query
-          // This would be handled by parent component through a callback
-          return;
-        }
-      }
-    }
-
-    // No valid slash command
-    onCommandMenuClose?.();
-  }, [onChange, onCommandSelect, onCommandMenuClose]);
-
-  /**
    * Handle focus change
    */
   const handleFocus = useCallback(() => {
@@ -339,6 +297,20 @@ export function ChatInput({
     };
   }, [commandMenuOpen]);
 
+  // Calculate file menu position
+  const fileMenuPosition = React.useMemo(() => {
+    if (!textareaRef.current || !fileMenuOpen) {
+      return { top: 0, left: 0 };
+    }
+
+    const rect = textareaRef.current.getBoundingClientRect();
+    return {
+      top: rect.top,
+      left: rect.left,
+      bottom: window.innerHeight - rect.top,
+    };
+  }, [fileMenuOpen]);
+
   const canSend = value.trim().length > 0 && !isLoading && !disabled;
 
   return (
@@ -404,7 +376,13 @@ export function ChatInput({
         <textarea
           ref={textareaRef}
           value={value}
-          onChange={(e) => handleInputChange(e.target.value)}
+          onChange={(e) => {
+            // Update cursor position first
+            const pos = e.target.selectionStart;
+            setCursorPosition(pos);
+            // Then call parent's onChange (which handles command/file detection)
+            onChange(e.target.value);
+          }}
           onKeyDown={handleKeyDown}
           onFocus={handleFocus}
           onBlur={handleBlur}
@@ -535,7 +513,7 @@ export function ChatInput({
             }
           }}
           onClose={onFileMenuClose || (() => {})}
-          position={commandMenuPosition}
+          position={fileMenuPosition}
           query={fileQuery}
           isLoading={filesLoading}
         />

@@ -87,19 +87,49 @@ export function useFileReferences({
 
     setIsLoading(true);
     try {
-      const response = await authenticatedFetch(`/api/files/list?project=${encodeURIComponent(selectedProject)}`);
+      // Use correct API endpoint: /api/projects/:projectName/files
+      const response = await authenticatedFetch(`/api/projects/${encodeURIComponent(selectedProject)}/files`);
       if (!response.ok) {
         throw new Error('Failed to load files');
       }
 
       const data = await response.json();
-      const fileList: FileReference[] = (data.files || []).map((file: any) => ({
-        path: file.path,
-        name: file.name,
-        extension: file.extension,
-        type: file.type || 'file',
-        relativePath: file.relativePath || file.path,
-      }));
+
+      // Handle file tree response format
+      const fileList: FileReference[] = [];
+
+      function traverseFileTree(node: any, parentPath = '') {
+        if (!node) return;
+
+        const nodePath = parentPath ? `${parentPath}/${node.name}` : node.name;
+
+        if (node.type === 'file' || !node.children) {
+          const extension = node.name?.includes('.') ? node.name.split('.').pop() : '';
+          fileList.push({
+            path: nodePath,
+            name: node.name,
+            extension,
+            type: 'file',
+            relativePath: nodePath,
+          });
+        } else if (node.children) {
+          // Add directory
+          fileList.push({
+            path: nodePath,
+            name: node.name,
+            type: 'directory',
+            relativePath: nodePath,
+          });
+          // Recursively process children
+          node.children.forEach((child: any) => traverseFileTree(child, nodePath));
+        }
+      }
+
+      // Handle response format: could be { tree: [...] } or just [...]
+      const treeData = data.tree || data.data || data;
+      if (Array.isArray(treeData)) {
+        treeData.forEach(node => traverseFileTree(node));
+      }
 
       setFiles(fileList);
     } catch (error) {
