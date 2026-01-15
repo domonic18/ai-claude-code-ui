@@ -57,6 +57,8 @@ interface ChatInputComponentProps extends Omit<ChatInputProps, 'files' | 'onAddF
   authenticatedFetch?: (url: string, options?: RequestInit) => Promise<Response>;
   /** Selected project */
   selectedProject?: { name: string; path: string } | null;
+  /** Project name for draft persistence */
+  projectName?: string;
 }
 
 /**
