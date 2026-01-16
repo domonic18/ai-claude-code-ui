@@ -15,21 +15,24 @@
  * - Delegate to tab-specific components
  */
 
-import React, { useState } from 'react';
-import { X, GitBranch, Key } from 'lucide-react';
+import React, { useState, useRef, useCallback } from 'react';
+import { X, Key } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 import type { SettingsTab, SettingsProps } from '../types/settings.types';
 import { SETTINGS_TABS } from '../constants/settings.constants';
 
-// Import existing components as tabs (will be refactored gradually)
-import GitSettings from '../../../components/GitSettings';
-import TasksSettings from '../../../components/TasksSettings';
+// Import refactored tab components
 import { AppearanceTab } from './AppearanceTab';
 import { AgentTab } from './AgentTab';
+import { ApiTab } from './ApiTab';
+import { TasksTab } from './TasksTab';
 
-// Temporary: Import existing Settings component content for other tabs
-// This will be replaced with refactored components
-import LegacySettingsContent from './LegacySettingsContent';
+// Create a context to expose save functionality to child tabs
+interface SettingsContextValue {
+  requestSave: () => void;
+}
+
+export const SettingsContext = React.createContext<SettingsContextValue | null>(null);
 
 /**
  * Settings Modal Component
@@ -37,62 +40,84 @@ import LegacySettingsContent from './LegacySettingsContent';
 export function Settings({
   isOpen,
   onClose,
-  projects = [],
   initialTab = 'agents',
-  autoRefreshInterval,
-  setAutoRefreshInterval,
 }: SettingsProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
+  const agentTabRef = useRef<any>(null);
+
+  // Handle save button click
+  const handleSave = useCallback(() => {
+    // Trigger save in AgentTab if it's the active tab
+    if (activeTab === 'agents' && agentTabRef.current?.savePermissions) {
+      agentTabRef.current.savePermissions();
+    }
+    // Close the modal after saving
+    onClose();
+  }, [activeTab, onClose]);
+
+  // Handle cancel button click
+  const handleCancel = useCallback(() => {
+    // Simply close the modal without saving
+    onClose();
+  }, [onClose]);
+
+  // Context value for child tabs
+  const contextValue = React.useMemo(
+    () => ({
+      requestSave: handleSave,
+    }),
+    [handleSave]
+  );
 
   if (!isOpen) return null;
 
   return (
-    <div className="modal-backdrop fixed inset-0 flex items-center justify-center z-[9999] md:p-4 bg-background/95">
-      <div className="bg-background border border-border md:rounded-lg shadow-xl w-full md:max-w-4xl h-full md:h-[90vh] flex flex-col">
-        {/* Header */}
-        <SettingsHeader onClose={onClose} />
+    <SettingsContext.Provider value={contextValue}>
+      <div className="modal-backdrop fixed inset-0 flex items-center justify-center z-[9999] md:p-4 bg-background/95">
+        <div className="bg-background border border-border md:rounded-lg shadow-xl w-full md:max-w-4xl h-full md:h-[90vh] flex flex-col">
+          {/* Header */}
+          <SettingsHeader onClose={handleCancel} />
 
-        {/* Tab Navigation */}
-        <SettingsNavigation
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-        />
+          {/* Tab Navigation */}
+          <SettingsNavigation
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+          />
 
-        {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 md:space-y-8 pb-safe-area-inset-bottom">
-          {activeTab === 'git' && (
-            <GitSettings
-              projects={projects}
-              isOpen={isOpen}
-              onClose={onClose}
-            />
-          )}
+          {/* Content Area */}
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 md:space-y-8 pb-safe-area-inset-bottom">
+            {/* Newly refactored: Tasks tab */}
+            {activeTab === 'tasks' && <TasksTab />}
 
-          {activeTab === 'tasks' && (
-            <TasksSettings
-              isOpen={isOpen}
-              onClose={onClose}
-            />
-          )}
+            {/* Newly refactored: Appearance tab */}
+            {activeTab === 'appearance' && <AppearanceTab />}
 
-          {/* Newly refactored: Appearance tab */}
-          {activeTab === 'appearance' && <AppearanceTab />}
+            {/* Newly refactored: Agents tab */}
+            {activeTab === 'agents' && <AgentTab ref={agentTabRef} />}
 
-          {/* Newly refactored: Agents tab */}
-          {activeTab === 'agents' && <AgentTab />}
+            {/* Newly refactored: API & Tokens tab */}
+            {activeTab === 'api' && <ApiTab />}
+          </div>
 
-          {/* Temporary: Use legacy content for api tab (not yet migrated) */}
-          {activeTab === 'api' && (
-            <LegacySettingsContent
-              activeTab={activeTab}
-              projects={projects}
-              autoRefreshInterval={autoRefreshInterval}
-              setAutoRefreshInterval={setAutoRefreshInterval}
-            />
-          )}
+          {/* Footer with Save/Cancel buttons */}
+          <div className="flex items-center justify-end gap-3 p-4 md:p-6 border-t border-border flex-shrink-0">
+            <Button
+              variant="outline"
+              onClick={handleCancel}
+              className="touch-manipulation"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              className="touch-manipulation"
+            >
+              Save
+            </Button>
+          </div>
         </div>
       </div>
-    </div>
+    </SettingsContext.Provider>
   );
 }
 
@@ -149,7 +174,6 @@ function SettingsNavigation({ activeTab, onTabChange }: SettingsNavigationProps)
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
-            {tab.id === 'git' && <GitBranch className="w-4 h-4 inline mr-2" />}
             {tab.id === 'api' && <Key className="w-4 h-4 inline mr-2" />}
             {tab.label}
           </button>
