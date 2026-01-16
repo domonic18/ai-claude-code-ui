@@ -11,7 +11,7 @@
  * - Automatic refresh on changes
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { getSidebarService } from '../services';
 import type { Project } from '../types';
 import { STORAGE_KEYS } from '../constants';
@@ -92,14 +92,19 @@ export function useProjects(initialProjects?: Project[] | null): UseProjectsRetu
   }, []);
 
   // Sync projects when initialProjects prop changes
+  // Use a ref to track previous value and only update when actual data changes
+  const prevProjectsRef = useRef<Project[] | null>(null);
   useEffect(() => {
-    if (initialProjects && initialProjects.length > 0) {
-      console.log('[useProjects] Syncing projects from props:', initialProjects);
-      setProjects(initialProjects);
+    if (initialProjects) {
+      const newProjects = Array.isArray(initialProjects) ? initialProjects : [];
+      // Only update if the array reference actually changed (not just a re-render with same data)
+      if (initialProjects !== prevProjectsRef.current) {
+        console.log('[useProjects] Syncing projects from props:', newProjects);
+        setProjects(newProjects);
+        prevProjectsRef.current = newProjects;
+      }
     }
-    // Only run when initialProjects changes from undefined/null to actual data
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialProjects?.length]);
+  }, [initialProjects]);
 
   // Set sort order and persist
   const setSortOrder = useCallback((order: ProjectSortOrder) => {

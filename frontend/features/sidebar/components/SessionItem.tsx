@@ -13,7 +13,7 @@
  * - Edit mode for renaming
  */
 
-import React, { memo, useState, useCallback, KeyboardEvent } from 'react';
+import React, { memo, useState, useCallback, useEffect, KeyboardEvent } from 'react';
 import ClaudeLogo from '../../../components/ClaudeLogo';
 import CursorLogo from '../../../components/CursorLogo';
 import CodexLogo from '../../../components/CodexLogo';
@@ -53,7 +53,13 @@ export const SessionItem = memo(function SessionItem({
   onRenameSave,
   onRenameCancel,
 }: SessionItemProps) {
+  // Use local value for input to ensure immediate updates
   const [localValue, setLocalValue] = useState(renameValue);
+
+  // Sync local value when renameValue prop changes (e.g., when starting edit mode)
+  useEffect(() => {
+    setLocalValue(renameValue);
+  }, [renameValue]);
 
   const handleDoubleClick = useCallback(() => {
     if (!isRenaming) {
@@ -77,36 +83,49 @@ export const SessionItem = memo(function SessionItem({
     onRenameChange(newValue);
   }, [onRenameChange]);
 
+  // Handle save button click (defined before conditional render)
+  const handleSaveClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onRenameSave();
+  }, [onRenameSave]);
+
+  // Handle cancel button click (defined before conditional render)
+  const handleCancelClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onRenameCancel();
+    setLocalValue(session.summary || '');
+  }, [onRenameCancel, session.summary]);
+
   const SessionLogo = getSessionLogo(session.__provider);
 
   if (isRenaming) {
     return (
-      <div className="flex items-center gap-2 p-2 rounded-md bg-accent/50">
-        <div className="w-3 h-3">
+      <div className="flex items-center gap-2 p-2 rounded-md bg-accent/50 relative z-10">
+        <div className="w-3 h-3 flex-shrink-0">
           <SessionLogo className="w-full h-full" />
         </div>
         <input
           type="text"
-          value={renameValue}
+          value={localValue}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           className="flex-1 min-w-0 px-2 py-1 text-sm border border-border rounded bg-background text-foreground focus:ring-2 focus:ring-primary/20"
           autoFocus
+          onClick={(e) => e.stopPropagation()}
         />
         <div
-          className="w-5 h-5 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20 flex items-center justify-center rounded cursor-pointer transition-colors"
-          onClick={onRenameSave}
+          className="w-6 h-6 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20 flex items-center justify-center rounded cursor-pointer transition-colors flex-shrink-0"
+          onClick={handleSaveClick}
+          title="Save"
         >
-          <Check className="w-3 h-3" />
+          <Check className="w-3.5 h-3.5" />
         </div>
         <div
-          className="w-5 h-5 text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-center rounded cursor-pointer transition-colors"
-          onClick={() => {
-            onRenameCancel();
-            setLocalValue(session.summary || '');
-          }}
+          className="w-6 h-6 text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-center rounded cursor-pointer transition-colors flex-shrink-0"
+          onClick={handleCancelClick}
+          title="Cancel"
         >
-          <X className="w-3 h-3" />
+          <X className="w-3.5 h-3.5" />
         </div>
       </div>
     );
@@ -171,7 +190,7 @@ export const SessionItem = memo(function SessionItem({
 
       {/* Hover Action Buttons - Desktop only */}
       <div className="hidden md:block absolute right-2 top-1/2 transform -translate-y-1/2">
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+        <div className="flex items-center gap-1 invisible group-hover:visible transition-all duration-200">
           {/* Edit Button */}
           <button
             className="w-6 h-6 bg-gray-50 hover:bg-gray-100 dark:bg-gray-900/20 dark:hover:bg-gray-900/40 rounded flex items-center justify-center"

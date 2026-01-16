@@ -11,6 +11,8 @@
  */
 
 import React, { memo, useCallback } from 'react';
+import { ChevronDown, Plus } from 'lucide-react';
+import { Button } from '../../../components/ui/button';
 import SessionItem from './SessionItem';
 import type { Session, SessionProvider } from '../types/sidebar.types';
 import { getAllSessions, formatTimeAgo } from '../utils/timeFormatters';
@@ -150,20 +152,26 @@ export const SessionList = memo(function SessionList({
       })}
 
       {/* Load More Button */}
-      {hasMoreSessions && !isLoadingSessions && (
-        <button
+      {allSessions.length > 0 && hasMoreSessions && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-center gap-2 mt-2 text-muted-foreground"
           onClick={handleLoadMore}
-          className="w-full text-left px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+          disabled={isLoadingSessions}
         >
-          Load more sessions...
-        </button>
-      )}
-
-      {/* Loading More Indicator */}
-      {isLoadingSessions && (
-        <div className="px-3 py-2 text-xs text-muted-foreground">
-          Loading...
-        </div>
+          {isLoadingSessions ? (
+            <>
+              <div className="w-3 h-3 animate-spin rounded-full border border-muted-foreground border-t-transparent" />
+              Loading...
+            </>
+          ) : (
+            <>
+              <ChevronDown className="w-3 h-3" />
+              Show more sessions
+            </>
+          )}
+        </Button>
       )}
 
       {/* New Session Button - Mobile */}
@@ -184,16 +192,15 @@ export const SessionList = memo(function SessionList({
 
       {/* New Session Button - Desktop */}
       {onNewSession && (
-        <button
+        <Button
+          variant="default"
+          size="sm"
+          className="hidden md:flex w-full justify-start gap-2 mt-1 h-8 text-xs font-medium bg-primary hover:bg-primary/90 text-primary-foreground transition-colors"
           onClick={onNewSession}
-          className="items-center whitespace-nowrap focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 shadow rounded-md px-3 hidden md:flex w-full justify-start gap-2 mt-1 h-8 text-xs font-medium bg-primary hover:bg-primary/90 text-primary-foreground transition-colors"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
-            <path d="M5 12h14"></path>
-            <path d="M12 5v14"></path>
-          </svg>
+          <Plus className="w-3 h-3" />
           New Session
-        </button>
+        </Button>
       )}
     </div>
   );

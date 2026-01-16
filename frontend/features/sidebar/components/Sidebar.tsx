@@ -181,15 +181,35 @@ export const Sidebar = memo(function Sidebar({
   }, [onSessionSelect]);
 
   const handleSessionDelete = useCallback(async (projectName: string, sessionId: string, provider?: any) => {
-    await deleteSession(projectName, sessionId, provider);
-    if (onSessionDelete) {
-      await onSessionDelete(projectName, sessionId, provider);
+    try {
+      await deleteSession(projectName, sessionId, provider);
+      // Call parent callback if provided
+      if (onSessionDelete) {
+        await onSessionDelete(projectName, sessionId, provider);
+      }
+    } catch (error) {
+      console.error('[Sidebar] Error deleting session:', error);
+      // Show error message to user
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete session. Please try again.';
+      window.alert(errorMessage);
     }
   }, [deleteSession, onSessionDelete]);
 
   const handleUpdateSessionSummary = useCallback(async (projectName: string, sessionId: string, summary: string) => {
-    await renameSession(projectName, sessionId, summary);
-  }, [renameSession]);
+    try {
+      await renameSession(projectName, sessionId, summary);
+      // Close editing state
+      setEditingSession(null);
+      setEditingSessionName('');
+      // Refresh to get updated data
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (error) {
+      console.error('Error updating session summary:', error);
+      // Don't close editing state on error, allowing user to retry
+    }
+  }, [renameSession, onRefresh]);
 
   const handleLoadMoreSessions = useCallback(async (project: any) => {
     await loadMoreSessions(project.name);
