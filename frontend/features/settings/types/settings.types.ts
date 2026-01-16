@@ -15,13 +15,23 @@ export type SettingsTab = 'agents' | 'appearance' | 'api' | 'tasks';
 export type AgentType = 'claude' | 'opencode';
 
 /**
+ * MCP Server transport type
+ */
+export type McpTransportType = 'stdio' | 'sse' | 'http';
+
+/**
+ * MCP Server scope type
+ */
+export type McpScope = 'user' | 'project';
+
+/**
  * MCP Server configuration
  */
 export interface McpServer {
   id?: string;
   name: string;
-  type: 'stdio' | 'sse';
-  scope: 'user' | 'project';
+  type: McpTransportType;
+  scope: McpScope;
   projectPath?: string;
   config: {
     command?: string;
@@ -31,6 +41,8 @@ export interface McpServer {
     headers?: Record<string, string>;
     timeout?: number;
   };
+  enabled?: boolean;
+  raw?: any;
   jsonInput?: string;
   importMode?: 'form' | 'json';
 }
@@ -52,7 +64,7 @@ export interface CodeEditorSettings {
   wordWrap: boolean;
   showMinimap: boolean;
   lineNumbers: boolean;
-  fontSize: number;
+  fontSize: string;
 }
 
 /**

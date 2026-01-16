@@ -1,5 +1,5 @@
 /**
- * McpServersContent Component
+ * McpServerList Component
  *
  * Displays and manages MCP servers for Claude agent.
  * Provides list view, add/edit/delete actions, test functionality, and tools discovery.
@@ -11,10 +11,10 @@
 import React from 'react';
 import { Button } from '../../../../components/ui/button';
 import { Server, Plus } from 'lucide-react';
-import { McpServer } from '../agent/McpServerForm';
+import { McpServer } from '../../types/settings.types';
 import { McpServerCard } from './McpServerCard';
 
-interface McpServersContentProps {
+interface McpServerListProps {
   agent: string;
   servers: McpServer[];
   onAdd: () => void;
@@ -28,9 +28,9 @@ interface McpServersContentProps {
 }
 
 /**
- * McpServersContent - Main MCP servers management interface
+ * McpServerList - Main MCP servers management interface
  */
-export const McpServersContent: React.FC<McpServersContentProps> = ({
+export const McpServerList: React.FC<McpServerListProps> = ({
   servers,
   onAdd,
   onEdit,
@@ -85,4 +85,4 @@ export const McpServersContent: React.FC<McpServersContentProps> = ({
   );
 };
 
-export default McpServersContent;
+export default McpServerList;

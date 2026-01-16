@@ -208,6 +208,19 @@ export const api = {
         }),
     },
 
+    // Permissions API (Claude-specific)
+    permissions: {
+      // Get Claude permissions
+      get: () => authenticatedFetch('/api/users/settings/claude'),
+
+      // Update Claude permissions
+      update: (settings) =>
+        authenticatedFetch('/api/users/settings/claude', {
+          method: 'PUT',
+          body: JSON.stringify(settings),
+        }),
+    },
+
     // MCP Servers API
     mcpServers: {
       // Get all MCP servers for the user

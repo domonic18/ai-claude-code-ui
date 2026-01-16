@@ -25,8 +25,7 @@ export const SETTINGS_TABS: Array<{
  */
 export const AGENT_TYPES = {
   CLAUDE: 'claude' as const,
-  CURSOR: 'cursor' as const,
-  CODEX: 'codex' as const,
+  OPENCODE: 'opencode' as const,
 } as const;
 
 /**
@@ -34,8 +33,7 @@ export const AGENT_TYPES = {
  */
 export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   claude: 'Claude',
-  cursor: 'Cursor',
-  codex: 'Codex',
+  opencode: 'OpenCode',
 };
 
 /**
@@ -109,7 +107,7 @@ export const DEFAULTS = {
     wordWrap: false,
     showMinimap: true,
     lineNumbers: true,
-    fontSize: 14,
+    fontSize: '14',
   },
   MCP: {
     timeout: 30000,

@@ -8,27 +8,26 @@
 export type {
   SettingsTab,
   AgentType,
-  Project,
   McpServer,
   PermissionSettings,
-  GitSettings,
   SettingsProps,
   SaveStatus,
   McpTestResult,
   ApiKeyConfig,
+  CodeEditorSettings,
 } from './types/settings.types';
 
 // Components
 export { Settings } from './components/Settings';
 export { AppearanceTab } from './components/AppearanceTab';
-// export { AgentsTab } from './components/AgentsTab';
-// export { GitTab } from './components/GitTab';
-// export { ApiTab } from './components/ApiTab';
-// export { TasksTab } from './components/TasksTab';
+export { AgentTab } from './components/AgentTab';
+export { ApiTab } from './components/ApiTab';
+export { TasksTab } from './components/TasksTab';
+export type { AgentTabHandle } from './components/AgentTab';
 
 // Hooks
-export { useAgentSettings, useCodeEditorSettings } from './hooks';
-export type { UseAgentSettingsReturn, UseCodeEditorSettingsReturn, CodeEditorSettings } from './hooks';
+export { useAgentSettings, useCodeEditorSettings, useSettings, useMcpServers } from './hooks';
+export type { UseAgentSettingsReturn, UseCodeEditorSettingsReturn, UseSettingsReturn, UseMcpServersReturn } from './hooks';
 
 // Services
 export { SettingsService, getSettingsService } from './services/settingsService';

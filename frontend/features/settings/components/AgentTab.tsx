@@ -12,16 +12,18 @@
  *
  * Note: Cursor and Codex have been removed.
  * Auto-save has been removed - settings are saved manually via Save button.
+ * All API calls now use settingsService for centralized management.
  */
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
-import { api } from '../../../utils/api';
+import { getSettingsService } from '../services/settingsService';
 import { AgentSelector } from './agent/AgentSelector';
-import PermissionsContent from './agent/PermissionsContent';
-import { McpServerForm, McpFormData, McpServer } from './agent/McpServerForm';
-import { McpServersContent } from './mcp/McpServersContent';
+import AgentPermissions from './agent/AgentPermissions';
+import { McpServerForm, McpFormData } from './agent/McpServerForm';
+import McpServerList from './mcp/McpServerList';
 import { CategoryTabs, CategoryType } from './common/CategoryTabs';
 import { OpenCodePlaceholder } from './common/OpenCodePlaceholder';
+import { McpServer } from '../types/settings.types';
 
 interface AgentTabProps {
   // Props passed from parent Settings if needed
@@ -93,20 +95,16 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((_props, ref) 
   }));
 
   const loadAgentSettings = async () => {
-    try {
-      // Load Claude permissions from user settings API
-      const permsResponse = await fetch('/api/users/settings/claude');
-      if (permsResponse.ok) {
-        const response = await permsResponse.json();
-        if (response.success && response.data) {
-          setSkipPermissions(response.data.skipPermissions || false);
-          setAllowedTools(response.data.allowedTools || []);
-          setDisallowedTools(response.data.disallowedTools || []);
-        }
-      } else {
-        console.error('[AgentTab] Failed to load permissions:', permsResponse.statusText);
-      }
+    const service = getSettingsService();
 
+    try {
+      // Load Claude permissions using settingsService
+      const permissions = await service.getPermissions();
+      setSkipPermissions(permissions.skipPermissions || false);
+      setAllowedTools(permissions.allowedTools || []);
+      setDisallowedTools(permissions.disallowedTools || []);
+
+      // Load MCP servers
       loadMcpServers();
     } catch (error) {
       console.error('[AgentTab] Error loading agent settings:', error);
@@ -114,21 +112,11 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((_props, ref) 
   };
 
   const loadMcpServers = async () => {
+    const service = getSettingsService();
+
     try {
-      const response = await api.user.mcpServers.getAll();
-      if (response.ok) {
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-          const result = await response.json();
-          setMcpServers(result.data || []);
-        } else {
-          console.warn('[AgentTab] MCP servers API returned non-JSON response');
-          setMcpServers([]);
-        }
-      } else {
-        console.warn(`[AgentTab] MCP servers API returned status: ${response.status}`);
-        setMcpServers([]);
-      }
+      const servers = await service.getMcpServers();
+      setMcpServers(servers);
     } catch (error) {
       console.error('[AgentTab] Error loading MCP servers:', error);
       setMcpServers([]);
@@ -140,24 +128,19 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((_props, ref) 
     currentAllowedTools: string[],
     currentDisallowedTools: string[]
   ) => {
+    const service = getSettingsService();
+
     try {
-      const response = await fetch('/api/users/settings/claude', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          skipPermissions: currentSkipPermissions,
-          allowedTools: currentAllowedTools,
-          disallowedTools: currentDisallowedTools,
-        }),
+      const result = await service.updatePermissions({
+        skipPermissions: currentSkipPermissions,
+        allowedTools: currentAllowedTools,
+        disallowedTools: currentDisallowedTools,
       });
 
-      if (response.ok) {
-        const result = await response.json();
+      if (result.success) {
         console.log('[AgentTab] Permissions saved successfully:', result.message);
       } else {
-        console.error('[AgentTab] Failed to save permissions:', response.statusText);
+        console.error('[AgentTab] Failed to save permissions');
       }
     } catch (error) {
       console.error('[AgentTab] Error saving permissions:', error);
@@ -234,45 +217,35 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((_props, ref) 
   };
 
   const saveMcpServer = async (serverData: McpFormData) => {
+    const service = getSettingsService();
+
     try {
       if (editingMcpServer) {
-        const response = await api.user.mcpServers.update(editingMcpServer.id, {
+        const result = await service.updateMcpServer(editingMcpServer.id, {
           name: serverData.name,
           type: serverData.type,
           config: serverData.config,
           enabled: true
         });
 
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success) {
-            await loadMcpServers();
-            return true;
-          } else {
-            throw new Error(result.error || 'Failed to update server');
-          }
+        if (result.success) {
+          await loadMcpServers();
+          return true;
         } else {
-          const error = await response.json();
-          throw new Error(error.error || 'Failed to update server');
+          throw new Error(result.error || 'Failed to update server');
         }
       } else {
-        const response = await api.user.mcpServers.create({
+        const result = await service.createMcpServer({
           name: serverData.name,
           type: serverData.type,
           config: serverData.config
         });
 
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success) {
-            await loadMcpServers();
-            return true;
-          } else {
-            throw new Error(result.error || 'Failed to create server');
-          }
+        if (result.success) {
+          await loadMcpServers();
+          return true;
         } else {
-          const error = await response.json();
-          throw new Error(error.error || 'Failed to create server');
+          throw new Error(result.error || 'Failed to create server');
         }
       }
     } catch (error: any) {
@@ -284,28 +257,23 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((_props, ref) 
   const handleMcpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const service = getSettingsService();
     setMcpLoading(true);
 
     try {
       if (mcpFormData.importMode === 'json') {
-        const response = await api.user.mcpServers.validate({
+        const result = await service.validateMcpServer({
           name: mcpFormData.name,
           jsonConfig: mcpFormData.jsonInput,
           scope: mcpFormData.scope,
           projectPath: mcpFormData.projectPath
         });
 
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success) {
-            await loadMcpServers();
-            resetMcpForm();
-          } else {
-            throw new Error(result.error || 'Failed to add server via JSON');
-          }
+        if (result.success) {
+          await loadMcpServers();
+          resetMcpForm();
         } else {
-          const error = await response.json();
-          throw new Error(error.error || 'Failed to add server');
+          throw new Error(result.error || 'Failed to add server via JSON');
         }
       } else {
         await saveMcpServer(mcpFormData);
@@ -319,15 +287,14 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((_props, ref) 
   };
 
   const handleMcpDelete = async (serverId: string) => {
+    const service = getSettingsService();
+
     try {
-      const response = await api.user.mcpServers.delete(serverId);
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          await loadMcpServers();
-        } else {
-          console.error('[AgentTab] Failed to delete server:', result.error);
-        }
+      const result = await service.deleteMcpServer(serverId);
+      if (result.success) {
+        await loadMcpServers();
+      } else {
+        console.error('[AgentTab] Failed to delete server:', result.error);
       }
     } catch (error) {
       console.error('[AgentTab] Error deleting MCP server:', error);
@@ -335,44 +302,30 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((_props, ref) 
   };
 
   const handleMcpTest = async (serverId: string, scope: string) => {
+    const service = getSettingsService();
+
     try {
-      const response = await api.user.mcpServers.test(serverId);
-      if (response.ok) {
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-          const result = await response.json();
-          setMcpTestResults(prev => ({
-            ...prev,
-            [`${scope}-${serverId}`]: result
-          }));
-        } else {
-          console.warn('[AgentTab] MCP test returned non-JSON response');
-        }
-      } else {
-        console.warn(`[AgentTab] MCP test returned status: ${response.status}`);
-      }
+      const result = await service.testMcpServer(serverId);
+      setMcpTestResults(prev => ({
+        ...prev,
+        [`${scope}-${serverId}`]: result
+      }));
     } catch (error) {
       console.error('[AgentTab] Error testing MCP server:', error);
     }
   };
 
   const handleMcpToolsDiscovery = async (serverId: string, scope: string) => {
+    const service = getSettingsService();
+
     setMcpToolsLoading(prev => ({ ...prev, [`${scope}-${serverId}`]: true }));
     try {
-      const response = await api.user.mcpServers.discoverTools(serverId);
-      if (response.ok) {
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-          const result = await response.json();
-          setMcpServerTools(prev => ({
-            ...prev,
-            [`${scope}-${serverId}`]: result.data || result
-          }));
-        } else {
-          console.warn('[AgentTab] MCP tools discovery returned non-JSON response');
-        }
-      } else {
-        console.warn(`[AgentTab] MCP tools discovery returned status: ${response.status}`);
+      const result = await service.discoverMcpTools(serverId);
+      if (result.success) {
+        setMcpServerTools(prev => ({
+          ...prev,
+          [`${scope}-${serverId}`]: result.data
+        }));
       }
     } catch (error) {
       console.error('[AgentTab] Error discovering MCP tools:', error);
@@ -404,7 +357,7 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((_props, ref) 
 
           {/* Claude - Permissions Category */}
           {selectedAgent === 'claude' && selectedCategory === 'permissions' && (
-            <PermissionsContent
+            <AgentPermissions
               agent="claude"
               skipPermissions={skipPermissions}
               setSkipPermissions={setSkipPermissions}
@@ -421,7 +374,7 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((_props, ref) 
 
           {/* Claude - MCP Servers Category */}
           {selectedAgent === 'claude' && selectedCategory === 'mcp' && (
-            <McpServersContent
+            <McpServerList
               agent="claude"
               servers={mcpServers}
               onAdd={() => openMcpForm()}

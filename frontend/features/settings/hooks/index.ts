@@ -8,10 +8,10 @@ export { useAgentSettings } from './useAgentSettings';
 export type { UseAgentSettingsParams, UseAgentSettingsReturn } from './useAgentSettings';
 
 export { useCodeEditorSettings } from './useCodeEditorSettings';
-export type { CodeEditorSettings, UseCodeEditorSettingsReturn } from './useCodeEditorSettings';
+export type { UseCodeEditorSettingsReturn } from './useCodeEditorSettings';
 
-// Additional hooks to be added:
-// export { useMcpServers } from './useMcpServers';
-// export { useGitSettings } from './useGitSettings';
-// export { useApiKeys } from './useApiKeys';
-// export { useSettings } from './useSettings';
+export { useSettings } from './useSettings';
+export type { UseSettingsReturn } from './useSettings';
+
+export { useMcpServers } from './useMcpServers';
+export type { UseMcpServersReturn } from './useMcpServers';

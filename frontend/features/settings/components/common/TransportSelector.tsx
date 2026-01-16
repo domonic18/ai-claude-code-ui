@@ -5,8 +5,7 @@
  */
 
 import React from 'react';
-
-export type McpTransportType = 'stdio' | 'sse' | 'http';
+import { McpTransportType } from '../../types/settings.types';
 
 interface TransportSelectorProps {
   type: McpTransportType;

@@ -17,16 +17,17 @@ import React, { useState } from 'react';
 import { X, Globe, FolderOpen } from 'lucide-react';
 import { Button } from '../../../../components/ui/button';
 import { Input } from '../../../../components/ui/input';
-import { ScopeSelector, McpScope, Project } from '../common/ScopeSelector';
-import { TransportSelector, McpTransportType } from '../common/TransportSelector';
+import { ScopeSelector, Project } from '../common/ScopeSelector';
+import { TransportSelector } from '../common/TransportSelector';
+import { McpServer, McpTransportType, McpScope } from '../../types/settings.types';
 
 export interface McpConfig {
-  command: string;
-  args: string[];
-  env: Record<string, string>;
-  url: string;
-  headers: Record<string, string>;
-  timeout: number;
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  url?: string;
+  headers?: Record<string, string>;
+  timeout?: number;
 }
 
 export interface McpFormData {
@@ -37,17 +38,6 @@ export interface McpFormData {
   importMode: 'form' | 'json';
   jsonInput: string;
   config: McpConfig;
-  raw?: any;
-}
-
-export interface McpServer {
-  id: string;
-  name: string;
-  type: McpTransportType;
-  scope: McpScope;
-  projectPath?: string;
-  config: McpConfig;
-  enabled: boolean;
   raw?: any;
 }
 

@@ -3,10 +3,19 @@
  *
  * API service layer for Settings feature module.
  * Handles all API calls related to settings management.
+ *
+ * Note: This service uses api.js for centralized API endpoint management.
+ * All API URLs are defined in frontend/utils/api.js
  */
 
-import { authenticatedFetch } from '../../../utils/api';
+import { api } from '../../../utils/api';
 import type { McpServer } from '../types/settings.types';
+
+export interface ClaudePermissions {
+  skipPermissions: boolean;
+  allowedTools: string[];
+  disallowedTools: string[];
+}
 
 /**
  * Settings Service Class
@@ -25,114 +34,64 @@ export class SettingsService {
     this.projectName = config.projectName;
   }
 
+  // ===== Permissions (Claude) =====
+
   /**
-   * Fetch allowed tools
+   * Get Claude permissions
    */
-  async getAllowedTools(): Promise<string[]> {
+  async getPermissions(): Promise<ClaudePermissions> {
     try {
-      const response = await authenticatedFetch('/api/settings/allowed-tools');
-      if (!response.ok) throw new Error('Failed to fetch allowed tools');
-      const data = await response.json();
-      return data.tools || [];
+      const response = await api.user.permissions.get();
+      if (!response.ok) {
+        console.warn('[SettingsService] Failed to fetch permissions:', response.statusText);
+        return { skipPermissions: false, allowedTools: [], disallowedTools: [] };
+      }
+
+      const result = await response.json();
+      return result.data || { skipPermissions: false, allowedTools: [], disallowedTools: [] };
     } catch (error) {
-      console.error('[SettingsService] Error fetching allowed tools:', error);
+      console.error('[SettingsService] Error fetching permissions:', error);
+      return { skipPermissions: false, allowedTools: [], disallowedTools: [] };
+    }
+  }
+
+  /**
+   * Update Claude permissions
+   */
+  async updatePermissions(data: ClaudePermissions): Promise<{ success: boolean; message?: string }> {
+    try {
+      const response = await api.user.permissions.update(data);
+      if (!response.ok) {
+        throw new Error(`Failed to update permissions: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      return { success: result.success, message: result.message };
+    } catch (error) {
+      console.error('[SettingsService] Error updating permissions:', error);
+      return { success: false };
+    }
+  }
+
+  // ===== MCP Servers =====
+
+  /**
+   * Get all MCP servers for the user
+   */
+  async getMcpServers(): Promise<McpServer[]> {
+    try {
+      const response = await api.user.mcpServers.getAll();
+      if (!response.ok) {
+        console.warn('[SettingsService] Failed to fetch MCP servers:', response.statusText);
+        return [];
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const result = await response.json();
+        return result.data || [];
+      }
       return [];
-    }
-  }
-
-  /**
-   * Save allowed tools
-   */
-  async saveAllowedTools(tools: string[]): Promise<boolean> {
-    try {
-      const response = await authenticatedFetch('/api/settings/allowed-tools', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tools }),
-      });
-      return response.ok;
-    } catch (error) {
-      console.error('[SettingsService] Error saving allowed tools:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Fetch disallowed tools
-   */
-  async getDisallowedTools(): Promise<string[]> {
-    try {
-      const response = await authenticatedFetch('/api/settings/disallowed-tools');
-      if (!response.ok) throw new Error('Failed to fetch disallowed tools');
-      const data = await response.json();
-      return data.tools || [];
-    } catch (error) {
-      console.error('[SettingsService] Error fetching disallowed tools:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Save disallowed tools
-   */
-  async saveDisallowedTools(tools: string[]): Promise<boolean> {
-    try {
-      const response = await authenticatedFetch('/api/settings/disallowed-tools', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tools }),
-      });
-      return response.ok;
-    } catch (error) {
-      console.error('[SettingsService] Error saving disallowed tools:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Fetch skip permissions setting
-   */
-  async getSkipPermissions(): Promise<boolean> {
-    try {
-      const response = await authenticatedFetch('/api/settings/skip-permissions');
-      if (!response.ok) throw new Error('Failed to fetch skip permissions');
-      const data = await response.json();
-      return data.skip || false;
-    } catch (error) {
-      console.error('[SettingsService] Error fetching skip permissions:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Save skip permissions setting
-   */
-  async saveSkipPermissions(skip: boolean): Promise<boolean> {
-    try {
-      const response = await authenticatedFetch('/api/settings/skip-permissions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ skip }),
-      });
-      return response.ok;
-    } catch (error) {
-      console.error('[SettingsService] Error saving skip permissions:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Fetch MCP servers
-   */
-  async getMcpServers(agentType: string = 'claude'): Promise<McpServer[]> {
-    try {
-      const url = agentType === 'claude'
-        ? '/api/mcp/servers'
-        : `/api/${agentType}/mcp/servers`;
-      const response = await authenticatedFetch(url);
-      if (!response.ok) throw new Error('Failed to fetch MCP servers');
-      const data = await response.json();
-      return data.servers || [];
     } catch (error) {
       console.error('[SettingsService] Error fetching MCP servers:', error);
       return [];
@@ -140,60 +99,125 @@ export class SettingsService {
   }
 
   /**
-   * Save MCP server
+   * Create a new MCP server
    */
-  async saveMcpServer(server: McpServer, agentType: string = 'claude'): Promise<boolean> {
+  async createMcpServer(server: Partial<McpServer>): Promise<{ success: boolean; error?: string }> {
     try {
-      const url = agentType === 'claude'
-        ? '/api/mcp/servers'
-        : `/api/${agentType}/mcp/servers`;
-      const response = await authenticatedFetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(server),
-      });
-      return response.ok;
+      const response = await api.user.mcpServers.create(server);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create MCP server');
+      }
+
+      const result = await response.json();
+      return { success: result.success };
     } catch (error) {
-      console.error('[SettingsService] Error saving MCP server:', error);
-      return false;
+      console.error('[SettingsService] Error creating MCP server:', error);
+      return { success: false, error: error.message };
     }
   }
 
   /**
-   * Delete MCP server
+   * Update an existing MCP server
    */
-  async deleteMcpServer(serverName: string, agentType: string = 'claude'): Promise<boolean> {
+  async updateMcpServer(id: string, server: Partial<McpServer>): Promise<{ success: boolean; error?: string }> {
     try {
-      const url = agentType === 'claude'
-        ? `/api/mcp/servers/${encodeURIComponent(serverName)}`
-        : `/api/${agentType}/mcp/servers/${encodeURIComponent(serverName)}`;
-      const response = await authenticatedFetch(url, {
-        method: 'DELETE',
-      });
-      return response.ok;
+      const response = await api.user.mcpServers.update(id, server);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update MCP server');
+      }
+
+      const result = await response.json();
+      return { success: result.success };
+    } catch (error) {
+      console.error('[SettingsService] Error updating MCP server:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Delete an MCP server
+   */
+  async deleteMcpServer(id: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await api.user.mcpServers.delete(id);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete MCP server');
+      }
+
+      const result = await response.json();
+      return { success: result.success };
     } catch (error) {
       console.error('[SettingsService] Error deleting MCP server:', error);
-      return false;
+      return { success: false, error: error.message };
     }
   }
 
   /**
    * Test MCP server connection
    */
-  async testMcpServer(server: McpServer, agentType: string = 'claude'): Promise<{ success: boolean; tools?: string[]; error?: string }> {
+  async testMcpServer(id: string): Promise<{ success: boolean; message?: string }> {
     try {
-      const url = agentType === 'claude'
-        ? '/api/mcp/test'
-        : `/api/${agentType}/mcp/test`;
-      const response = await authenticatedFetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(server),
-      });
-      if (!response.ok) throw new Error('Failed to test MCP server');
-      return await response.json();
+      const response = await api.user.mcpServers.test(id);
+      if (!response.ok) {
+        throw new Error(`Failed to test MCP server: ${response.statusText}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        return await response.json();
+      }
+      return { success: false, message: 'No response from server' };
     } catch (error) {
       console.error('[SettingsService] Error testing MCP server:', error);
+      return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Discover tools from MCP server
+   */
+  async discoverMcpTools(id: string): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const response = await api.user.mcpServers.discoverTools(id);
+      if (!response.ok) {
+        throw new Error(`Failed to discover MCP tools: ${response.statusText}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const result = await response.json();
+        return { success: true, data: result.data || result };
+      }
+      return { success: false, error: 'Invalid response format' };
+    } catch (error) {
+      console.error('[SettingsService] Error discovering MCP tools:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Validate MCP server configuration (for JSON import)
+   */
+  async validateMcpServer(server: {
+    name: string;
+    jsonConfig: string;
+    scope: string;
+    projectPath?: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await api.user.mcpServers.validate(server);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to validate MCP server');
+      }
+
+      const result = await response.json();
+      return { success: result.success };
+    } catch (error) {
+      console.error('[SettingsService] Error validating MCP server:', error);
       return { success: false, error: error.message };
     }
   }
@@ -203,7 +227,7 @@ export class SettingsService {
    */
   async getProjectSortOrder(): Promise<string> {
     try {
-      const response = await authenticatedFetch('/api/settings/project-sort-order');
+      const response = await api.get('/settings/project-sort-order');
       if (!response.ok) throw new Error('Failed to fetch project sort order');
       const data = await response.json();
       return data.order || 'name';
@@ -218,11 +242,7 @@ export class SettingsService {
    */
   async saveProjectSortOrder(order: string): Promise<boolean> {
     try {
-      const response = await authenticatedFetch('/api/settings/project-sort-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order }),
-      });
+      const response = await api.user.settings.update('claude', { projectSortOrder: order });
       return response.ok;
     } catch (error) {
       console.error('[SettingsService] Error saving project sort order:', error);

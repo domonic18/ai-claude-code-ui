@@ -1,5 +1,5 @@
 /**
- * PermissionsContent Component
+ * AgentPermissions Component
  *
  * Manages Claude tool permissions (allowed/blocked tools).
  * Provides quick-add buttons for common tools and tool pattern configuration.
@@ -31,7 +31,7 @@ const commonClaudeTools = [
   'WebSearch'
 ];
 
-interface ClaudePermissionsProps {
+interface AgentPermissionsProps {
   skipPermissions: boolean;
   setSkipPermissions: (value: boolean) => void;
   allowedTools: string[];
@@ -45,9 +45,9 @@ interface ClaudePermissionsProps {
 }
 
 /**
- * ClaudePermissions - Claude tool permissions configuration
+ * AgentPermissions - Claude tool permissions configuration
  */
-const ClaudePermissions: React.FC<ClaudePermissionsProps> = ({
+const AgentPermissions: React.FC<AgentPermissionsProps> = ({
   skipPermissions,
   setSkipPermissions,
   allowedTools,
@@ -269,4 +269,4 @@ const ClaudePermissions: React.FC<ClaudePermissionsProps> = ({
 };
 
 // Main component
-export default PermissionsContent;
+export default AgentPermissions;

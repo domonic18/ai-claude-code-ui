@@ -11,9 +11,7 @@ import React from 'react';
 import { Button } from '../../../../components/ui/button';
 import { Badge } from '../../../../components/ui/badge';
 import { Server, Terminal, Globe, Zap, Edit3, Trash2 } from 'lucide-react';
-import { McpServer } from '../agent/McpServerForm';
-
-type McpTransportType = 'stdio' | 'sse' | 'http';
+import { McpServer, McpTransportType } from '../../types/settings.types';
 
 interface McpServerCardProps {
   server: McpServer;
@@ -32,6 +30,11 @@ const getTransportIcon = (type: McpTransportType) => {
   }
 };
 
+// Helper to convert backend scope to UI display
+const toUiScope = (scope: 'user' | 'project'): 'user' | 'local' => {
+  return scope === 'project' ? 'local' : scope;
+};
+
 /**
  * McpServerCard - Single MCP server display card
  */
@@ -42,6 +45,8 @@ export const McpServerCard: React.FC<McpServerCardProps> = ({
   onEdit,
   onDelete
 }) => {
+  const uiScope = toUiScope(server.scope);
+
   return (
     <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
       <div className="flex items-start justify-between">
@@ -53,7 +58,7 @@ export const McpServerCard: React.FC<McpServerCardProps> = ({
               {server.type}
             </Badge>
             <Badge variant="outline" className="text-xs">
-              {server.scope === 'local' ? 'local' : server.scope === 'user' ? 'user' : server.scope}
+              {uiScope}
             </Badge>
           </div>
 

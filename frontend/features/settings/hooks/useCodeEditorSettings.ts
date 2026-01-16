@@ -9,14 +9,7 @@
  */
 
 import { useState, useCallback } from 'react';
-
-export interface CodeEditorSettings {
-  theme: string;
-  wordWrap: boolean;
-  showMinimap: boolean;
-  lineNumbers: boolean;
-  fontSize: string;
-}
+import type { CodeEditorSettings } from '../types/settings.types';
 
 export interface UseCodeEditorSettingsReturn {
   settings: CodeEditorSettings;
