@@ -7,21 +7,12 @@
 /**
  * Available settings tabs
  */
-export type SettingsTab = 'agents' | 'appearance' | 'git' | 'api' | 'tasks';
+export type SettingsTab = 'agents' | 'appearance' | 'api' | 'tasks';
 
 /**
  * Agent type selection
  */
 export type AgentType = 'claude' | 'opencode';
-
-/**
- * Project information
- */
-export interface Project {
-  name: string;
-  path?: string;
-  sessions?: any[];
-}
 
 /**
  * MCP Server configuration
@@ -65,15 +56,6 @@ export interface CodeEditorSettings {
 }
 
 /**
- * Git settings
- */
-export interface GitSettings {
-  username?: string;
-  email?: string;
-  defaultBranch?: string;
-}
-
-/**
  * Settings modal props
  */
 export interface SettingsProps {
@@ -81,14 +63,8 @@ export interface SettingsProps {
   isOpen: boolean;
   /** Close modal callback */
   onClose: () => void;
-  /** Available projects */
-  projects?: Project[];
   /** Initial tab to display */
   initialTab?: SettingsTab;
-  /** Auto-refresh interval in seconds */
-  autoRefreshInterval?: number;
-  /** Set auto-refresh interval callback */
-  setAutoRefreshInterval?: (interval: number) => void;
 }
 
 /**

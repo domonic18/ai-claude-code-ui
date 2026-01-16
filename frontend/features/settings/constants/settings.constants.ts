@@ -16,8 +16,7 @@ export const SETTINGS_TABS: Array<{
 }> = [
   { id: 'agents', label: 'Agents' },
   { id: 'appearance', label: 'Appearance' },
-  { id: 'git', label: 'Git' },
-  { id: 'api', label: 'API & Tokens' },
+  { id: 'api', label: 'API Keys' },
   { id: 'tasks', label: 'Tasks' },
 ];
 

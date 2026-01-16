@@ -4,7 +4,9 @@
  * Export all Settings feature components.
  */
 
-export { Settings } from './Settings';
+export { Settings, SettingsContext } from './Settings';
 export { AppearanceTab } from './AppearanceTab';
-export { AgentTab } from './AgentTab';
+export { AgentTab, type AgentTabHandle } from './AgentTab';
+export { ApiTab } from './ApiTab';
+export { TasksTab } from './TasksTab';
 export { LegacySettingsContent } from './LegacySettingsContent';
