@@ -2,136 +2,111 @@
  * useCodeEditorSettings Hook
  *
  * Custom hook for managing code editor appearance settings.
- * Handles theme, word wrap, minimap, line numbers, and font size.
+ * Matches the exact implementation from original Settings.jsx.
+ *
+ * Triggers 'codeEditorSettingsChanged' event on settings change
+ * to notify CodeEditor component to reload from localStorage.
  */
 
-import { useState, useCallback, useEffect } from 'react';
-import { STORAGE_KEYS, DEFAULTS } from '../constants/settings.constants';
+import { useState, useCallback } from 'react';
 
 export interface CodeEditorSettings {
   theme: string;
   wordWrap: boolean;
   showMinimap: boolean;
   lineNumbers: boolean;
-  fontSize: number;
+  fontSize: string;
 }
 
 export interface UseCodeEditorSettingsReturn {
   settings: CodeEditorSettings;
-  setTheme: (theme: string) => void;
-  setWordWrap: (enabled: boolean) => void;
-  setShowMinimap: (show: boolean) => void;
-  setLineNumbers: (show: boolean) => void;
-  setFontSize: (size: number) => void;
-  resetToDefaults: () => void;
+  setCodeEditorTheme: (theme: string) => void;
+  setCodeEditorWordWrap: (enabled: boolean) => void;
+  setCodeEditorShowMinimap: (show: boolean) => void;
+  setCodeEditorLineNumbers: (show: boolean) => void;
+  setCodeEditorFontSize: (size: string) => void;
 }
 
 /**
- * Load setting from localStorage
+ * Trigger codeEditorSettingsChanged event to notify CodeEditor component
  */
-function loadFromLocalStorage<T>(key: string, defaultValue: T): T {
-  try {
-    const value = localStorage.getItem(key);
-    if (value === null) return defaultValue;
-    return JSON.parse(value);
-  } catch {
-    return defaultValue;
-  }
-}
-
-/**
- * Save setting to localStorage
- */
-function saveToLocalStorage<T>(key: string, value: T): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (error) {
-    console.error(`[useCodeEditorSettings] Error saving to localStorage (${key}):`, error);
-  }
+function triggerSettingsChangedEvent() {
+  window.dispatchEvent(new Event('codeEditorSettingsChanged'));
 }
 
 /**
  * Custom hook for code editor settings management
+ * Matches original Settings.jsx implementation exactly
  */
 export function useCodeEditorSettings(): UseCodeEditorSettingsReturn {
-  const [theme, setThemeState] = useState<string>(() =>
-    loadFromLocalStorage(STORAGE_KEYS.CODE_EDITOR_THEME, DEFAULTS.CODE_EDITOR.theme)
+  // Code Editor Theme - use 'dark' or 'light' to match CodeEditor.jsx expectations
+  const [theme, setCodeEditorThemeState] = useState<string>(() =>
+    localStorage.getItem('codeEditorTheme') || 'dark'
   );
 
-  const [wordWrap, setWordWrapState] = useState<boolean>(() =>
-    loadFromLocalStorage(STORAGE_KEYS.CODE_EDITOR_WORD_WRAP, DEFAULTS.CODE_EDITOR.wordWrap)
+  // Word Wrap - check for string 'true' like original
+  const [wordWrap, setCodeEditorWordWrapState] = useState<boolean>(() =>
+    localStorage.getItem('codeEditorWordWrap') === 'true'
   );
 
-  const [showMinimap, setShowMinimapState] = useState<boolean>(() =>
-    loadFromLocalStorage(STORAGE_KEYS.CODE_EDITOR_SHOW_MINIMAP, DEFAULTS.CODE_EDITOR.showMinimap)
+  // Show Minimap - default true, only false if explicitly 'false'
+  const [showMinimap, setCodeEditorShowMinimapState] = useState<boolean>(() =>
+    localStorage.getItem('codeEditorShowMinimap') !== 'false'
   );
 
-  const [lineNumbers, setLineNumbersState] = useState<boolean>(() =>
-    loadFromLocalStorage(STORAGE_KEYS.CODE_EDITOR_LINE_NUMBERS, DEFAULTS.CODE_EDITOR.lineNumbers)
+  // Line Numbers - default true, only false if explicitly 'false'
+  const [lineNumbers, setCodeEditorLineNumbersState] = useState<boolean>(() =>
+    localStorage.getItem('codeEditorLineNumbers') !== 'false'
   );
 
-  const [fontSize, setFontSizeState] = useState<number>(() =>
-    loadFromLocalStorage(STORAGE_KEYS.CODE_EDITOR_FONT_SIZE, DEFAULTS.CODE_EDITOR.fontSize)
+  // Font Size - use string directly like original
+  const [fontSize, setCodeEditorFontSizeState] = useState<string>(() =>
+    localStorage.getItem('codeEditorFontSize') || '14'
   );
 
   /**
    * Set theme and persist to localStorage
    */
-  const setTheme = useCallback((newTheme: string) => {
-    setThemeState(newTheme);
-    saveToLocalStorage(STORAGE_KEYS.CODE_EDITOR_THEME, newTheme);
+  const setCodeEditorTheme = useCallback((newTheme: string) => {
+    setCodeEditorThemeState(newTheme);
+    localStorage.setItem('codeEditorTheme', newTheme);
+    triggerSettingsChangedEvent();
   }, []);
 
   /**
    * Set word wrap and persist to localStorage
    */
-  const setWordWrap = useCallback((enabled: boolean) => {
-    setWordWrapState(enabled);
-    saveToLocalStorage(STORAGE_KEYS.CODE_EDITOR_WORD_WRAP, enabled);
+  const setCodeEditorWordWrap = useCallback((enabled: boolean) => {
+    setCodeEditorWordWrapState(enabled);
+    localStorage.setItem('codeEditorWordWrap', enabled ? 'true' : 'false');
+    triggerSettingsChangedEvent();
   }, []);
 
   /**
    * Set show minimap and persist to localStorage
    */
-  const setShowMinimap = useCallback((show: boolean) => {
-    setShowMinimapState(show);
-    saveToLocalStorage(STORAGE_KEYS.CODE_EDITOR_SHOW_MINIMAP, show);
+  const setCodeEditorShowMinimap = useCallback((show: boolean) => {
+    setCodeEditorShowMinimapState(show);
+    localStorage.setItem('codeEditorShowMinimap', show ? 'true' : 'false');
+    triggerSettingsChangedEvent();
   }, []);
 
   /**
    * Set line numbers and persist to localStorage
    */
-  const setLineNumbers = useCallback((show: boolean) => {
-    setLineNumbersState(show);
-    saveToLocalStorage(STORAGE_KEYS.CODE_EDITOR_LINE_NUMBERS, show);
+  const setCodeEditorLineNumbers = useCallback((show: boolean) => {
+    setCodeEditorLineNumbersState(show);
+    localStorage.setItem('codeEditorLineNumbers', show ? 'true' : 'false');
+    triggerSettingsChangedEvent();
   }, []);
 
   /**
    * Set font size and persist to localStorage
    */
-  const setFontSize = useCallback((size: number) => {
-    setFontSizeState(size);
-    saveToLocalStorage(STORAGE_KEYS.CODE_EDITOR_FONT_SIZE, size);
-  }, []);
-
-  /**
-   * Reset all settings to defaults
-   */
-  const resetToDefaults = useCallback(() => {
-    const defaults = DEFAULTS.CODE_EDITOR;
-
-    setThemeState(defaults.theme);
-    setWordWrapState(defaults.wordWrap);
-    setShowMinimapState(defaults.showMinimap);
-    setLineNumbersState(defaults.lineNumbers);
-    setFontSizeState(defaults.fontSize);
-
-    Object.entries(defaults).forEach(([key, value]) => {
-      const storageKey = (STORAGE_KEYS as Record<string, string>)[`CODE_EDITOR_${key.toUpperCase()}`];
-      if (storageKey) {
-        saveToLocalStorage(storageKey, value);
-      }
-    });
+  const setCodeEditorFontSize = useCallback((size: string) => {
+    setCodeEditorFontSizeState(size);
+    localStorage.setItem('codeEditorFontSize', size);
+    triggerSettingsChangedEvent();
   }, []);
 
   return {
@@ -142,12 +117,11 @@ export function useCodeEditorSettings(): UseCodeEditorSettingsReturn {
       lineNumbers,
       fontSize,
     },
-    setTheme,
-    setWordWrap,
-    setShowMinimap,
-    setLineNumbers,
-    setFontSize,
-    resetToDefaults,
+    setCodeEditorTheme,
+    setCodeEditorWordWrap,
+    setCodeEditorShowMinimap,
+    setCodeEditorLineNumbers,
+    setCodeEditorFontSize,
   };
 }
 

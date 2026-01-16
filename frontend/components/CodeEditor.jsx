@@ -7,9 +7,10 @@ import { css } from '@codemirror/lang-css';
 import { json } from '@codemirror/lang-json';
 import { markdown } from '@codemirror/lang-markdown';
 import { oneDark } from '@codemirror/theme-one-dark';
-import { EditorView, showPanel, ViewPlugin } from '@codemirror/view';
+import { githubLight } from '@uiw/codemirror-theme-github';
 import { unifiedMergeView, getChunks } from '@codemirror/merge';
 import { showMinimap } from '@replit/codemirror-minimap';
+import { EditorView, showPanel, ViewPlugin } from '@codemirror/view';
 import { X, Save, Download, Maximize2, Minimize2 } from 'lucide-react';
 import { api } from '../utils/api';
 
@@ -664,7 +665,7 @@ function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded 
                 : []),
               ...(wordWrap ? [EditorView.lineWrapping] : [])
             ]}
-            theme={isDarkMode ? oneDark : undefined}
+            theme={isDarkMode ? oneDark : githubLight}
             height="100%"
             style={{
               fontSize: `${fontSize}px`,

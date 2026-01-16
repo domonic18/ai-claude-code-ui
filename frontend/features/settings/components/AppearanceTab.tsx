@@ -19,7 +19,7 @@ import { useCodeEditorSettings } from '../hooks';
  */
 export function AppearanceTab() {
   const { isDarkMode, toggleDarkMode } = useTheme();
-  const { settings, setTheme, setWordWrap, setShowMinimap, setLineNumbers } = useCodeEditorSettings();
+  const { settings, setCodeEditorTheme, setCodeEditorWordWrap, setCodeEditorShowMinimap, setCodeEditorLineNumbers, setCodeEditorFontSize } = useCodeEditorSettings();
 
   // Local state for project sorting
   const [projectSortOrder, setProjectSortOrder] = React.useState('name');
@@ -40,7 +40,9 @@ export function AppearanceTab() {
             </div>
             <button
               onClick={toggleDarkMode}
-              className="relative inline-flex h-8 w-14 items-center rounded-full bg-gray-200 dark:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
+                isDarkMode ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'
+              }`}
               role="switch"
               aria-checked={isDarkMode}
               aria-label="Toggle dark mode"
@@ -102,8 +104,10 @@ export function AppearanceTab() {
               </div>
             </div>
             <button
-              onClick={() => setTheme(settings.theme === 'dark' ? 'light' : 'dark')}
-              className="relative inline-flex h-8 w-14 items-center rounded-full bg-gray-200 dark:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+              onClick={() => setCodeEditorTheme(settings.theme === 'dark' ? 'light' : 'dark')}
+              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
+                settings.theme === 'dark' ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'
+              }`}
               role="switch"
               aria-checked={settings.theme === 'dark'}
               aria-label="Toggle editor theme"
@@ -136,8 +140,10 @@ export function AppearanceTab() {
               </div>
             </div>
             <button
-              onClick={() => setWordWrap(!settings.wordWrap)}
-              className="relative inline-flex h-8 w-14 items-center rounded-full bg-gray-200 dark:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+              onClick={() => setCodeEditorWordWrap(!settings.wordWrap)}
+              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
+                settings.wordWrap ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'
+              }`}
               role="switch"
               aria-checked={settings.wordWrap}
               aria-label="Toggle word wrap"
@@ -164,8 +170,10 @@ export function AppearanceTab() {
               </div>
             </div>
             <button
-              onClick={() => setShowMinimap(!settings.showMinimap)}
-              className="relative inline-flex h-8 w-14 items-center rounded-full bg-gray-200 dark:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+              onClick={() => setCodeEditorShowMinimap(!settings.showMinimap)}
+              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
+                settings.showMinimap ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'
+              }`}
               role="switch"
               aria-checked={settings.showMinimap}
               aria-label="Toggle minimap"
@@ -192,8 +200,10 @@ export function AppearanceTab() {
               </div>
             </div>
             <button
-              onClick={() => setLineNumbers(!settings.lineNumbers)}
-              className="relative inline-flex h-8 w-14 items-center rounded-full bg-gray-200 dark:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+              onClick={() => setCodeEditorLineNumbers(!settings.lineNumbers)}
+              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
+                settings.lineNumbers ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'
+              }`}
               role="switch"
               aria-checked={settings.lineNumbers}
               aria-label="Toggle line numbers"
@@ -205,6 +215,35 @@ export function AppearanceTab() {
                 } inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform duration-200`}
               />
             </button>
+          </div>
+        </div>
+
+        {/* Font Size */}
+        <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-medium text-foreground">
+                Font Size
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Editor font size in pixels
+              </div>
+            </div>
+            <select
+              value={settings.fontSize}
+              onChange={(e) => setCodeEditorFontSize(e.target.value)}
+              className="text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2 w-24"
+            >
+              <option value="10">10px</option>
+              <option value="11">11px</option>
+              <option value="12">12px</option>
+              <option value="13">13px</option>
+              <option value="14">14px</option>
+              <option value="15">15px</option>
+              <option value="16">16px</option>
+              <option value="18">18px</option>
+              <option value="20">20px</option>
+            </select>
           </div>
         </div>
       </div>
