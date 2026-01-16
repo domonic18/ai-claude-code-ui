@@ -1,22 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Key, Plus, Trash2, Eye, EyeOff, Copy, Check, Github, ExternalLink } from 'lucide-react';
+import { Key, Plus, Trash2, Copy, Check, ExternalLink } from 'lucide-react';
 import { useVersionCheck } from '../hooks/useVersionCheck';
 import { version } from '../../package.json';
 import { authenticatedFetch } from '../utils/api';
 
 function CredentialsSettings() {
   const [apiKeys, setApiKeys] = useState([]);
-  const [githubCredentials, setGithubCredentials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showNewKeyForm, setShowNewKeyForm] = useState(false);
-  const [showNewGithubForm, setShowNewGithubForm] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
-  const [newGithubName, setNewGithubName] = useState('');
-  const [newGithubToken, setNewGithubToken] = useState('');
-  const [newGithubDescription, setNewGithubDescription] = useState('');
-  const [showToken, setShowToken] = useState({});
   const [copiedKey, setCopiedKey] = useState(null);
   const [newlyCreatedKey, setNewlyCreatedKey] = useState(null);
 
@@ -33,15 +27,22 @@ function CredentialsSettings() {
 
       // Fetch API keys
       const apiKeysRes = await authenticatedFetch('/api/settings/api-keys');
-      const apiKeysData = await apiKeysRes.json();
-      setApiKeys(apiKeysData.apiKeys || []);
-
-      // Fetch GitHub credentials only
-      const credentialsRes = await authenticatedFetch('/api/settings/credentials?type=github_token');
-      const credentialsData = await credentialsRes.json();
-      setGithubCredentials(credentialsData.credentials || []);
+      if (apiKeysRes.ok) {
+        const contentType = apiKeysRes.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const apiKeysData = await apiKeysRes.json();
+          setApiKeys(apiKeysData.apiKeys || []);
+        } else {
+          console.warn('[CredentialsSettings] API keys endpoint returned non-JSON response');
+          setApiKeys([]);
+        }
+      } else {
+        console.warn(`[CredentialsSettings] API keys endpoint returned status: ${apiKeysRes.status}`);
+        setApiKeys([]);
+      }
     } catch (error) {
       console.error('Error fetching settings:', error);
+      setApiKeys([]);
     } finally {
       setLoading(false);
     }
@@ -56,12 +57,16 @@ function CredentialsSettings() {
         body: JSON.stringify({ keyName: newKeyName })
       });
 
-      const data = await res.json();
-      if (data.success) {
-        setNewlyCreatedKey(data.apiKey);
-        setNewKeyName('');
-        setShowNewKeyForm(false);
-        fetchData();
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setNewlyCreatedKey(data.apiKey);
+          setNewKeyName('');
+          setShowNewKeyForm(false);
+          fetchData();
+        }
+      } else {
+        console.error(`Error creating API key: ${res.status}`);
       }
     } catch (error) {
       console.error('Error creating API key:', error);
@@ -72,10 +77,14 @@ function CredentialsSettings() {
     if (!confirm('Are you sure you want to delete this API key?')) return;
 
     try {
-      await authenticatedFetch(`/api/settings/api-keys/${keyId}`, {
+      const res = await authenticatedFetch(`/api/settings/api-keys/${keyId}`, {
         method: 'DELETE'
       });
-      fetchData();
+      if (res.ok) {
+        fetchData();
+      } else {
+        console.error(`Error deleting API key: ${res.status}`);
+      }
     } catch (error) {
       console.error('Error deleting API key:', error);
     }
@@ -83,65 +92,17 @@ function CredentialsSettings() {
 
   const toggleApiKey = async (keyId, isActive) => {
     try {
-      await authenticatedFetch(`/api/settings/api-keys/${keyId}/toggle`, {
+      const res = await authenticatedFetch(`/api/settings/api-keys/${keyId}/toggle`, {
         method: 'PATCH',
         body: JSON.stringify({ isActive: !isActive })
       });
-      fetchData();
-    } catch (error) {
-      console.error('Error toggling API key:', error);
-    }
-  };
-
-  const createGithubCredential = async () => {
-    if (!newGithubName.trim() || !newGithubToken.trim()) return;
-
-    try {
-      const res = await authenticatedFetch('/api/settings/credentials', {
-        method: 'POST',
-        body: JSON.stringify({
-          credentialName: newGithubName,
-          credentialType: 'github_token',
-          credentialValue: newGithubToken,
-          description: newGithubDescription
-        })
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        setNewGithubName('');
-        setNewGithubToken('');
-        setNewGithubDescription('');
-        setShowNewGithubForm(false);
+      if (res.ok) {
         fetchData();
+      } else {
+        console.error(`Error toggling API key: ${res.status}`);
       }
     } catch (error) {
-      console.error('Error creating GitHub credential:', error);
-    }
-  };
-
-  const deleteGithubCredential = async (credentialId) => {
-    if (!confirm('Are you sure you want to delete this GitHub token?')) return;
-
-    try {
-      await authenticatedFetch(`/api/settings/credentials/${credentialId}`, {
-        method: 'DELETE'
-      });
-      fetchData();
-    } catch (error) {
-      console.error('Error deleting GitHub credential:', error);
-    }
-  };
-
-  const toggleGithubCredential = async (credentialId, isActive) => {
-    try {
-      await authenticatedFetch(`/api/settings/credentials/${credentialId}/toggle`, {
-        method: 'PATCH',
-        body: JSON.stringify({ isActive: !isActive })
-      });
-      fetchData();
-    } catch (error) {
-      console.error('Error toggling GitHub credential:', error);
+      console.error('Error toggling API key:', error);
     }
   };
 
@@ -264,120 +225,6 @@ function CredentialsSettings() {
                     size="sm"
                     variant="ghost"
                     onClick={() => deleteApiKey(key.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* GitHub Credentials Section */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Github className="h-5 w-5" />
-            <h3 className="text-lg font-semibold">GitHub Credentials</h3>
-          </div>
-          <Button
-            size="sm"
-            onClick={() => setShowNewGithubForm(!showNewGithubForm)}
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Add Token
-          </Button>
-        </div>
-
-        <p className="text-sm text-muted-foreground mb-4">
-          Add GitHub Personal Access Tokens to clone private repositories. You can also pass tokens directly in API requests without storing them.
-        </p>
-
-        {showNewGithubForm && (
-          <div className="mb-4 p-4 border rounded-lg bg-card space-y-3">
-            <Input
-              placeholder="Token Name (e.g., Personal Repos)"
-              value={newGithubName}
-              onChange={(e) => setNewGithubName(e.target.value)}
-            />
-
-            <div className="relative">
-              <Input
-                type={showToken['new'] ? 'text' : 'password'}
-                placeholder="GitHub Personal Access Token (ghp_...)"
-                value={newGithubToken}
-                onChange={(e) => setNewGithubToken(e.target.value)}
-                className="pr-10"
-              />
-              <button
-                type="button"
-                onClick={() => setShowToken({ ...showToken, new: !showToken['new'] })}
-                className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
-              >
-                {showToken['new'] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-
-            <Input
-              placeholder="Description (optional)"
-              value={newGithubDescription}
-              onChange={(e) => setNewGithubDescription(e.target.value)}
-            />
-
-            <div className="flex gap-2">
-              <Button onClick={createGithubCredential}>Add Token</Button>
-              <Button variant="outline" onClick={() => {
-                setShowNewGithubForm(false);
-                setNewGithubName('');
-                setNewGithubToken('');
-                setNewGithubDescription('');
-              }}>
-                Cancel
-              </Button>
-            </div>
-
-            <a
-              href="https://github.com/settings/tokens"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-primary hover:underline block"
-            >
-              How to create a GitHub Personal Access Token →
-            </a>
-          </div>
-        )}
-
-        <div className="space-y-2">
-          {githubCredentials.length === 0 ? (
-            <p className="text-sm text-muted-foreground italic">No GitHub tokens added yet.</p>
-          ) : (
-            githubCredentials.map((credential) => (
-              <div
-                key={credential.id}
-                className="flex items-center justify-between p-3 border rounded-lg"
-              >
-                <div className="flex-1">
-                  <div className="font-medium">{credential.credential_name}</div>
-                  {credential.description && (
-                    <div className="text-xs text-muted-foreground">{credential.description}</div>
-                  )}
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Added: {new Date(credential.created_at).toLocaleDateString()}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant={credential.is_active ? 'outline' : 'secondary'}
-                    onClick={() => toggleGithubCredential(credential.id, credential.is_active)}
-                  >
-                    {credential.is_active ? 'Active' : 'Inactive'}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => deleteGithubCredential(credential.id)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
