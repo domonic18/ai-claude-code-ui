@@ -26,6 +26,7 @@ import MainContent from './components/MainContent';
 import MobileNav from './components/MobileNav';
 import Settings from './components/Settings';
 import QuickSettingsPanel from './components/QuickSettingsPanel';
+import TestRefactoredSettings from './components/TestRefactoredSettings';
 
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -1026,6 +1027,8 @@ function App() {
                   <Routes>
                     <Route path="/" element={<AppContent />} />
                     <Route path="/session/:sessionId" element={<AppContent />} />
+                    {/* 测试路由：Settings 重构版本 */}
+                    <Route path="/test-settings" element={<TestRefactoredSettings />} />
                   </Routes>
                 </Router>
               </ProtectedRoute>
