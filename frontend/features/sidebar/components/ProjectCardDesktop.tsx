@@ -184,7 +184,7 @@ export const ProjectCardDesktop = memo(function ProjectCardDesktop({
 
       {/* Sessions List */}
       {isExpanded && (
-        <div className="ml-3 space-y-1 border-l border-border pl-3">
+        <div className="hidden md:block ml-3 space-y-1 border-l border-border pl-3">
           <SessionList
             projectName={project.name}
             sessions={sessions}
