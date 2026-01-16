@@ -83,7 +83,7 @@ export const ProjectCardDesktop = memo(function ProjectCardDesktop({
   };
 
   return (
-    <div className="group">
+    <div className="group/project">
       {/* Desktop Project Item */}
       <Button
         variant="ghost"

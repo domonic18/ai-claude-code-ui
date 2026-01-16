@@ -34,7 +34,7 @@ export const QuickActions = memo(function QuickActions({
         className={`w-6 h-6 transition-all duration-200 flex items-center justify-center rounded cursor-pointer touch:opacity-100 ${
           isStarred
             ? 'hover:bg-yellow-50 dark:hover:bg-yellow-900/20 opacity-100'
-            : 'opacity-0 group-hover:opacity-100 hover:bg-accent'
+            : 'opacity-0 group-hover/project:opacity-100 hover:bg-accent'
         }`}
         onClick={onToggleStar}
         title={isStarred ? 'Remove from favorites' : 'Add to favorites'}
@@ -50,7 +50,7 @@ export const QuickActions = memo(function QuickActions({
 
       {/* Edit button */}
       <div
-        className="w-6 h-6 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-accent flex items-center justify-center rounded cursor-pointer touch:opacity-100"
+        className="w-6 h-6 opacity-0 group-hover/project:opacity-100 transition-all duration-200 hover:bg-accent flex items-center justify-center rounded cursor-pointer touch:opacity-100"
         onClick={onStartEdit}
         title="Rename project (F2)"
       >
@@ -60,7 +60,7 @@ export const QuickActions = memo(function QuickActions({
       {/* Delete button (optional) */}
       {onDelete && (
         <div
-          className="w-6 h-6 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center justify-center rounded cursor-pointer touch:opacity-100"
+          className="w-6 h-6 opacity-0 group-hover/project:opacity-100 transition-all duration-200 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center justify-center rounded cursor-pointer touch:opacity-100"
           onClick={onDelete}
           title="Delete empty project (Delete)"
         >
@@ -70,9 +70,9 @@ export const QuickActions = memo(function QuickActions({
 
       {/* Expand/Collapse indicator */}
       {isExpanded ? (
-        <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+        <ChevronDown className="w-4 h-4 text-muted-foreground group-hover/project:text-foreground transition-colors" />
       ) : (
-        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover/project:text-foreground transition-colors" />
       )}
     </>
   );

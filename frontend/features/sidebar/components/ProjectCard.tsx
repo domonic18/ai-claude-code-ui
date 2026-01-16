@@ -83,7 +83,7 @@ export const ProjectCard = memo(function ProjectCard({
   };
 
   return (
-    <div className="group">
+    <div className="group/project">
       {/* Mobile Project Item */}
       <div
         className={cn(
