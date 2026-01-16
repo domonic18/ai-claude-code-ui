@@ -164,7 +164,7 @@ export interface ProjectCardProps {
   /** Session click callback */
   onSessionClick: (session: Session) => void;
   /** Load more sessions callback */
-  onLoadMoreSessions: () => void;
+  onLoadMoreSessions: () => Promise<void>;
   /** Whether sessions are loading */
   isLoadingSessions: boolean;
   /** Whether currently renaming */
@@ -299,6 +299,8 @@ export interface ProjectListProps {
   onCancelEditing: () => void;
   /** Save project name callback */
   onSaveProjectName: (projectName: string, newName: string) => Promise<void>;
+  /** Set editing project name callback */
+  onSetEditingName: (name: string) => void;
   /** Toggle star callback */
   onToggleStar: (projectName: string) => void;
   /** Delete project callback */
