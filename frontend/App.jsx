@@ -21,13 +21,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useParams } from 'react-router-dom';
 import { Settings as SettingsIcon, Sparkles } from 'lucide-react';
-import Sidebar from './components/Sidebar';
+import { Sidebar } from './features/sidebar/components';
 import MainContent from './components/MainContent';
 import MobileNav from './components/MobileNav';
 import { Settings } from './features/settings/components';
 import QuickSettingsPanel from './components/QuickSettingsPanel';
-import TestRefactoredSettings from './components/TestRefactoredSettings';
-import TestRefactoredSidebar from './components/TestRefactoredSidebar';
 
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -1005,19 +1003,6 @@ function AppContent() {
 
       {/* Version Upgrade Modal */}
       <VersionUpgradeModal />
-
-      {/* Test Entry Button - Bottom Right */}
-      <button
-        onClick={() => navigate('/test-sidebar')}
-        className="fixed bottom-4 right-4 z-50 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg shadow-lg transition-colors duration-200 flex items-center gap-2"
-        title="测试重构后的 Sidebar"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M9 3H5a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4" />
-          <polyline points="9 14 15 15 15 9" />
-        </svg>
-        <span>测试 Sidebar</span>
-      </button>
     </div>
   );
 }
@@ -1038,10 +1023,6 @@ function App() {
                   <Routes>
                     <Route path="/" element={<AppContent />} />
                     <Route path="/session/:sessionId" element={<AppContent />} />
-                    {/* 测试路由：Settings 重构版本 */}
-                    <Route path="/test-settings" element={<TestRefactoredSettings />} />
-                    {/* 测试路由：Sidebar 重构版本 */}
-                    <Route path="/test-sidebar" element={<TestRefactoredSidebar />} />
                   </Routes>
                 </Router>
               </ProtectedRoute>
