@@ -149,6 +149,8 @@ export interface ProjectCardProps {
   onToggleExpand: () => void;
   /** Start editing callback */
   onStartEdit: () => void;
+  /** Set editing name callback */
+  onSetEditingName: (name: string) => void;
   /** Cancel edit callback */
   onCancelEdit: () => void;
   /** Save name callback */
