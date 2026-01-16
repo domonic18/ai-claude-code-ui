@@ -34,6 +34,7 @@ export const Sidebar = memo(function Sidebar({
   projects: propProjects,
   selectedProject,
   selectedSession,
+  isLoading,
   onProjectSelect,
   onSessionSelect,
   onSessionDelete,
@@ -251,6 +252,7 @@ export const Sidebar = memo(function Sidebar({
           loadingSessions={loadingSessions}
           additionalSessions={additionalSessions}
           currentTime={currentTime}
+          isLoading={isLoading}
           onToggleProject={handleToggleProject}
           onStartEditing={handleStartEditing}
           onCancelEditing={handleCancelEditing}

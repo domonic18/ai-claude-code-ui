@@ -291,6 +291,8 @@ export interface ProjectListProps {
   additionalSessions: AdditionalSessions;
   /** Current time */
   currentTime: Date;
+  /** Whether projects are loading */
+  isLoading?: boolean;
   /** Toggle project expand callback */
   onToggleProject: (projectName: string) => void;
   /** Start editing callback */

@@ -33,6 +33,7 @@ export const ProjectList = memo(function ProjectList({
   loadingSessions,
   additionalSessions,
   currentTime,
+  isLoading,
   onToggleProject,
   onStartEditing,
   onCancelEditing,
@@ -107,7 +108,20 @@ export const ProjectList = memo(function ProjectList({
   return (
     <ScrollArea className="flex-1">
       <div className="space-y-0 p-2">
-        {projects.length === 0 ? (
+        {isLoading ? (
+          // Loading skeleton
+          Array.from({ length: SKELETON_COUNT }).map((_, i) => (
+            <div key={i} className="p-2 space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="w-4 h-4 bg-muted rounded animate-pulse flex-shrink-0" />
+                <div className="flex-1 space-y-1">
+                  <div className="h-3 bg-muted rounded animate-pulse w-3/4" />
+                  <div className="h-2 bg-muted rounded animate-pulse w-1/2" />
+                </div>
+              </div>
+            </div>
+          ))
+        ) : projects.length === 0 ? (
           <div className="py-8 text-center text-muted-foreground">
             <p className="text-sm">No projects found</p>
           </div>
