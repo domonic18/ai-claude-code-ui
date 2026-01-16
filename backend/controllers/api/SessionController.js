@@ -113,7 +113,7 @@ export class SessionController extends BaseController {
       const { projectId, sessionId } = req.params;
 
       // 使用会话管理服务删除
-      const { deleteSession } = await import('../../services/project/project-management/index.js');
+      const { deleteSession } = await import('../../services/projects/project-management/index.js');
       await deleteSession(projectId, sessionId);
 
       this._success(res, null, 'Session deleted successfully');

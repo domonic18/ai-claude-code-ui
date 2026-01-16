@@ -159,7 +159,7 @@ export class ProjectController extends BaseController {
       }
 
       // 使用项目管理服务重命名
-      const { renameProject } = await import('../../services/project/project-management/index.js');
+      const { renameProject } = await import('../../services/projects/project-management/index.js');
       await renameProject(projectName, displayName);
 
       this._success(res, { projectName, displayName }, 'Project renamed successfully');
@@ -274,7 +274,7 @@ export class ProjectController extends BaseController {
       }
 
       // 使用项目管理服务添加项目
-      const { addProjectManually } = await import('../../services/project/project-management/index.js');
+      const { addProjectManually } = await import('../../services/projects/project-management/index.js');
       const project = await addProjectManually(path.trim());
 
       this._success(res, { project }, 'Project added successfully');
