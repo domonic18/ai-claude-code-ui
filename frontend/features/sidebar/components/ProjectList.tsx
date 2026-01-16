@@ -37,6 +37,7 @@ export const ProjectList = memo(function ProjectList({
   onStartEditing,
   onCancelEditing,
   onSaveProjectName,
+  onSetEditingName,
   onToggleStar,
   onDeleteProject,
   onSelectProject,
@@ -48,6 +49,7 @@ export const ProjectList = memo(function ProjectList({
   onSetEditingSessionName,
   editingSession,
   editingSessionName,
+  onNewSession,
 }: ProjectListProps) {
   // Track initial sessions loaded state per project
   const [initialSessionsLoaded, setInitialSessionsLoaded] = useState<Set<string>>(new Set());
@@ -96,6 +98,12 @@ export const ProjectList = memo(function ProjectList({
     await onLoadMoreSessions(project);
   }, [onLoadMoreSessions]);
 
+  const handleNewSession = useCallback((projectName: string) => {
+    if (onNewSession) {
+      onNewSession(projectName);
+    }
+  }, [onNewSession]);
+
   return (
     <ScrollArea className="flex-1">
       <div className="space-y-0 p-2">
@@ -127,6 +135,7 @@ export const ProjectList = memo(function ProjectList({
               onToggleExpand: () => onToggleProject(project.name),
               onStartEdit: () => onStartEditing(project),
               onCancelEdit: onCancelEditing,
+              onSetEditingName: onSetEditingName,
               onSaveName: (newName: string) => handleSaveProjectName(project.name, newName),
               onToggleStar: () => handleToggleStar(project.name),
               onDelete: () => handleDeleteProject(project.name),
@@ -150,6 +159,7 @@ export const ProjectList = memo(function ProjectList({
               onSetEditingSession,
               editingSessionName,
               onSetEditingSessionName,
+              onNewSession: () => handleNewSession(project.name),
             };
 
             return (

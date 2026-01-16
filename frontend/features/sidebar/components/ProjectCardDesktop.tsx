@@ -34,6 +34,7 @@ export const ProjectCardDesktop = memo(function ProjectCardDesktop({
   hasMoreSessions,
   onToggleExpand,
   onStartEdit,
+  onSetEditingName,
   onCancelEdit,
   onSaveName,
   onToggleStar,
@@ -43,6 +44,7 @@ export const ProjectCardDesktop = memo(function ProjectCardDesktop({
   onLoadMoreSessions,
   isLoadingSessions,
   isRenaming,
+  onNewSession,
   // Session list props
   projectName,
   sessions,
@@ -109,7 +111,7 @@ export const ProjectCardDesktop = memo(function ProjectCardDesktop({
                 <input
                   type="text"
                   value={editingName}
-                  onChange={(e) => onStartEdit(e.target.value)}
+                  onChange={(e) => onSetEditingName(e.target.value)}
                   className="w-full px-2 py-1 text-sm border border-border rounded bg-background text-foreground focus:ring-2 focus:ring-primary/20"
                   placeholder="Project name"
                   autoFocus
@@ -169,7 +171,7 @@ export const ProjectCardDesktop = memo(function ProjectCardDesktop({
               }}
               onStartEdit={(e) => {
                 e.stopPropagation();
-                onStartEdit(project);
+                onStartEdit();
               }}
               onDelete={sessionCount === 0 ? (e) => {
                 e.stopPropagation();
@@ -203,6 +205,7 @@ export const ProjectCardDesktop = memo(function ProjectCardDesktop({
             onSetEditingSession={onSetEditingSession}
             editingSessionName={editingSessionName}
             onSetEditingSessionName={onSetEditingSessionName}
+            onNewSession={onNewSession}
           />
         </div>
       )}
