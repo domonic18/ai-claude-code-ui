@@ -183,11 +183,15 @@ export const Sidebar = memo(function Sidebar({
   const handleSessionDelete = useCallback(async (projectName: string, sessionId: string, provider?: any) => {
     try {
       await deleteSession(projectName, sessionId, provider);
-      // Call parent callback if provided
+      // Only call parent callback if deletion was successful (not cancelled)
       if (onSessionDelete) {
         await onSessionDelete(projectName, sessionId, provider);
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Ignore user cancellation
+      if (error?.code === 'CANCELLED') {
+        return;
+      }
       console.error('[Sidebar] Error deleting session:', error);
       // Show error message to user
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete session. Please try again.';
