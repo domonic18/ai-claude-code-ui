@@ -127,6 +127,14 @@ export function useSessions(): UseSessionsReturn {
     sessionId: string,
     provider?: SessionProvider
   ): Promise<void> => {
+    // Show confirmation dialog before deleting
+    if (!window.confirm('Are you sure you want to delete this session? This action cannot be undone.')) {
+      // Throw a special error to indicate cancellation
+      const cancelError = new Error('Delete cancelled by user');
+      (cancelError as any).code = 'CANCELLED';
+      throw cancelError;
+    }
+
     try {
       await service.deleteSession(projectName, sessionId, provider);
 
@@ -144,6 +152,10 @@ export function useSessions(): UseSessionsReturn {
         [projectName]: prev[projectName] ? filterSession(prev[projectName]) : [],
       }));
     } catch (err) {
+      // Don't re-throw cancellation errors
+      if ((err as any).code === 'CANCELLED') {
+        throw err;
+      }
       console.error(`Error deleting session ${sessionId}:`, err);
       throw err;
     }
