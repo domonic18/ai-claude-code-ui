@@ -93,6 +93,25 @@ export function TestRefactoredSidebar() {
     if (selectedSession?.id === sessionId) {
       setSelectedSession(null);
     }
+
+    // Update projects state locally to remove the deleted session
+    setProjects(prevProjects =>
+      prevProjects.map(project => {
+        if (project.name === projectName) {
+          return {
+            ...project,
+            sessions: project.sessions?.filter(session => session.id !== sessionId) || [],
+            cursorSessions: project.cursorSessions?.filter(session => session.id !== sessionId) || [],
+            codexSessions: project.codexSessions?.filter(session => session.id !== sessionId) || [],
+            sessionMeta: {
+              ...project.sessionMeta,
+              total: Math.max(0, (project.sessionMeta?.total || 0) - 1)
+            }
+          };
+        }
+        return project;
+      })
+    );
   };
 
   const handleProjectDelete = (projectName) => {
@@ -101,6 +120,18 @@ export function TestRefactoredSidebar() {
       setSelectedProject(null);
       setSelectedSession(null);
     }
+  };
+
+  const handleNewSession = (projectName) => {
+    console.log('New session requested for project:', projectName);
+    // Find the project to get display name
+    const project = projects.find(p => p.name === projectName);
+    const displayName = project?.displayName || projectName;
+    // In a real application, this would create a new session
+    // For testing purposes, show a message or navigate to main interface
+    alert(`New session for project "${displayName}" - this would create a new Claude session`);
+    // Alternatively, navigate to main interface:
+    // navigate('/');
   };
 
   const handleSidebarRefresh = async () => {
@@ -128,6 +159,7 @@ export function TestRefactoredSidebar() {
                 onProjectDelete={handleProjectDelete}
                 isLoading={isLoadingProjects}
                 onRefresh={handleSidebarRefresh}
+                onNewSession={handleNewSession}
                 onShowSettings={() => navigate('/settings')}
                 isPWA={false}
                 isMobile={isMobile}
@@ -136,6 +168,7 @@ export function TestRefactoredSidebar() {
             ) : (
               /* Collapsed Sidebar */
               <div className="h-full flex flex-col items-center py-4 gap-4">
+                {/* Expand Button */}
                 <button
                   onClick={() => setSidebarVisible(true)}
                   className="p-2 hover:bg-accent rounded-md transition-colors duration-200 group"
@@ -143,19 +176,25 @@ export function TestRefactoredSidebar() {
                   title="Show sidebar"
                 >
                   <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
+                    className="w-5 h-5 text-foreground group-hover:scale-110 transition-transform"
                     fill="none"
                     stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                    viewBox="0 0 24 24"
                   >
-                    <rect width="18" height="18" x="3" y="3" rx="2" />
-                    <path d="M9 3v18" />
-                    <path d="m14 9 3 3-3 3" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                  </svg>
+                </button>
+
+                {/* Settings Icon */}
+                <button
+                  onClick={() => navigate('/settings')}
+                  className="p-2 hover:bg-accent rounded-md transition-colors duration-200"
+                  aria-label="Settings"
+                  title="Settings"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-muted-foreground hover:text-foreground transition-colors">
+                    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
                   </svg>
                 </button>
               </div>
@@ -177,6 +216,7 @@ export function TestRefactoredSidebar() {
             onProjectDelete={handleProjectDelete}
             isLoading={isLoadingProjects}
             onRefresh={handleSidebarRefresh}
+            onNewSession={handleNewSession}
             onShowSettings={() => navigate('/settings')}
             isPWA={false}
             isMobile={isMobile}
