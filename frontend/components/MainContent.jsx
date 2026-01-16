@@ -12,7 +12,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import ChatInterface from './ChatInterface';
+import { ChatInterface } from '../features/chat/components';
 import FileTree from './FileTree';
 import CodeEditor from './CodeEditor';
 import StandaloneShell from './StandaloneShell';
@@ -477,7 +477,7 @@ function MainContent({
               selectedSession={selectedSession}
               ws={ws}
               sendMessage={sendMessage}
-              messages={messages}
+              wsMessages={messages}
               onFileOpen={handleFileOpen}
               onInputFocusChange={onInputFocusChange}
               onSessionActive={onSessionActive}
