@@ -25,6 +25,7 @@ import { SETTINGS_TABS } from '../constants/settings.constants';
 import GitSettings from '../../../components/GitSettings';
 import TasksSettings from '../../../components/TasksSettings';
 import { AppearanceTab } from './AppearanceTab';
+import { AgentTab } from './AgentTab';
 
 // Temporary: Import existing Settings component content for other tabs
 // This will be replaced with refactored components
@@ -77,8 +78,11 @@ export function Settings({
           {/* Newly refactored: Appearance tab */}
           {activeTab === 'appearance' && <AppearanceTab />}
 
-          {/* Temporary: Use legacy content for agents, api tabs (not yet migrated) */}
-          {(activeTab === 'agents' || activeTab === 'api') && (
+          {/* Newly refactored: Agents tab */}
+          {activeTab === 'agents' && <AgentTab />}
+
+          {/* Temporary: Use legacy content for api tab (not yet migrated) */}
+          {activeTab === 'api' && (
             <LegacySettingsContent
               activeTab={activeTab}
               projects={projects}

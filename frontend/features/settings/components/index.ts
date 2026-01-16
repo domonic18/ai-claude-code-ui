@@ -6,7 +6,5 @@
 
 export { Settings } from './Settings';
 export { AppearanceTab } from './AppearanceTab';
+export { AgentTab } from './AgentTab';
 export { LegacySettingsContent } from './LegacySettingsContent';
-
-// Re-export header components (if needed externally)
-export type { SettingsHeaderProps, SettingsNavigationProps } from './Settings';

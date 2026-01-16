@@ -12,7 +12,7 @@ export type SettingsTab = 'agents' | 'appearance' | 'git' | 'api' | 'tasks';
 /**
  * Agent type selection
  */
-export type AgentType = 'claude' | 'cursor' | 'codex';
+export type AgentType = 'claude' | 'opencode';
 
 /**
  * Project information

@@ -69,9 +69,10 @@ function TestRefactoredSettings() {
           <div className="font-semibold text-green-800 dark:text-green-200 mb-2">✅ 已迁移的功能:</div>
           <div className="flex flex-wrap gap-2 text-sm text-green-700 dark:text-green-300">
             <span className="px-2 py-1 bg-white dark:bg-green-900/50 rounded">Appearance 标签页</span>
+            <span className="px-2 py-1 bg-white dark:bg-green-900/50 rounded">Agents 标签页</span>
             <span className="px-2 py-1 bg-white dark:bg-green-900/50 rounded">代码编辑器设置</span>
             <span className="px-2 py-1 bg-white dark:bg-green-900/50 rounded">主题切换</span>
-            <span className="px-2 py-1 bg-white dark:bg-green-900/50 rounded">useCodeEditorSettings Hook</span>
+            <span className="px-2 py-1 bg-white dark:bg-green-900/50 rounded">Agent 选择导航</span>
           </div>
         </div>
       </div>
@@ -93,8 +94,20 @@ function TestRefactoredSettings() {
           <h3 className="font-semibold text-gray-900 dark:text-white mb-3">测试操作:</h3>
           <div className="flex flex-wrap gap-3">
             <button
-              onClick={() => setIsOpen(true)}
+              onClick={() => {
+                setIsOpen(false);
+                setTimeout(() => setIsOpen(true), 100);
+              }}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              打开 Settings (Agents 标签页)
+            </button>
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                setTimeout(() => setIsOpen(true), 100);
+              }}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
             >
               打开 Settings (Appearance 标签页)
             </button>
@@ -133,15 +146,27 @@ function TestRefactoredSettings() {
               </label>
               <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
                 <input type="checkbox" className="rounded" />
+                Agents 标签页显示正常
+              </label>
+              <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                <input type="checkbox" className="rounded" />
+                Agent 切换（Claude/OpenCode）正常
+              </label>
+              <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                <input type="checkbox" className="rounded" />
+                分类标签页（Account/Permissions/MCP）正常
+              </label>
+              <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                <input type="checkbox" className="rounded" />
+                OpenCode 显示 "Coming Soon" 占位
+              </label>
+              <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                <input type="checkbox" className="rounded" />
                 深色模式切换功能正常
               </label>
               <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
                 <input type="checkbox" className="rounded" />
                 代码编辑器设置保存到 localStorage
-              </label>
-              <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                <input type="checkbox" className="rounded" />
-                关闭按钮能正常关闭模态框
               </label>
               <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
                 <input type="checkbox" className="rounded" />
@@ -180,7 +205,7 @@ function TestRefactoredSettings() {
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         projects={projects}
-        initialTab="appearance"
+        initialTab="agents"
       />
     </div>
   );
