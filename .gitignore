@@ -138,3 +138,6 @@ tasks/
 # 明确保留 backend/services/workspace 代码目录（覆盖全局 gitignore）
 !backend/services/workspace/
 !backend/services/workspace/**
+
+# Deprecated backup files
+*.deprecated
