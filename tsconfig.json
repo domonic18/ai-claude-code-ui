@@ -13,6 +13,7 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
+    "types": ["vite/client"],
 
     /* Linting - 逐步启用严格模式 */
     "strict": false,
