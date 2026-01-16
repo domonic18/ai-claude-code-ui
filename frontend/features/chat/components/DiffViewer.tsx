@@ -45,21 +45,23 @@ export function DiffViewer({
     <div className={`bg-white dark:bg-gray-900/50 border border-gray-200/60 dark:border-gray-700/60 rounded-lg overflow-hidden shadow-sm ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-800/80 dark:to-gray-800/40 border-b border-gray-200/60 dark:border-gray-700/60 backdrop-blur-sm">
-        <div className="flex items-center gap-3">
-          {title && (
-            <button
-              onClick={() => onFileOpen?.(filePath || '', { old_string: oldContent, new_string: newContent })}
-              className="text-xs font-mono text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 truncate cursor-pointer font-medium transition-colors"
-            >
-              {filePath || filename}
-            </button>
-          )}
-          {subtitle && (
-            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium px-2 py-0.5 bg-gray-100 dark:bg-gray-700/50 rounded">
-              {subtitle}
-            </span>
-          )}
-        </div>
+        {(title || filePath) && (
+          <button
+            onClick={() => onFileOpen?.(filePath || '', { old_string: oldContent, new_string: newContent })}
+            className="text-xs font-mono text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 truncate cursor-pointer font-medium transition-colors"
+          >
+            {filePath || filename}
+          </button>
+        )}
+        {subtitle && (
+          <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+            subtitle === 'New File'
+              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+              : 'bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400'
+          }`}>
+            {subtitle}
+          </span>
+        )}
       </div>
 
       {/* Diff content */}

@@ -28,22 +28,11 @@ export function ToolResultRenderer({ toolResult, toolId }: ToolResultRendererPro
       id={`tool-result-${toolId}`}
       defaultOpen={true}
       title={
-        <>
-          <svg className={`w-4 h-4 transition-transform duration-200 group-open/details:rotate-180 ${
-            isError ? 'text-red-800 dark:text-red-200' : 'text-green-800 dark:text-green-200'
-          }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            {isError ? (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-            ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-            )}
-          </svg>
-          <span className={`text-sm font-semibold ${
-            isError ? 'text-red-800 dark:text-red-200' : 'text-green-800 dark:text-green-200'
-          }`}>
-            {isError ? 'Tool Error' : 'Tool Result'}
-          </span>
-        </>
+        <span className={`text-sm font-semibold ${
+          isError ? 'text-red-800 dark:text-red-200' : 'text-green-800 dark:text-green-200'
+        }`}>
+          {isError ? 'Tool Error' : 'Tool Result'}
+        </span>
       }
       className={`relative mt-4 ${
         isError
