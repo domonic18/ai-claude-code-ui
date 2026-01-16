@@ -264,9 +264,18 @@ export function ChatInterface({
   // Sync session ID when session changes
   useEffect(() => {
     if (selectedSession?.id) {
-      setCurrentSessionId(selectedSession.id);
+      // Session selected - update current session ID
+      if (currentSessionId !== selectedSession.id) {
+        setCurrentSessionId(selectedSession.id);
+      }
+    } else {
+      // No session selected (new session) - clear current session ID and messages
+      if (currentSessionId !== null) {
+        setCurrentSessionId(null);
+        setMessages([]);
+      }
     }
-  }, [selectedSession?.id]);
+  }, [selectedSession?.id, currentSessionId, setMessages]);
 
   // Update provider from session
   useEffect(() => {

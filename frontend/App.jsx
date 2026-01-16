@@ -593,7 +593,7 @@ function AppContent() {
   // replaceTemporarySession: Called when WebSocket provides real session ID for new sessions
   // Removes temporary "new-session-*" identifiers and adds the real session ID
   // This maintains protection continuity during the transition from temporary to real session
-  const replaceTemporarySession = useCallback((realSessionId) => {
+  const replaceTemporarySession = useCallback(async (realSessionId) => {
     if (realSessionId) {
       setActiveSessions(prev => {
         const newSet = new Set();
@@ -606,8 +606,16 @@ function AppContent() {
         newSet.add(realSessionId);
         return newSet;
       });
+
+      // If we have a selected project but no selected session (new session was created),
+      // refresh the sidebar and navigate to the new session
+      if (selectedProject && !selectedSession) {
+        await handleSidebarRefresh();
+        // Navigate to the new session
+        navigate(`/session/${realSessionId}`);
+      }
     }
-  }, []);
+  }, [selectedProject, selectedSession, handleSidebarRefresh, navigate]);
 
   // Version Upgrade Modal Component
   const VersionUpgradeModal = () => {
