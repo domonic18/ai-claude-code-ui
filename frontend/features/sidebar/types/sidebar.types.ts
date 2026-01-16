@@ -169,6 +169,8 @@ export interface ProjectCardProps {
   isLoadingSessions: boolean;
   /** Whether currently renaming */
   isRenaming?: boolean;
+  /** New session callback (optional) */
+  onNewSession?: () => void;
 }
 
 /**
@@ -319,4 +321,6 @@ export interface ProjectListProps {
   editingSession: Session | null;
   /** Current editing session name */
   editingSessionName: string;
+  /** New session callback (optional) */
+  onNewSession?: (projectName: string) => void;
 }
