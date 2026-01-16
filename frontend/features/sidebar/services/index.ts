@@ -11,6 +11,8 @@ export {
 } from './sidebarService';
 
 export type {
-  PaginatedSessionsResponse,
   SidebarServiceError,
 } from './sidebarService';
+
+// Re-export PaginatedSessionsResponse from types
+export type { PaginatedSessionsResponse } from '../types';

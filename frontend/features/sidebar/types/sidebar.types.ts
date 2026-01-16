@@ -34,6 +34,14 @@ export interface SessionMeta {
 }
 
 /**
+ * Response type for paginated sessions
+ */
+export interface PaginatedSessionsResponse {
+  sessions: Session[];
+  hasMore?: boolean;
+}
+
+/**
  * Project information
  */
 export interface Project {

@@ -6,15 +6,7 @@
  */
 
 import { api } from '../../../utils/api';
-import type { Project, Session, SessionMeta, SessionProvider } from '../types/sidebar.types';
-
-/**
- * Response type for paginated sessions
- */
-export interface PaginatedSessionsResponse {
-  sessions: Session[];
-  hasMore?: boolean;
-}
+import type { Project, Session, SessionMeta, SessionProvider, PaginatedSessionsResponse } from '../types/sidebar.types';
 
 /**
  * Error class for Sidebar service errors

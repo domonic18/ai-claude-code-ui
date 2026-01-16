@@ -9,6 +9,7 @@ export type {
   ProjectSortOrder,
   Session,
   SessionMeta,
+  PaginatedSessionsResponse,
   Project,
   StarredProjects,
   ExpandedProjects,
