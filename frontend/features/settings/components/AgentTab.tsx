@@ -11,9 +11,10 @@
  * Note: Cursor and Codex have been removed.
  * OpenCode is currently a placeholder and not yet supported.
  * Account tab has been removed as it has no actual functionality.
+ * Auto-save has been removed - settings are now saved manually via Save button.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 import AgentListItem from '../../../components/settings/AgentListItem';
@@ -28,9 +29,16 @@ interface AgentTabProps {
 type AgentType = 'claude' | 'opencode';
 
 /**
+ * Exposed methods for parent component
+ */
+export interface AgentTabHandle {
+  savePermissions: () => void;
+}
+
+/**
  * AgentTab Component - Manages agent settings for Claude and OpenCode
  */
-export function AgentTab({}: AgentTabProps) {
+export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((props, ref) => {
   // ===== Agent Selection State =====
   const [selectedAgent, setSelectedAgent] = useState<AgentType>('claude');
   const [selectedCategory, setSelectedCategory] = useState<'permissions' | 'mcp'>('permissions');
@@ -41,6 +49,8 @@ export function AgentTab({}: AgentTabProps) {
   const [disallowedTools, setDisallowedTools] = useState([]);
   const [newAllowedTool, setNewAllowedTool] = useState('');
   const [newDisallowedTool, setNewDisallowedTool] = useState('');
+  const [isSavingPermissions, setIsSavingPermissions] = useState(false);
+  const [hasLoadedInitialSettings, setHasLoadedInitialSettings] = useState(false);
 
   // ===== MCP Server States (Claude) =====
   const [mcpServers, setMcpServers] = useState([]);
@@ -71,15 +81,31 @@ export function AgentTab({}: AgentTabProps) {
     loadAgentSettings();
   }, []);
 
+  // Expose savePermissions method to parent via ref
+  useImperativeHandle(ref, () => ({
+    savePermissions: () => {
+      savePermissions(skipPermissions, allowedTools, disallowedTools);
+    }
+  }));
+
   const loadAgentSettings = async () => {
     try {
-      // Load Claude permissions
-      const permsResponse = await fetch('/api/claude/permissions');
+      // Load Claude permissions from user settings API
+      const permsResponse = await fetch('/api/users/settings/claude');
       if (permsResponse.ok) {
-        const data = await permsResponse.json();
-        setSkipPermissions(data.skipPermissions || false);
-        setAllowedTools(data.allowedTools || []);
-        setDisallowedTools(data.disallowedTools || []);
+        const response = await permsResponse.json();
+        // API returns { success: true, data: {...}, message: "..." }
+        if (response.success && response.data) {
+          setSkipPermissions(response.data.skipPermissions || false);
+          setAllowedTools(response.data.allowedTools || []);
+          setDisallowedTools(response.data.disallowedTools || []);
+          // Mark that initial settings have been loaded
+          setHasLoadedInitialSettings(true);
+        }
+      } else {
+        console.error('[AgentTab] Failed to load permissions:', permsResponse.statusText);
+        // Still mark as loaded to allow user to configure
+        setHasLoadedInitialSettings(true);
       }
 
       // Load MCP servers
@@ -87,6 +113,8 @@ export function AgentTab({}: AgentTabProps) {
 
     } catch (error) {
       console.error('[AgentTab] Error loading agent settings:', error);
+      // Still mark as loaded to allow user to configure
+      setHasLoadedInitialSettings(true);
     }
   };
 
@@ -99,6 +127,32 @@ export function AgentTab({}: AgentTabProps) {
       }
     } catch (error) {
       console.error('[AgentTab] Error loading MCP servers:', error);
+    }
+  };
+
+  // Save permissions to database
+  const savePermissions = async (currentSkipPermissions, currentAllowedTools, currentDisallowedTools) => {
+    try {
+      const response = await fetch('/api/users/settings/claude', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          skipPermissions: currentSkipPermissions,
+          allowedTools: currentAllowedTools,
+          disallowedTools: currentDisallowedTools,
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('[AgentTab] Permissions saved successfully:', result.message);
+      } else {
+        console.error('[AgentTab] Failed to save permissions:', response.statusText);
+      }
+    } catch (error) {
+      console.error('[AgentTab] Error saving permissions:', error);
     }
   };
 
@@ -368,6 +422,8 @@ export function AgentTab({}: AgentTabProps) {
       )}
     </div>
   );
-}
+});
+
+AgentTab.displayName = 'AgentTab';
 
 export default AgentTab;
