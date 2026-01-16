@@ -21,7 +21,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useParams } from 'react-router-dom';
 import { Settings as SettingsIcon, Sparkles } from 'lucide-react';
-import Sidebar from './components/Sidebar';
+import { Sidebar } from './features/sidebar/components';
 import MainContent from './components/MainContent';
 import MobileNav from './components/MobileNav';
 import { Settings } from './features/settings/components';

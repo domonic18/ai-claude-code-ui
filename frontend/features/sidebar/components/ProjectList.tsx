@@ -1,0 +1,171 @@
+/**
+ * ProjectList Component
+ *
+ * Container for displaying a list of projects with their sessions.
+ *
+ * Features:
+ * - Scrollable area for project list
+ * - Renders both mobile and desktop project cards
+ * - Handles project selection and expansion
+ * - Manages session loading and pagination
+ */
+
+import React, { memo, useCallback, useState, useEffect } from 'react';
+import { ScrollArea } from '../../../components/ui/scroll-area';
+import { formatTimeAgo, getAllSessions } from '../utils/timeFormatters';
+import type { ProjectListProps, Project, Session, SessionProvider } from '../types/sidebar.types';
+import { cn } from '../../../lib/utils';
+import ProjectCard from './ProjectCard';
+import ProjectCardDesktop from './ProjectCardDesktop';
+import { SKELETON_COUNT } from '../constants/sidebar.constants';
+
+/**
+ * ProjectList Component
+ */
+export const ProjectList = memo(function ProjectList({
+  projects,
+  selectedProject,
+  selectedSession,
+  expandedProjects,
+  starredProjects,
+  editingProject,
+  editingName,
+  loadingSessions,
+  additionalSessions,
+  currentTime,
+  onToggleProject,
+  onStartEditing,
+  onCancelEditing,
+  onSaveProjectName,
+  onToggleStar,
+  onDeleteProject,
+  onSelectProject,
+  onSessionClick,
+  onDeleteSession,
+  onUpdateSessionSummary,
+  onLoadMoreSessions,
+  onSetEditingSession,
+  onSetEditingSessionName,
+  editingSession,
+  editingSessionName,
+}: ProjectListProps) {
+  // Track initial sessions loaded state per project
+  const [initialSessionsLoaded, setInitialSessionsLoaded] = useState<Set<string>>(new Set());
+
+  // Mark sessions as loaded when projects come in
+  useEffect(() => {
+    const newLoaded = new Set<string>();
+    projects.forEach(project => {
+      const hasSessions = (project.sessions?.length ?? 0) > 0;
+      if (hasSessions) {
+        newLoaded.add(project.name);
+      }
+    });
+    setInitialSessionsLoaded(newLoaded);
+  }, [projects]);
+
+  const handleSaveProjectName = useCallback(async (projectName: string, newName: string) => {
+    await onSaveProjectName(projectName, newName);
+  }, [onSaveProjectName]);
+
+  const handleToggleStar = useCallback((projectName: string) => {
+    onToggleStar(projectName);
+  }, [onToggleStar]);
+
+  const handleDeleteProject = useCallback((projectName: string) => {
+    onDeleteProject(projectName);
+  }, [onDeleteProject]);
+
+  const handleSelectProject = useCallback((project: Project) => {
+    onSelectProject(project);
+  }, [onSelectProject]);
+
+  const handleSessionClick = useCallback((session: Session, projectName: string) => {
+    onSessionClick(session, projectName);
+  }, [onSessionClick]);
+
+  const handleSessionDelete = useCallback(async (projectName: string, sessionId: string, provider?: SessionProvider) => {
+    await onDeleteSession(projectName, sessionId, provider);
+  }, [onDeleteSession]);
+
+  const handleSessionRename = useCallback(async (projectName: string, sessionId: string, summary: string) => {
+    await onUpdateSessionSummary(projectName, sessionId, summary);
+  }, [onUpdateSessionSummary]);
+
+  const handleLoadMoreSessions = useCallback(async (project: Project) => {
+    await onLoadMoreSessions(project);
+  }, [onLoadMoreSessions]);
+
+  return (
+    <ScrollArea className="flex-1">
+      <div className="space-y-0 p-2">
+        {projects.length === 0 ? (
+          <div className="py-8 text-center text-muted-foreground">
+            <p className="text-sm">No projects found</p>
+          </div>
+        ) : (
+          projects.map((project) => {
+            const isExpanded = expandedProjects.has(project.name);
+            const isStarred = starredProjects.has(project.name);
+            const isEditing = editingProject === project.name;
+            const isSelected = selectedProject?.name === project.name;
+            const allSessions = getAllSessions(project);
+            const sessionCount = allSessions.length;
+            const hasMoreSessions = project.sessionMeta?.hasMore !== false;
+            const isLoadingSessionsForProject = loadingSessions[project.name];
+
+            // Common props for both card versions
+            const commonCardProps = {
+              project,
+              isSelected,
+              isStarred,
+              isExpanded,
+              isEditing,
+              editingName,
+              sessionCount,
+              hasMoreSessions,
+              onToggleExpand: () => onToggleProject(project.name),
+              onStartEdit: () => onStartEditing(project),
+              onCancelEdit: onCancelEditing,
+              onSaveName: (newName: string) => handleSaveProjectName(project.name, newName),
+              onToggleStar: () => handleToggleStar(project.name),
+              onDelete: () => handleDeleteProject(project.name),
+              onSelect: () => handleSelectProject(project),
+              // Session props
+              projectName: project.name,
+              sessions: project.sessions,
+              cursorSessions: project.cursorSessions,
+              codexSessions: project.codexSessions,
+              selectedSessionId: selectedSession?.id,
+              currentTime,
+              isLoadingSessions: isLoadingSessionsForProject,
+              initialSessionsLoaded: initialSessionsLoaded.has(project.name),
+              onSessionClick: (session: Session) => handleSessionClick(session, project.name),
+              onSessionDelete: (sessionId: string, provider?: SessionProvider) =>
+                handleSessionDelete(project.name, sessionId, provider),
+              onSessionRename: (sessionId: string, summary: string) =>
+                handleSessionRename(project.name, sessionId, summary),
+              onLoadMoreSessions: () => handleLoadMoreSessions(project),
+              editingSession,
+              onSetEditingSession,
+              editingSessionName,
+              onSetEditingSessionName,
+            };
+
+            return (
+              <div key={project.name}>
+                {/* Mobile Card */}
+                <ProjectCard {...commonCardProps} />
+
+                {/* Desktop Card */}
+                <ProjectCardDesktop {...commonCardProps} />
+              </div>
+            );
+          })
+        )}
+      </div>
+    </ScrollArea>
+  );
+});
+
+export default ProjectList;
