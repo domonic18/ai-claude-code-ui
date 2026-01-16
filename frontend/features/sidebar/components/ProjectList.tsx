@@ -55,14 +55,13 @@ export const ProjectList = memo(function ProjectList({
   // Track initial sessions loaded state per project
   const [initialSessionsLoaded, setInitialSessionsLoaded] = useState<Set<string>>(new Set());
 
-  // Mark sessions as loaded when projects come in
+  // Mark all projects as loaded when they come in (regardless of whether they have sessions)
   useEffect(() => {
     const newLoaded = new Set<string>();
     projects.forEach(project => {
-      const hasSessions = (project.sessions?.length ?? 0) > 0;
-      if (hasSessions) {
-        newLoaded.add(project.name);
-      }
+      // All projects should be marked as loaded when we receive them
+      // The sessions data (even if empty) has been loaded from the server
+      newLoaded.add(project.name);
     });
     setInitialSessionsLoaded(newLoaded);
   }, [projects]);

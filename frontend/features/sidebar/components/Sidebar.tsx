@@ -150,9 +150,14 @@ export const Sidebar = memo(function Sidebar({
   }, []);
 
   const handleSaveProjectName = useCallback(async (projectName: string, newName: string) => {
-    await renameProject(projectName, newName);
-    setEditingProject(null);
-    setEditingName('');
+    try {
+      await renameProject(projectName, newName);
+      setEditingProject(null);
+      setEditingName('');
+    } catch (error) {
+      console.error('Error renaming project:', error);
+      // Don't clear editing state on error, allowing user to retry
+    }
   }, [renameProject]);
 
   const handleDeleteProject = useCallback(async (projectName: string) => {

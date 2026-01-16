@@ -14,7 +14,7 @@
  * - Swipe-friendly touch handling
  */
 
-import React, { memo, KeyboardEvent } from 'react';
+import React, { memo, KeyboardEvent, useState, useEffect } from 'react';
 import { FolderOpen, Folder, Check, X, ChevronDown, ChevronRight } from 'lucide-react';
 import QuickActions from './QuickActions';
 import SessionList from './SessionList';
