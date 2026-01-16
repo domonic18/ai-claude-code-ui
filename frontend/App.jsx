@@ -24,7 +24,7 @@ import { Settings as SettingsIcon, Sparkles } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import MobileNav from './components/MobileNav';
-import Settings from './components/Settings';
+import { Settings } from './features/settings/components';
 import QuickSettingsPanel from './components/QuickSettingsPanel';
 import TestRefactoredSettings from './components/TestRefactoredSettings';
 
@@ -66,7 +66,7 @@ function AppContent() {
   const [sendByCtrlEnter, setSendByCtrlEnter] = useLocalStorage('sendByCtrlEnter', false);
   const [sidebarVisible, setSidebarVisible] = useLocalStorage('sidebarVisible', true);
   // Auto-refresh projects interval (in seconds, 0 = disabled)
-  const [autoRefreshInterval, setAutoRefreshInterval] = useLocalStorage('autoRefreshInterval', 0);
+  const [autoRefreshInterval] = useLocalStorage('autoRefreshInterval', 0);
   // Session Protection System: Track sessions with active conversations to prevent
   // automatic project updates from interrupting ongoing chats. When a user sends
   // a message, the session is marked as "active" and project updates are paused
@@ -999,10 +999,7 @@ function AppContent() {
       <Settings
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
-        projects={projects}
         initialTab={settingsInitialTab}
-        autoRefreshInterval={autoRefreshInterval}
-        setAutoRefreshInterval={setAutoRefreshInterval}
       />
 
       {/* Version Upgrade Modal */}
