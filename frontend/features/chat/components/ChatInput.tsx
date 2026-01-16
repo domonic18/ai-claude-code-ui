@@ -255,7 +255,7 @@ export function ChatInput({
       {/* Input container */}
       <div
         {...getRootProps()}
-        className={`relative flex items-end gap-2 p-3 bg-white dark:bg-gray-800 border-2 rounded-2xl transition-colors ${
+        className={`relative flex items-center gap-2 p-3 bg-white dark:bg-gray-800 border-2 rounded-2xl transition-colors ${
           isDragActive
             ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20'
             : isFocused

@@ -12,7 +12,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { CLAUDE_MODELS, CURSOR_MODELS, CODEX_MODELS } from '../../../../shared/modelConstants';
+import { CLAUDE_MODELS } from '../../../../shared/modelConstants';
 import type { TokenBudget } from './TokenDisplay';
 
 export interface ModelOption {
@@ -227,26 +227,12 @@ export function ModelSelector({
  * Convert shared model constants to ModelOption format
  */
 const DEFAULT_MODELS: ModelOption[] = [
-  // Claude models
+  // Claude models only
   ...CLAUDE_MODELS.OPTIONS.map(opt => ({
     id: `claude-${opt.value}`,
-    name: opt.label,
+    name: opt.value === 'custom' ? 'Custom' : opt.label,
     provider: 'Claude',
-    description: opt.value === 'custom' ? 'Custom model from ANTHROPIC_MODEL env var' : undefined,
-  })),
-
-  // Cursor models
-  ...CURSOR_MODELS.OPTIONS.map(opt => ({
-    id: `cursor-${opt.value}`,
-    name: opt.label,
-    provider: 'Cursor',
-  })),
-
-  // Codex models
-  ...CODEX_MODELS.OPTIONS.map(opt => ({
-    id: `codex-${opt.value}`,
-    name: opt.label,
-    provider: 'Codex',
+    description: opt.value === 'custom' ? undefined : undefined,
   })),
 ];
 

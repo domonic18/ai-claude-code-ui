@@ -132,6 +132,7 @@ export function ChatInterface({
   const [currentSessionId, setCurrentSessionId] = useState(selectedSession?.id || null);
   const [tasks, setTasks] = useState<any[]>([]);
   const [tokenBudget, setTokenBudget] = useState<any>(null);
+  const [permissionMode, setPermissionMode] = useState<'default' | 'acceptEdits' | 'plan'>('default');
 
   // Use model selection hook
   const { selectedModel, handleModelSelect } = useModelSelection();
@@ -460,7 +461,8 @@ export function ChatInterface({
           sendMessage={sendMessage}
           onSetLoading={setIsLoading}
           onResetStream={resetStream}
-          selectedProject={selectedProject}
+          permissionMode={permissionMode}
+          onPermissionModeChange={setPermissionMode}
         />
 
         {/* Input */}

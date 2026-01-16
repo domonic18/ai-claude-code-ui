@@ -15,6 +15,8 @@ export { TokenDisplay } from './TokenDisplay';
 export { ModelSelector } from './ModelSelector';
 export { FileAttachmentsPreview } from './FileAttachmentsPreview';
 export { ChatToolbar } from './ChatToolbar';
+export { PermissionModeSelector } from './PermissionModeSelector';
+export type { PermissionMode } from './PermissionModeSelector';
 
 // Refactored modular components
 export { CollapsiblePanel } from './CollapsiblePanel';
