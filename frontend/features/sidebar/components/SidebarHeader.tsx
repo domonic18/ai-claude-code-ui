@@ -135,11 +135,38 @@ export const SidebarHeader = memo(function SidebarHeader({
     </div>
   );
 
-  return (
-    <div className="md:p-4 md:border-b md:border-border">
-      {desktopHeader}
-      {mobileHeader}
+  // Desktop Action Bar (New Project + Refresh buttons)
+  const desktopActionBar = (
+    <div className="hidden md:block px-4 py-2 border-b border-border">
+      <div className="flex gap-2">
+        <button
+          className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary-foreground shadow rounded-md px-3 flex-1 h-8 text-xs bg-primary hover:bg-primary/90 transition-all duration-200"
+          onClick={onShowNewProject}
+          title="Create new project"
+        >
+          <FolderPlus className="w-3.5 h-3.5 mr-1.5" />
+          New Project
+        </button>
+        <button
+          className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input bg-background shadow-sm hover:text-accent-foreground rounded-md text-xs h-8 w-8 px-0 hover:bg-accent transition-colors duration-200 group"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          title="Refresh projects and sessions (Ctrl+R)"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-300 ${isRefreshing ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
     </div>
+  );
+
+  return (
+    <>
+      <div className="md:p-4 md:border-b md:border-border">
+        {desktopHeader}
+        {mobileHeader}
+      </div>
+      {desktopActionBar}
+    </>
   );
 });
 
