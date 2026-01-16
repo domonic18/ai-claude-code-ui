@@ -9,7 +9,7 @@
  * - 验证新的 Settings 架构
  * - 确认 AppearanceTab 功能正常
  * - 测试标签页切换
- * - 验证 Git 和 Tasks 集成
+ * - 验证 Tasks 集成
  */
 
 import React, { useState, useEffect } from 'react';
@@ -70,6 +70,8 @@ function TestRefactoredSettings() {
           <div className="flex flex-wrap gap-2 text-sm text-green-700 dark:text-green-300">
             <span className="px-2 py-1 bg-white dark:bg-green-900/50 rounded">Appearance 标签页</span>
             <span className="px-2 py-1 bg-white dark:bg-green-900/50 rounded">Agents 标签页</span>
+            <span className="px-2 py-1 bg-white dark:bg-green-900/50 rounded">API Keys 标签页</span>
+            <span className="px-2 py-1 bg-white dark:bg-green-900/50 rounded">Tasks 标签页</span>
             <span className="px-2 py-1 bg-white dark:bg-green-900/50 rounded">代码编辑器设置</span>
             <span className="px-2 py-1 bg-white dark:bg-green-900/50 rounded">主题切换</span>
             <span className="px-2 py-1 bg-white dark:bg-green-900/50 rounded">Agent 选择导航</span>
@@ -154,11 +156,19 @@ function TestRefactoredSettings() {
               </label>
               <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
                 <input type="checkbox" className="rounded" />
-                分类标签页（Account/Permissions/MCP）正常
+                分类标签页（Permissions/MCP）正常
               </label>
               <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
                 <input type="checkbox" className="rounded" />
                 OpenCode 显示 "Coming Soon" 占位
+              </label>
+              <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                <input type="checkbox" className="rounded" />
+                API Keys 标签页正常工作
+              </label>
+              <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                <input type="checkbox" className="rounded" />
+                Tasks 标签页正常工作
               </label>
               <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
                 <input type="checkbox" className="rounded" />
@@ -167,14 +177,6 @@ function TestRefactoredSettings() {
               <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
                 <input type="checkbox" className="rounded" />
                 代码编辑器设置保存到 localStorage
-              </label>
-              <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                <input type="checkbox" className="rounded" />
-                Git 标签页（现有组件）正常集成
-              </label>
-              <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                <input type="checkbox" className="rounded" />
-                Tasks 标签页（现有组件）正常集成
               </label>
             </div>
           </div>
@@ -204,7 +206,6 @@ function TestRefactoredSettings() {
       <Settings
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
-        projects={projects}
         initialTab="agents"
       />
     </div>

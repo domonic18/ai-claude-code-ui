@@ -15,8 +15,10 @@
  */
 
 import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
-import { X } from 'lucide-react';
+import { X, Globe, FolderOpen } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import { api } from '../../../utils/api';
 import AgentListItem from '../../../components/settings/AgentListItem';
 import PermissionsContent from '../../../components/settings/PermissionsContent';
 import McpServersContent from '../../../components/settings/McpServersContent';
@@ -54,19 +56,39 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((props, ref) =
 
   // ===== MCP Server States (Claude) =====
   const [mcpServers, setMcpServers] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [showMcpForm, setShowMcpForm] = useState(false);
   const [editingMcpServer, setEditingMcpServer] = useState(null);
-  const [mcpFormData, setMcpFormData] = useState({
+  const [mcpFormData, setMcpFormData] = useState<{
+    name: string;
+    type: string;
+    scope: string;
+    projectPath: string;
+    importMode: string;
+    jsonInput: string;
+    config: {
+      command: string;
+      args: string[];
+      env: Record<string, string>;
+      url: string;
+      headers: Record<string, string>;
+      timeout: number;
+    };
+    raw?: any;
+  }>({
     name: '',
     type: 'stdio',
     scope: 'user',
     projectPath: '',
     importMode: 'form',
-    jsonConfig: '',
+    jsonInput: '',
     config: {
       command: '',
       args: [],
-      env: {}
+      env: {},
+      url: '',
+      headers: {},
+      timeout: 30000
     }
   });
   const [mcpLoading, setMcpLoading] = useState(false);
@@ -120,13 +142,26 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((props, ref) =
 
   const loadMcpServers = async () => {
     try {
-      const response = await fetch('/api/mcp/servers');
+      const response = await api.user.mcpServers.getAll();
       if (response.ok) {
-        const data = await response.json();
-        setMcpServers(data.servers || []);
+        const contentType = response.headers.get('content-type');
+        // Only parse as JSON if the response is actually JSON
+        if (contentType && contentType.includes('application/json')) {
+          const result = await response.json();
+          // API returns { success: true, data: [...], message: "..." }
+          setMcpServers(result.data || []);
+        } else {
+          console.warn('[AgentTab] MCP servers API returned non-JSON response');
+          setMcpServers([]);
+        }
+      } else {
+        // API returned an error status (404, 500, etc.)
+        console.warn(`[AgentTab] MCP servers API returned status: ${response.status}`);
+        setMcpServers([]);
       }
     } catch (error) {
       console.error('[AgentTab] Error loading MCP servers:', error);
+      setMcpServers([]);
     }
   };
 
@@ -161,8 +196,14 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((props, ref) =
     if (server) {
       setEditingMcpServer(server);
       setMcpFormData({
-        ...server,
-        importMode: 'form'
+        name: server.name,
+        type: server.type,
+        scope: server.scope,
+        projectPath: server.projectPath || '',
+        config: { ...server.config },
+        raw: server.raw,
+        importMode: 'form',
+        jsonInput: ''
       });
     } else {
       setEditingMcpServer(null);
@@ -172,11 +213,14 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((props, ref) =
         scope: 'user',
         projectPath: '',
         importMode: 'form',
-        jsonConfig: '',
+        jsonInput: '',
         config: {
           command: '',
           args: [],
-          env: {}
+          env: {},
+          url: '',
+          headers: {},
+          timeout: 30000
         }
       });
     }
@@ -193,28 +237,109 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((props, ref) =
       scope: 'user',
       projectPath: '',
       importMode: 'form',
-      jsonConfig: '',
+      jsonInput: '',
       config: {
         command: '',
         args: [],
-        env: {}
+        env: {},
+        url: '',
+        headers: {},
+        timeout: 30000
       }
     });
     setJsonValidationError('');
   };
 
-  const handleMcpSubmit = async (e) => {
-    e.preventDefault();
-    // Implementation from original Settings.jsx
-    // TODO: Complete this handler
-    setMcpLoading(true);
+  const updateMcpConfig = (key, value) => {
+    setMcpFormData(prev => ({
+      ...prev,
+      config: {
+        ...prev.config,
+        [key]: value
+      }
+    }));
+  };
+
+  const saveMcpServer = async (serverData) => {
     try {
-      // Submit MCP server configuration
-      // ...
-      await loadMcpServers();
-      resetMcpForm();
+      if (editingMcpServer) {
+        const response = await api.user.mcpServers.update(editingMcpServer.id, {
+          name: serverData.name,
+          type: serverData.type,
+          config: serverData.config,
+          enabled: serverData.enabled !== undefined ? serverData.enabled : true
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            await loadMcpServers();
+            return true;
+          } else {
+            throw new Error(result.error || 'Failed to update server');
+          }
+        } else {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to update server');
+        }
+      } else {
+        const response = await api.user.mcpServers.create({
+          name: serverData.name,
+          type: serverData.type,
+          config: serverData.config
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            await loadMcpServers();
+            return true;
+          } else {
+            throw new Error(result.error || 'Failed to create server');
+          }
+        } else {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to create server');
+        }
+      }
     } catch (error) {
       console.error('[AgentTab] Error saving MCP server:', error);
+      throw error;
+    }
+  };
+
+  const handleMcpSubmit = async (e) => {
+    e.preventDefault();
+
+    setMcpLoading(true);
+
+    try {
+      if (mcpFormData.importMode === 'json') {
+        const response = await api.user.mcpServers.validate({
+          name: mcpFormData.name,
+          jsonConfig: mcpFormData.jsonInput,
+          scope: mcpFormData.scope,
+          projectPath: mcpFormData.projectPath
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            await loadMcpServers();
+            resetMcpForm();
+          } else {
+            throw new Error(result.error || 'Failed to add server via JSON');
+          }
+        } else {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to add server');
+        }
+      } else {
+        await saveMcpServer(mcpFormData);
+        resetMcpForm();
+      }
+    } catch (error) {
+      alert(`Error: ${error.message}`);
     } finally {
       setMcpLoading(false);
     }
@@ -222,11 +347,14 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((props, ref) =
 
   const handleMcpDelete = async (serverId, scope) => {
     try {
-      const response = await fetch(`/api/mcp/servers/${encodeURIComponent(serverId)}?scope=${scope}`, {
-        method: 'DELETE'
-      });
+      const response = await api.user.mcpServers.delete(serverId);
       if (response.ok) {
-        await loadMcpServers();
+        const result = await response.json();
+        if (result.success) {
+          await loadMcpServers();
+        } else {
+          console.error('[AgentTab] Failed to delete server:', result.error);
+        }
       }
     } catch (error) {
       console.error('[AgentTab] Error deleting MCP server:', error);
@@ -235,15 +363,20 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((props, ref) =
 
   const handleMcpTest = async (serverId, scope) => {
     try {
-      const response = await fetch(`/api/mcp/servers/${encodeURIComponent(serverId)}/test?scope=${scope}`, {
-        method: 'POST'
-      });
+      const response = await api.user.mcpServers.test(serverId);
       if (response.ok) {
-        const result = await response.json();
-        setMcpTestResults(prev => ({
-          ...prev,
-          [`${scope}-${serverId}`]: result
-        }));
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const result = await response.json();
+          setMcpTestResults(prev => ({
+            ...prev,
+            [`${scope}-${serverId}`]: result
+          }));
+        } else {
+          console.warn('[AgentTab] MCP test returned non-JSON response');
+        }
+      } else {
+        console.warn(`[AgentTab] MCP test returned status: ${response.status}`);
       }
     } catch (error) {
       console.error('[AgentTab] Error testing MCP server:', error);
@@ -253,15 +386,20 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((props, ref) =
   const handleMcpToolsDiscovery = async (serverId, scope) => {
     setMcpToolsLoading(prev => ({ ...prev, [`${scope}-${serverId}`]: true }));
     try {
-      const response = await fetch(`/api/mcp/servers/${encodeURIComponent(serverId)}/tools?scope=${scope}`, {
-        method: 'POST'
-      });
+      const response = await api.user.mcpServers.discoverTools(serverId);
       if (response.ok) {
-        const tools = await response.json();
-        setMcpServerTools(prev => ({
-          ...prev,
-          [`${scope}-${serverId}`]: tools
-        }));
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const result = await response.json();
+          setMcpServerTools(prev => ({
+            ...prev,
+            [`${scope}-${serverId}`]: result.data || result
+          }));
+        } else {
+          console.warn('[AgentTab] MCP tools discovery returned non-JSON response');
+        }
+      } else {
+        console.warn(`[AgentTab] MCP tools discovery returned status: ${response.status}`);
       }
     } catch (error) {
       console.error('[AgentTab] Error discovering MCP tools:', error);
@@ -412,9 +550,347 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((props, ref) =
             </div>
 
             <form onSubmit={handleMcpSubmit} className="p-4 space-y-4">
-              {/* TODO: Complete MCP form implementation */}
-              <div className="text-center text-muted-foreground">
-                MCP form implementation - TODO
+
+              {!editingMcpServer && (
+              <div className="flex gap-2 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setMcpFormData(prev => ({...prev, importMode: 'form'}))}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    mcpFormData.importMode === 'form'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  Form Input
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMcpFormData(prev => ({...prev, importMode: 'json'}))}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    mcpFormData.importMode === 'json'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  JSON Import
+                </button>
+              </div>
+              )}
+
+              {/* Show current scope when editing */}
+              {mcpFormData.importMode === 'form' && editingMcpServer && (
+                <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Scope
+                  </label>
+                  <div className="flex items-center gap-2">
+                    {mcpFormData.scope === 'user' ? <Globe className="w-4 h-4" /> : <FolderOpen className="w-4 h-4" />}
+                    <span className="text-sm">
+                      {mcpFormData.scope === 'user' ? 'User (Global)' : 'Project (Local)'}
+                    </span>
+                    {mcpFormData.scope === 'local' && mcpFormData.projectPath && (
+                      <span className="text-xs text-muted-foreground">
+                        - {mcpFormData.projectPath}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Scope cannot be changed when editing an existing server
+                  </p>
+                </div>
+              )}
+
+              {/* Scope Selection - Moved to top, disabled when editing */}
+              {mcpFormData.importMode === 'form' && !editingMcpServer && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Scope *
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setMcpFormData(prev => ({...prev, scope: 'user', projectPath: ''}))}
+                        className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                          mcpFormData.scope === 'user'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-center gap-2">
+                          <Globe className="w-4 h-4" />
+                          <span>User (Global)</span>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMcpFormData(prev => ({...prev, scope: 'local'}))}
+                        className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                          mcpFormData.scope === 'local'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-center gap-2">
+                          <FolderOpen className="w-4 h-4" />
+                          <span>Project (Local)</span>
+                        </div>
+                      </button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {mcpFormData.scope === 'user'
+                        ? 'User scope: Available across all projects on your machine'
+                        : 'Local scope: Only available in the selected project'
+                      }
+                    </p>
+                  </div>
+
+                  {/* Project Selection for Local Scope */}
+                  {mcpFormData.scope === 'local' && !editingMcpServer && (
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Project *
+                      </label>
+                      <select
+                        value={mcpFormData.projectPath}
+                        onChange={(e) => setMcpFormData(prev => ({...prev, projectPath: e.target.value}))}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                        required={mcpFormData.scope === 'local'}
+                      >
+                        <option value="">Select a project...</option>
+                        {projects.map(project => (
+                          <option key={project.name} value={project.path || project.fullPath}>
+                            {project.displayName || project.name}
+                          </option>
+                        ))}
+                      </select>
+                      {mcpFormData.projectPath && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Path: {mcpFormData.projectPath}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Basic Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className={mcpFormData.importMode === 'json' ? 'md:col-span-2' : ''}>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Server Name *
+                  </label>
+                  <Input
+                    value={mcpFormData.name}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      setMcpFormData(prev => ({...prev, name: e.target.value}));
+                    }}
+                    placeholder="my-server"
+                    required
+                  />
+                </div>
+
+                {mcpFormData.importMode === 'form' && (
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Transport Type *
+                    </label>
+                    <select
+                      value={mcpFormData.type}
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                        setMcpFormData(prev => ({...prev, type: e.target.value}));
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="stdio">stdio</option>
+                      <option value="sse">SSE</option>
+                      <option value="http">HTTP</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+
+              {/* Show raw configuration details when editing */}
+              {editingMcpServer && mcpFormData.raw && mcpFormData.importMode === 'form' && (
+                <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                  <h4 className="text-sm font-medium text-foreground mb-2">
+                    Configuration Details (from {editingMcpServer.scope === 'global' ? '~/.claude.json' : 'project config'})
+                  </h4>
+                  <pre className="text-xs bg-gray-100 dark:bg-gray-800 p-3 rounded overflow-x-auto">
+                    {JSON.stringify(mcpFormData.raw, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {/* JSON Import Mode */}
+              {mcpFormData.importMode === 'json' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      JSON Configuration *
+                    </label>
+                    <textarea
+                      value={mcpFormData.jsonInput}
+                      onChange={(e) => {
+                        setMcpFormData(prev => ({...prev, jsonInput: e.target.value}));
+                        // Validate JSON as user types
+                        try {
+                          if (e.target.value.trim()) {
+                            const parsed = JSON.parse(e.target.value);
+                            // Basic validation
+                            if (!parsed.type) {
+                              setJsonValidationError('Missing required field: type');
+                            } else if (parsed.type === 'stdio' && !parsed.command) {
+                              setJsonValidationError('stdio type requires a command field');
+                            } else if ((parsed.type === 'http' || parsed.type === 'sse') && !parsed.url) {
+                              setJsonValidationError(`${parsed.type} type requires a url field`);
+                            } else {
+                              setJsonValidationError('');
+                            }
+                          }
+                        } catch (err) {
+                          if (e.target.value.trim()) {
+                            setJsonValidationError('Invalid JSON format');
+                          } else {
+                            setJsonValidationError('');
+                          }
+                        }
+                      }}
+                      className={`w-full px-3 py-2 border ${jsonValidationError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500 font-mono text-sm placeholder-gray-400 dark:placeholder-gray-500`}
+                      rows={8}
+                      placeholder={`{
+  "type": "stdio",
+  "command": "/path/to/server",
+  "args": ["--api-key", "abc123"],
+  "env": {
+    "CACHE_DIR": "/tmp"
+  }
+}`}
+                      required
+                    />
+                    {jsonValidationError && (
+                      <p className="text-xs text-red-500 mt-1">{jsonValidationError}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Paste your MCP server configuration in JSON format. Example formats:
+                      <br />• stdio: {`{"type":"stdio","command":"npx","args":["@upstash/context7-mcp"]}`}
+                      <br />• http/sse: {`{"type":"http","url":"https://api.example.com/mcp"}`}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Transport-specific Config - Only show in form mode */}
+              {mcpFormData.importMode === 'form' && mcpFormData.type === 'stdio' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Command *
+                    </label>
+                    <Input
+                      value={mcpFormData.config.command}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateMcpConfig('command', e.target.value)}
+                      placeholder="/path/to/mcp-server"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Arguments (one per line)
+                    </label>
+                    <textarea
+                      value={Array.isArray(mcpFormData.config.args) ? mcpFormData.config.args.join('\n') : ''}
+                      onChange={(e) => updateMcpConfig('args', e.target.value.split('\n').filter(arg => arg.trim()))}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 dark:placeholder-gray-500"
+                      rows={3}
+                      placeholder={`--api-key
+abc123`}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {mcpFormData.importMode === 'form' && (mcpFormData.type === 'sse' || mcpFormData.type === 'http') && (
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    URL *
+                  </label>
+                  <Input
+                    value={mcpFormData.config.url}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateMcpConfig('url', e.target.value)}
+                    placeholder="https://api.example.com/mcp"
+                    type="url"
+                    required
+                  />
+                </div>
+              )}
+
+              {/* Environment Variables - Only show in form mode */}
+              {mcpFormData.importMode === 'form' && (
+                <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Environment Variables (KEY=value, one per line)
+                </label>
+                <textarea
+                  value={Object.entries(mcpFormData.config.env || {}).map(([k, v]) => `${k}=${v}`).join('\n')}
+                  onChange={(e) => {
+                    const env = {};
+                    e.target.value.split('\n').forEach(line => {
+                      const [key, ...valueParts] = line.split('=');
+                      if (key && key.trim()) {
+                        env[key.trim()] = valueParts.join('=').trim();
+                      }
+                    });
+                    updateMcpConfig('env', env);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 dark:placeholder-gray-500"
+                  rows={3}
+                  placeholder={`API_KEY=your-key
+DEBUG=true`}
+                />
+              </div>
+              )}
+
+              {mcpFormData.importMode === 'form' && (mcpFormData.type === 'sse' || mcpFormData.type === 'http') && (
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Headers (KEY=value, one per line)
+                  </label>
+                  <textarea
+                    value={Object.entries(mcpFormData.config.headers || {}).map(([k, v]) => `${k}=${v}`).join('\n')}
+                    onChange={(e) => {
+                      const headers = {};
+                      e.target.value.split('\n').forEach(line => {
+                        const [key, ...valueParts] = line.split('=');
+                        if (key && key.trim()) {
+                          headers[key.trim()] = valueParts.join('=').trim();
+                        }
+                      });
+                      updateMcpConfig('headers', headers);
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 dark:placeholder-gray-500"
+                    rows={3}
+                    placeholder={`Authorization=Bearer token
+X-API-Key=your-key`}
+                  />
+                </div>
+              )}
+
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button type="button" variant="outline" onClick={resetMcpForm}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={mcpLoading}
+                  className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
+                >
+                  {mcpLoading ? 'Saving...' : (editingMcpServer ? 'Update Server' : 'Add Server')}
+                </Button>
               </div>
             </form>
           </div>
