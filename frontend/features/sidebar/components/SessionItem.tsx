@@ -6,9 +6,10 @@
  * Features:
  * - Provider-specific icon (Claude/Cursor/Codex)
  * - Session name with rename on double-click
- * - Time ago display
+ * - Time ago display with clock icon
+ * - Message count badge
  * - Active status indicator (within 10 minutes)
- * - Delete button
+ * - Delete button (always visible on mobile, hover on desktop)
  * - Edit mode for renaming
  */
 
@@ -16,7 +17,8 @@ import React, { memo, useState, useCallback, KeyboardEvent } from 'react';
 import ClaudeLogo from '../../../components/ClaudeLogo';
 import CursorLogo from '../../../components/CursorLogo';
 import CodexLogo from '../../../components/CodexLogo';
-import { Check, X } from 'lucide-react';
+import { Check, X, Clock } from 'lucide-react';
+import { Badge } from '../../../components/ui/badge';
 import type { SessionItemProps } from '../types/sidebar.types';
 import { cn } from '../../../lib/utils';
 
@@ -129,48 +131,96 @@ export const SessionItem = memo(function SessionItem({
 
         {/* Session Info */}
         <div className="flex-1 min-w-0">
-          <div className="text-sm truncate text-foreground">
+          {/* Session Name */}
+          <div className="text-xs font-medium truncate text-foreground">
             {session.summary || 'Untitled session'}
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>{timeAgo}</span>
-            {isActive && (
-              <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                <span className="w-1.5 h-1.5 bg-current rounded-full animate-pulse" />
-                Active
-              </span>
+
+          {/* Metadata Row */}
+          <div className="flex items-center gap-1 mt-0.5">
+            {/* Clock Icon */}
+            <Clock className="w-2.5 h-2.5 text-muted-foreground" />
+
+            {/* Time Ago */}
+            <span className="text-xs text-muted-foreground">
+              {timeAgo}
+            </span>
+
+            {/* Message Count Badge */}
+            {(session.messageCount ?? 0) > 0 && (
+              <Badge variant="secondary" className="text-xs px-1 py-0 ml-auto">
+                {session.messageCount}
+              </Badge>
             )}
+
+            {/* Provider Icon (tiny) */}
+            <span className="ml-1 opacity-70">
+              <SessionLogo className="w-3 h-3" />
+            </span>
           </div>
+
+          {/* Active Indicator */}
+          {isActive && (
+            <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+              <span className="w-1.5 h-1.5 bg-current rounded-full animate-pulse" />
+              Active
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Hover Action Buttons */}
-      <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
-        <button
-          className="w-6 h-6 bg-gray-50 hover:bg-gray-100 dark:bg-gray-900/20 dark:hover:bg-gray-900/40 rounded flex items-center justify-center"
-          onClick={(e) => {
-            e.stopPropagation();
-            onStartRename();
-            setLocalValue(session.summary || '');
-          }}
-          title="Manually edit session name"
-        >
-          <svg className="w-3 h-3 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
-          </svg>
-        </button>
-        <button
-          className="w-6 h-6 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded flex items-center justify-center"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          title="Delete this session permanently"
-        >
-          <svg className="w-3 h-3 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6" />
-          </svg>
-        </button>
+      {/* Hover Action Buttons - Desktop only */}
+      <div className="hidden md:block absolute right-2 top-1/2 transform -translate-y-1/2">
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+          {/* Edit Button */}
+          <button
+            className="w-6 h-6 bg-gray-50 hover:bg-gray-100 dark:bg-gray-900/20 dark:hover:bg-gray-900/40 rounded flex items-center justify-center"
+            onClick={(e) => {
+              e.stopPropagation();
+              onStartRename();
+              setLocalValue(session.summary || '');
+            }}
+            title="Manually edit session name"
+          >
+            <svg className="w-3 h-3 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
+            </svg>
+          </button>
+
+          {/* Delete Button (only for non-Cursor sessions) */}
+          {session.__provider !== 'cursor' && (
+            <button
+              className="w-6 h-6 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded flex items-center justify-center"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              title="Delete this session permanently"
+            >
+              <svg className="w-3 h-3 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6" />
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Mobile Delete Button - Always visible */}
+      <div className="md:hidden absolute right-2 top-1/2 transform -translate-y-1/2">
+        {session.__provider !== 'cursor' && (
+          <button
+            className="w-5 h-5 rounded-md bg-red-50 dark:bg-red-900/20 flex items-center justify-center active:scale-95 transition-transform opacity-70"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            title="Delete this session"
+          >
+            <svg className="w-2.5 h-2.5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6" />
+            </svg>
+          </button>
+        )}
       </div>
     </div>
   );

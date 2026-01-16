@@ -165,8 +165,8 @@ export const ProjectList = memo(function ProjectList({
               onSessionClick: (session: Session) => handleSessionClick(session, project.name),
               onSessionDelete: (sessionId: string, provider?: SessionProvider) =>
                 handleSessionDelete(project.name, sessionId, provider),
-              onSessionRename: (sessionId: string, summary: string) =>
-                handleSessionRename(project.name, sessionId, summary),
+              onSessionRename: (projectName: string, sessionId: string, summary: string) =>
+                handleSessionRename(projectName, sessionId, summary),
               onLoadMoreSessions: () => handleLoadMoreSessions(project),
               editingSession,
               onSetEditingSession,

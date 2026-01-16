@@ -23,6 +23,7 @@ export interface Session {
   lastActivity: string;
   createdAt?: string;
   __provider?: SessionProvider;
+  messageCount?: number;
 }
 
 /**
