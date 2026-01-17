@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import Shell from './Shell.jsx';
+import { default as Shell } from './Terminal';
 
 /**
  * Generic Shell wrapper that can be used in tabs, modals, and other contexts.

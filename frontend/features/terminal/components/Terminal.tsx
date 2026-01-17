@@ -559,3 +559,4 @@ function Shell({ selectedProject, selectedSession, initialCommand, isPlainShell 
 }
 
 export default Shell;
+export { Shell as Terminal };
