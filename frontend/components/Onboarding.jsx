@@ -5,7 +5,7 @@ import CursorLogo from './CursorLogo';
 import CodexLogo from './CodexLogo';
 import LoginModal from './LoginModal';
 import { authenticatedFetch } from '../utils/api';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@/shared/contexts/AuthContext';
 
 const Onboarding = ({ onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);

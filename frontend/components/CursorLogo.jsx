@@ -1,5 +1,5 @@
 import React from 'react';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '@/shared/contexts/ThemeContext';
 
 const CursorLogo = ({ className = 'w-5 h-5' }) => {
   const { isDarkMode } = useTheme();

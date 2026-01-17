@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@/shared/contexts/AuthContext';
 import { MessageSquare, UserPlus } from 'lucide-react';
 
 const LoginForm = () => {

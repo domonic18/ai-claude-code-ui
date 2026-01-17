@@ -10,8 +10,8 @@
  */
 
 import React, { memo } from 'react';
-import { Badge } from '../../../components/ui/badge';
-import { Button } from '../../../components/ui/button';
+import { Badge } from '@/shared/components/ui/Badge';
+import { Button } from '@/shared/components/ui/Button';
 import type { VersionBannerProps } from '../types/sidebar.types';
 
 /**

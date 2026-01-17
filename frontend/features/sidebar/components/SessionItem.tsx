@@ -18,7 +18,7 @@ import ClaudeLogo from '../../../components/ClaudeLogo';
 import CursorLogo from '../../../components/CursorLogo';
 import CodexLogo from '../../../components/CodexLogo';
 import { Check, X, Clock } from 'lucide-react';
-import { Badge } from '../../../components/ui/badge';
+import { Badge } from '@/shared/components/ui/Badge';
 import type { SessionItemProps } from '../types/sidebar.types';
 import { cn } from '../../../lib/utils';
 

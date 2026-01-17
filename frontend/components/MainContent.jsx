@@ -16,15 +16,15 @@ import { ChatInterface } from '../features/chat/components';
 import FileTree from './FileTree';
 import CodeEditor from './CodeEditor';
 import StandaloneShell from './StandaloneShell';
-import ErrorBoundary from './ErrorBoundary';
+import ErrorBoundary from '@/shared/components/common/ErrorBoundary';
 import ClaudeLogo from './ClaudeLogo';
 import CursorLogo from './CursorLogo';
 import TaskList from './TaskList';
 import TaskDetail from './TaskDetail';
 import PRDEditor from './PRDEditor';
-import Tooltip from './Tooltip';
+import { default as Tooltip } from '@/shared/components/ui/Tooltip';
 import { useTaskMaster } from '../contexts/TaskMasterContext';
-import { useTasksSettings } from '../contexts/TasksSettingsContext';
+import { useTasksSettings } from '@/shared/contexts/TasksSettingsContext';
 import { api } from '../utils/api';
 
 function MainContent({

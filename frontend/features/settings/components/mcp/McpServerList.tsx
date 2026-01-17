@@ -9,7 +9,7 @@
  */
 
 import React from 'react';
-import { Button } from '../../../../components/ui/button';
+import { Button } from '@/shared/components/ui/button';
 import { Server, Plus } from 'lucide-react';
 import { McpServer } from '../../types/settings.types';
 import { McpServerCard } from './McpServerCard';

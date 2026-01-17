@@ -17,7 +17,7 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import { X, Key } from 'lucide-react';
-import { Button } from '../../../components/ui/button';
+import { Button } from '@/shared/components/ui/Button';
 import type { SettingsTab, SettingsProps } from '../types/settings.types';
 import { SETTINGS_TABS } from '../constants/settings.constants';
 

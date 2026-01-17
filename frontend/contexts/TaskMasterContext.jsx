@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { api } from '../utils/api';
-import { useAuth } from './AuthContext';
-import { useWebSocketContext } from './WebSocketContext';
+import { useAuth } from '@/shared/contexts/AuthContext';
+import { useWebSocketContext } from '@/shared/contexts/WebSocketContext';
 
 const TaskMasterContext = createContext({
   // TaskMaster project state

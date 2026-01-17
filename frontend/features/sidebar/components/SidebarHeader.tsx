@@ -14,7 +14,7 @@
 
 import React, { memo } from 'react';
 import { MessageSquare, RefreshCw, FolderPlus, ChevronLeft } from 'lucide-react';
-import { Button } from '../../../components/ui/button';
+import { Button } from '@/shared/components/ui/Button';
 import type { SidebarHeaderProps } from '../types/sidebar.types';
 import { IS_PLATFORM, PLATFORM_DASHBOARD_URL } from '../constants/sidebar.constants';
 

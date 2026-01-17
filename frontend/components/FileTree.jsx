@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollArea } from './ui/scroll-area';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
+import { ScrollArea } from '@/shared/components/ui/ScrollArea';
+import { Button } from '@/shared/components/ui/Button';
+import { Input } from '@/shared/components/ui/Input';
 import { Folder, FolderOpen, File, FileText, FileCode, List, TableProperties, Eye, Search, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import CodeEditor from './CodeEditor';
-import ImageViewer from './ImageViewer';
+import ImageViewer from '@/shared/components/common/ImageViewer';
 import { api } from '../utils/api';
 
 function FileTree({ selectedProject }) {

@@ -9,8 +9,8 @@
  */
 
 import React from 'react';
-import { Button } from '../../../../components/ui/button';
-import { Input } from '../../../../components/ui/input';
+import { Button } from '@/shared/components/ui/button';
+import { Input } from '@/shared/components/ui/input';
 import { Shield, AlertTriangle, Plus, X } from 'lucide-react';
 
 // Common tool patterns for Claude

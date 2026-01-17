@@ -7,7 +7,7 @@
 import React from 'react';
 import { ModelSelector, PermissionModeSelector } from './index';
 import type { PermissionMode } from './PermissionModeSelector';
-import TokenUsagePie from '../../../components/TokenUsagePie';
+import TokenUsagePie from '@/shared/components/ui/TokenUsagePie';
 
 export interface ChatToolbarProps {
   /** Selected model */

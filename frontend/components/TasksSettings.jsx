@@ -1,5 +1,5 @@
 import { Zap } from 'lucide-react';
-import { useTasksSettings } from '../contexts/TasksSettingsContext';
+import { useTasksSettings } from '@/shared/contexts/TasksSettingsContext';
 
 function TasksSettings() {
   const {

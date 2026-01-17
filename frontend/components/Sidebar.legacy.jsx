@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { ScrollArea } from './ui/scroll-area';
-import { Button } from './ui/button';
-import { Badge } from './ui/badge';
-import { Input } from './ui/input';
+import { ScrollArea } from '@/shared/components/ui/ScrollArea';
+import { Button } from '@/shared/components/ui/Button';
+import { Badge, badgeVariants } from '@/shared/components/ui/Badge';
+import { Input } from '@/shared/components/ui/Input';
 
 import { FolderOpen, Folder, Plus, MessageSquare, Clock, ChevronDown, ChevronRight, Edit3, Check, X, Trash2, Settings, FolderPlus, RefreshCw, Sparkles, Edit2, Star, Search } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -14,7 +14,7 @@ import TaskIndicator from './TaskIndicator';
 import ProjectCreationWizard from './ProjectCreationWizard';
 import { api } from '../utils/api';
 import { useTaskMaster } from '../contexts/TaskMasterContext';
-import { useTasksSettings } from '../contexts/TasksSettingsContext';
+import { useTasksSettings } from '@/shared/contexts/TasksSettingsContext';
 
 // Move formatTimeAgo outside component to avoid recreation on every render
 const formatTimeAgo = (dateString, currentTime) => {

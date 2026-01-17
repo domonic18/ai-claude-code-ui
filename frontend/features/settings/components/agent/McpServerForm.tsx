@@ -15,8 +15,8 @@
 
 import React, { useState } from 'react';
 import { X, Globe, FolderOpen } from 'lucide-react';
-import { Button } from '../../../../components/ui/button';
-import { Input } from '../../../../components/ui/input';
+import { Button } from '@/shared/components/ui/button';
+import { Input } from '@/shared/components/ui/input';
 import { ScopeSelector, Project } from '../common/ScopeSelector';
 import { TransportSelector } from '../common/TransportSelector';
 import { McpServer, McpTransportType, McpScope } from '../../types/settings.types';

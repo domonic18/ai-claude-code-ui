@@ -12,8 +12,8 @@
 
 import React, { memo, useCallback } from 'react';
 import { Search, X } from 'lucide-react';
-import { Input } from '../../../components/ui/input';
-import { Button } from '../../../components/ui/button';
+import { Input } from '@/shared/components/ui/Input';
+import { Button } from '@/shared/components/ui/Button';
 import type { ProjectSearchProps } from '../types/sidebar.types';
 
 /**

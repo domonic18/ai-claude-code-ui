@@ -12,7 +12,7 @@
 
 import React, { memo, useCallback } from 'react';
 import { ChevronDown, Plus } from 'lucide-react';
-import { Button } from '../../../components/ui/button';
+import { Button } from '@/shared/components/ui/Button';
 import SessionItem from './SessionItem';
 import type { Session, SessionProvider } from '../types/sidebar.types';
 import { getAllSessions, formatTimeAgo } from '../utils/timeFormatters';

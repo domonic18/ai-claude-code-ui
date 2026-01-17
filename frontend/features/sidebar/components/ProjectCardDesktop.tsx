@@ -14,7 +14,7 @@
 
 import React, { memo, KeyboardEvent } from 'react';
 import { FolderOpen, Folder, Check, X, ChevronDown, ChevronRight } from 'lucide-react';
-import { Button } from '../../../components/ui/button';
+import { Button } from '@/shared/components/ui/Button';
 import QuickActions from './QuickActions';
 import SessionList from './SessionList';
 import type { ProjectCardProps } from '../types/sidebar.types';

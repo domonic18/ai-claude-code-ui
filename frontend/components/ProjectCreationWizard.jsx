@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, FolderPlus, GitBranch, Key, ChevronRight, ChevronLeft, Check, Loader2, AlertCircle } from 'lucide-react';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
+import { Button } from '@/shared/components/ui/Button';
+import { Input } from '@/shared/components/ui/Input';
 import { api } from '../utils/api';
 
 const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {

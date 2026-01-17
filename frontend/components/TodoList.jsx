@@ -1,5 +1,5 @@
 import React from 'react';
-import { Badge } from './ui/badge';
+import { Badge, badgeVariants } from '@/shared/components/ui/Badge';
 import { CheckCircle2, Clock, Circle } from 'lucide-react';
 
 const TodoList = ({ todos, isResult = false }) => {

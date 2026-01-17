@@ -11,7 +11,7 @@
  */
 
 import React, { memo, useCallback, useState, useEffect } from 'react';
-import { ScrollArea } from '../../../components/ui/scroll-area';
+import { ScrollArea } from '@/shared/components/ui/ScrollArea';
 import { formatTimeAgo, getAllSessions } from '../utils/timeFormatters';
 import type { ProjectListProps, Project, Session, SessionProvider } from '../types/sidebar.types';
 import { cn } from '../../../lib/utils';

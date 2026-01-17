@@ -14,8 +14,8 @@ import {
   FileText,
   Languages
 } from 'lucide-react';
-import DarkModeToggle from './DarkModeToggle';
-import { useTheme } from '../contexts/ThemeContext';
+import DarkModeToggle from '@/shared/components/ui/DarkModeToggle';
+import { useTheme } from '@/shared/contexts/ThemeContext';
 
 const QuickSettingsPanel = ({
   isOpen,
