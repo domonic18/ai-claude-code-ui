@@ -15,6 +15,14 @@
     "jsx": "react-jsx",
     "types": ["vite/client"],
 
+    /* TypeScript 渐进式迁移配置
+     * 允许 .js/.jsx 和 .ts/.tsx 文件共存
+     * 只对 .ts/.tsx 文件进行类型检查，.js/.jsx 文件不受影响
+     * 参考：docs/plan/frontend-structure-migration-plan.md
+     */
+    "allowJs": true,
+    "checkJs": false,
+
     /* Linting - 逐步启用严格模式 */
     "strict": false,
     "noUnusedLocals": false,
@@ -29,6 +37,12 @@
       "@/shared/*": ["./frontend/shared/*"]
     }
   },
-  "include": ["frontend/**/*"],
+  "include": [
+    "frontend/**/*",
+    "frontend/**/*.ts",
+    "frontend/**/*.tsx",
+    "frontend/**/*.js",
+    "frontend/**/*.jsx"
+  ],
   "exclude": ["node_modules", "dist", "build"]
 }
