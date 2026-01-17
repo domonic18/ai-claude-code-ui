@@ -138,8 +138,18 @@ function MainContent({
 
   // Sync selectedProject with TaskMaster context
   useEffect(() => {
-    if (selectedProject && selectedProject !== currentProject) {
-      setCurrentProject(selectedProject);
+    if (selectedProject && selectedProject.name !== currentProject?.name) {
+      // Convert SidebarProject to TaskMasterProject by mapping fullPath to path
+      const project = selectedProject as any;
+      setCurrentProject({
+        name: selectedProject.name,
+        path: selectedProject.fullPath,
+        taskmaster: project.taskmaster,
+        taskMasterConfigured: project.taskMasterConfigured,
+        taskMasterStatus: project.taskMasterStatus,
+        taskCount: project.taskCount,
+        completedCount: project.completedCount
+      });
     }
   }, [selectedProject, currentProject, setCurrentProject]);
 
@@ -484,8 +494,14 @@ function MainContent({
           <div className={`h-full ${activeTab === 'chat' ? 'block' : 'hidden'}`}>
             <ErrorBoundary showDetails={true}>
               <ChatInterface
-                selectedProject={selectedProject}
-                selectedSession={selectedSession}
+                selectedProject={selectedProject ? {
+                  name: selectedProject.name,
+                  path: selectedProject.fullPath
+                } : undefined}
+                selectedSession={selectedSession ? {
+                  id: (selectedSession as any).id || (selectedSession as any).summary || 'temp',
+                  __provider: selectedSession.__provider
+                } : undefined}
                 ws={ws}
                 sendMessage={sendMessage}
                 wsMessages={messages}
@@ -496,7 +512,10 @@ function MainContent({
                 onSessionProcessing={onSessionProcessing}
                 onSessionNotProcessing={onSessionNotProcessing}
                 processingSessions={processingSessions}
-                onReplaceTemporarySession={onReplaceTemporarySession}
+                onReplaceTemporarySession={onReplaceTemporarySession ? (realSessionId: string) => {
+                  // Wrap the two-parameter function to match the expected signature
+                  onReplaceTemporarySession('', realSessionId);
+                } : undefined}
                 onNavigateToSession={onNavigateToSession}
                 onShowSettings={onShowSettings}
                 autoExpandTools={autoExpandTools}
@@ -615,7 +634,7 @@ function MainContent({
       {showPRDEditor && (
         <PRDEditor
           project={currentProject}
-          projectPath={currentProject?.fullPath || currentProject?.path}
+          projectPath={currentProject?.path}
           onClose={() => {
             setShowPRDEditor(false);
             setSelectedPRD(null);
