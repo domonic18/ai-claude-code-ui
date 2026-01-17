@@ -1,7 +1,11 @@
 import React from 'react';
 import { useTheme } from '@/shared/contexts/ThemeContext';
 
-const CodexLogo = ({ className = 'w-5 h-5' }) => {
+interface CodexLogoProps {
+  className?: string;
+}
+
+export const CodexLogo: React.FC<CodexLogoProps> = ({ className = 'w-5 h-5' }) => {
   const { isDarkMode } = useTheme();
 
   return (

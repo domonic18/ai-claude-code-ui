@@ -1,31 +1,91 @@
 /*
- * MainContent.jsx - Main Content Area with Session Protection Props Passthrough
- * 
+ * MainContent.tsx - Main Content Area with Session Protection Props Passthrough
+ *
  * SESSION PROTECTION PASSTHROUGH:
  * ===============================
- * 
+ *
  * This component serves as a passthrough layer for Session Protection functions:
- * - Receives session management functions from App.jsx
- * - Passes them down to ChatInterface.jsx
- * 
+ * - Receives session management functions from App.tsx
+ * - Passes them down to ChatInterface.tsx
+ *
  * No session protection logic is implemented here - it's purely a props bridge.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ChatInterface } from '../features/chat/components';
-import FileTree from './FileTree';
-import CodeEditor from './CodeEditor';
-import StandaloneShell from './StandaloneShell';
+import { ChatInterface } from '@/features/chat/components';
+import { FileTree } from '@/features/file-explorer';
+import { CodeEditor } from '@/features/editor';
+import { StandaloneShell } from '@/features/terminal';
 import ErrorBoundary from '@/shared/components/common/ErrorBoundary';
-import ClaudeLogo from './ClaudeLogo';
-import CursorLogo from './CursorLogo';
-import TaskList from './TaskList';
-import TaskDetail from './TaskDetail';
-import PRDEditor from './PRDEditor';
-import { default as Tooltip } from '@/shared/components/ui/Tooltip';
+import { ClaudeLogo, CursorLogo } from '@/shared/assets/icons';
+import { TaskList, TaskDetail } from '@/features/tasks';
+import { PRDEditor } from '@/features/editor';
+import Tooltip from '@/shared/components/ui/Tooltip';
 import { useTaskMaster } from '@/shared/contexts/TaskMasterContext';
 import { useTasksSettings } from '@/shared/contexts/TasksSettingsContext';
 import { api } from '@/shared/services';
+import type { Project as SidebarProject } from '@/features/sidebar/types/sidebar.types';
+
+// Types
+interface Project extends SidebarProject {
+  path?: string; // Legacy property, use fullPath instead
+}
+
+interface Session {
+  __provider?: string;
+  name?: string;
+  summary?: string;
+  [key: string]: any;
+}
+
+interface File {
+  name: string;
+  path: string;
+  projectName?: string;
+  diffInfo?: any;
+}
+
+interface Task {
+  id: string;
+  title?: string;
+  [key: string]: any;
+}
+
+interface PRDFile {
+  name: string;
+  content?: string;
+  isExisting?: boolean;
+}
+
+export interface MainContentProps {
+  selectedProject?: Project | null;
+  selectedSession?: Session | null;
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  ws?: any;
+  sendMessage: (message: any) => void;
+  messages: any[];
+  isMobile: boolean;
+  isPWA: boolean;
+  onMenuClick: () => void;
+  isLoading: boolean;
+  onInputFocusChange?: (focused: boolean) => void;
+  // Session Protection Props
+  onSessionActive?: (sessionId: string) => void;
+  onSessionInactive?: (sessionId: string) => void;
+  onSessionProcessing?: (sessionId: string) => void;
+  onSessionNotProcessing?: (sessionId: string) => void;
+  processingSessions?: Set<string>;
+  onReplaceTemporarySession?: (tempId: string, realId: string) => void;
+  onNavigateToSession?: (sessionId: string) => void;
+  onShowSettings?: () => void;
+  autoExpandTools?: boolean;
+  showRawParameters?: boolean;
+  showThinking?: boolean;
+  autoScrollToBottom?: boolean;
+  sendByCtrlEnter?: boolean;
+  externalMessageUpdate?: number;
+}
 
 function MainContent({
   selectedProject,
@@ -40,41 +100,39 @@ function MainContent({
   onMenuClick,
   isLoading,
   onInputFocusChange,
-  // Session Protection Props: Functions passed down from App.jsx to manage active session state
-  // These functions control when project updates are paused during active conversations
-  onSessionActive,        // Mark session as active when user sends message
-  onSessionInactive,      // Mark session as inactive when conversation completes/aborts
-  onSessionProcessing,    // Mark session as processing (thinking/working)
-  onSessionNotProcessing, // Mark session as not processing (finished thinking)
-  processingSessions,     // Set of session IDs currently processing
-  onReplaceTemporarySession, // Replace temporary session ID with real session ID from WebSocket
-  onNavigateToSession,    // Navigate to a specific session (for Claude CLI session duplication workaround)
-  onShowSettings,         // Show tools settings panel
-  autoExpandTools,        // Auto-expand tool accordions
-  showRawParameters,      // Show raw parameters in tool accordions
-  showThinking,           // Show thinking/reasoning sections
-  autoScrollToBottom,     // Auto-scroll to bottom when new messages arrive
-  sendByCtrlEnter,        // Send by Ctrl+Enter mode for East Asian language input
-  externalMessageUpdate   // Trigger for external CLI updates to current session
-}) {
-  const [editingFile, setEditingFile] = useState(null);
-  const [selectedTask, setSelectedTask] = useState(null);
+  onSessionActive,
+  onSessionInactive,
+  onSessionProcessing,
+  onSessionNotProcessing,
+  processingSessions,
+  onReplaceTemporarySession,
+  onNavigateToSession,
+  onShowSettings,
+  autoExpandTools = false,
+  showRawParameters = false,
+  showThinking = false,
+  autoScrollToBottom = true,
+  sendByCtrlEnter = false,
+  externalMessageUpdate
+}: MainContentProps) {
+  const [editingFile, setEditingFile] = useState<File | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTaskDetail, setShowTaskDetail] = useState(false);
   const [editorWidth, setEditorWidth] = useState(600);
   const [isResizing, setIsResizing] = useState(false);
   const [editorExpanded, setEditorExpanded] = useState(false);
-  const resizeRef = useRef(null);
-  
+  const resizeRef = useRef<HTMLDivElement>(null);
+
   // PRD Editor state
   const [showPRDEditor, setShowPRDEditor] = useState(false);
-  const [selectedPRD, setSelectedPRD] = useState(null);
-  const [existingPRDs, setExistingPRDs] = useState([]);
-  const [prdNotification, setPRDNotification] = useState(null);
-  
+  const [selectedPRD, setSelectedPRD] = useState<PRDFile | null>(null);
+  const [existingPRDs, setExistingPRDs] = useState<any[]>([]);
+  const [prdNotification, setPRDNotification] = useState<string | null>(null);
+
   // TaskMaster context
   const { tasks, currentProject, refreshTasks, setCurrentProject } = useTaskMaster();
-  const { tasksEnabled, isTaskMasterInstalled, isTaskMasterReady } = useTasksSettings();
-  
+  const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
+
   // Only show tasks tab if TaskMaster is installed and enabled
   const shouldShowTasksTab = tasksEnabled && isTaskMasterInstalled;
 
@@ -99,12 +157,11 @@ function MainContent({
         setExistingPRDs([]);
         return;
       }
-      
+
       try {
         const response = await api.get(`/taskmaster/prd/${encodeURIComponent(currentProject.name)}`);
         if (response.ok) {
           const responseData = await response.json();
-          // 后端返回 {success: true, data: {projectName, projectPath, prdFiles, ...}}
           const data = responseData.data;
           setExistingPRDs(data?.prdFiles || []);
         } else {
@@ -119,13 +176,12 @@ function MainContent({
     loadExistingPRDs();
   }, [currentProject?.name]);
 
-  const handleFileOpen = (filePath, diffInfo = null) => {
-    // Create a file object that CodeEditor expects
-    const file = {
-      name: filePath.split('/').pop(),
+  const handleFileOpen = (filePath: string, diffInfo: any = null) => {
+    const file: File = {
+      name: filePath.split('/').pop() || '',
       path: filePath,
       projectName: selectedProject?.name,
-      diffInfo: diffInfo // Pass along diff information if available
+      diffInfo: diffInfo
     };
     setEditingFile(file);
   };
@@ -139,16 +195,15 @@ function MainContent({
     setEditorExpanded(!editorExpanded);
   };
 
-  const handleTaskClick = (task) => {
-    // If task is just an ID (from dependency click), find the full task object
+  const handleTaskClick = (task: Task | string) => {
     if (typeof task === 'object' && task.id && !task.title) {
-      const fullTask = tasks?.find(t => t.id === task.id);
+      const fullTask = tasks?.find((t: Task) => t.id === task.id);
       if (fullTask) {
         setSelectedTask(fullTask);
         setShowTaskDetail(true);
       }
     } else {
-      setSelectedTask(task);
+      setSelectedTask(task as Task);
       setShowTaskDetail(true);
     }
   };
@@ -158,21 +213,20 @@ function MainContent({
     setSelectedTask(null);
   };
 
-  const handleTaskStatusChange = (taskId, newStatus) => {
-    // This would integrate with TaskMaster API to update task status
+  const handleTaskStatusChange = (taskId: string, newStatus: string) => {
     console.log('Update task status:', taskId, newStatus);
     refreshTasks?.();
   };
 
   // Handle resize functionality
-  const handleMouseDown = (e) => {
-    if (isMobile) return; // Disable resize on mobile
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (isMobile) return;
     setIsResizing(true);
     e.preventDefault();
   };
 
   useEffect(() => {
-    const handleMouseMove = (e) => {
+    const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return;
 
       const container = resizeRef.current?.parentElement;
@@ -181,7 +235,6 @@ function MainContent({
       const containerRect = container.getBoundingClientRect();
       const newWidth = containerRect.right - e.clientX;
 
-      // Min width: 300px, Max width: 80% of container
       const minWidth = 300;
       const maxWidth = containerRect.width * 0.8;
 
@@ -207,16 +260,13 @@ function MainContent({
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     };
-  }, [isResizing]);
+  }, [isResizing, isMobile]);
 
   if (isLoading) {
     return (
       <div className="h-full flex flex-col">
-        {/* Header with menu button for mobile */}
         {isMobile && (
-          <div
-            className="bg-background border-b border-border p-2 sm:p-3 pwa-header-safe flex-shrink-0"
-          >
+          <div className="bg-background border-b border-border p-2 sm:p-3 pwa-header-safe flex-shrink-0">
             <button
               onClick={onMenuClick}
               className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 pwa-menu-button"
@@ -230,13 +280,13 @@ function MainContent({
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center text-gray-500 dark:text-gray-400">
             <div className="w-12 h-12 mx-auto mb-4">
-              <div 
-                className="w-full h-full rounded-full border-4 border-gray-200 border-t-blue-500" 
-                style={{ 
+              <div
+                className="w-full h-full rounded-full border-4 border-gray-200 border-t-blue-500"
+                style={{
                   animation: 'spin 1s linear infinite',
                   WebkitAnimation: 'spin 1s linear infinite',
                   MozAnimation: 'spin 1s linear infinite'
-                }} 
+                }}
               />
             </div>
             <h2 className="text-xl font-semibold mb-2">Loading Claude Code UI</h2>
@@ -250,11 +300,8 @@ function MainContent({
   if (!selectedProject) {
     return (
       <div className="h-full flex flex-col">
-        {/* Header with menu button for mobile */}
         {isMobile && (
-          <div
-            className="bg-background border-b border-border p-2 sm:p-3 pwa-header-safe flex-shrink-0"
-          >
+          <div className="bg-background border-b border-border p-2 sm:p-3 pwa-header-safe flex-shrink-0">
             <button
               onClick={onMenuClick}
               className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 pwa-menu-button"
@@ -290,9 +337,7 @@ function MainContent({
   return (
     <div className="h-full flex flex-col">
       {/* Header with tabs */}
-      <div
-        className="bg-background border-b border-border p-2 sm:p-3 pwa-header-safe flex-shrink-0"
-      >
+      <div className="bg-background border-b border-border p-2 sm:p-3 pwa-header-safe flex-shrink-0">
         <div className="flex items-center justify-between relative">
           <div className="flex items-center space-x-2 min-w-0 flex-1">
             {isMobile && (
@@ -353,7 +398,7 @@ function MainContent({
               </div>
             </div>
           </div>
-          
+
           {/* Modern Tab Navigation - Right Side */}
           <div className="flex-shrink-0 hidden sm:block">
             <div className="relative flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
@@ -427,21 +472,6 @@ function MainContent({
                   </button>
                 </Tooltip>
               )}
-               {/* <button
-                onClick={() => setActiveTab('preview')}
-                className={`relative px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-all duration-200 ${
-                  activeTab === 'preview'
-                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700'
-                }`}
-              > 
-                <span className="flex items-center gap-1 sm:gap-1.5">
-                  <svg className="w-3 sm:w-3.5 h-3 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                  </svg>
-                  <span className="hidden sm:inline">Preview</span>
-                </span>
-              </button> */}
             </div>
           </div>
         </div>
@@ -454,113 +484,84 @@ function MainContent({
           <div className={`h-full ${activeTab === 'chat' ? 'block' : 'hidden'}`}>
             <ErrorBoundary showDetails={true}>
               <ChatInterface
-              selectedProject={selectedProject}
-              selectedSession={selectedSession}
-              ws={ws}
-              sendMessage={sendMessage}
-              wsMessages={messages}
-              onFileOpen={handleFileOpen}
-              onInputFocusChange={onInputFocusChange}
-              onSessionActive={onSessionActive}
-              onSessionInactive={onSessionInactive}
-              onSessionProcessing={onSessionProcessing}
-              onSessionNotProcessing={onSessionNotProcessing}
-              processingSessions={processingSessions}
-              onReplaceTemporarySession={onReplaceTemporarySession}
-              onNavigateToSession={onNavigateToSession}
-              onShowSettings={onShowSettings}
-              autoExpandTools={autoExpandTools}
-              showRawParameters={showRawParameters}
-              showThinking={showThinking}
-              autoScrollToBottom={autoScrollToBottom}
-              sendByCtrlEnter={sendByCtrlEnter}
-              externalMessageUpdate={externalMessageUpdate}
-              onShowAllTasks={tasksEnabled ? () => setActiveTab('tasks') : null}
-            />
-          </ErrorBoundary>
-        </div>
-        {activeTab === 'files' && (
-          <div className="h-full overflow-hidden">
-            <FileTree selectedProject={selectedProject} />
+                selectedProject={selectedProject}
+                selectedSession={selectedSession}
+                ws={ws}
+                sendMessage={sendMessage}
+                wsMessages={messages}
+                onFileOpen={handleFileOpen}
+                onInputFocusChange={onInputFocusChange}
+                onSessionActive={onSessionActive}
+                onSessionInactive={onSessionInactive}
+                onSessionProcessing={onSessionProcessing}
+                onSessionNotProcessing={onSessionNotProcessing}
+                processingSessions={processingSessions}
+                onReplaceTemporarySession={onReplaceTemporarySession}
+                onNavigateToSession={onNavigateToSession}
+                onShowSettings={onShowSettings}
+                autoExpandTools={autoExpandTools}
+                showRawParameters={showRawParameters}
+                showThinking={showThinking}
+                autoScrollToBottom={autoScrollToBottom}
+                sendByCtrlEnter={sendByCtrlEnter}
+                externalMessageUpdate={externalMessageUpdate}
+                onShowAllTasks={tasksEnabled ? () => setActiveTab('tasks') : null}
+              />
+            </ErrorBoundary>
           </div>
-        )}
-        {activeTab === 'shell' && (
-          <div className="h-full w-full overflow-hidden">
-            <StandaloneShell
-              project={selectedProject}
-              session={selectedSession}
-              showHeader={false}
-            />
-          </div>
-        )}
-        {shouldShowTasksTab && (
-          <div className={`h-full ${activeTab === 'tasks' ? 'block' : 'hidden'}`}>
-            <div className="h-full flex flex-col overflow-hidden">
-              <TaskList
-                tasks={tasks || []}
-                onTaskClick={handleTaskClick}
-                showParentTasks={true}
-                className="flex-1 overflow-y-auto p-4"
-                currentProject={currentProject}
-                onTaskCreated={refreshTasks}
-                onShowPRDEditor={(prd = null) => {
-                  setSelectedPRD(prd);
-                  setShowPRDEditor(true);
-                }}
-                existingPRDs={existingPRDs}
-                onRefreshPRDs={(showNotification = false) => {
-                  // Reload existing PRDs
-                  if (currentProject?.name) {
-                    api.get(`/taskmaster/prd/${encodeURIComponent(currentProject.name)}`)
-                      .then(response => response.ok ? response.json() : Promise.reject())
-                      .then(responseData => {
-                        // 后端返回 {success: true, data: {projectName, projectPath, prdFiles, ...}}
-                        const data = responseData.data;
-                        setExistingPRDs(data?.prdFiles || []);
-                        if (showNotification) {
-                          setPRDNotification('PRD saved successfully!');
-                          setTimeout(() => setPRDNotification(null), 3000);
-                        }
-                      })
-                      .catch(error => console.error('Failed to refresh PRDs:', error));
-                  }
-                }}
+          {activeTab === 'files' && (
+            <div className="h-full overflow-hidden">
+              <FileTree selectedProject={selectedProject} />
+            </div>
+          )}
+          {activeTab === 'shell' && (
+            <div className="h-full w-full overflow-hidden">
+              <StandaloneShell
+                project={selectedProject}
+                session={selectedSession}
+                showHeader={false}
               />
             </div>
-          </div>
-        )}
-        <div className={`h-full overflow-hidden ${activeTab === 'preview' ? 'block' : 'hidden'}`}>
-          {/* <LivePreviewPanel
-            selectedProject={selectedProject}
-            serverStatus={serverStatus}
-            serverUrl={serverUrl}
-            availableScripts={availableScripts}
-            onStartServer={(script) => {
-              sendMessage({
-                type: 'server:start',
-                projectPath: selectedProject?.fullPath,
-                script: script
-              });
-            }}
-            onStopServer={() => {
-              sendMessage({
-                type: 'server:stop',
-                projectPath: selectedProject?.fullPath
-              });
-            }}
-            onScriptSelect={setCurrentScript}
-            currentScript={currentScript}
-            isMobile={isMobile}
-            serverLogs={serverLogs}
-            onClearLogs={() => setServerLogs([])}
-          /> */}
-        </div>
+          )}
+          {shouldShowTasksTab && (
+            <div className={`h-full ${activeTab === 'tasks' ? 'block' : 'hidden'}`}>
+              <div className="h-full flex flex-col overflow-hidden">
+                <TaskList
+                  tasks={tasks || []}
+                  onTaskClick={handleTaskClick}
+                  showParentTasks={true}
+                  className="flex-1 overflow-y-auto p-4"
+                  currentProject={currentProject}
+                  onTaskCreated={refreshTasks}
+                  onShowPRDEditor={(prd = null) => {
+                    setSelectedPRD(prd);
+                    setShowPRDEditor(true);
+                  }}
+                  existingPRDs={existingPRDs}
+                  onRefreshPRDs={(showNotification = false) => {
+                    if (currentProject?.name) {
+                      api.get(`/taskmaster/prd/${encodeURIComponent(currentProject.name)}`)
+                        .then(response => response.ok ? response.json() : Promise.reject())
+                        .then(responseData => {
+                          const data = responseData.data;
+                          setExistingPRDs(data?.prdFiles || []);
+                          if (showNotification) {
+                            setPRDNotification('PRD saved successfully!');
+                            setTimeout(() => setPRDNotification(null), 3000);
+                          }
+                        })
+                        .catch(error => console.error('Failed to refresh PRDs:', error));
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Code Editor Right Sidebar - Desktop only, Mobile uses modal */}
         {editingFile && !isMobile && (
           <>
-            {/* Resize Handle - Hidden when expanded */}
             {!editorExpanded && (
               <div
                 ref={resizeRef}
@@ -568,12 +569,10 @@ function MainContent({
                 className="flex-shrink-0 w-1 bg-gray-200 dark:bg-gray-700 hover:bg-blue-500 dark:hover:bg-blue-600 cursor-col-resize transition-colors relative group"
                 title="Drag to resize"
               >
-                {/* Visual indicator on hover */}
                 <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-1 bg-blue-500 dark:bg-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
             )}
 
-            {/* Editor Sidebar */}
             <div
               className={`flex-shrink-0 border-l border-gray-200 dark:border-gray-700 h-full overflow-hidden ${editorExpanded ? 'flex-1' : ''}`}
               style={editorExpanded ? {} : { width: `${editorWidth}px` }}
@@ -581,7 +580,7 @@ function MainContent({
               <CodeEditor
                 file={editingFile}
                 onClose={handleCloseEditor}
-                projectPath={selectedProject?.path}
+                projectPath={selectedProject?.fullPath}
                 isSidebar={true}
                 isExpanded={editorExpanded}
                 onToggleExpand={handleToggleEditorExpand}
@@ -596,7 +595,7 @@ function MainContent({
         <CodeEditor
           file={editingFile}
           onClose={handleCloseEditor}
-          projectPath={selectedProject?.path}
+          projectPath={selectedProject?.fullPath}
           isSidebar={false}
         />
       )}
@@ -611,6 +610,7 @@ function MainContent({
           onTaskClick={handleTaskClick}
         />
       )}
+
       {/* PRD Editor Modal */}
       {showPRDEditor && (
         <PRDEditor
@@ -621,20 +621,18 @@ function MainContent({
             setSelectedPRD(null);
           }}
           isNewFile={!selectedPRD?.isExisting}
-          file={{ 
+          file={{
             name: selectedPRD?.name || 'prd.txt',
             content: selectedPRD?.content || ''
           }}
           onSave={async () => {
             setShowPRDEditor(false);
             setSelectedPRD(null);
-            
-            // Reload existing PRDs with notification
+
             try {
               const response = await api.get(`/taskmaster/prd/${encodeURIComponent(currentProject.name)}`);
               if (response.ok) {
                 const responseData = await response.json();
-                // 后端返回 {success: true, data: {projectName, projectPath, prdFiles, ...}}
                 const data = responseData.data;
                 setExistingPRDs(data?.prdFiles || []);
                 setPRDNotification('PRD saved successfully!');
@@ -643,11 +641,12 @@ function MainContent({
             } catch (error) {
               console.error('Failed to refresh PRDs:', error);
             }
-            
+
             refreshTasks?.();
           }}
         />
       )}
+
       {/* PRD Notification */}
       {prdNotification && (
         <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-2 duration-300">

@@ -6,7 +6,11 @@ import React from 'react';
  * Placeholder logo for OpenCode integration.
  * Uses a lightbulb icon to represent the "coming soon" feature.
  */
-const OpenCodeLogo = ({ className = 'w-5 h-5' }) => {
+interface OpenCodeLogoProps {
+  className?: string;
+}
+
+export const OpenCodeLogo: React.FC<OpenCodeLogoProps> = ({ className = 'w-5 h-5' }) => {
   return (
     <svg
       className={className}

@@ -1,7 +1,11 @@
 import React from 'react';
 import { useTheme } from '@/shared/contexts/ThemeContext';
 
-const CursorLogo = ({ className = 'w-5 h-5' }) => {
+interface CursorLogoProps {
+  className?: string;
+}
+
+export const CursorLogo: React.FC<CursorLogoProps> = ({ className = 'w-5 h-5' }) => {
   const { isDarkMode } = useTheme();
 
   return (
