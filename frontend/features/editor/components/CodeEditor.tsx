@@ -13,6 +13,7 @@ import { showMinimap } from '@replit/codemirror-minimap';
 import { EditorView, showPanel, ViewPlugin } from '@codemirror/view';
 import { X, Save, Download, Maximize2, Minimize2 } from 'lucide-react';
 import { api } from '@/shared/services';
+import type { CodeEditorComponentProps, EditorFile, EditorLanguage } from '../types/editor.types';
 
 // Extend Window interface
 declare global {
@@ -21,30 +22,38 @@ declare global {
   }
 }
 
-function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded = false, onToggleExpand = null }) {
-  const [content, setContent] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(() => {
+function CodeEditor({
+  file,
+  onClose,
+  projectPath,
+  isSidebar = false,
+  isExpanded = false,
+  onToggleExpand = null,
+  className = ''
+}: CodeEditorComponentProps) {
+  const [content, setContent] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const savedTheme = localStorage.getItem('codeEditorTheme');
     return savedTheme ? savedTheme === 'dark' : true;
   });
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [showDiff, setShowDiff] = useState(!!file.diffInfo);
-  const [wordWrap, setWordWrap] = useState(() => {
+  const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
+  const [showDiff, setShowDiff] = useState<boolean>(!!file.diffInfo);
+  const [wordWrap, setWordWrap] = useState<boolean>(() => {
     return localStorage.getItem('codeEditorWordWrap') === 'true';
   });
-  const [minimapEnabled, setMinimapEnabled] = useState(() => {
+  const [minimapEnabled, setMinimapEnabled] = useState<boolean>(() => {
     return localStorage.getItem('codeEditorShowMinimap') !== 'false';
   });
-  const [showLineNumbers, setShowLineNumbers] = useState(() => {
+  const [showLineNumbers, setShowLineNumbers] = useState<boolean>(() => {
     return localStorage.getItem('codeEditorLineNumbers') !== 'false';
   });
-  const [fontSize, setFontSize] = useState(() => {
+  const [fontSize, setFontSize] = useState<string>(() => {
     return localStorage.getItem('codeEditorFontSize') || '14';
   });
-  const editorRef = useRef(null);
+  const editorRef = useRef<EditorView | null>(null);
 
   // Create minimap extension with chunk-based gutters
   const minimapExtension = useMemo(() => {

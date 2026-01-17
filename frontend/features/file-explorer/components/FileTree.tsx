@@ -7,16 +7,24 @@ import { cn } from '@/lib/utils';
 import { CodeEditor } from '@/features/editor';
 import ImageViewer from '@/shared/components/common/ImageViewer';
 import { api } from '@/shared/services';
+import type {
+  FileTreeComponentProps,
+  FileNode,
+  FileViewMode,
+  SelectedFile,
+  SelectedImage,
+  FileType
+} from '../types/file-explorer.types';
 
-function FileTree({ selectedProject }) {
-  const [files, setFiles] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [expandedDirs, setExpandedDirs] = useState(new Set());
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [viewMode, setViewMode] = useState('detailed'); // 'simple', 'detailed', 'compact'
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filteredFiles, setFilteredFiles] = useState([]);
+function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
+  const [files, setFiles] = useState<FileNode[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
+  const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
+  const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
+  const [viewMode, setViewMode] = useState<FileViewMode>('detailed');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [filteredFiles, setFilteredFiles] = useState<FileNode[]>([]);
 
   useEffect(() => {
     if (selectedProject) {
@@ -101,7 +109,7 @@ function FileTree({ selectedProject }) {
     }
   };
 
-  const toggleDirectory = (path) => {
+  const toggleDirectory = (path: string) => {
     const newExpanded = new Set(expandedDirs);
     if (newExpanded.has(path)) {
       newExpanded.delete(path);
@@ -112,7 +120,7 @@ function FileTree({ selectedProject }) {
   };
 
   // Change view mode and save preference
-  const changeViewMode = (mode) => {
+  const changeViewMode = (mode: FileViewMode) => {
     setViewMode(mode);
     localStorage.setItem('file-tree-view-mode', mode);
   };
