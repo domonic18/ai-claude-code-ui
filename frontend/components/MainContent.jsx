@@ -23,7 +23,7 @@ import TaskList from './TaskList';
 import TaskDetail from './TaskDetail';
 import PRDEditor from './PRDEditor';
 import { default as Tooltip } from '@/shared/components/ui/Tooltip';
-import { useTaskMaster } from '../contexts/TaskMasterContext';
+import { useTaskMaster } from '@/shared/contexts/TaskMasterContext';
 import { useTasksSettings } from '@/shared/contexts/TasksSettingsContext';
 import { api } from '@/shared/services';
 

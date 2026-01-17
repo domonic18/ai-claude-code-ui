@@ -3,7 +3,7 @@ import { X, Flag, User, ArrowRight, CheckCircle, Circle, AlertCircle, Pause, Edi
 import { cn } from '../lib/utils';
 import TaskIndicator from './TaskIndicator';
 import { api } from '@/shared/services';
-import { useTaskMaster } from '../contexts/TaskMasterContext';
+import { useTaskMaster } from '@/shared/contexts/TaskMasterContext';
 
 const TaskDetail = ({ 
   task, 

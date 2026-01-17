@@ -3,7 +3,7 @@ import { Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, List, Grid, ChevronDow
 import { cn } from '../lib/utils';
 import TaskCard from './TaskCard';
 import CreateTaskModal from './CreateTaskModal';
-import { useTaskMaster } from '../contexts/TaskMasterContext';
+import { useTaskMaster } from '@/shared/contexts/TaskMasterContext';
 import Shell from './Shell';
 import { api } from '@/shared/services';
 

@@ -10,3 +10,17 @@ export type { WebSocketContextValue, WebSocketProviderProps } from './WebSocketC
 
 export { TasksSettingsProvider, useTasksSettings } from './TasksSettingsContext';
 export type { TasksSettingsContextValue, TasksSettingsProviderProps, InstallationStatus } from './TasksSettingsContext';
+
+export { TaskMasterProvider, useTaskMaster } from './TaskMasterContext';
+export type {
+  TaskMasterContextValue,
+  TaskMasterProviderProps,
+  TaskMasterProject,
+  TaskMasterTask,
+  TaskMasterMetadata,
+  TaskMasterData,
+  TaskMasterError,
+  McpServerStatus,
+  TaskStatus,
+  TaskPriority
+} from './TaskMasterContext';

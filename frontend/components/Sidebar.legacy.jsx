@@ -13,7 +13,7 @@ import CodexLogo from './CodexLogo.jsx';
 import TaskIndicator from './TaskIndicator';
 import ProjectCreationWizard from './ProjectCreationWizard';
 import { api } from '@/shared/services';
-import { useTaskMaster } from '../contexts/TaskMasterContext';
+import { useTaskMaster } from '@/shared/contexts/TaskMasterContext';
 import { useTasksSettings } from '@/shared/contexts/TasksSettingsContext';
 
 // Move formatTimeAgo outside component to avoid recreation on every render

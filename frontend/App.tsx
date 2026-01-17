@@ -29,7 +29,7 @@ import QuickSettingsPanel from './components/QuickSettingsPanel';
 
 import { ThemeProvider } from '@/shared/contexts/ThemeContext';
 import { AuthProvider, useAuth } from '@/shared/contexts/AuthContext';
-import { TaskMasterProvider } from './contexts/TaskMasterContext';
+import { TaskMasterProvider } from '@/shared/contexts/TaskMasterContext';
 import { TasksSettingsProvider } from '@/shared/contexts/TasksSettingsContext';
 import { WebSocketProvider, useWebSocketContext } from '@/shared/contexts/WebSocketContext';
 import ProtectedRoute from './components/ProtectedRoute';

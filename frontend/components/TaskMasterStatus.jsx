@@ -1,5 +1,5 @@
 import React from 'react';
-import { useTaskMaster } from '../contexts/TaskMasterContext';
+import { useTaskMaster } from '@/shared/contexts/TaskMasterContext';
 import TaskIndicator from './TaskIndicator';
 
 const TaskMasterStatus = () => {

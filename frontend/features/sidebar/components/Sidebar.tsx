@@ -19,7 +19,7 @@ import ProjectSearch from './ProjectSearch';
 import VersionBanner from './VersionBanner';
 import ProjectList from './ProjectList';
 import ProjectCreationWizard from '../../../components/ProjectCreationWizard';
-import { useTaskMaster } from '@/contexts/TaskMasterContext';
+import { useTaskMaster } from '@/shared/contexts/TaskMasterContext';
 import { TIMESTAMP_UPDATE_INTERVAL } from '../constants/sidebar.constants';
 import type { SidebarProps, ExpandedProjects } from '../types/sidebar.types';
 import { useProjects } from '../hooks';
