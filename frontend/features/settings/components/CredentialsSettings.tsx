@@ -3,8 +3,10 @@ import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
 import { Key, Plus, Trash2, Copy, Check, ExternalLink } from 'lucide-react';
 import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
-import { version } from '../../package.json';
 import { authenticatedFetch } from '@/shared/services';
+
+// Version - will be displayed in UI
+const APP_VERSION = '1.13.6';
 
 function CredentialsSettings() {
   const [apiKeys, setApiKeys] = useState([]);
@@ -244,7 +246,7 @@ function CredentialsSettings() {
             rel="noopener noreferrer"
             className="hover:text-muted-foreground transition-colors"
           >
-            v{version}
+            v{APP_VERSION}
           </a>
           {updateAvailable && latestVersion && (
             <a

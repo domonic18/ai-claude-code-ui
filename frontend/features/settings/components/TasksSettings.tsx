@@ -1,7 +1,7 @@
 import { Zap } from 'lucide-react';
 import { useTasksSettings } from '@/shared/contexts/TasksSettingsContext';
 
-function TasksSettings() {
+const TasksSettings: React.FC = () => {
   const {
     tasksEnabled,
     setTasksEnabled,
@@ -102,6 +102,6 @@ function TasksSettings() {
       )}
     </div>
   );
-}
+};
 
 export default TasksSettings;

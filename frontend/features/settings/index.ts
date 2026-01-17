@@ -25,6 +25,12 @@ export { ApiTab } from './components/ApiTab';
 export { TasksTab } from './components/TasksTab';
 export type { AgentTabHandle } from './components/AgentTab';
 
+// Migrated components
+export { default as TasksSettings } from './components/TasksSettings';
+export { default as ApiKeysSettings } from './components/ApiKeysSettings';
+export { default as CredentialsSettings } from './components/CredentialsSettings';
+export { default as QuickSettingsPanel } from './components/QuickSettingsPanel';
+
 // Hooks
 export { useAgentSettings, useCodeEditorSettings, useSettings, useMcpServers } from './hooks';
 export type { UseAgentSettingsReturn, UseCodeEditorSettingsReturn, UseSettingsReturn, UseMcpServersReturn } from './hooks';

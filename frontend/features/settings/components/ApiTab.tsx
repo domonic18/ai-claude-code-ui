@@ -10,7 +10,7 @@
  * This component wraps the existing CredentialsSettings component.
  */
 
-import CredentialsSettings from '../../../components/CredentialsSettings';
+import CredentialsSettings from './CredentialsSettings';
 
 interface ApiTabProps {
   // Props passed from parent Settings if needed

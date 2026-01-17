@@ -12,7 +12,7 @@
  */
 
 import React from 'react';
-import TasksSettings from '../../../components/TasksSettings';
+import TasksSettings from './TasksSettings';
 
 interface TasksTabProps {
   // Props passed from parent Settings if needed

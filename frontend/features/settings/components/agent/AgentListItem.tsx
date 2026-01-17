@@ -8,8 +8,7 @@
  */
 
 import React from 'react';
-import ClaudeLogo from '../../../../components/ClaudeLogo';
-import OpenCodeLogo from '../../../../components/OpenCodeLogo';
+import { ClaudeLogo, OpenCodeLogo } from '@/shared/assets/icons';
 
 type AgentId = 'claude' | 'opencode';
 
