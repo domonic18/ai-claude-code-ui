@@ -1,37 +1,43 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/shared/contexts/AuthContext';
-import { MessageSquare, UserPlus } from 'lucide-react';
+import { ClaudeLogo } from '@/shared/assets/icons';
 
-const LoginForm = () => {
+const SetupForm: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  
-  const { login } = useAuth();
 
-  const handleFirstTimeSetup = () => {
-    // Reload to trigger status check (cookie will be checked automatically)
-    window.location.reload();
-  };
+  const { register } = useAuth();
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
-    if (!username || !password) {
-      setError('Please enter both username and password');
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
       return;
     }
-    
-    setIsLoading(true);
-    
-    const result = await login(username, password);
-    
-    if (!result.success) {
-      setError(result.error);
+
+    if (username.length < 3) {
+      setError('Username must be at least 3 characters long');
+      return;
     }
-    
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return;
+    }
+
+    setIsLoading(true);
+
+    const result = await register(username, password);
+
+    if (!result.success) {
+      setError(result.error || 'Registration failed');
+    }
+
     setIsLoading(false);
   };
 
@@ -42,17 +48,15 @@ const LoginForm = () => {
           {/* Logo and Title */}
           <div className="text-center">
             <div className="flex justify-center mb-4">
-              <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center shadow-sm">
-                <MessageSquare className="w-8 h-8 text-primary-foreground" />
-              </div>
+              <ClaudeLogo className="w-16 h-16" />
             </div>
-            <h1 className="text-2xl font-bold text-foreground">Welcome Back</h1>
+            <h1 className="text-2xl font-bold text-foreground">Welcome to Claude Code UI</h1>
             <p className="text-muted-foreground mt-2">
-              Sign in to your Claude Code UI account
+              Set up your account to get started
             </p>
           </div>
 
-          {/* Login Form */}
+          {/* Setup Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-foreground mb-1">
@@ -82,7 +86,24 @@ const LoginForm = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Enter your password"
-                autoComplete="current-password"
+                autoComplete="new-password"
+                required
+                disabled={isLoading}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground mb-1">
+                Confirm Password
+              </label>
+              <input
+                type="password"
+                id="confirmPassword"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Confirm your password"
+                autoComplete="new-password"
                 required
                 disabled={isLoading}
               />
@@ -91,11 +112,6 @@ const LoginForm = () => {
             {error && (
               <div className="p-3 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-800 rounded-md">
                 <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
-                {error.includes('Invalid username or password') && (
-                  <p className="text-xs text-red-600 dark:text-red-400 mt-2">
-                    If this is your first time, the system may need to be initialized. Please refresh the page.
-                  </p>
-                )}
               </div>
             )}
 
@@ -104,22 +120,14 @@ const LoginForm = () => {
               disabled={isLoading}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200"
             >
-              {isLoading ? 'Signing in...' : 'Sign In'}
+              {isLoading ? 'Setting up...' : 'Create Account'}
             </button>
           </form>
 
-          <div className="text-center space-y-2">
+          <div className="text-center">
             <p className="text-sm text-muted-foreground">
-              Enter your credentials to access Claude Code UI
+              This is a single-user system. Only one account can be created.
             </p>
-            <button
-              type="button"
-              onClick={handleFirstTimeSetup}
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center justify-center gap-1 mx-auto"
-            >
-              <UserPlus className="w-3 h-3" />
-              First time? Create an account
-            </button>
           </div>
         </div>
       </div>
@@ -127,4 +135,4 @@ const LoginForm = () => {
   );
 };
 
-export default LoginForm;
+export default SetupForm;

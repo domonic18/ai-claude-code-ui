@@ -1,16 +1,23 @@
 import { X } from 'lucide-react';
-import StandaloneShell from './StandaloneShell';
+import { StandaloneShell } from '@/features/terminal';
+
+type Provider = 'claude' | 'cursor' | 'codex';
+
+interface LoginModalProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+  provider?: Provider;
+  project?: {
+    name?: string;
+    path?: string;
+    [key: string]: any;
+  };
+  onComplete?: (exitCode: number) => void;
+  customCommand?: string;
+}
 
 /**
  * Reusable login modal component for Claude, Cursor, and Codex CLI authentication
- *
- * @param {Object} props
- * @param {boolean} props.isOpen - Whether the modal is visible
- * @param {Function} props.onClose - Callback when modal is closed
- * @param {'claude'|'cursor'|'codex'} props.provider - Which CLI provider to authenticate with
- * @param {Object} props.project - Project object containing name and path information
- * @param {Function} props.onComplete - Callback when login process completes (receives exitCode)
- * @param {string} props.customCommand - Optional custom command to override defaults
  */
 function LoginModal({
   isOpen,
@@ -19,10 +26,10 @@ function LoginModal({
   project,
   onComplete,
   customCommand
-}) {
+}: LoginModalProps) {
   if (!isOpen) return null;
 
-  const getCommand = () => {
+  const getCommand = (): string => {
     if (customCommand) return customCommand;
 
     const isPlatform = import.meta.env.VITE_IS_PLATFORM === 'true';
@@ -39,7 +46,7 @@ function LoginModal({
     }
   };
 
-  const getTitle = () => {
+  const getTitle = (): string => {
     switch (provider) {
       case 'claude':
         return 'Claude CLI Login';
@@ -52,11 +59,11 @@ function LoginModal({
     }
   };
 
-  const handleComplete = (exitCode) => {
+  const handleComplete = (exitCode: number) => {
     if (onComplete) {
       onComplete(exitCode);
     }
-    if (exitCode === 0) {
+    if (exitCode === 0 && onClose) {
       onClose();
     }
   };
@@ -68,13 +75,15 @@ function LoginModal({
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
             {getTitle()}
           </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            aria-label="Close login modal"
-          >
-            <X className="w-6 h-6" />
-          </button>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              aria-label="Close login modal"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          )}
         </div>
         <div className="flex-1 overflow-hidden">
           <StandaloneShell

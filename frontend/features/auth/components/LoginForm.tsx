@@ -1,43 +1,36 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/shared/contexts/AuthContext';
-import ClaudeLogo from './ClaudeLogo';
+import { MessageSquare, UserPlus } from 'lucide-react';
 
-const SetupForm = () => {
+const LoginForm: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  
-  const { register } = useAuth();
 
-  const handleSubmit = async (e) => {
+  const { login } = useAuth();
+
+  const handleFirstTimeSetup = () => {
+    window.location.reload();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
+
+    if (!username || !password) {
+      setError('Please enter both username and password');
       return;
     }
-    
-    if (username.length < 3) {
-      setError('Username must be at least 3 characters long');
-      return;
-    }
-    
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long');
-      return;
-    }
-    
+
     setIsLoading(true);
-    
-    const result = await register(username, password);
-    
+
+    const result = await login(username, password);
+
     if (!result.success) {
-      setError(result.error);
+      setError(result.error || 'Login failed');
     }
-    
+
     setIsLoading(false);
   };
 
@@ -48,15 +41,17 @@ const SetupForm = () => {
           {/* Logo and Title */}
           <div className="text-center">
             <div className="flex justify-center mb-4">
-              <ClaudeLogo size={64} />
+              <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center shadow-sm">
+                <MessageSquare className="w-8 h-8 text-primary-foreground" />
+              </div>
             </div>
-            <h1 className="text-2xl font-bold text-foreground">Welcome to Claude Code UI</h1>
+            <h1 className="text-2xl font-bold text-foreground">Welcome Back</h1>
             <p className="text-muted-foreground mt-2">
-              Set up your account to get started
+              Sign in to your Claude Code UI account
             </p>
           </div>
 
-          {/* Setup Form */}
+          {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-foreground mb-1">
@@ -86,24 +81,7 @@ const SetupForm = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Enter your password"
-                autoComplete="new-password"
-                required
-                disabled={isLoading}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground mb-1">
-                Confirm Password
-              </label>
-              <input
-                type="password"
-                id="confirmPassword"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Confirm your password"
-                autoComplete="new-password"
+                autoComplete="current-password"
                 required
                 disabled={isLoading}
               />
@@ -112,6 +90,11 @@ const SetupForm = () => {
             {error && (
               <div className="p-3 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-800 rounded-md">
                 <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+                {error.includes('Invalid username or password') && (
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+                    If this is your first time, the system may need to be initialized. Please refresh the page.
+                  </p>
+                )}
               </div>
             )}
 
@@ -120,14 +103,22 @@ const SetupForm = () => {
               disabled={isLoading}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200"
             >
-              {isLoading ? 'Setting up...' : 'Create Account'}
+              {isLoading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
 
-          <div className="text-center">
+          <div className="text-center space-y-2">
             <p className="text-sm text-muted-foreground">
-              This is a single-user system. Only one account can be created.
+              Enter your credentials to access Claude Code UI
             </p>
+            <button
+              type="button"
+              onClick={handleFirstTimeSetup}
+              className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center justify-center gap-1 mx-auto"
+            >
+              <UserPlus className="w-3 h-3" />
+              First time? Create an account
+            </button>
           </div>
         </div>
       </div>
@@ -135,4 +126,4 @@ const SetupForm = () => {
   );
 };
 
-export default SetupForm;
+export default LoginForm;
