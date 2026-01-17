@@ -14,9 +14,7 @@
  */
 
 import React, { memo, useState, useCallback, useEffect, KeyboardEvent } from 'react';
-import ClaudeLogo from '../../../components/ClaudeLogo';
-import CursorLogo from '../../../components/CursorLogo';
-import CodexLogo from '../../../components/CodexLogo';
+import { ClaudeLogo, CursorLogo, CodexLogo } from '@/shared/assets/icons';
 import { Check, X, Clock } from 'lucide-react';
 import { Badge } from '@/shared/components/ui/Badge';
 import type { SessionItemProps } from '../types/sidebar.types';

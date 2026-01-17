@@ -5,9 +5,7 @@
  */
 
 import React from 'react';
-import ClaudeLogo from '../../../components/ClaudeLogo.jsx';
-import CursorLogo from '../../../components/CursorLogo.jsx';
-import CodexLogo from '../../../components/CodexLogo.jsx';
+import { ClaudeLogo, CursorLogo, CodexLogo } from '@/shared/assets/icons';
 import { getAvatarBackgroundClass, getAvatarContent } from '../utils/messageRenderUtils';
 
 export interface MessageHeaderProps {

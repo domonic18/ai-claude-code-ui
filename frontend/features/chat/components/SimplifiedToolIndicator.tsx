@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { extractFilename } from './toolUtils';
-import TodoList from '../../../components/TodoList';
+import { TodoList } from '@/features/tasks';
 
 export interface SimplifiedToolIndicatorProps {
   toolName: string;
