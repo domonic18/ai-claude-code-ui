@@ -3,26 +3,27 @@ import { X, FolderPlus, GitBranch, Key, ChevronRight, ChevronLeft, Check, Loader
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
 import { api } from '@/shared/services';
+import type { Project, ProjectCreationWizardProps } from '../types/project.types';
 
-const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {
+const ProjectCreationWizard = ({ onClose, onProjectCreated, isOpen = true, mode = 'create' }: ProjectCreationWizardProps) => {
   // Wizard state
-  const [step, setStep] = useState(1); // 1: Choose type, 2: Configure, 3: Confirm
-  const [workspaceType, setWorkspaceType] = useState(null); // 'existing' or 'new'
+  const [step, setStep] = useState<number>(1);
+  const [workspaceType, setWorkspaceType] = useState<'existing' | 'new' | null>(null);
 
   // Form state
-  const [workspacePath, setWorkspacePath] = useState('');
-  const [githubUrl, setGithubUrl] = useState('');
-  const [selectedGithubToken, setSelectedGithubToken] = useState('');
-  const [tokenMode, setTokenMode] = useState('stored'); // 'stored' | 'new' | 'none'
-  const [newGithubToken, setNewGithubToken] = useState('');
+  const [workspacePath, setWorkspacePath] = useState<string>('');
+  const [githubUrl, setGithubUrl] = useState<string>('');
+  const [selectedGithubToken, setSelectedGithubToken] = useState<string>('');
+  const [tokenMode, setTokenMode] = useState<'stored' | 'new' | 'none'>('stored');
+  const [newGithubToken, setNewGithubToken] = useState<string>('');
 
   // UI state
-  const [isCreating, setIsCreating] = useState(false);
-  const [error, setError] = useState(null);
-  const [availableTokens, setAvailableTokens] = useState([]);
-  const [loadingTokens, setLoadingTokens] = useState(false);
-  const [pathSuggestions, setPathSuggestions] = useState([]);
-  const [showPathDropdown, setShowPathDropdown] = useState(false);
+  const [isCreating, setIsCreating] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [availableTokens, setAvailableTokens] = useState<Array<{ id: string | number; name: string; is_active: boolean }>>([]);
+  const [loadingTokens, setLoadingTokens] = useState<boolean>(false);
+  const [pathSuggestions, setPathSuggestions] = useState<Array<{ path: string; type: string }>>([]);
+  const [showPathDropdown, setShowPathDropdown] = useState<boolean>(false);
 
   // Load available GitHub tokens when needed
   useEffect(() => {

@@ -6,30 +6,38 @@ import { EditorView } from '@codemirror/view';
 import { X, Save, Download, Maximize2, Minimize2, Eye, FileText, Sparkles, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api, authenticatedFetch } from '@/shared/services';
+import type { PRDEditorComponentProps } from '../types/editor.types';
 
-const PRDEditor = ({ 
-  file, 
-  onClose, 
+const PRDEditor = ({
+  file,
+  onClose,
   projectPath,
-  project, // Add project object
+  project,
   initialContent = '',
   isNewFile = false,
-  onSave
+  onSave,
+  className = ''
+}: PRDEditorComponentProps & {
+  file?: { path: string; name: string };
+  projectPath?: string;
+  project?: { name: string; path: string };
+  initialContent?: string;
+  isNewFile?: boolean;
 }) => {
-  const [content, setContent] = useState(initialContent);
-  const [loading, setLoading] = useState(!isNewFile);
-  const [saving, setSaving] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(true);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [previewMode, setPreviewMode] = useState(false);
-  const [wordWrap, setWordWrap] = useState(true); // Default to true for markdown
-  const [fileName, setFileName] = useState('');
-  const [showGenerateModal, setShowGenerateModal] = useState(false);
-  const [showOverwriteConfirm, setShowOverwriteConfirm] = useState(false);
-  const [existingPRDs, setExistingPRDs] = useState([]);
-  
-  const editorRef = useRef(null);
+  const [content, setContent] = useState<string>(initialContent);
+  const [loading, setLoading] = useState<boolean>(!isNewFile);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
+  const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
+  const [previewMode, setPreviewMode] = useState<boolean>(false);
+  const [wordWrap, setWordWrap] = useState<boolean>(true);
+  const [fileName, setFileName] = useState<string>('');
+  const [showGenerateModal, setShowGenerateModal] = useState<boolean>(false);
+  const [showOverwriteConfirm, setShowOverwriteConfirm] = useState<boolean>(false);
+  const [existingPRDs, setExistingPRDs] = useState<Array<{ name: string; modified: string }>>([]);
+
+  const editorRef = useRef<EditorView | null>(null);
 
   const PRD_TEMPLATE = `# Product Requirements Document - Example Project
 

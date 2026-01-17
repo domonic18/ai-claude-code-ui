@@ -4,32 +4,40 @@ import { ClaudeLogo, CursorLogo, CodexLogo } from '@/shared/assets/icons';
 import { LoginModal } from '@/features/auth';
 import { authenticatedFetch } from '@/shared/services';
 import { useAuth } from '@/shared/contexts/AuthContext';
+import type {
+  OnboardingPageProps,
+  OnboardingState,
+  OnboardingStep,
+  AgentAuthStatus,
+  ActiveLoginProvider,
+  AgentType
+} from './types/onboarding.types';
 
-const Onboarding = ({ onComplete }) => {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [gitName, setGitName] = useState('');
-  const [gitEmail, setGitEmail] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
+const Onboarding = ({ onComplete, onCancel, initialStep = 0 }: OnboardingPageProps) => {
+  const [currentStep, setCurrentStep] = useState<OnboardingStep>(initialStep);
+  const [gitName, setGitName] = useState<string>('');
+  const [gitEmail, setGitEmail] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
 
-  const [activeLoginProvider, setActiveLoginProvider] = useState(null);
-  const [selectedProject] = useState({ name: 'default', fullPath: '' });
+  const [activeLoginProvider, setActiveLoginProvider] = useState<ActiveLoginProvider>(null);
+  const [selectedProject] = useState<{ name: string; fullPath: string }>({ name: 'default', fullPath: '' });
 
-  const [claudeAuthStatus, setClaudeAuthStatus] = useState({
+  const [claudeAuthStatus, setClaudeAuthStatus] = useState<AgentAuthStatus>({
     authenticated: false,
     email: null,
     loading: true,
     error: null
   });
 
-  const [cursorAuthStatus, setCursorAuthStatus] = useState({
+  const [cursorAuthStatus, setCursorAuthStatus] = useState<AgentAuthStatus>({
     authenticated: false,
     email: null,
     loading: true,
     error: null
   });
 
-  const [codexAuthStatus, setCodexAuthStatus] = useState({
+  const [codexAuthStatus, setCodexAuthStatus] = useState<AgentAuthStatus>({
     authenticated: false,
     email: null,
     loading: true,

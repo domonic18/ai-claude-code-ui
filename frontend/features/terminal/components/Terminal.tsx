@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
+import type { ShellProps } from '../types/terminal.types';
 
 const xtermStyles = `
   .xterm .xterm-screen {
@@ -30,17 +31,26 @@ if (typeof document !== 'undefined') {
   document.head.appendChild(styleSheet);
 }
 
-function Shell({ selectedProject, selectedSession, initialCommand, isPlainShell = false, onProcessComplete, minimal = false, autoConnect = false }) {
-  const terminalRef = useRef(null);
-  const terminal = useRef(null);
-  const fitAddon = useRef(null);
-  const ws = useRef(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [isRestarting, setIsRestarting] = useState(false);
-  const [lastSessionId, setLastSessionId] = useState(null);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [userDisconnected, setUserDisconnected] = useState(false); // 跟踪用户是否主动断开
+function Shell({
+  selectedProject,
+  selectedSession,
+  initialCommand,
+  isPlainShell = false,
+  onProcessComplete,
+  minimal = false,
+  autoConnect = false,
+  isActive = false
+}: ShellProps) {
+  const terminalRef = useRef<HTMLDivElement>(null);
+  const terminal = useRef<Terminal | null>(null);
+  const fitAddon = useRef<FitAddon | null>(null);
+  const ws = useRef<WebSocket | null>(null);
+  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [isInitialized, setIsInitialized] = useState<boolean>(false);
+  const [isRestarting, setIsRestarting] = useState<boolean>(false);
+  const [lastSessionId, setLastSessionId] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState<boolean>(false);
+  const [userDisconnected, setUserDisconnected] = useState<boolean>(false);
 
   const selectedProjectRef = useRef(selectedProject);
   const selectedSessionRef = useRef(selectedSession);

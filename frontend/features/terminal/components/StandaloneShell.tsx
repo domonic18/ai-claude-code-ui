@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { default as Shell } from './Terminal';
+import type { ShellProps } from '../types/terminal.types';
 
 /**
  * Generic Shell wrapper that can be used in tabs, modals, and other contexts.
@@ -18,6 +19,24 @@ import { default as Shell } from './Terminal';
  * @param {boolean} compact - Use compact layout (default: false)
  * @param {boolean} minimal - Use minimal mode: no header, no overlays, auto-connect (default: false)
  */
+interface StandaloneShellProps extends Omit<ShellProps, 'selectedProject' | 'selectedSession' | 'initialCommand'> {
+  project?: {
+    name: string;
+    path: string;
+    displayName?: string;
+  } | null;
+  session?: {
+    id: string;
+  } | null;
+  command?: string | null;
+  isPlainShell?: boolean | null;
+  onComplete?: (exitCode: number) => void;
+  onClose?: () => void;
+  title?: string | null;
+  showHeader?: boolean;
+  compact?: boolean;
+}
+
 function StandaloneShell({
   project,
   session = null,
@@ -31,7 +50,7 @@ function StandaloneShell({
   showHeader = true,
   compact = false,
   minimal = false
-}) {
+}: StandaloneShellProps) {
   const [isCompleted, setIsCompleted] = useState(false);
 
   const shouldUsePlainShell = isPlainShell !== null ? isPlainShell : (command !== null);
