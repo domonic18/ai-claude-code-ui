@@ -5,7 +5,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { EditorView } from '@codemirror/view';
 import { X, Save, Download, Maximize2, Minimize2, Eye, FileText, Sparkles, AlertTriangle } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { api, authenticatedFetch } from '../utils/api';
+import { api, authenticatedFetch } from '@/shared/services';
 
 const PRDEditor = ({ 
   file, 

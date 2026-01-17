@@ -14,7 +14,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/shared/contexts/AuthContext';
-import { api } from '../utils/api';
+import { api } from '@/shared/services';
 import { Settings } from '../features/settings/components';
 
 function TestRefactoredSettings() {

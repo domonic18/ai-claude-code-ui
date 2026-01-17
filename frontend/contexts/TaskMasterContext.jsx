@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { api } from '../utils/api';
+import { api } from '@/shared/services';
 import { useAuth } from '@/shared/contexts/AuthContext';
 import { useWebSocketContext } from '@/shared/contexts/WebSocketContext';
 

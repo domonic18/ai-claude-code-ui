@@ -4,7 +4,7 @@ import { Input } from '@/shared/components/ui/Input';
 import { Key, Plus, Trash2, Copy, Check, ExternalLink } from 'lucide-react';
 import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import { version } from '../../package.json';
-import { authenticatedFetch } from '../utils/api';
+import { authenticatedFetch } from '@/shared/services';
 
 function CredentialsSettings() {
   const [apiKeys, setApiKeys] = useState([]);

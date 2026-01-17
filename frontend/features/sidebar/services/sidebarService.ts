@@ -5,7 +5,7 @@
  * Provides centralized API management with error handling and type safety.
  */
 
-import { api } from '../../../utils/api';
+import { api } from '@/shared/services';
 import type { Project, Session, SessionMeta, SessionProvider, PaginatedSessionsResponse } from '../types/sidebar.types';
 
 /**

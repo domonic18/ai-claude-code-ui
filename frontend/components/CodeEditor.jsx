@@ -12,7 +12,7 @@ import { unifiedMergeView, getChunks } from '@codemirror/merge';
 import { showMinimap } from '@replit/codemirror-minimap';
 import { EditorView, showPanel, ViewPlugin } from '@codemirror/view';
 import { X, Save, Download, Maximize2, Minimize2 } from 'lucide-react';
-import { api } from '../utils/api';
+import { api } from '@/shared/services';
 
 function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded = false, onToggleExpand = null }) {
   const [content, setContent] = useState('');

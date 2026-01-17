@@ -8,7 +8,7 @@
  * - File operations
  */
 
-import { authenticatedFetch } from '../../../utils/api';
+import { authenticatedFetch } from '@/shared/services';
 
 /**
  * Chat service configuration

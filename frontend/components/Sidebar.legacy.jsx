@@ -12,7 +12,7 @@ import CursorLogo from './CursorLogo.jsx';
 import CodexLogo from './CodexLogo.jsx';
 import TaskIndicator from './TaskIndicator';
 import ProjectCreationWizard from './ProjectCreationWizard';
-import { api } from '../utils/api';
+import { api } from '@/shared/services';
 import { useTaskMaster } from '../contexts/TaskMasterContext';
 import { useTasksSettings } from '@/shared/contexts/TasksSettingsContext';
 

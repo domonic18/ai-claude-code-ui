@@ -35,7 +35,7 @@ import { WebSocketProvider, useWebSocketContext } from '@/shared/contexts/WebSoc
 import ProtectedRoute from './components/ProtectedRoute';
 import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import useLocalStorage from '@/shared/hooks/useLocalStorage';
-import { api, authenticatedFetch } from './utils/api';
+import { api, authenticatedFetch } from '@/shared/services';
 import type { Project, Session as SidebarSession } from './features/sidebar/types/sidebar.types';
 import type { SettingsTab } from './features/settings/types/settings.types';
 

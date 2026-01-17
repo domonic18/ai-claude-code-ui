@@ -6,7 +6,7 @@ import { Folder, FolderOpen, File, FileText, FileCode, List, TableProperties, Ey
 import { cn } from '../lib/utils';
 import CodeEditor from './CodeEditor';
 import ImageViewer from '@/shared/components/common/ImageViewer';
-import { api } from '../utils/api';
+import { api } from '@/shared/services';
 
 function FileTree({ selectedProject }) {
   const [files, setFiles] = useState([]);

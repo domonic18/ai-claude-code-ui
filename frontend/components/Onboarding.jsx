@@ -4,7 +4,7 @@ import ClaudeLogo from './ClaudeLogo';
 import CursorLogo from './CursorLogo';
 import CodexLogo from './CodexLogo';
 import LoginModal from './LoginModal';
-import { authenticatedFetch } from '../utils/api';
+import { authenticatedFetch } from '@/shared/services';
 import { useAuth } from '@/shared/contexts/AuthContext';
 
 const Onboarding = ({ onComplete }) => {

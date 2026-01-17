@@ -5,7 +5,7 @@ import TaskCard from './TaskCard';
 import CreateTaskModal from './CreateTaskModal';
 import { useTaskMaster } from '../contexts/TaskMasterContext';
 import Shell from './Shell';
-import { api } from '../utils/api';
+import { api } from '@/shared/services';
 
 const TaskList = ({ 
   tasks = [], 

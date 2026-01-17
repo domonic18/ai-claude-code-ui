@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
 import { Key, Plus, Trash2, Eye, EyeOff, Copy, Check, Github } from 'lucide-react';
-import { authenticatedFetch } from '../utils/api';
+import { authenticatedFetch } from '@/shared/services';
 
 function ApiKeysSettings() {
   const [apiKeys, setApiKeys] = useState([]);

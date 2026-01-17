@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { WebSocketMessage } from '@/shared/types/websocket.types';
+import type { WebSocketMessage } from '@/shared/types';
 
 export interface UseWebSocketResult {
   ws: WebSocket | null;

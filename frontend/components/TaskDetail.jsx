@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, Flag, User, ArrowRight, CheckCircle, Circle, AlertCircle, Pause, Edit, Save, Copy, ChevronDown, ChevronRight, Clock } from 'lucide-react';
 import { cn } from '../lib/utils';
 import TaskIndicator from './TaskIndicator';
-import { api } from '../utils/api';
+import { api } from '@/shared/services';
 import { useTaskMaster } from '../contexts/TaskMasterContext';
 
 const TaskDetail = ({ 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, ChevronRight, ChevronLeft, CheckCircle, AlertCircle, Settings, Server, FileText, Sparkles, ExternalLink, Copy } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { api } from '../utils/api';
+import { api } from '@/shared/services';
 
 const TaskMasterSetupWizard = ({ 
   isOpen = true, 

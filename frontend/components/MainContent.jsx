@@ -25,7 +25,7 @@ import PRDEditor from './PRDEditor';
 import { default as Tooltip } from '@/shared/components/ui/Tooltip';
 import { useTaskMaster } from '../contexts/TaskMasterContext';
 import { useTasksSettings } from '@/shared/contexts/TasksSettingsContext';
-import { api } from '../utils/api';
+import { api } from '@/shared/services';
 
 function MainContent({
   selectedProject,

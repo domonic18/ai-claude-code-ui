@@ -8,7 +8,7 @@
  * All API URLs are defined in frontend/utils/api.js
  */
 
-import { api } from '../../../utils/api';
+import { api } from '@/shared/services';
 import type { McpServer } from '../types/settings.types';
 
 export interface ClaudePermissions {
