@@ -1,2 +1,2 @@
 export { default as ProtectedRoute } from './ProtectedRoute';
-export type { ProtectedRouteProps } from './ProtectedRoute';
+// ProtectedRouteProps is exported directly from ProtectedRoute.tsx

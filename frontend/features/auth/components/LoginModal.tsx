@@ -1,9 +1,9 @@
 import { X } from 'lucide-react';
 import { StandaloneShell } from '@/features/terminal';
 
-type Provider = 'claude' | 'cursor' | 'codex';
+export type Provider = 'claude' | 'cursor' | 'codex';
 
-interface LoginModalProps {
+export interface LoginModalProps {
   isOpen?: boolean;
   onClose?: () => void;
   provider?: Provider;

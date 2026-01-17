@@ -4,7 +4,7 @@ import { SetupForm, LoginForm } from '@/features/auth';
 import { OnboardingPage } from '@/pages/Onboarding';
 import { MessageSquare } from 'lucide-react';
 
-interface ProtectedRouteProps {
+export interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
