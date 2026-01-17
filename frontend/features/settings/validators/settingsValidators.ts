@@ -5,7 +5,7 @@
  * Provides form validation and data validation functions.
  */
 
-import type { ClaudePermissions, McpServer, McpTransportType, McpScope } from '../types/settings.types';
+import type { PermissionSettings, McpServer, McpTransportType, McpScope } from '../types/settings.types';
 
 export interface ValidationResult {
   valid: boolean;

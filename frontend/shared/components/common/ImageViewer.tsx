@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Button } from '@/shared/components/ui/Button';
 import { X } from 'lucide-react';
-import { authenticatedFetch } from '@/utils/api';
+import { authenticatedFetch } from '@/shared/services';
 
 export interface ImageViewerFile {
   name: string;

@@ -23,11 +23,7 @@ if ('serviceWorker' in navigator) {
  */
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ErrorBoundary
-      onError={(error: Error, errorInfo: React.ErrorInfo) => {
-        console.error('Global error:', error, errorInfo);
-      }}
-    >
+    <ErrorBoundary>
       <App />
     </ErrorBoundary>
   </React.StrictMode>

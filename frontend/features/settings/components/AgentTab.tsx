@@ -358,7 +358,6 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((_props, ref) 
           {/* Claude - Permissions Category */}
           {selectedAgent === 'claude' && selectedCategory === 'permissions' && (
             <AgentPermissions
-              agent="claude"
               skipPermissions={skipPermissions}
               setSkipPermissions={setSkipPermissions}
               allowedTools={allowedTools}

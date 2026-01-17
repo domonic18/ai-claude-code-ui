@@ -172,7 +172,7 @@ export const ProjectList = memo(function ProjectList({
               onSetEditingSession,
               editingSessionName,
               onSetEditingSessionName,
-              onNewSession: () => handleNewSession(project),
+              onNewSession: () => handleNewSession(project.name),
             };
 
             return (

@@ -33,25 +33,14 @@ import { TaskMasterProvider } from './contexts/TaskMasterContext';
 import { TasksSettingsProvider } from '@/shared/contexts/TasksSettingsContext';
 import { WebSocketProvider, useWebSocketContext } from '@/shared/contexts/WebSocketContext';
 import ProtectedRoute from './components/ProtectedRoute';
-import { useVersionCheck } from './hooks/useVersionCheck';
-import useLocalStorage from './hooks/useLocalStorage';
+import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
+import useLocalStorage from '@/shared/hooks/useLocalStorage';
 import { api, authenticatedFetch } from './utils/api';
+import type { Project, Session as SidebarSession } from './features/sidebar/types/sidebar.types';
+import type { SettingsTab } from './features/settings/types/settings.types';
 
-// Type definitions
-interface Project {
-  name: string;
-  displayName?: string;
-  fullPath?: string;
-  path?: string;
-  sessionMeta?: {
-    total: number;
-  };
-  sessions?: Session[];
-  cursorSessions?: Session[];
-  codexSessions?: Session[];
-}
-
-interface Session {
+// Local type definitions (API response format)
+interface ApiSession {
   id: string;
   title?: string;
   created_at?: string;
@@ -59,6 +48,9 @@ interface Session {
   __provider?: 'claude' | 'cursor' | 'codex';
   __projectName?: string;
 }
+
+// Type alias for Session - use ApiSession internally but cast to SidebarSession when passing to Sidebar
+type Session = ApiSession;
 
 interface ReleaseInfo {
   title: string;
@@ -96,7 +88,7 @@ function AppContent() {
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [settingsInitialTab, setSettingsInitialTab] = useState('agents');
+  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>('agents');
   const [showQuickSettings, setShowQuickSettings] = useState(false);
   const [autoExpandTools, setAutoExpandTools] = useLocalStorage('autoExpandTools', false);
   const [showRawParameters, setShowRawParameters] = useLocalStorage('showRawParameters', false);
@@ -122,7 +114,8 @@ function AppContent() {
                           (window.navigator as any).standalone ||
                           document.referrer.includes('android-app://');
       setIsPWA(isStandalone);
-      document.addEventListener('touchstart', {});
+      // Enable touch action for PWA
+      document.addEventListener('touchstart', () => {}, { passive: true });
 
       if (isStandalone) {
         document.documentElement.classList.add('pwa-mode');
@@ -203,8 +196,8 @@ function AppContent() {
       return false;
     }
 
-    const currentSelectedSession = currentSelectedProject.sessions?.find(s => s.id === selectedSession.id);
-    const updatedSelectedSession = updatedSelectedProject.sessions?.find(s => s.id === selectedSession.id);
+    const currentSelectedSession = currentSelectedProject.sessions?.find(s => s.id === selectedSession.id) as Session | undefined;
+    const updatedSelectedSession = updatedSelectedProject.sessions?.find(s => s.id === selectedSession.id) as Session | undefined;
 
     if (!currentSelectedSession || !updatedSelectedSession) {
       return false;
@@ -364,7 +357,7 @@ function AppContent() {
   (window as any).refreshProjects = fetchProjects;
 
   // Expose openSettings function globally
-  (window as any).openSettings = useCallback((tab = 'tools') => {
+  (window as any).openSettings = useCallback((tab: SettingsTab = 'agents') => {
     setSettingsInitialTab(tab);
     setShowSettings(true);
   }, []);
@@ -427,13 +420,16 @@ function AppContent() {
     navigate(`/session/${session.id}`);
   };
 
-  const handleNewSession = (project: Project) => {
-    setSelectedProject(project);
-    setSelectedSession(null);
-    setActiveTab('chat');
-    navigate('/');
-    if (isMobile) {
-      setSidebarOpen(false);
+  const handleNewSession = (projectName: string) => {
+    const project = projects.find(p => p.name === projectName);
+    if (project) {
+      setSelectedProject(project);
+      setSelectedSession(null);
+      setActiveTab('chat');
+      navigate('/');
+      if (isMobile) {
+        setSidebarOpen(false);
+      }
     }
   };
 
@@ -762,7 +758,7 @@ function AppContent() {
               <Sidebar
                 projects={projects}
                 selectedProject={selectedProject}
-                selectedSession={selectedSession}
+                selectedSession={selectedSession as SidebarSession | null}
                 onProjectSelect={handleProjectSelect}
                 onSessionSelect={handleSessionSelect}
                 onNewSession={handleNewSession}
@@ -852,7 +848,7 @@ function AppContent() {
             <Sidebar
               projects={projects}
               selectedProject={selectedProject}
-              selectedSession={selectedSession}
+              selectedSession={selectedSession as SidebarSession | null}
               onProjectSelect={handleProjectSelect}
               onSessionSelect={handleSessionSelect}
               onNewSession={handleNewSession}

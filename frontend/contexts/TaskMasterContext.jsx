@@ -26,7 +26,7 @@ const TaskMasterContext = createContext({
   
   // Actions
   refreshProjects: () => {},
-  setCurrentProject: () => {},
+  setCurrentProject: (project) => {},
   refreshTasks: () => {},
   refreshMCPStatus: () => {},
   clearError: () => {}

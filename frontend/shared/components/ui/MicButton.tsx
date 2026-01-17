@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, Loader2, Brain } from 'lucide-react';
-import { transcribeWithWhisper } from '@/utils/audio/whisper';
+import { transcribeWithWhisper } from '../../../utils/whisper';
 
 export interface MicButtonProps {
   onTranscript?: (text: string) => void;

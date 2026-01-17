@@ -1,12 +1,7 @@
 import React, { createContext, useContext } from 'react';
 import { useWebSocket } from '@/utils/websocket';
 import { useAuth } from './AuthContext';
-
-export interface WebSocketMessage {
-  type: string;
-  data?: any;
-  [key: string]: any;
-}
+import type { WebSocketMessage } from '@/shared/types';
 
 export interface WebSocketContextValue {
   ws: WebSocket | null;

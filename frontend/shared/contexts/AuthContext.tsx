@@ -1,11 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { api } from '@/utils/api';
-
-export interface User {
-  id: string;
-  username: string;
-  email?: string;
-}
+import { api } from '@/shared/services';
+import type { User } from '@/shared/types';
 
 export interface AuthResult {
   success: boolean;

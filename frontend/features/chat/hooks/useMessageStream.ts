@@ -58,7 +58,7 @@ export function useMessageStream(options: UseMessageStreamOptions = {}): UseMess
   // Refs for stream buffering
   const streamBufferRef = useRef('');
   const thinkingBufferRef = useRef('');
-  const streamTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const streamTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasContentRef = useRef(false);
 
   /**

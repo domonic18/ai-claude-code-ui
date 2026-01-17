@@ -88,19 +88,14 @@ export function useAgentSettings(params: UseAgentSettingsParams): UseAgentSettin
   const loadSettings = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Load permissions
-      const [allowed, disallowed, skip] = await Promise.all([
-        settingsService.getAllowedTools(),
-        settingsService.getDisallowedTools(),
-        settingsService.getSkipPermissions(),
-      ]);
+      // Load permissions using getPermissions()
+      const permissions = await settingsService.getPermissions();
+      setAllowedTools(permissions.allowedTools || []);
+      setDisallowedTools(permissions.disallowedTools || []);
+      setSkipPermissions(permissions.skipPermissions || false);
 
-      setAllowedTools(allowed);
-      setDisallowedTools(disallowed);
-      setSkipPermissions(skip);
-
-      // Load MCP servers
-      const servers = await settingsService.getMcpServers(agentType);
+      // Load MCP servers (no parameters needed)
+      const servers = await settingsService.getMcpServers();
       setMcpServers(servers);
     } catch (error) {
       console.error(`[useAgentSettings] Error loading settings for ${agentType}:`, error);
@@ -117,21 +112,24 @@ export function useAgentSettings(params: UseAgentSettingsParams): UseAgentSettin
     setSaveStatus('idle');
 
     try {
-      const results = await Promise.all([
-        settingsService.saveAllowedTools(allowedTools),
-        settingsService.saveDisallowedTools(disallowedTools),
-        settingsService.saveSkipPermissions(skipPermissions),
-      ]);
+      const result = await settingsService.updatePermissions({
+        skipPermissions,
+        allowedTools,
+        disallowedTools,
+      });
 
-      const allSuccess = results.every(r => r === true);
-      setSaveStatus(allSuccess ? 'success' : 'error');
+      if (result.success) {
+        setSaveStatus('success');
+      } else {
+        setSaveStatus('error');
+      }
     } catch (error) {
       console.error('[useAgentSettings] Error saving permissions:', error);
       setSaveStatus('error');
     } finally {
       setIsSaving(false);
     }
-  }, [allowedTools, disallowedTools, skipPermissions, settingsService]);
+  }, [skipPermissions, allowedTools, disallowedTools, settingsService]);
 
   /**
    * Add a new allowed tool

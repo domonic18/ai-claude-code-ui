@@ -8,8 +8,8 @@
  */
 
 import React from 'react';
-import { Button } from '@/shared/components/ui/button';
-import { Badge } from '@/shared/components/ui/badge';
+import { Button } from '@/shared/components/ui/Button';
+import { Badge } from '@/shared/components/ui/Badge';
 import { Server, Terminal, Globe, Zap, Edit3, Trash2 } from 'lucide-react';
 import { McpServer, McpTransportType } from '../../types/settings.types';
 
