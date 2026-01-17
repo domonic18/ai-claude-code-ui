@@ -5,6 +5,7 @@
  */
 
 export { WebSocketClient, createWebSocketClient } from './websocketClient';
+export { useWebSocket } from './useWebSocket';
 export type {
   WebSocketMessage,
   WebSocketConfig,
@@ -12,3 +13,4 @@ export type {
   WebSocketState,
   IWebSocketClient,
 } from './websocketTypes';
+export type { UseWebSocketResult } from './useWebSocket';

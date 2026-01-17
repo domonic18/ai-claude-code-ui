@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from 'react';
-import { useWebSocket } from '@/utils/websocket';
+import { useWebSocket } from '@/shared/services/websocket';
 import { useAuth } from './AuthContext';
 import type { WebSocketMessage } from '@/shared/types';
 
