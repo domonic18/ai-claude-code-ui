@@ -14,6 +14,8 @@ export default defineConfig(({ command, mode }) => {
         '@': path.resolve(__dirname, './frontend'),
         '@/features': path.resolve(__dirname, './frontend/features'),
         '@/shared': path.resolve(__dirname, './frontend/shared'),
+        '@/config': path.resolve(__dirname, './frontend/config'),
+        '@/lib': path.resolve(__dirname, './frontend/lib'),
       },
     },
     server: {
