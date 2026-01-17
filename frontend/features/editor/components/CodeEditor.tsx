@@ -14,6 +14,13 @@ import { EditorView, showPanel, ViewPlugin } from '@codemirror/view';
 import { X, Save, Download, Maximize2, Minimize2 } from 'lucide-react';
 import { api } from '@/shared/services';
 
+// Extend Window interface
+declare global {
+  interface Window {
+    openSettings?: (tab: string) => void;
+  }
+}
+
 function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded = false, onToggleExpand = null }) {
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);

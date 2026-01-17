@@ -554,7 +554,7 @@ This document outlines the requirements for building an AI-powered task manageme
                     <span className="text-sm sm:text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap ml-1">.txt</span>
                   </div>
                   <button
-                    onClick={() => document.querySelector('input[placeholder="Enter PRD filename"]')?.focus()}
+                    onClick={() => (document.querySelector('input[placeholder="Enter PRD filename"]') as HTMLElement)?.focus()}
                     className="p-1 text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
                     title="Click to edit filename"
                   >

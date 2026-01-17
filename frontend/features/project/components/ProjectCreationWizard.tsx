@@ -131,7 +131,13 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {
     setError(null);
 
     try {
-      const payload = {
+      const payload: {
+        workspaceType: string;
+        path: string;
+        githubUrl?: string;
+        githubTokenId?: number;
+        newGithubToken?: string;
+      } = {
         workspaceType,
         path: workspacePath.trim(),
       };

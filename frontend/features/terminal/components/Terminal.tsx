@@ -300,8 +300,6 @@ function Shell({ selectedProject, selectedSession, initialCommand, isPlainShell 
         foreground: '#d4d4d4',
         cursor: '#ffffff',
         cursorAccent: '#1e1e1e',
-        selection: '#264f78',
-        selectionForeground: '#ffffff',
         black: '#000000',
         red: '#cd3131',
         green: '#0dbc79',
@@ -317,14 +315,8 @@ function Shell({ selectedProject, selectedSession, initialCommand, isPlainShell 
         brightBlue: '#3b8eea',
         brightMagenta: '#d670d6',
         brightCyan: '#29b8db',
-        brightWhite: '#ffffff',
-        extendedAnsi: [
-          '#000000', '#800000', '#008000', '#808000',
-          '#000080', '#800080', '#008080', '#c0c0c0',
-          '#808080', '#ff0000', '#00ff00', '#ffff00',
-          '#0000ff', '#ff00ff', '#00ffff', '#ffffff'
-        ]
-      }
+        brightWhite: '#ffffff'
+      } as any
     });
 
     fitAddon.current = new FitAddon();

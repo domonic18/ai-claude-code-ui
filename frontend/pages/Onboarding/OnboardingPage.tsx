@@ -474,8 +474,6 @@ const Onboarding = ({ onComplete }) => {
                     }`}>
                       {index < currentStep ? (
                         <Check className="w-6 h-6" />
-                      ) : typeof step.icon === 'function' ? (
-                        <step.icon />
                       ) : (
                         <step.icon className="w-6 h-6" />
                       )}
