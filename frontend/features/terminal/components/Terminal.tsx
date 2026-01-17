@@ -561,4 +561,4 @@ function Shell({
 }
 
 export default Shell;
-export { Shell as Terminal };
+export { Shell as Terminal, Shell };
