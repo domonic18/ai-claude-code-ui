@@ -1,9 +1,12 @@
 import React from 'react';
 import { useAuth } from '@/shared/contexts/AuthContext';
-import SetupForm from './SetupForm';
-import LoginForm from './LoginForm';
-import Onboarding from './Onboarding';
+import { SetupForm, LoginForm } from '@/features/auth';
+import { OnboardingPage } from '@/pages/Onboarding';
 import { MessageSquare } from 'lucide-react';
+
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+}
 
 const LoadingScreen = () => (
   <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -24,7 +27,7 @@ const LoadingScreen = () => (
   </div>
 );
 
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { user, isLoading, needsSetup, hasCompletedOnboarding, refreshOnboardingStatus } = useAuth();
 
   if (import.meta.env.VITE_IS_PLATFORM === 'true') {
@@ -33,10 +36,10 @@ const ProtectedRoute = ({ children }) => {
     }
 
     if (!hasCompletedOnboarding) {
-      return <Onboarding onComplete={refreshOnboardingStatus} />;
+      return <OnboardingPage onComplete={refreshOnboardingStatus} />;
     }
 
-    return children;
+    return <>{children}</>;
   }
 
   if (isLoading) {
@@ -52,10 +55,10 @@ const ProtectedRoute = ({ children }) => {
   }
 
   if (!hasCompletedOnboarding) {
-    return <Onboarding onComplete={refreshOnboardingStatus} />;
+    return <OnboardingPage onComplete={refreshOnboardingStatus} />;
   }
 
-  return children;
+  return <>{children}</>;
 };
 
 export default ProtectedRoute;

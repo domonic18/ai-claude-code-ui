@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronRight, ChevronLeft, Check, GitBranch, User, Mail, LogIn, ExternalLink, Loader2 } from 'lucide-react';
-import ClaudeLogo from './ClaudeLogo';
-import CursorLogo from './CursorLogo';
-import CodexLogo from './CodexLogo';
-import LoginModal from './LoginModal';
+import { ClaudeLogo, CursorLogo, CodexLogo } from '@/shared/assets/icons';
+import { LoginModal } from '@/features/auth';
 import { authenticatedFetch } from '@/shared/services';
 import { useAuth } from '@/shared/contexts/AuthContext';
 
