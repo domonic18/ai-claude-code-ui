@@ -10,6 +10,7 @@
  */
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Moon, Sun } from 'lucide-react';
 import { useTheme } from '@/shared/contexts/ThemeContext';
 import { useCodeEditorSettings } from '../hooks';
@@ -18,6 +19,7 @@ import { useCodeEditorSettings } from '../hooks';
  * AppearanceTab Component
  */
 export function AppearanceTab() {
+  const { t } = useTranslation();
   const { isDarkMode, toggleDarkMode } = useTheme();
   const { settings, setCodeEditorTheme, setCodeEditorWordWrap, setCodeEditorShowMinimap, setCodeEditorLineNumbers, setCodeEditorFontSize } = useCodeEditorSettings();
 
@@ -32,10 +34,10 @@ export function AppearanceTab() {
           <div className="flex items-center justify-between">
             <div>
               <div className="font-medium text-foreground">
-                Dark Mode
+                {t('settings.appearance.darkMode')}
               </div>
               <div className="text-sm text-muted-foreground">
-                Toggle between light and dark themes
+                {t('settings.appearance.darkModeDescription')}
               </div>
             </div>
             <button
@@ -45,9 +47,9 @@ export function AppearanceTab() {
               }`}
               role="switch"
               aria-checked={isDarkMode}
-              aria-label="Toggle dark mode"
+              aria-label={t('settings.appearance.toggleDarkMode')}
             >
-              <span className="sr-only">Toggle dark mode</span>
+              <span className="sr-only">{t('settings.appearance.toggleDarkMode')}</span>
               <span
                 className={`${
                   isDarkMode ? 'translate-x-7' : 'translate-x-1'
@@ -70,10 +72,10 @@ export function AppearanceTab() {
           <div className="flex items-center justify-between">
             <div>
               <div className="font-medium text-foreground">
-                Project Sorting
+                {t('settings.appearance.projectSorting')}
               </div>
               <div className="text-sm text-muted-foreground">
-                How projects are ordered in the sidebar
+                {t('settings.appearance.projectSortingDescription')}
               </div>
             </div>
             <select
@@ -81,8 +83,8 @@ export function AppearanceTab() {
               onChange={(e) => setProjectSortOrder(e.target.value)}
               className="text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2 w-32"
             >
-              <option value="name">Alphabetical</option>
-              <option value="date">Recent Activity</option>
+              <option value="name">{t('settings.appearance.alphabetical')}</option>
+              <option value="date">{t('settings.appearance.recentActivity')}</option>
             </select>
           </div>
         </div>
@@ -90,17 +92,17 @@ export function AppearanceTab() {
 
       {/* Code Editor Settings */}
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-foreground">Code Editor</h3>
+        <h3 className="text-lg font-semibold text-foreground">{t('settings.appearance.codeEditor')}</h3>
 
         {/* Editor Theme */}
         <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div>
               <div className="font-medium text-foreground">
-                Editor Theme
+                {t('settings.appearance.editorTheme')}
               </div>
               <div className="text-sm text-muted-foreground">
-                Default theme for the code editor
+                {t('settings.appearance.editorThemeDescription')}
               </div>
             </div>
             <button
@@ -110,9 +112,9 @@ export function AppearanceTab() {
               }`}
               role="switch"
               aria-checked={settings.theme === 'dark'}
-              aria-label="Toggle editor theme"
+              aria-label={t('settings.appearance.toggleEditorTheme')}
             >
-              <span className="sr-only">Toggle editor theme</span>
+              <span className="sr-only">{t('settings.appearance.toggleEditorTheme')}</span>
               <span
                 className={`${
                   settings.theme === 'dark' ? 'translate-x-7' : 'translate-x-1'
@@ -133,10 +135,10 @@ export function AppearanceTab() {
           <div className="flex items-center justify-between">
             <div>
               <div className="font-medium text-foreground">
-                Word Wrap
+                {t('settings.appearance.wordWrap')}
               </div>
               <div className="text-sm text-muted-foreground">
-                Enable word wrapping by default in the editor
+                {t('settings.appearance.wordWrapDescription')}
               </div>
             </div>
             <button
@@ -146,9 +148,9 @@ export function AppearanceTab() {
               }`}
               role="switch"
               aria-checked={settings.wordWrap}
-              aria-label="Toggle word wrap"
+              aria-label={t('settings.appearance.toggleWordWrap')}
             >
-              <span className="sr-only">Toggle word wrap</span>
+              <span className="sr-only">{t('settings.appearance.toggleWordWrap')}</span>
               <span
                 className={`${
                   settings.wordWrap ? 'translate-x-7' : 'translate-x-1'
@@ -163,10 +165,10 @@ export function AppearanceTab() {
           <div className="flex items-center justify-between">
             <div>
               <div className="font-medium text-foreground">
-                Show Minimap
+                {t('settings.appearance.showMinimap')}
               </div>
               <div className="text-sm text-muted-foreground">
-                Display a minimap for easier navigation in diff view
+                {t('settings.appearance.showMinimapDescription')}
               </div>
             </div>
             <button
@@ -176,9 +178,9 @@ export function AppearanceTab() {
               }`}
               role="switch"
               aria-checked={settings.showMinimap}
-              aria-label="Toggle minimap"
+              aria-label={t('settings.appearance.toggleMinimap')}
             >
-              <span className="sr-only">Toggle minimap</span>
+              <span className="sr-only">{t('settings.appearance.toggleMinimap')}</span>
               <span
                 className={`${
                   settings.showMinimap ? 'translate-x-7' : 'translate-x-1'
@@ -193,10 +195,10 @@ export function AppearanceTab() {
           <div className="flex items-center justify-between">
             <div>
               <div className="font-medium text-foreground">
-                Show Line Numbers
+                {t('settings.appearance.showLineNumbers')}
               </div>
               <div className="text-sm text-muted-foreground">
-                Display line numbers in the editor
+                {t('settings.appearance.showLineNumbersDescription')}
               </div>
             </div>
             <button
@@ -206,9 +208,9 @@ export function AppearanceTab() {
               }`}
               role="switch"
               aria-checked={settings.lineNumbers}
-              aria-label="Toggle line numbers"
+              aria-label={t('settings.appearance.toggleLineNumbers')}
             >
-              <span className="sr-only">Toggle line numbers</span>
+              <span className="sr-only">{t('settings.appearance.toggleLineNumbers')}</span>
               <span
                 className={`${
                   settings.lineNumbers ? 'translate-x-7' : 'translate-x-1'
@@ -223,10 +225,10 @@ export function AppearanceTab() {
           <div className="flex items-center justify-between">
             <div>
               <div className="font-medium text-foreground">
-                Font Size
+                {t('settings.appearance.fontSize')}
               </div>
               <div className="text-sm text-muted-foreground">
-                Editor font size in pixels
+                {t('settings.appearance.fontSizeDescription')}
               </div>
             </div>
             <select
