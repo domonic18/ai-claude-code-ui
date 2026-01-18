@@ -12,7 +12,7 @@
  * - Integration with TaskMaster context
  */
 
-import React, { useState, useEffect, useCallback, memo } from 'react';
+import React, { useState, useEffect, useCallback, memo, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import SidebarHeader from './SidebarHeader';
 import ProjectSearch from './ProjectSearch';
@@ -102,11 +102,31 @@ export const Sidebar = memo(function Sidebar({
   }, []);
 
   // Auto-expand project when a session is selected
+  // Use ref to track previous session/project to avoid unnecessary updates
+  const prevSelectionRef = useRef<{ sessionId?: string; projectName?: string } | null>(null);
+
   useEffect(() => {
-    if (selectedSession && selectedProject) {
-      setExpandedProjects(prev => new Set([...prev, selectedProject.name]));
+    const currentSelection = {
+      sessionId: selectedSession?.id,
+      projectName: selectedProject?.name
+    };
+
+    // Only expand if the selection actually changed
+    const hasChanged = !prevSelectionRef.current ||
+                       prevSelectionRef.current.sessionId !== currentSelection.sessionId ||
+                       prevSelectionRef.current.projectName !== currentSelection.projectName;
+
+    if (hasChanged && selectedSession && selectedProject) {
+      setExpandedProjects(prev => {
+        // Only update if project is not already expanded
+        if (prev.has(selectedProject.name)) {
+          return prev; // Return same reference to avoid re-render
+        }
+        return new Set([...prev, selectedProject.name]);
+      });
+      prevSelectionRef.current = currentSelection;
     }
-  }, [selectedSession, selectedProject]);
+  }, [selectedSession?.id, selectedProject?.name]);
 
   // Filter and sort projects
   const filteredAndSortedProjects = getSortedProjects(starredProjects);

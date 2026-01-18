@@ -10,7 +10,7 @@
  * - Manages session loading and pagination
  */
 
-import React, { memo, useCallback, useState, useEffect } from 'react';
+import React, { memo, useCallback, useState, useEffect, useRef } from 'react';
 import { ScrollArea } from '@/shared/components/ui/ScrollArea';
 import { formatTimeAgo, getAllSessions } from '../utils/timeFormatters';
 import type { ProjectListProps, Project, Session, SessionProvider } from '../types/sidebar.types';
@@ -55,15 +55,28 @@ export const ProjectList = memo(function ProjectList({
   // Track initial sessions loaded state per project
   const [initialSessionsLoaded, setInitialSessionsLoaded] = useState<Set<string>>(new Set());
 
+  // Use ref to track previous projects for deep comparison
+  const prevProjectsRef = useRef<Project[]>([]);
+
   // Mark all projects as loaded when they come in (regardless of whether they have sessions)
   useEffect(() => {
-    const newLoaded = new Set<string>();
-    projects.forEach(project => {
-      // All projects should be marked as loaded when we receive them
-      // The sessions data (even if empty) has been loaded from the server
-      newLoaded.add(project.name);
-    });
-    setInitialSessionsLoaded(newLoaded);
+    // Check if projects have actually changed by comparing project names
+    const prevNames = new Set(prevProjectsRef.current.map(p => p.name));
+    const currentNames = new Set(projects.map(p => p.name));
+
+    const hasChanged = projects.length !== prevProjectsRef.current.length ||
+                       !projects.every(p => prevNames.has(p.name));
+
+    if (hasChanged) {
+      const newLoaded = new Set<string>();
+      projects.forEach(project => {
+        // All projects should be marked as loaded when we receive them
+        // The sessions data (even if empty) has been loaded from the server
+        newLoaded.add(project.name);
+      });
+      setInitialSessionsLoaded(newLoaded);
+      prevProjectsRef.current = projects;
+    }
   }, [projects]);
 
   const handleSaveProjectName = useCallback(async (projectName: string, newName: string) => {

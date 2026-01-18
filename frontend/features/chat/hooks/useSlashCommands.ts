@@ -152,7 +152,7 @@ export function useSlashCommands({
     };
 
     fetchCommands();
-  }, [selectedProject, authenticatedFetch]);
+  }, [selectedProject?.name, authenticatedFetch]);
 
   // Update frequent commands
   const updateFrequentCommands = useCallback((allCommands: SlashCommand[], projectName: string) => {
