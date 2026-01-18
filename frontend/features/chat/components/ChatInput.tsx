@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useDropzone } from 'react-dropzone';
 import { CommandAutocomplete } from './CommandAutocomplete';
 import { FileReferenceMenu } from './FileReferenceMenu';
@@ -75,7 +76,7 @@ export function ChatInput({
   sendByCtrlEnter = false,
   onFocusChange,
   maxFileSize = MAX_FILE_SIZE,
-  placeholder = 'Type your message...',
+  placeholder,
   minRows = 1,
   maxRows = 10,
   projectName = '',
@@ -100,6 +101,7 @@ export function ChatInput({
   authenticatedFetch,
   selectedProject,
 }: ChatInputComponentProps) {
+  const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
@@ -279,7 +281,7 @@ export function ChatInput({
           onKeyDown={handleKeyDown}
           onFocus={handleFocus}
           onBlur={handleBlur}
-          placeholder={placeholder}
+          placeholder={placeholder || t('chat.typeMessage')}
           disabled={disabled || isLoading}
           rows={minRows}
           className="flex-1 resize-none bg-transparent outline-none text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 disabled:opacity-50"
@@ -415,13 +417,12 @@ export function ChatInput({
       {/* Hint text */}
       <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
         {sendByCtrlEnter ? (
-          <>Press <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">Ctrl+Enter</kbd> to send</>
+          <>{t('chat.pressCtrlEnter')} <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">Ctrl+Enter</kbd> {t('chat.toSend')}</>
         ) : (
-          <>Press <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">Enter</kbd> to send, <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">Shift+Enter</kbd> for new line</>
+          <>{t('chat.pressEnter')} <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">Enter</kbd> {t('chat.toSend')}, <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">Shift+Enter</kbd> {t('chat.forNewLine')}</>
         )}
         {selectedProject && !sendByCtrlEnter && (
-          <span>, type <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">/</kbd> for commands or <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">@</kbd> for files
-        </span>
+          <span>, {t('chat.typeForCommands')} <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">/</kbd> {t('chat.forCommands')} {t('chat.or')} <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">@</kbd> {t('chat.forFiles')}</span>
       )}
       </div>
     </div>

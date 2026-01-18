@@ -12,6 +12,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ChatMessageList,
   ChatInput,
@@ -125,6 +126,8 @@ export function ChatInterface({
   onShowAllTasks,
   onSetTokenBudget,
 }: ChatInterfaceProps) {
+  const { t } = useTranslation();
+
   // State
   const [input, setInput] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<FileAttachment[]>([]);
@@ -490,8 +493,8 @@ export function ChatInterface({
           projectName={selectedProject?.name}
           placeholder={
             selectedProject
-              ? `Message about ${selectedProject.name}...`
-              : 'Select a project to start chatting...'
+              ? t('chat.messageAbout', { project: selectedProject.name })
+              : t('chat.selectProject')
           }
           // Command system props
           commands={filteredCommands}
