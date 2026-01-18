@@ -18,6 +18,7 @@ export type EditorLanguage =
   | 'rust'
   | 'php'
   | 'ruby'
+  | 'perl'
   | 'sql'
   | 'yaml'
   | 'json'
@@ -80,8 +81,20 @@ export interface PRDDocument {
   metadata?: {
     version?: string;
     author?: string;
-    lastModified?: Date;
+    lastModified?: Date | string;
+    created?: Date | string;
   };
+}
+
+/**
+ * PRD file item
+ */
+export interface PRDItem {
+  name: string;
+  path?: string;
+  content?: string;
+  modified?: string;
+  created?: Date | string;
 }
 
 /**
@@ -119,9 +132,12 @@ export interface EditorFile {
   content?: string;
   language?: EditorLanguage;
   extension?: string;
+  projectName?: string;
   diffInfo?: {
     original: string;
     modified: string;
+    old_string?: string;
+    new_string?: string;
     hunks?: Array<{
       oldStart: number;
       oldLines: number;
@@ -163,10 +179,12 @@ export interface PRDEditorComponentProps {
   currentProject?: {
     name: string;
     path: string;
+    fullPath?: string;
   } | null;
   initialPRD?: {
     name?: string;
     content?: string;
+    path?: string;
     isExisting?: boolean;
   };
   onClose?: () => void;

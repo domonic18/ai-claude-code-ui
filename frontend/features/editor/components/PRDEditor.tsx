@@ -18,7 +18,7 @@ const PRDEditor = ({
   onSave,
   className = ''
 }: PRDEditorComponentProps & {
-  file?: { path: string; name: string };
+  file?: { path: string; name: string; content?: string; projectName?: string; isExisting?: boolean };
   projectPath?: string;
   project?: { name: string; path: string };
   initialContent?: string;
