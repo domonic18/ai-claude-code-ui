@@ -12,7 +12,7 @@ import type {
   WorkspaceCreationOptions,
   ProjectFile,
   Session,
-} from '../types';
+} from '../types/sidebar.types';
 
 /**
  * Hook for project management functionality

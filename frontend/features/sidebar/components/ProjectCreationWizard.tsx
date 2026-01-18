@@ -3,7 +3,7 @@ import { X, FolderPlus, GitBranch, Key, ChevronRight, ChevronLeft, Check, Loader
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
 import { api } from '@/shared/services';
-import type { Project, ProjectCreationWizardProps } from '../types/project.types';
+import type { Project, ProjectCreationWizardProps } from '../types/sidebar.types';
 
 const ProjectCreationWizard = ({ onClose, onProjectCreated, isOpen = true, mode = 'create' }: ProjectCreationWizardProps) => {
   // Wizard state
@@ -62,7 +62,7 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated, isOpen = true, mode 
     }
   };
 
-  const loadPathSuggestions = async (inputPath) => {
+  const loadPathSuggestions = async (inputPath: string) => {
     try {
       // Extract the directory to browse (parent of input)
       const lastSlash = inputPath.lastIndexOf('/');
@@ -82,7 +82,7 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated, isOpen = true, mode 
 
       if (response.ok && responseData.data?.suggestions) {
         // Filter suggestions based on the input
-        const filtered = responseData.data.suggestions.filter(s =>
+        const filtered = responseData.data.suggestions.filter((s: { path: string }) =>
           s.path.toLowerCase().startsWith(inputPath.toLowerCase())
         );
         setPathSuggestions(filtered.slice(0, 5));
@@ -185,13 +185,13 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated, isOpen = true, mode 
       onClose();
     } catch (error) {
       console.error('[ProjectCreationWizard] Error creating workspace:', error);
-      setError(error.message || 'Failed to create workspace');
+      setError((error as Error).message || 'Failed to create workspace');
     } finally {
       setIsCreating(false);
     }
   };
 
-  const selectPathSuggestion = (suggestion) => {
+  const selectPathSuggestion = (suggestion: { path: string }) => {
     setWorkspacePath(suggestion.path);
     setShowPathDropdown(false);
   };
@@ -453,7 +453,7 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated, isOpen = true, mode 
                                 <option value="">-- Select a token --</option>
                                 {availableTokens.map((token) => (
                                   <option key={token.id} value={token.id}>
-                                    {token.credential_name}
+                                    {token.name}
                                   </option>
                                 ))}
                               </select>
@@ -542,7 +542,7 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated, isOpen = true, mode 
                         <span className="text-gray-600 dark:text-gray-400">Authentication:</span>
                         <span className="text-xs text-gray-900 dark:text-white">
                           {tokenMode === 'stored' && selectedGithubToken
-                            ? `Using stored token: ${availableTokens.find(t => t.id.toString() === selectedGithubToken)?.credential_name || 'Unknown'}`
+                            ? `Using stored token: ${availableTokens.find(t => t.id.toString() === selectedGithubToken)?.name || 'Unknown'}`
                             : tokenMode === 'new' && newGithubToken
                             ? 'Using provided token'
                             : 'No authentication'}

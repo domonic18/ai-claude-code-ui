@@ -18,7 +18,7 @@ import SidebarHeader from './SidebarHeader';
 import ProjectSearch from './ProjectSearch';
 import VersionBanner from './VersionBanner';
 import ProjectList from './ProjectList';
-import { ProjectCreationWizard } from '@/features/project';
+import ProjectCreationWizard from './ProjectCreationWizard';
 import { TIMESTAMP_UPDATE_INTERVAL } from '../constants/sidebar.constants';
 import type { SidebarProps, ExpandedProjects } from '../types/sidebar.types';
 import { useProjects } from '../hooks';
@@ -253,7 +253,7 @@ export const Sidebar = memo(function Sidebar({
           onClose={() => setShowNewProject(false)}
           onProjectCreated={async (newProject) => {
             try {
-              const created = await createProject(newProject.path);
+              const created = await createProject(newProject.fullPath || (newProject as any).path);
               // 选中新创建的项目
               if (onProjectSelect && created) {
                 onProjectSelect(created);

@@ -5,6 +5,16 @@
  */
 
 /**
+ * Project type enum
+ */
+export type ProjectType = 'default' | 'workspace' | 'git' | 'svn';
+
+/**
+ * Project status
+ */
+export type ProjectStatus = 'active' | 'archived' | 'deleted';
+
+/**
  * Session provider type
  */
 export type SessionProvider = 'claude' | 'cursor' | 'codex';
@@ -58,6 +68,52 @@ export interface Project {
   codexSessions?: Session[];
   sessionMeta?: SessionMeta;
   lastActivity?: string;
+  type?: ProjectType;
+  status?: ProjectStatus;
+  description?: string;
+  createdAt?: Date;
+  lastModified?: Date;
+}
+
+/**
+ * Project creation options
+ */
+export interface ProjectCreationOptions {
+  path: string;
+  displayName?: string;
+  type?: ProjectType;
+  description?: string;
+}
+
+/**
+ * Workspace creation options
+ */
+export interface WorkspaceCreationOptions extends ProjectCreationOptions {
+  type: 'workspace';
+  projects?: string[];
+}
+
+/**
+ * File in project
+ */
+export interface ProjectFile {
+  path: string;
+  name: string;
+  type: 'file' | 'directory';
+  size?: number;
+  modifiedTime?: Date;
+}
+
+/**
+ * Project creation wizard props
+ */
+export interface ProjectCreationWizardProps {
+  isOpen: boolean;
+  onClose?: () => void;
+  onProjectCreated?: (project: Project) => void;
+  onComplete?: (project: Project) => void;
+  onCancel?: () => void;
+  mode?: 'create' | 'workspace';
 }
 
 /**

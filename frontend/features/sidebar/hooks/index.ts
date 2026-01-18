@@ -15,3 +15,12 @@ export type { UseProjectSearchReturn } from './useProjectSearch';
 
 export { useStarredProjects } from './useStarredProjects';
 export type { UseStarredProjectsReturn } from './useStarredProjects';
+
+// Project management hooks (merged from features/project)
+export { useProject, useProjectFiles, useWorkspace, useProjectSessions } from './useProject';
+export type {
+  UseProjectReturn,
+  UseProjectFilesReturn,
+  UseWorkspaceReturn,
+  UseProjectSessionsReturn,
+} from './useProject';

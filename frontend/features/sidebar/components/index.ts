@@ -14,3 +14,4 @@ export { SessionList } from './SessionList';
 export { ProjectCard } from './ProjectCard';
 export { ProjectCardDesktop } from './ProjectCardDesktop';
 export { ProjectList } from './ProjectList';
+export { default as ProjectCreationWizard } from './ProjectCreationWizard';
