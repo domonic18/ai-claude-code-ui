@@ -84,8 +84,8 @@ export interface AppActions {
 
   // Project actions
   fetchProjects: (isRetry?: boolean) => Promise<void>;
-  handleProjectSelect: (project: Project) => void;
-  handleSessionSelect: (session: Session) => void;
+  handleProjectSelect: (project: Project, shouldNavigate?: boolean, preventAutoSession?: boolean) => void;
+  handleSessionSelect: (session: Session, projectName?: string) => void;
   handleNewSession: (projectName: string) => void;
   handleSessionDelete: (deletedSessionId: string) => void;
   handleSidebarRefresh: () => Promise<void>;

@@ -12,8 +12,10 @@ import type { Project } from '@/features/sidebar/types/sidebar.types';
 export interface ApiSession {
   id: string;
   title?: string;
+  summary?: string; // Add summary for compatibility
   created_at?: string;
   updated_at?: string;
+  lastActivity?: string; // Add lastActivity for compatibility
   __provider?: 'claude' | 'cursor' | 'codex';
   __projectName?: string;
 }
@@ -38,7 +40,7 @@ export interface ProjectManagementState {
  */
 export interface ProjectManagementActions {
   fetchProjects: (isRetry?: boolean) => Promise<void>;
-  handleProjectSelect: (project: Project) => void;
+  handleProjectSelect: (project: Project, shouldNavigate?: boolean, preventAutoSession?: boolean) => void;
   handleSessionSelect: (session: Session) => void;
   setSelectedSession: (session: Session | null) => void;
   handleNewSession: (projectName: string) => void;
