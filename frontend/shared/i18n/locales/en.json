@@ -69,7 +69,28 @@
     "send": "Send",
     "attachFile": "Attach File",
     "typeMessage": "Type your message...",
-    "thinking": "Thinking..."
+    "thinking": "Thinking...",
+    "messageAbout": "Message about {{project}}...",
+    "selectProject": "Select a project to start chatting...",
+    "pressCtrlEnter": "Press",
+    "toSend": "to send",
+    "pressEnter": "Press",
+    "forNewLine": "for new line",
+    "typeForCommands": "type",
+    "forCommands": "for commands",
+    "or": "or",
+    "forFiles": "for files",
+    "stop": "Stop",
+    "tokenUsage": "Token usage: {{percentage}}%",
+    "context": "Context: {{tokens}} tokens"
+  },
+  "permissionMode": {
+    "default": "Bypass Permissions",
+    "acceptEdits": "Accept Edits",
+    "plan": "Plan Mode",
+    "description": "Click to change permission mode (or press Tab in input)",
+    "acceptEditsDescription": "Auto-accept file edits suggested by AI",
+    "planDescription": "Planning mode - review before executing"
   },
   "settings": {
     "title": "Settings",

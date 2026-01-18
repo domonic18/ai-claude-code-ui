@@ -69,7 +69,28 @@
     "send": "发送",
     "attachFile": "附加文件",
     "typeMessage": "输入您的消息...",
-    "thinking": "思考中..."
+    "thinking": "思考中...",
+    "messageAbout": "关于 {{project}} 的消息...",
+    "selectProject": "选择一个项目以开始聊天...",
+    "pressCtrlEnter": "按",
+    "toSend": "发送",
+    "pressEnter": "按",
+    "forNewLine": "换行",
+    "typeForCommands": "输入",
+    "forCommands": "使用命令",
+    "or": "或",
+    "forFiles": "引用文件",
+    "stop": "停止",
+    "tokenUsage": "令牌使用: {{percentage}}%",
+    "context": "上下文: {{tokens}} 令牌"
+  },
+  "permissionMode": {
+    "default": "绕过权限",
+    "acceptEdits": "接受编辑",
+    "plan": "计划模式",
+    "description": "点击更改权限模式（或在输入框中按 Tab）",
+    "acceptEditsDescription": "自动接受 AI 建议的文件编辑",
+    "planDescription": "计划模式 - 执行前先审查"
   },
   "settings": {
     "title": "设置",
