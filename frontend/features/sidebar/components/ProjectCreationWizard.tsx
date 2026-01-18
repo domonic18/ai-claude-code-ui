@@ -9,7 +9,7 @@
  * - Real-time validation feedback
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, FolderPlus, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
@@ -41,24 +41,32 @@ async function checkNameAvailability(projectName: string): Promise<NameAvailabil
     const response = await api.browseFilesystem('/workspace');
 
     if (!response.ok) {
+      console.warn('[checkNameAvailability] API response not OK:', response.status);
       return 'error';
     }
 
     const data = await response.json();
+    console.log('[checkNameAvailability] API response:', data);
 
     // Check if the project name already exists in suggestions
-    if (data.data?.suggestions) {
+    if (data.data?.suggestions && Array.isArray(data.data.suggestions)) {
       const exists = data.data.suggestions.some(
-        (item: { path: string; type: string }) =>
-          item.type === 'directory' && item.path.endsWith(`/${projectName}`)
+        (item: { path: string; type: string; name?: string }) => {
+          // Check by path ending or by name field
+          const pathMatch = item.path?.endsWith(`/${projectName}`);
+          const nameMatch = item.name === projectName;
+          return item.type === 'directory' && (pathMatch || nameMatch);
+        }
       );
+      console.log('[checkNameAvailability] Project exists:', projectName, exists);
       return exists ? 'unavailable' : 'available';
     }
 
     // If we can't determine, assume available
+    console.warn('[checkNameAvailability] No suggestions in response, assuming available');
     return 'available';
   } catch (error) {
-    console.error('Error checking name availability:', error);
+    console.error('[checkNameAvailability] Error:', error);
     return 'error';
   }
 }
@@ -98,6 +106,9 @@ const ProjectCreationWizard = ({
   const [error, setError] = useState<string | null>(null);
   const [availabilityStatus, setAvailabilityStatus] = useState<NameAvailabilityStatus>('idle');
 
+  // Track initial load to skip check for the auto-generated name
+  const isInitialLoad = useRef(true);
+
   /**
    * Check project name availability with debounce
    */
@@ -122,6 +133,8 @@ const ProjectCreationWizard = ({
     const initializeName = async () => {
       const availableName = await generateAvailableName(DEFAULT_PROJECT_NAME);
       setProjectName(availableName);
+      // Mark initial load as complete after setting the name
+      isInitialLoad.current = false;
     };
 
     initializeName();
@@ -131,8 +144,8 @@ const ProjectCreationWizard = ({
    * Check availability when project name changes
    */
   useEffect(() => {
-    if (projectName === DEFAULT_PROJECT_NAME) {
-      // Skip check for initial default name
+    if (isInitialLoad.current) {
+      // Skip check during initial load
       return;
     }
     checkAvailability(projectName);
