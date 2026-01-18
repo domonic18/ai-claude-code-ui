@@ -33,6 +33,7 @@ import { AuthProvider, useAuth } from '@/shared/contexts/AuthContext';
 import { TaskMasterProvider } from '@/shared/contexts/TaskMasterContext';
 import { TasksSettingsProvider } from '@/shared/contexts/TasksSettingsContext';
 import { WebSocketProvider, useWebSocketContext } from '@/shared/contexts/WebSocketContext';
+import { QueryClientProvider, queryClient } from '@/shared/libs/query';
 import { ProtectedRoute } from '@/router';
 import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import useLocalStorage from '@/shared/hooks/useLocalStorage';
@@ -568,11 +569,12 @@ function RootRedirect() {
 // Root App component with router
 function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <WebSocketProvider>
-          <TasksSettingsProvider>
-            <TaskMasterProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <AuthProvider>
+          <WebSocketProvider>
+            <TasksSettingsProvider>
+              <TaskMasterProvider>
                 <Router future={{
                   v7_startTransition: true,
                   v7_relativeSplatPath: true
@@ -597,11 +599,12 @@ function App() {
                     <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                 </Router>
-            </TaskMasterProvider>
-          </TasksSettingsProvider>
-        </WebSocketProvider>
-      </AuthProvider>
-    </ThemeProvider>
+              </TaskMasterProvider>
+            </TasksSettingsProvider>
+          </WebSocketProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
 
