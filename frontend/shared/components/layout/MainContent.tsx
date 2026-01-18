@@ -522,6 +522,7 @@ function MainContent({
           isNewFile={!selectedPRD?.isExisting}
           file={{
             name: selectedPRD?.name || 'prd.txt',
+            path: selectedPRD?.name || '',
             content: selectedPRD?.content || ''
           } as any}
           onSave={async () => {

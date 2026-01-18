@@ -33,7 +33,7 @@ export interface MessageHandlerCallbacks {
   // Session state updates
   onSetLoading: (loading: boolean) => void;
   onSetSessionId: (sessionId: string) => void;
-  onReplaceTemporarySession?: (realSessionId: string) => void;
+  onReplaceTemporarySession?: (tempId: string, realId: string) => void;
   onNavigateToSession?: (sessionId: string) => void;
 
   // Session lifecycle
@@ -201,8 +201,13 @@ function handleSessionCreated(
     safeLocalStorage.setItem('pendingSessionId', message.sessionId);
 
     if (callbacks.onReplaceTemporarySession) {
-      callbacks.onReplaceTemporarySession(message.sessionId);
+      // Use currentSessionId as tempId if it exists, otherwise empty string
+      // The hook will clear all temporary prefixes anyway
+      callbacks.onReplaceTemporarySession(currentSessionId || '', message.sessionId);
     }
+    
+    // Also update the current session ID in the chat interface
+    callbacks.onSetSessionId(message.sessionId);
   }
   return true;
 }

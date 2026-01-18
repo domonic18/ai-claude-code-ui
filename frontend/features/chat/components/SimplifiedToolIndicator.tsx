@@ -6,7 +6,6 @@
 
 import React from 'react';
 import { extractFilename } from './toolUtils';
-import { TodoList } from '@/features/tasks';
 
 export interface SimplifiedToolIndicatorProps {
   toolName: string;
@@ -92,6 +91,44 @@ function TodoWriteIndicator({ toolInput }: { toolInput: string | null }) {
       </div>
       <TodoList todos={input.todos} />
     </div>
+  );
+}
+
+/**
+ * Simple TodoList component
+ */
+interface Todo {
+  id: string;
+  content: string;
+  status: 'pending' | 'completed';
+}
+
+interface TodoListProps {
+  todos: Todo[];
+}
+
+function TodoList({ todos }: TodoListProps) {
+  return (
+    <ul className="space-y-1 text-xs">
+      {todos.map((todo) => (
+        <li key={todo.id} className="flex items-start gap-2">
+          <span className={`mt-0.5 w-3 h-3 rounded border flex-shrink-0 ${
+            todo.status === 'completed'
+              ? 'bg-green-500 border-green-500'
+              : 'border-gray-400 dark:border-gray-500'
+          }`}>
+            {todo.status === 'completed' && (
+              <svg className="w-full h-full text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+          </span>
+          <span className={todo.status === 'completed' ? 'line-through text-gray-500' : ''}>
+            {todo.content}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

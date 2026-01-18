@@ -9,7 +9,6 @@
  * - Session management
  * - Version update banner
  * - Responsive design (mobile/desktop)
- * - Integration with TaskMaster context
  */
 
 import React, { useState, useEffect, useCallback, memo, useRef } from 'react';
@@ -20,7 +19,6 @@ import ProjectSearch from './ProjectSearch';
 import VersionBanner from './VersionBanner';
 import ProjectList from './ProjectList';
 import { ProjectCreationWizard } from '@/features/project';
-import { useTaskMaster } from '@/shared/contexts/TaskMasterContext';
 import { TIMESTAMP_UPDATE_INTERVAL } from '../constants/sidebar.constants';
 import type { SidebarProps, ExpandedProjects } from '../types/sidebar.types';
 import { useProjects } from '../hooks';
@@ -91,9 +89,6 @@ export const Sidebar = memo(function Sidebar({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [editingSession, setEditingSession] = useState(null);
   const [editingSessionName, setEditingSessionName] = useState('');
-
-  // TaskMaster context
-  const { setCurrentProject } = useTaskMaster();
 
   // Auto-update timestamps every minute
   useEffect(() => {
@@ -197,8 +192,7 @@ export const Sidebar = memo(function Sidebar({
     if (onProjectSelect) {
       onProjectSelect(project);
     }
-    setCurrentProject(project);
-  }, [onProjectSelect, setCurrentProject]);
+  }, [onProjectSelect]);
 
   const handleSessionClick = useCallback((session: any, projectName: string) => {
     if (onSessionSelect) {
@@ -207,6 +201,11 @@ export const Sidebar = memo(function Sidebar({
   }, [onSessionSelect]);
 
   const handleSessionDelete = useCallback(async (projectName: string, sessionId: string, provider?: any) => {
+    // 再次确认以确保用户看到对话框
+    if (!window.confirm(t('sidebar.confirmDeleteSession') || 'Are you sure you want to delete this session?')) {
+      return;
+    }
+
     try {
       await deleteSession(projectName, sessionId, provider);
       // Only call parent callback if deletion was successful (not cancelled)
@@ -214,7 +213,7 @@ export const Sidebar = memo(function Sidebar({
         await onSessionDelete(projectName, sessionId, provider);
       }
     } catch (error: any) {
-      // Ignore user cancellation
+      // Ignore user cancellation (already handled by confirm above, but for robust error handling)
       if (error?.code === 'CANCELLED') {
         return;
       }
@@ -223,7 +222,7 @@ export const Sidebar = memo(function Sidebar({
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete session. Please try again.';
       window.alert(errorMessage);
     }
-  }, [deleteSession, onSessionDelete]);
+  }, [deleteSession, onSessionDelete, t]);
 
   const handleUpdateSessionSummary = useCallback(async (projectName: string, sessionId: string, summary: string) => {
     try {
@@ -253,7 +252,12 @@ export const Sidebar = memo(function Sidebar({
           onClose={() => setShowNewProject(false)}
           onProjectCreated={async (newProject) => {
             try {
-              await createProject(newProject.path);
+              const created = await createProject(newProject.path);
+              // 选中新创建的项目
+              if (onProjectSelect && created) {
+                onProjectSelect(created);
+              }
+              setShowNewProject(false);
             } catch (error) {
               console.error('Error creating project:', error);
             }
