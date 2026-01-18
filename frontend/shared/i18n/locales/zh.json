@@ -1,0 +1,85 @@
+{
+  "common": {
+    "login": "登录",
+    "logout": "退出登录",
+    "settings": "设置",
+    "language": "语言",
+    "back": "返回",
+    "save": "保存",
+    "cancel": "取消",
+    "loading": "加载中..."
+  },
+  "homepage": {
+    "title": "Claude Code UI",
+    "subtitle": "AI 编码的多用户 Web 界面",
+    "description": "一个强大的基于 Web 的 Claude Code CLI、Cursor CLI 和 OpenAI Codex 界面。与您的团队协作，利用 AI 驱动的代码辅助功能。",
+    "features": {
+      "title": "核心功能",
+      "chat": {
+        "title": "实时聊天",
+        "description": "交互式 AI 聊天界面，支持流式响应"
+      },
+      "collaboration": {
+        "title": "团队协作",
+        "description": "多用户支持，基于项目的组织管理"
+      },
+      "multiModel": {
+        "title": "多模型支持",
+        "description": "支持 Claude、Cursor 和 OpenAI Codex"
+      },
+      "fileManager": {
+        "title": "文件浏览器",
+        "description": "集成文件浏览器，支持语法高亮"
+      },
+      "terminal": {
+        "title": "Web 终端",
+        "description": "功能完整的终端，直接在浏览器中使用"
+      },
+      "tasks": {
+        "title": "任务管理",
+        "description": "跟踪进度并管理开发任务"
+      }
+    },
+    "cta": {
+      "title": "准备开始了吗？",
+      "description": "加入成千上万使用 AI 编写更好代码的开发者。立即注册，体验编程的未来。",
+      "login": "开始使用",
+      "getStarted": "立即开始"
+    },
+    "footer": {
+      "copyright": "© 2025 Claude Code UI. 保留所有权利。"
+    }
+  },
+  "login": {
+    "welcome": "欢迎回来",
+    "subtitle": "登录您的 Claude Code UI 账户",
+    "username": "用户名",
+    "usernamePlaceholder": "请输入用户名",
+    "password": "密码",
+    "passwordPlaceholder": "请输入密码",
+    "signIn": "登录",
+    "signingIn": "登录中...",
+    "error": "请输入用户名和密码",
+    "firstTime": "首次使用？创建账户",
+    "credentials": "输入您的凭据以访问 Claude Code UI",
+    "setupHint": "如果是首次使用，系统可能需要初始化。请刷新页面。"
+  },
+  "chat": {
+    "newSession": "新会话",
+    "send": "发送",
+    "attachFile": "附加文件",
+    "typeMessage": "输入您的消息...",
+    "thinking": "思考中..."
+  },
+  "settings": {
+    "title": "设置",
+    "backToChat": "返回聊天",
+    "saveChanges": "保存更改",
+    "tabs": {
+      "agents": "代理",
+      "appearance": "外观",
+      "api": "API 和令牌",
+      "tasks": "任务"
+    }
+  }
+}

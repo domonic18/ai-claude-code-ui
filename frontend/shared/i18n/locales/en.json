@@ -1,0 +1,109 @@
+{
+  "common": {
+    "login": "Login",
+    "logout": "Logout",
+    "settings": "Settings",
+    "language": "Language",
+    "back": "Back",
+    "save": "Save",
+    "cancel": "Cancel",
+    "loading": "Loading..."
+  },
+  "homepage": {
+    "title": "Claude Code UI",
+    "subtitle": "Multi-user Web Interface for AI Coding",
+    "description": "A powerful web-based interface for Claude Code CLI, Cursor CLI, and OpenAI Codex. Collaborate with your team and leverage AI-powered code assistance.",
+    "features": {
+      "title": "Key Features",
+      "chat": {
+        "title": "Real-time Chat",
+        "description": "Interactive AI chat interface with streaming responses"
+      },
+      "collaboration": {
+        "title": "Team Collaboration",
+        "description": "Multi-user support with project-based organization"
+      },
+      "multiModel": {
+        "title": "Multi-Model Support",
+        "description": "Works with Claude, Cursor, and OpenAI Codex"
+      },
+      "fileManager": {
+        "title": "File Explorer",
+        "description": "Integrated file browser with syntax highlighting"
+      },
+      "terminal": {
+        "title": "Web Terminal",
+        "description": "Full-featured terminal directly in your browser"
+      },
+      "tasks": {
+        "title": "Task Management",
+        "description": "Track progress and manage development tasks"
+      }
+    },
+    "cta": {
+      "title": "Ready to Get Started?",
+      "description": "Join thousands of developers using AI to write better code faster. Sign up now and experience the future of programming.",
+      "login": "Get Started",
+      "getStarted": "Get Started Now"
+    },
+    "footer": {
+      "copyright": "© 2025 Claude Code UI. All rights reserved."
+    }
+  },
+  "login": {
+    "welcome": "Welcome Back",
+    "subtitle": "Sign in to your Claude Code UI account",
+    "username": "Username",
+    "usernamePlaceholder": "Enter your username",
+    "password": "Password",
+    "passwordPlaceholder": "Enter your password",
+    "signIn": "Sign In",
+    "signingIn": "Signing in...",
+    "error": "Please enter both username and password",
+    "firstTime": "First time? Create an account",
+    "credentials": "Enter your credentials to access Claude Code UI",
+    "setupHint": "If this is your first time, the system may need to be initialized. Please refresh the page."
+  },
+  "chat": {
+    "newSession": "New Session",
+    "send": "Send",
+    "attachFile": "Attach File",
+    "typeMessage": "Type your message...",
+    "thinking": "Thinking..."
+  },
+  "settings": {
+    "title": "Settings",
+    "backToChat": "Back to Chat",
+    "saveChanges": "Save Changes",
+    "tabs": {
+      "agents": "Agents",
+      "appearance": "Appearance",
+      "api": "API & Tokens",
+      "tasks": "Tasks"
+    }
+  },
+  "sidebar": {
+    "searchPlaceholder": "Search projects...",
+    "noProjectsFound": "No projects found",
+    "createProject": "Create Project",
+    "refresh": "Refresh",
+    "settings": "Settings",
+    "updateAvailable": "Update Available",
+    "sessions": "Sessions",
+    "total": "Total",
+    "loadMore": "Load More",
+    "rename": "Rename",
+    "delete": "Delete",
+    "renameProject": "Rename Project",
+    "deleteProject": "Delete Project",
+    "renameSession": "Rename Session",
+    "deleteSession": "Delete Session",
+    "confirmDeleteProject": "Are you sure you want to delete this project? This action cannot be undone.",
+    "confirmDeleteSession": "Are you sure you want to delete this session? This action cannot be undone.",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "newSession": "New Session",
+    "open": "Open",
+    "toggleSidebar": "Toggle Sidebar"
+  }
+}
