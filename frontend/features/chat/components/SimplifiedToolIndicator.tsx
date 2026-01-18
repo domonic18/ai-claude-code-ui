@@ -98,9 +98,9 @@ function TodoWriteIndicator({ toolInput }: { toolInput: string | null }) {
  * Simple TodoList component
  */
 interface Todo {
-  id: string;
+  id?: string;
   content: string;
-  status: 'pending' | 'completed';
+  status: 'pending' | 'completed' | 'in_progress' | 'cancelled';
 }
 
 interface TodoListProps {
@@ -110,24 +110,40 @@ interface TodoListProps {
 function TodoList({ todos }: TodoListProps) {
   return (
     <ul className="space-y-1 text-xs">
-      {todos.map((todo) => (
-        <li key={todo.id} className="flex items-start gap-2">
-          <span className={`mt-0.5 w-3 h-3 rounded border flex-shrink-0 ${
-            todo.status === 'completed'
-              ? 'bg-green-500 border-green-500'
-              : 'border-gray-400 dark:border-gray-500'
-          }`}>
-            {todo.status === 'completed' && (
-              <svg className="w-full h-full text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            )}
-          </span>
-          <span className={todo.status === 'completed' ? 'line-through text-gray-500' : ''}>
-            {todo.content}
-          </span>
-        </li>
-      ))}
+      {todos.map((todo, index) => {
+        // Generate a stable key - prefer id, fallback to index-based key
+        const key = todo.id || `todo-${index}-${todo.content?.slice(0, 20) || 'empty'}`;
+        return (
+          <li key={key} className="flex items-start gap-2">
+            <span className={`mt-0.5 w-3 h-3 rounded border flex-shrink-0 ${
+              todo.status === 'completed'
+                ? 'bg-green-500 border-green-500'
+                : todo.status === 'in_progress'
+                ? 'bg-blue-500 border-blue-500'
+                : todo.status === 'cancelled'
+                ? 'bg-gray-400 border-gray-400'
+                : 'border-gray-400 dark:border-gray-500'
+            }`}>
+              {todo.status === 'completed' && (
+                <svg className="w-full h-full text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+              {todo.status === 'in_progress' && (
+                <svg className="w-full h-full text-white animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              )}
+            </span>
+            <span className={
+              todo.status === 'completed' ? 'line-through text-gray-500' :
+              todo.status === 'cancelled' ? 'line-through text-gray-400' : ''
+            }>
+              {todo.content}
+            </span>
+          </li>
+        );
+      })}
     </ul>
   );
 }

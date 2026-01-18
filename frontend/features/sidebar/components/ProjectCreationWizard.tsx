@@ -1,209 +1,266 @@
-import React, { useState, useEffect } from 'react';
-import { X, FolderPlus, GitBranch, Key, ChevronRight, ChevronLeft, Check, Loader2, AlertCircle } from 'lucide-react';
+/**
+ * Project Creation Wizard Component
+ *
+ * Simplified project creation dialog for non-technical users.
+ * Features:
+ * - Single-step workflow
+ * - Project name input with availability checking
+ * - Auto-generated default name with numbering
+ * - Real-time validation feedback
+ */
+
+import { useState, useEffect, useCallback } from 'react';
+import { X, FolderPlus, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
 import { api } from '@/shared/services';
-import type { Project, ProjectCreationWizardProps } from '../types/sidebar.types';
+import type { ProjectCreationWizardProps } from '../types/sidebar.types';
 
-const ProjectCreationWizard = ({ onClose, onProjectCreated, isOpen = true, mode = 'create' }: ProjectCreationWizardProps) => {
-  // Wizard state
-  const [step, setStep] = useState<number>(1);
-  const [workspaceType, setWorkspaceType] = useState<'existing' | 'new' | null>(null);
+// Default project name
+const DEFAULT_PROJECT_NAME = 'my-project';
 
+// Debounce delay for name checking (ms)
+const CHECK_DEBOUNCE_MS = 300;
+
+/**
+ * Name availability status
+ */
+type NameAvailabilityStatus = 'idle' | 'checking' | 'available' | 'unavailable' | 'error';
+
+/**
+ * Check if a project name is available
+ */
+async function checkNameAvailability(projectName: string): Promise<NameAvailabilityStatus> {
+  if (!projectName || projectName.trim().length === 0) {
+    return 'idle';
+  }
+
+  try {
+    // Use browseFilesystem API to check if path exists
+    // Default base path for user projects is typically /workspace
+    const response = await api.browseFilesystem('/workspace');
+
+    if (!response.ok) {
+      return 'error';
+    }
+
+    const data = await response.json();
+
+    // Check if the project name already exists in suggestions
+    if (data.data?.suggestions) {
+      const exists = data.data.suggestions.some(
+        (item: { path: string; type: string }) =>
+          item.type === 'directory' && item.path.endsWith(`/${projectName}`)
+      );
+      return exists ? 'unavailable' : 'available';
+    }
+
+    // If we can't determine, assume available
+    return 'available';
+  } catch (error) {
+    console.error('Error checking name availability:', error);
+    return 'error';
+  }
+}
+
+/**
+ * Generate next available project name with numbering
+ */
+async function generateAvailableName(baseName: string): Promise<string> {
+  let counter = 1;
+  let suggestedName = baseName;
+
+  while (counter <= 100) {
+    const status = await checkNameAvailability(suggestedName);
+    if (status === 'available') {
+      return suggestedName;
+    }
+    if (status === 'idle' || status === 'error') {
+      // Can't determine, return the suggested name anyway
+      return suggestedName;
+    }
+    suggestedName = `${baseName}-${counter}`;
+    counter++;
+  }
+
+  return `${baseName}-${Date.now()}`;
+}
+
+const ProjectCreationWizard = ({
+  onClose,
+  onProjectCreated
+}: ProjectCreationWizardProps) => {
   // Form state
-  const [workspacePath, setWorkspacePath] = useState<string>('');
-  const [githubUrl, setGithubUrl] = useState<string>('');
-  const [selectedGithubToken, setSelectedGithubToken] = useState<string>('');
-  const [tokenMode, setTokenMode] = useState<'stored' | 'new' | 'none'>('stored');
-  const [newGithubToken, setNewGithubToken] = useState<string>('');
+  const [projectName, setProjectName] = useState<string>(DEFAULT_PROJECT_NAME);
 
   // UI state
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [availableTokens, setAvailableTokens] = useState<Array<{ id: string | number; name: string; is_active: boolean }>>([]);
-  const [loadingTokens, setLoadingTokens] = useState<boolean>(false);
-  const [pathSuggestions, setPathSuggestions] = useState<Array<{ path: string; type: string }>>([]);
-  const [showPathDropdown, setShowPathDropdown] = useState<boolean>(false);
+  const [availabilityStatus, setAvailabilityStatus] = useState<NameAvailabilityStatus>('idle');
 
-  // Load available GitHub tokens when needed
+  /**
+   * Check project name availability with debounce
+   */
+  const checkAvailability = useCallback(
+    debounce(async (name: string) => {
+      if (!name || name.trim().length === 0) {
+        setAvailabilityStatus('idle');
+        return;
+      }
+
+      setAvailabilityStatus('checking');
+      const status = await checkNameAvailability(name);
+      setAvailabilityStatus(status);
+    }, CHECK_DEBOUNCE_MS),
+    []
+  );
+
+  /**
+   * Initialize with available project name on mount
+   */
   useEffect(() => {
-    if (step === 2 && workspaceType === 'new' && githubUrl) {
-      loadGithubTokens();
-    }
-  }, [step, workspaceType, githubUrl]);
+    const initializeName = async () => {
+      const availableName = await generateAvailableName(DEFAULT_PROJECT_NAME);
+      setProjectName(availableName);
+    };
 
-  // Load path suggestions
+    initializeName();
+  }, []);
+
+  /**
+   * Check availability when project name changes
+   */
   useEffect(() => {
-    if (workspacePath.length > 2) {
-      loadPathSuggestions(workspacePath);
-    } else {
-      setPathSuggestions([]);
-      setShowPathDropdown(false);
+    if (projectName === DEFAULT_PROJECT_NAME) {
+      // Skip check for initial default name
+      return;
     }
-  }, [workspacePath]);
+    checkAvailability(projectName);
+  }, [projectName, checkAvailability]);
 
-  const loadGithubTokens = async () => {
-    try {
-      setLoadingTokens(true);
-      const response = await api.get('/settings/credentials?type=github_token');
-      const data = await response.json();
-
-      const activeTokens = (data.credentials || []).filter(t => t.is_active);
-      setAvailableTokens(activeTokens);
-
-      // Auto-select first token if available
-      if (activeTokens.length > 0 && !selectedGithubToken) {
-        setSelectedGithubToken(activeTokens[0].id.toString());
-      }
-    } catch (error) {
-      console.error('Error loading GitHub tokens:', error);
-    } finally {
-      setLoadingTokens(false);
-    }
-  };
-
-  const loadPathSuggestions = async (inputPath: string) => {
-    try {
-      // Extract the directory to browse (parent of input)
-      const lastSlash = inputPath.lastIndexOf('/');
-      const dirPath = lastSlash > 0 ? inputPath.substring(0, lastSlash) : '~';
-
-      const response = await api.browseFilesystem(dirPath);
-
-      // Check content-type before parsing JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        setPathSuggestions([]);
-        setShowPathDropdown(false);
-        return;
-      }
-
-      const responseData = await response.json();
-
-      if (response.ok && responseData.data?.suggestions) {
-        // Filter suggestions based on the input
-        const filtered = responseData.data.suggestions.filter((s: { path: string }) =>
-          s.path.toLowerCase().startsWith(inputPath.toLowerCase())
-        );
-        setPathSuggestions(filtered.slice(0, 5));
-        setShowPathDropdown(filtered.length > 0);
-      } else {
-        setPathSuggestions([]);
-        setShowPathDropdown(false);
-      }
-    } catch (error) {
-      console.error('Error loading path suggestions:', error);
-      setPathSuggestions([]);
-      setShowPathDropdown(false);
-    }
-  };
-
-  const handleNext = () => {
+  /**
+   * Handle project name input change
+   */
+  const handleNameChange = (value: string) => {
+    // Allow only alphanumeric, hyphens, and underscores
+    const sanitizedName = value.replace(/[^a-zA-Z0-9-_]/g, '');
+    setProjectName(sanitizedName);
     setError(null);
-
-    if (step === 1) {
-      if (!workspaceType) {
-        setError('Please select whether you have an existing workspace or want to create a new one');
-        return;
-      }
-      setStep(2);
-    } else if (step === 2) {
-      if (!workspacePath.trim()) {
-        setError('Please provide a workspace path');
-        return;
-      }
-
-      // No validation for GitHub token - it's optional (only needed for private repos)
-      setStep(3);
-    }
   };
 
-  const handleBack = () => {
-    setError(null);
-    setStep(step - 1);
-  };
-
+  /**
+   * Handle create project
+   */
   const handleCreate = async () => {
-    console.log('[ProjectCreationWizard] handleCreate called');
-    console.log('[ProjectCreationWizard] workspaceType:', workspaceType);
-    console.log('[ProjectCreationWizard] workspacePath:', workspacePath);
+    if (!projectName || projectName.trim().length === 0) {
+      setError('Please enter a project name');
+      return;
+    }
+
+    if (availabilityStatus === 'unavailable') {
+      setError('A project with this name already exists. Please choose a different name.');
+      return;
+    }
 
     setIsCreating(true);
     setError(null);
 
     try {
-      const payload: {
-        workspaceType: string;
-        path: string;
-        githubUrl?: string;
-        githubTokenId?: number;
-        newGithubToken?: string;
-      } = {
-        workspaceType,
-        path: workspacePath.trim(),
-      };
+      // Default workspace path for user projects
+      const workspacePath = `/workspace/${projectName}`;
 
-      console.log('[ProjectCreationWizard] Sending payload:', payload);
+      console.log('[ProjectCreationWizard] Creating project:', workspacePath);
 
-      // Add GitHub info if creating new workspace with GitHub URL
-      if (workspaceType === 'new' && githubUrl) {
-        payload.githubUrl = githubUrl.trim();
+      const response = await api.createProject(workspacePath);
 
-        if (tokenMode === 'stored' && selectedGithubToken) {
-          payload.githubTokenId = parseInt(selectedGithubToken);
-        } else if (tokenMode === 'new' && newGithubToken) {
-          payload.newGithubToken = newGithubToken.trim();
-        }
-      }
-
-      console.log('[ProjectCreationWizard] Calling api.createWorkspace...');
-      const response = await api.createWorkspace(payload);
-      console.log('[ProjectCreationWizard] Response received:', response.status, response.statusText);
-
-      // Check content-type before parsing JSON
       const contentType = response.headers.get('content-type');
-      console.log('[ProjectCreationWizard] Response content-type:', contentType);
-
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
         console.error('[ProjectCreationWizard] Non-JSON response:', text);
-        throw new Error('Server returned non-JSON response');
+        throw new Error('Server returned an unexpected response');
       }
 
       const data = await response.json();
-      console.log('[ProjectCreationWizard] Response data:', data);
+      console.log('[ProjectCreationWizard] Response:', data);
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to create workspace');
+        throw new Error(data.error || data.message || 'Failed to create project');
       }
 
-      // Success!
-      if (onProjectCreated) {
+      // Success! Notify parent
+      if (onProjectCreated && data.project) {
         onProjectCreated(data.project);
       }
 
       onClose();
-    } catch (error) {
-      console.error('[ProjectCreationWizard] Error creating workspace:', error);
-      setError((error as Error).message || 'Failed to create workspace');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create project';
+      console.error('[ProjectCreationWizard] Error:', err);
+      setError(errorMessage);
     } finally {
       setIsCreating(false);
     }
   };
 
-  const selectPathSuggestion = (suggestion: { path: string }) => {
-    setWorkspacePath(suggestion.path);
-    setShowPathDropdown(false);
+  /**
+   * Get availability status icon and color
+   */
+  const getAvailabilityIndicator = () => {
+    switch (availabilityStatus) {
+      case 'checking':
+        return (
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Checking...</span>
+          </div>
+        );
+      case 'available':
+        return (
+          <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+            <Check className="w-4 h-4" />
+            <span>Available</span>
+          </div>
+        );
+      case 'unavailable':
+        return (
+          <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+            <AlertCircle className="w-4 h-4" />
+            <span>Already exists</span>
+          </div>
+        );
+      case 'error':
+        return (
+          <div className="flex items-center gap-2 text-sm text-yellow-600 dark:text-yellow-400">
+            <AlertCircle className="w-4 h-4" />
+            <span>Unable to check</span>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  /**
+   * Check if create button should be disabled
+   */
+  const isCreateDisabled = () => {
+    return (
+      isCreating ||
+      !projectName ||
+      projectName.trim().length === 0 ||
+      availabilityStatus === 'unavailable' ||
+      availabilityStatus === 'checking'
+    );
   };
 
   return (
     <div className="fixed top-0 left-0 right-0 bottom-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-0 sm:p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-none sm:rounded-lg shadow-xl w-full h-full sm:h-auto sm:max-w-2xl border-0 sm:border border-gray-200 dark:border-gray-700 overflow-y-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-none sm:rounded-lg shadow-xl w-full h-full sm:h-auto sm:max-w-md border-0 sm:border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/50 rounded-lg flex items-center justify-center">
-              <FolderPlus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/50 rounded-lg flex items-center justify-center">
+              <FolderPlus className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               Create New Project
@@ -211,48 +268,16 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated, isOpen = true, mode 
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
+            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             disabled={isCreating}
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Progress Indicator */}
-        <div className="px-6 pt-4 pb-2">
-          <div className="flex items-center justify-between">
-            {[1, 2, 3].map((s) => (
-              <React.Fragment key={s}>
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center font-medium text-sm ${
-                      s < step
-                        ? 'bg-green-500 text-white'
-                        : s === step
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-500'
-                    }`}
-                  >
-                    {s < step ? <Check className="w-4 h-4" /> : s}
-                  </div>
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300 hidden sm:inline">
-                    {s === 1 ? 'Type' : s === 2 ? 'Configure' : 'Confirm'}
-                  </span>
-                </div>
-                {s < 3 && (
-                  <div
-                    className={`flex-1 h-1 mx-2 rounded ${
-                      s < step ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'
-                    }`}
-                  />
-                )}
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
-
         {/* Content */}
-        <div className="p-6 space-y-6 min-h-[300px]">
+        <div className="flex-1 p-6 space-y-6 overflow-y-auto">
           {/* Error Display */}
           {error && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
@@ -263,344 +288,74 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated, isOpen = true, mode 
             </div>
           )}
 
-          {/* Step 1: Choose workspace type */}
-          {step === 1 && (
-            <div className="space-y-4">
-              <div>
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  Do you already have a workspace, or would you like to create a new one?
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Existing Workspace */}
-                  <button
-                    onClick={() => setWorkspaceType('existing')}
-                    className={`p-4 border-2 rounded-lg text-left transition-all ${
-                      workspaceType === 'existing'
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 bg-green-100 dark:bg-green-900/50 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <FolderPlus className="w-5 h-5 text-green-600 dark:text-green-400" />
-                      </div>
-                      <div className="flex-1">
-                        <h5 className="font-semibold text-gray-900 dark:text-white mb-1">
-                          Existing Workspace
-                        </h5>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          I already have a workspace on my server and just need to add it to the project list
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-
-                  {/* New Workspace */}
-                  <button
-                    onClick={() => setWorkspaceType('new')}
-                    className={`p-4 border-2 rounded-lg text-left transition-all ${
-                      workspaceType === 'new'
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/50 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <GitBranch className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                      </div>
-                      <div className="flex-1">
-                        <h5 className="font-semibold text-gray-900 dark:text-white mb-1">
-                          New Workspace
-                        </h5>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          Create a new workspace, optionally clone from a GitHub repository
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-                </div>
+          {/* Project Name Input */}
+          <div className="space-y-3">
+            <label htmlFor="project-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Project Name
+            </label>
+            <div className="relative">
+              <Input
+                id="project-name"
+                type="text"
+                value={projectName}
+                onChange={(e) => handleNameChange(e.target.value)}
+                placeholder="Enter project name"
+                className="w-full pr-24"
+                disabled={isCreating}
+                autoFocus
+                autoComplete="off"
+              />
+              {/* Availability Status Indicator */}
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                {getAvailabilityIndicator()}
               </div>
             </div>
-          )}
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Use letters, numbers, hyphens, and underscores only
+            </p>
+          </div>
 
-          {/* Step 2: Configure workspace */}
-          {step === 2 && (
-            <div className="space-y-4">
-              {/* Workspace Path */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {workspaceType === 'existing' ? 'Workspace Path' : 'Where should the workspace be created?'}
-                </label>
-                <div className="relative">
-                  <Input
-                    type="text"
-                    value={workspacePath}
-                    onChange={(e) => setWorkspacePath(e.target.value)}
-                    placeholder={workspaceType === 'existing' ? '/path/to/existing/workspace' : '/path/to/new/workspace'}
-                    className="w-full"
-                  />
-                  {showPathDropdown && pathSuggestions.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {pathSuggestions.map((suggestion, index) => (
-                        <button
-                          key={index}
-                          onClick={() => selectPathSuggestion(suggestion)}
-                          className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-sm"
-                        >
-                          <div className="font-medium text-gray-900 dark:text-white">{suggestion.name}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">{suggestion.path}</div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  {workspaceType === 'existing'
-                    ? 'Full path to your existing workspace directory'
-                    : 'Full path where the new workspace will be created'}
-                </p>
-              </div>
+          {/* Info Card */}
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              A new folder will be created in your workspace with this name.
+              You can start coding with Claude right away!
+            </p>
+          </div>
 
-              {/* GitHub URL (only for new workspace) */}
-              {workspaceType === 'new' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      GitHub URL (Optional)
-                    </label>
-                    <Input
-                      type="text"
-                      value={githubUrl}
-                      onChange={(e) => setGithubUrl(e.target.value)}
-                      placeholder="https://github.com/username/repository"
-                      className="w-full"
-                    />
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      Leave empty to create an empty workspace, or provide a GitHub URL to clone
-                    </p>
-                  </div>
-
-                  {/* GitHub Token (only if GitHub URL is provided) */}
-                  {githubUrl && (
-                    <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-                      <div className="flex items-start gap-3 mb-4">
-                        <Key className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0 mt-0.5" />
-                        <div className="flex-1">
-                          <h5 className="font-medium text-gray-900 dark:text-white mb-1">
-                            GitHub Authentication (Optional)
-                          </h5>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Only required for private repositories. Public repos can be cloned without authentication.
-                          </p>
-                        </div>
-                      </div>
-
-                      {loadingTokens ? (
-                        <div className="flex items-center gap-2 text-sm text-gray-500">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Loading stored tokens...
-                        </div>
-                      ) : availableTokens.length > 0 ? (
-                        <>
-                          {/* Token Selection Tabs */}
-                          <div className="grid grid-cols-3 gap-2 mb-4">
-                            <button
-                              onClick={() => setTokenMode('stored')}
-                              className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                                tokenMode === 'stored'
-                                  ? 'bg-blue-500 text-white'
-                                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                              }`}
-                            >
-                              Stored Token
-                            </button>
-                            <button
-                              onClick={() => setTokenMode('new')}
-                              className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                                tokenMode === 'new'
-                                  ? 'bg-blue-500 text-white'
-                                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                              }`}
-                            >
-                              New Token
-                            </button>
-                            <button
-                              onClick={() => {
-                                setTokenMode('none');
-                                setSelectedGithubToken('');
-                                setNewGithubToken('');
-                              }}
-                              className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                                tokenMode === 'none'
-                                  ? 'bg-green-500 text-white'
-                                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                              }`}
-                            >
-                              None (Public)
-                            </button>
-                          </div>
-
-                          {tokenMode === 'stored' ? (
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Select Token
-                              </label>
-                              <select
-                                value={selectedGithubToken}
-                                onChange={(e) => setSelectedGithubToken(e.target.value)}
-                                className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
-                              >
-                                <option value="">-- Select a token --</option>
-                                {availableTokens.map((token) => (
-                                  <option key={token.id} value={token.id}>
-                                    {token.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          ) : tokenMode === 'new' ? (
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                GitHub Token
-                              </label>
-                              <Input
-                                type="password"
-                                value={newGithubToken}
-                                onChange={(e) => setNewGithubToken(e.target.value)}
-                                placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                                className="w-full"
-                                autoComplete="off"
-                              />
-                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                This token will be used only for this operation
-                              </p>
-                            </div>
-                          ) : null}
-                        </>
-                      ) : (
-                        <div className="space-y-4">
-                          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
-                            <p className="text-sm text-blue-800 dark:text-blue-200">
-                              💡 <strong>Public repositories</strong> don't require authentication. You can skip providing a token if cloning a public repo.
-                            </p>
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                              GitHub Token (Optional for Public Repos)
-                            </label>
-                            <Input
-                              type="password"
-                              value={newGithubToken}
-                              onChange={(e) => setNewGithubToken(e.target.value)}
-                              placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (leave empty for public repos)"
-                              className="w-full"
-                              autoComplete="off"
-                            />
-                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                              No stored tokens available. You can add tokens in Settings → API Keys for easier reuse.
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Step 3: Confirm */}
-          {step === 3 && (
-            <div className="space-y-4">
-              <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                  Review Your Configuration
-                </h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">Workspace Type:</span>
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {workspaceType === 'existing' ? 'Existing Workspace' : 'New Workspace'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">Path:</span>
-                    <span className="font-mono text-xs text-gray-900 dark:text-white break-all">
-                      {workspacePath}
-                    </span>
-                  </div>
-                  {workspaceType === 'new' && githubUrl && (
-                    <>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">Clone From:</span>
-                        <span className="font-mono text-xs text-gray-900 dark:text-white break-all">
-                          {githubUrl}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">Authentication:</span>
-                        <span className="text-xs text-gray-900 dark:text-white">
-                          {tokenMode === 'stored' && selectedGithubToken
-                            ? `Using stored token: ${availableTokens.find(t => t.id.toString() === selectedGithubToken)?.name || 'Unknown'}`
-                            : tokenMode === 'new' && newGithubToken
-                            ? 'Using provided token'
-                            : 'No authentication'}
-                        </span>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-                <p className="text-sm text-blue-800 dark:text-blue-200">
-                  {workspaceType === 'existing'
-                    ? 'The workspace will be added to your project list and will be available for Claude/Cursor sessions.'
-                    : githubUrl
-                    ? 'A new workspace will be created and the repository will be cloned from GitHub.'
-                    : 'An empty workspace directory will be created at the specified path.'}
-                </p>
-              </div>
+          {/* Project Path Preview */}
+          {projectName && (
+            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Project will be created at:</p>
+              <p className="text-sm font-mono text-gray-900 dark:text-white">
+                /workspace/{projectName}
+              </p>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
           <Button
             variant="outline"
-            onClick={step === 1 ? onClose : handleBack}
+            onClick={onClose}
             disabled={isCreating}
           >
-            {step === 1 ? (
-              'Cancel'
-            ) : (
-              <>
-                <ChevronLeft className="w-4 h-4 mr-1" />
-                Back
-              </>
-            )}
+            Cancel
           </Button>
-
           <Button
-            onClick={step === 3 ? handleCreate : handleNext}
-            disabled={isCreating || (step === 1 && !workspaceType)}
+            onClick={handleCreate}
+            disabled={isCreateDisabled()}
           >
             {isCreating ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Creating...
               </>
-            ) : step === 3 ? (
-              <>
-                <Check className="w-4 h-4 mr-1" />
-                Create Project
-              </>
             ) : (
               <>
-                Next
-                <ChevronRight className="w-4 h-4 ml-1" />
+                <Check className="w-4 h-4 mr-2" />
+                Create Project
               </>
             )}
           </Button>
@@ -609,5 +364,27 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated, isOpen = true, mode 
     </div>
   );
 };
+
+/**
+ * Simple debounce utility function
+ */
+function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+
+  return function executedFunction(...args: Parameters<T>) {
+    const later = () => {
+      timeout = null;
+      func(...args);
+    };
+
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+    timeout = setTimeout(later, wait);
+  };
+}
 
 export default ProjectCreationWizard;
