@@ -10,7 +10,12 @@
     "loading": "加载中...",
     "user": "用户",
     "userMenu": "用户菜单",
-    "loggedInAs": "登录为"
+    "loggedInAs": "登录为",
+    "chat": "聊天",
+    "shell": "终端",
+    "files": "文件",
+    "version": "版本",
+    "currentVersion": "当前版本"
   },
   "homepage": {
     "title": "Claude Code UI",
@@ -120,6 +125,14 @@
       "appearance": "外观",
       "api": "API 和令牌",
       "tasks": "任务"
+    },
+    "agents": {
+      "title": "代理设置",
+      "description": "配置 AI 模型行为和权限",
+      "permission": "权限模式",
+      "permissionDescription": "控制 Claude 如何与您的文件和系统交互",
+      "mcpServers": "MCP 服务器",
+      "mcpServersDescription": "管理模型上下文协议服务器以扩展功能"
     },
     "appearance": {
       "darkMode": "深色模式",

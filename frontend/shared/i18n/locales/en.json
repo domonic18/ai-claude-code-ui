@@ -10,7 +10,12 @@
     "loading": "Loading...",
     "user": "User",
     "userMenu": "User menu",
-    "loggedInAs": "Logged in as"
+    "loggedInAs": "Logged in as",
+    "chat": "Chat",
+    "shell": "Shell",
+    "files": "Files",
+    "version": "Version",
+    "currentVersion": "Current version"
   },
   "homepage": {
     "title": "Claude Code UI",
@@ -120,6 +125,14 @@
       "appearance": "Appearance",
       "api": "API & Tokens",
       "tasks": "Tasks"
+    },
+    "agents": {
+      "title": "Agent Settings",
+      "description": "Configure AI model behavior and permissions",
+      "permission": "Permission Mode",
+      "permissionDescription": "Control how Claude interacts with your files and system",
+      "mcpServers": "MCP Servers",
+      "mcpServersDescription": "Manage Model Context Protocol servers for extended capabilities"
     },
     "appearance": {
       "darkMode": "Dark Mode",
