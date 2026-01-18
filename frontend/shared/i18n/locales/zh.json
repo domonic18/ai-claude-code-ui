@@ -7,7 +7,10 @@
     "back": "返回",
     "save": "保存",
     "cancel": "取消",
-    "loading": "加载中..."
+    "loading": "加载中...",
+    "user": "用户",
+    "userMenu": "用户菜单",
+    "loggedInAs": "登录为"
   },
   "homepage": {
     "title": "Claude Code UI",

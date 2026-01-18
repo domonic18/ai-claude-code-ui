@@ -7,7 +7,10 @@
     "back": "Back",
     "save": "Save",
     "cancel": "Cancel",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "user": "User",
+    "userMenu": "User menu",
+    "loggedInAs": "Logged in as"
   },
   "homepage": {
     "title": "Claude Code UI",
