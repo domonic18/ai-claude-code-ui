@@ -4,7 +4,7 @@
  * Custom hooks for terminal and shell functionality.
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import type {
   TerminalOutput,
   TerminalProcess,
@@ -13,6 +13,9 @@ import type {
   TerminalOptions,
   TerminalTheme
 } from '../types';
+
+// Stable empty array reference to prevent unnecessary re-renders
+const EMPTY_ARGS: string[] = [];
 
 /**
  * Hook for terminal functionality
@@ -47,7 +50,7 @@ export interface UseTerminalReturn {
 export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn {
   const {
     shell = '/bin/bash',
-    args = [],
+    args: rawArgs,
     cwd,
     env,
     autoConnect = false,
@@ -55,6 +58,9 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
     onProcessComplete,
     onError,
   } = options;
+
+  // Use stable reference for args to prevent unnecessary callback recreations
+  const args = useMemo(() => rawArgs ?? EMPTY_ARGS, [rawArgs]);
 
   // State
   const [process, setProcess] = useState<TerminalProcess | null>(null);

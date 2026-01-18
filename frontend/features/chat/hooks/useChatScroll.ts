@@ -8,7 +8,10 @@
  * - Smooth scroll behavior
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+
+// Stable empty array reference to prevent unnecessary re-renders
+const EMPTY_MESSAGES: any[] = [];
 
 interface UseChatScrollOptions {
   /** Whether to auto-scroll to bottom */
@@ -45,10 +48,13 @@ interface UseChatScrollReturn {
 export function useChatScroll(options: UseChatScrollOptions = {}): UseChatScrollReturn {
   const {
     autoScrollToBottom = true,
-    messages = [],
+    messages: rawMessages,
     isStreaming = false,
     onScrollChange,
   } = options;
+
+  // Use stable reference for messages to prevent unnecessary effect triggers
+  const messages = useMemo(() => rawMessages ?? EMPTY_MESSAGES, [rawMessages]);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);

@@ -11,7 +11,7 @@
  * - Process WebSocket messages
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ChatMessageList,
@@ -34,6 +34,9 @@ import { getChatService } from '../services';
 import { handleWebSocketMessage } from '../services/websocketHandler';
 import type { ChatMessage, FileAttachment } from '../types';
 import { calculateDiff } from '../utils/diffUtils';
+
+// Stable empty array reference to prevent unnecessary effect triggers
+const EMPTY_WS_MESSAGES: any[] = [];
 
 interface ChatInterfaceProps {
   /** Selected project */
@@ -104,7 +107,7 @@ export function ChatInterface({
   selectedSession,
   ws,
   sendMessage,
-  wsMessages = [],
+  wsMessages: rawWsMessages,
   messages: externalMessages,
   onFileOpen,
   onInputFocusChange,
@@ -126,6 +129,8 @@ export function ChatInterface({
   onShowAllTasks,
   onSetTokenBudget,
 }: ChatInterfaceProps) {
+  // Use stable reference for wsMessages to prevent unnecessary effect triggers
+  const wsMessages = useMemo(() => rawWsMessages ?? EMPTY_WS_MESSAGES, [rawWsMessages]);
   const { t } = useTranslation();
 
   // State

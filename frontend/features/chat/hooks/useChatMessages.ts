@@ -7,7 +7,7 @@
  * - Message CRUD operations
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import type { ChatMessage } from '../types';
 import { MAX_STORED_MESSAGES, MIN_STORED_MESSAGES } from '../constants';
 
@@ -95,6 +95,9 @@ const safeLocalStorage = {
   }
 };
 
+// Stable empty array reference to prevent infinite loops
+const EMPTY_MESSAGES: ChatMessage[] = [];
+
 interface UseChatMessagesOptions {
   /** Selected project name for storage key */
   projectName?: string;
@@ -126,7 +129,13 @@ interface UseChatMessagesReturn {
  * @returns Message state and operations
  */
 export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMessagesReturn {
-  const { projectName, initialMessages = [], externalMessages } = options;
+  const { projectName, initialMessages, externalMessages } = options;
+
+  // Use stable reference for initial messages to prevent infinite loops
+  // This is critical - using a default value like [] in destructuring creates a new reference every render
+  const stableInitialMessages = useMemo(() => {
+    return initialMessages ?? EMPTY_MESSAGES;
+  }, [initialMessages]);
 
   // Initialize messages from localStorage or use initial/external messages
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
@@ -140,11 +149,20 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
         }
       }
     }
-    return initialMessages;
+    return stableInitialMessages;
   });
 
-  // Reload messages when projectName changes
+  // Track previous projectName to detect actual changes
+  const prevProjectNameRef = useRef<string | undefined>(projectName);
+
+  // Reload messages when projectName actually changes (not on every render)
   useEffect(() => {
+    // Only reload if projectName actually changed
+    if (prevProjectNameRef.current === projectName) {
+      return;
+    }
+    prevProjectNameRef.current = projectName;
+
     if (typeof window !== 'undefined' && projectName) {
       const saved = safeLocalStorage.getItem(`chat_messages_${projectName}`);
       if (saved) {
@@ -159,9 +177,9 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     }
     // If no saved messages and no external messages being synced, clear
     if (!externalMessages) {
-      setMessages(initialMessages);
+      setMessages(stableInitialMessages);
     }
-  }, [projectName, initialMessages, externalMessages]);
+  }, [projectName, stableInitialMessages, externalMessages]);
 
   // Ref to track messages for scroll restoration
   const messagesRef = useRef(messages);
@@ -174,12 +192,17 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     }
   }, [projectName]);
 
-  // Sync with external messages
+  // Track previous external messages reference to detect actual changes
+  const prevExternalMessagesRef = useRef<ChatMessage[] | undefined>();
+
+  // Sync with external messages (only when externalMessages actually changes)
   useEffect(() => {
-    if (externalMessages && externalMessages !== messages) {
+    // Only sync if externalMessages actually changed (reference comparison)
+    if (externalMessages && externalMessages !== prevExternalMessagesRef.current) {
+      prevExternalMessagesRef.current = externalMessages;
       setMessages(externalMessages);
     }
-  }, [externalMessages, messages]);
+  }, [externalMessages]);
 
   /**
    * Add a new message to the chat
