@@ -148,14 +148,14 @@ export function useSessionProtection(
   /**
    * Replace temporary session ID with real session ID
    */
-  const replaceTemporarySession = useCallback(async (realSessionId: string) => {
+  const replaceTemporarySession = useCallback(async (tempId: string, realSessionId: string) => {
     if (realSessionId) {
-      console.log(`[SessionProtection] Replacing temporary session with: ${realSessionId}`);
+      console.log(`[SessionProtection] Replacing temporary session ${tempId} with: ${realSessionId}`);
 
       setActiveSessions(prev => {
         const newSet = new Set<string>();
         for (const sessionId of prev) {
-          if (!sessionId.startsWith('new-session-')) {
+          if (!sessionId.startsWith('new-session-') && !sessionId.startsWith('temp-')) {
             newSet.add(sessionId);
           }
         }
@@ -180,7 +180,7 @@ export function useSessionProtection(
   ): boolean => {
     // Check if there's an active session
     const hasActiveSession = (selectedSession && activeSessions.has(selectedSession.id)) ||
-                             (activeSessions.size > 0 && Array.from(activeSessions).some(id => id.startsWith('new-session-')));
+                             (activeSessions.size > 0 && Array.from(activeSessions).some(id => id.startsWith('new-session-') || id.startsWith('temp-')));
 
     if (hasActiveSession) {
       // Check if update is purely additive

@@ -297,24 +297,51 @@ function AppContent() {
 
   // Handle URL-based session loading
   useEffect(() => {
-    if (sessionId && projects.length > 0) {
+    // 只有在路径为 /session/:sessionId 时才从 URL 同步 Session
+    const isSessionPath = window.location.pathname.startsWith('/session/');
+    
+    if (isSessionPath && sessionId && projects.length > 0) {
       // Skip if already viewing the correct session
       if (selectedSession?.id === sessionId) {
         return;
       }
 
       for (const project of projects) {
+        // Search in Claude sessions
         const session = project.sessions?.find(s => s.id === sessionId);
         if (session) {
           handleProjectSelect(project, false); // 传入 false，避免在加载 Session 时跳回 /chat
-          setSelectedSession({ ...session, __provider: 'claude' });
+          setSelectedSession({ 
+            ...session, 
+            __provider: 'claude',
+            __projectName: project.name
+          });
           setActiveTab('chat');
           return;
         }
+        
+        // Search in Cursor sessions
         const cSession = project.cursorSessions?.find(s => s.id === sessionId);
         if (cSession) {
           handleProjectSelect(project, false); // 传入 false，避免在加载 Session 时跳回 /chat
-          setSelectedSession({ ...cSession, __provider: 'cursor' });
+          setSelectedSession({ 
+            ...cSession, 
+            __provider: 'cursor',
+            __projectName: project.name
+          });
+          setActiveTab('chat');
+          return;
+        }
+
+        // Search in Codex sessions
+        const codexSession = (project as any).codexSessions?.find((s: any) => s.id === sessionId);
+        if (codexSession) {
+          handleProjectSelect(project, false);
+          setSelectedSession({
+            ...codexSession,
+            __provider: 'codex',
+            __projectName: project.name
+          });
           setActiveTab('chat');
           return;
         }

@@ -21,7 +21,7 @@ export interface SessionProtectionActions {
   markSessionAsInactive: (sessionId: string) => void;
   markSessionAsProcessing: (sessionId: string) => void;
   markSessionAsNotProcessing: (sessionId: string) => void;
-  replaceTemporarySession: (realSessionId: string) => Promise<void>;
+  replaceTemporarySession: (tempId: string, realSessionId: string) => Promise<void>;
   clearAllActiveSessions: () => void;
   hasActiveSession: (sessionId?: string) => boolean;
   isSessionActive: (sessionId: string) => boolean;

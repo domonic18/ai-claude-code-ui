@@ -93,6 +93,36 @@ export function useProjectManager(
   }, [selectedProject]);
 
   /**
+   * Handle session selection
+   */
+  const handleSessionSelect = useCallback((session: Session) => {
+    // Ensure session has required metadata if possible
+    const enrichedSession = {
+      ...session,
+      __projectName: session.__projectName || selectedProjectRef.current?.name,
+      __provider: session.__provider || (selectedProjectRef.current?.sessions?.some(s => s.id === session.id) ? 'claude' : 'cursor')
+    };
+    
+    setSelectedSession(enrichedSession);
+
+    const provider = enrichedSession.__provider || 'claude';
+    localStorage.setItem('selected-provider', provider);
+    if (provider === 'cursor') {
+      sessionStorage.setItem('cursorSessionId', session.id);
+    }
+
+    // 只有在不在对应 session 路径时才跳转
+    const targetPath = `/session/${session.id}`;
+    if (window.location.pathname !== targetPath) {
+      navigate(targetPath);
+    }
+
+    if (config.onSessionSelect) {
+      config.onSessionSelect(enrichedSession);
+    }
+  }, [navigate, config]);
+
+  /**
    * Fetch projects from API
    *
    * 调用时序：
@@ -162,6 +192,29 @@ export function useProjectManager(
 
         setProjects(prevProjects => {
           if (prevProjects.length === 0) {
+            // First time loading projects - if no session selected and we have data,
+            // try to select the first session of the first project
+            if (data.length > 0 && !selectedSession && !window.location.pathname.startsWith('/session/')) {
+              const firstProject = data[0];
+              const firstSession = firstProject.sessions?.[0] || 
+                                  (firstProject as any).cursorSessions?.[0] || 
+                                  (firstProject as any).codexSessions?.[0];
+              
+              if (firstSession) {
+                console.log('[useProjectManager] Auto-selecting first session:', firstSession.id);
+                // We use setTimeout to ensure this happens after the state update
+                setTimeout(() => {
+                  setSelectedProject(firstProject);
+                  handleSessionSelect({ 
+                    ...firstSession, 
+                    __projectName: firstProject.name,
+                    __provider: (firstSession as any).__provider || 
+                               (firstProject.sessions?.some(s => s.id === (firstSession as any).id) ? 'claude' : 
+                                (firstProject as any).cursorSessions?.some(s => s.id === (firstSession as any).id) ? 'cursor' : 'codex')
+                  });
+                }, 0);
+              }
+            }
             return data;
           }
 
@@ -174,56 +227,40 @@ export function useProjectManager(
         setIsLoadingProjects(false);
       }
     });
-  }, [user]);
+  }, [user, handleSessionSelect, selectedSession]);
 
   /**
    * Handle project selection
    */
   const handleProjectSelect = useCallback((project: Project, shouldNavigate = true) => {
     setSelectedProject(project);
-    setSelectedSession(null);
+    
+    // Auto-select first session if available
+    const firstSession = project.sessions?.[0] || 
+                        (project as any).cursorSessions?.[0] || 
+                        (project as any).codexSessions?.[0];
+    
+    if (firstSession) {
+      handleSessionSelect({
+        ...firstSession,
+        __projectName: project.name,
+        __provider: firstSession.__provider || 
+                   (project.sessions?.some(s => s.id === firstSession.id) ? 'claude' : 
+                    (project as any).cursorSessions?.some((s: any) => s.id === firstSession.id) ? 'cursor' : 'codex')
+      });
+    } else {
+      setSelectedSession(null);
+    }
     
     // 只有在明确要求导航且不在 /chat 路径下时，才进行导航
-    if (shouldNavigate && window.location.pathname !== '/chat') {
+    if (shouldNavigate && window.location.pathname !== '/chat' && !firstSession) {
       navigate('/chat');
     }
 
     if (config.onProjectSelect) {
       config.onProjectSelect(project);
     }
-  }, [navigate, config]);
-
-  /**
-   * Handle session selection
-   */
-  const handleSessionSelect = useCallback((session: Session) => {
-    setSelectedSession(session);
-
-    const provider = localStorage.getItem('selected-provider') || 'claude';
-    if (provider === 'cursor') {
-      sessionStorage.setItem('cursorSessionId', session.id);
-    }
-
-    if (isMobile) {
-      const sessionProjectName = session.__projectName;
-      // Use ref to get latest selectedProject without including in dependencies
-      const currentProjectName = selectedProjectRef.current?.name;
-
-      if (sessionProjectName !== currentProjectName) {
-        // Sidebar will be closed by caller if needed
-      }
-    }
-
-    // 只有在不在对应 session 路径时才跳转
-    const targetPath = `/session/${session.id}`;
-    if (window.location.pathname !== targetPath) {
-      navigate(targetPath);
-    }
-
-    if (config.onSessionSelect) {
-      config.onSessionSelect(session);
-    }
-  }, [navigate, isMobile, config]);
+  }, [navigate, config, handleSessionSelect]);
 
   /**
    * Handle new session creation
@@ -231,11 +268,15 @@ export function useProjectManager(
   const handleNewSession = useCallback((projectName: string) => {
     const project = projects.find(p => p.name === projectName);
     if (project) {
-      setSelectedProject(project);
-      setSelectedSession(null);
+      // 1. 如果当前不在 /chat，先跳转
       if (window.location.pathname !== '/chat') {
         navigate('/chat');
       }
+      
+      // 2. 更新选中的项目和会话
+      setSelectedProject(project);
+      setSelectedSession(null);
+      
       if (config.onProjectSelect) {
         config.onProjectSelect(project);
       }
@@ -246,24 +287,60 @@ export function useProjectManager(
    * Handle session deletion
    */
   const handleSessionDelete = useCallback((deletedSessionId: string) => {
-    if (selectedSession?.id === deletedSessionId) {
-      setSelectedSession(null);
-      if (window.location.pathname !== '/chat') {
-        navigate('/chat');
-      }
-    }
+    let nextSessionToSelect: Session | null = null;
+    let targetProject: Project | null = null;
 
-    setProjects(prevProjects =>
-      prevProjects.map(project => ({
-        ...project,
-        sessions: project.sessions?.filter(session => session.id !== deletedSessionId) || [],
-        sessionMeta: {
-          ...project.sessionMeta,
-          total: Math.max(0, (project.sessionMeta?.total || 0) - 1)
+    setProjects(prevProjects => {
+      const updatedProjects = prevProjects.map(project => {
+        const remainingSessions = project.sessions?.filter(session => session.id !== deletedSessionId) || [];
+        const remainingCursorSessions = (project as any).cursorSessions?.filter((session: any) => session.id !== deletedSessionId) || [];
+        const remainingCodexSessions = (project as any).codexSessions?.filter((session: any) => session.id !== deletedSessionId) || [];
+        
+        const isSelectedProject = selectedProjectRef.current?.name === project.name;
+        
+        if (isSelectedProject && selectedSession?.id === deletedSessionId) {
+          targetProject = project;
+          // Try to find the next best session to select in the same project
+          nextSessionToSelect = remainingSessions[0] || remainingCursorSessions[0] || remainingCodexSessions[0] || null;
         }
-      }))
-    );
-  }, [selectedSession, navigate]);
+
+        return {
+          ...project,
+          sessions: remainingSessions,
+          cursorSessions: remainingCursorSessions,
+          codexSessions: remainingCodexSessions,
+          sessionMeta: {
+            ...project.sessionMeta,
+            total: Math.max(0, (project.sessionMeta?.total || 0) - 1)
+          }
+        };
+      });
+
+      // After updating projects, if we need to switch sessions, do it
+      if (selectedSession?.id === deletedSessionId) {
+        if (nextSessionToSelect && targetProject) {
+          const sessionWithMetadata = {
+            ...nextSessionToSelect,
+            __projectName: (targetProject as Project).name,
+            __provider: (nextSessionToSelect as any).__provider || 
+                        ((targetProject as Project).sessions?.some(s => s.id === (nextSessionToSelect as any).id) ? 'claude' : 
+                         (targetProject as Project).cursorSessions?.some(s => s.id === (nextSessionToSelect as any).id) ? 'cursor' : 'codex')
+          };
+          // Use setTimeout to ensure this happens after the projects state is updated
+          setTimeout(() => {
+            handleSessionSelect(sessionWithMetadata);
+          }, 0);
+        } else {
+          setSelectedSession(null);
+          if (window.location.pathname !== '/chat') {
+            navigate('/chat');
+          }
+        }
+      }
+
+      return updatedProjects;
+    });
+  }, [selectedSession, navigate, handleSessionSelect]);
 
   /**
    * Handle sidebar refresh
@@ -379,7 +456,7 @@ export function useProjectManager(
       hasFetchedRef.current = true;
       fetchProjects();
     }
-  }, [user]);  // 移除 fetchProjects 依赖，只依赖 user
+  }, [user, fetchProjects]);
 
   // Expose fetchProjects globally for debugging
   useEffect(() => {

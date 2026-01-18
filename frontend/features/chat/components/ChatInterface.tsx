@@ -69,7 +69,7 @@ interface ChatInterfaceProps {
   /** Set of currently processing sessions */
   processingSessions?: Set<string>;
   /** Callback to replace temporary session ID */
-  onReplaceTemporarySession?: (realSessionId: string) => void;
+  onReplaceTemporarySession?: (tempId: string, realSessionId: string) => void;
   /** Callback to navigate to session */
   onNavigateToSession?: (sessionId: string) => void;
   /** Callback to show settings */
@@ -164,12 +164,12 @@ export function ChatInterface({
 
   const chatService = useRef(getChatService({ projectName: selectedProject?.name }));
 
-  // Update service config when project changes
+  // Update service config when project name changes
   useEffect(() => {
-    if (selectedProject) {
+    if (selectedProject?.name) {
       chatService.current.setConfig({ projectName: selectedProject.name });
     }
-  }, [selectedProject]);
+  }, [selectedProject?.name]);
 
   // Authenticated fetch function for API calls
   const authenticatedFetch = useCallback(async (url: string, options?: RequestInit) => {
@@ -328,7 +328,7 @@ export function ChatInterface({
       getCurrentSessionId: () => currentSessionId,
       getSelectedProjectName: () => selectedProject?.name,
     });
-  }, [wsMessages, currentSessionId, selectedProject, addMessage, updateMessage, completeStream, resetStream, updateStreamContent, updateStreamThinking]);
+  }, [wsMessages, currentSessionId, addMessage, updateMessage, completeStream, resetStream, updateStreamContent, updateStreamThinking]);
 
   /**
    * Handle send message
