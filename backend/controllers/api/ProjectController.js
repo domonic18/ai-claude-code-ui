@@ -273,9 +273,17 @@ export class ProjectController extends BaseController {
         throw new ValidationError('Path is required');
       }
 
+      // 规范化路径：提取项目名称（最后一个路径段）
+      const cleanPath = path.trim();
+      const projectName = cleanPath.split('/').filter(Boolean).pop() || cleanPath.replace(/^\//, '');
+
+      if (!projectName) {
+        throw new ValidationError('Invalid project path');
+      }
+
       // 使用项目管理服务添加项目
       const { addProjectManually } = await import('../../services/projects/project-management/index.js');
-      const project = await addProjectManually(path.trim());
+      const project = await addProjectManually(userId, projectName, projectName);
 
       this._success(res, { project }, 'Project added successfully');
     } catch (error) {
