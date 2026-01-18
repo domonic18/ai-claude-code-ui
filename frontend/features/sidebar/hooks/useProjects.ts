@@ -4,15 +4,25 @@
  * Custom hook for managing project data and operations.
  * Handles project fetching, creation, renaming, and deletion.
  *
- * Features:
+ * ## Features
  * - Project list state management
  * - Loading states
  * - Error handling
  * - Automatic refresh on changes
+ *
+ * ## 数据流说明
+ * 此 Hook 主要用于 Sidebar 内部的项目操作（创建、重命名、删除）。
+ * 项目数据主要由父组件 (App.tsx → useProjectManager) 提供。
+ *
+ * ## 调用时序
+ * 1. Sidebar 组件挂载 → useProjects(propProjects) 初始化
+ * 2. propProjects 变化时 → useEffect 同步到内部 state
+ * 3. 用户操作（创建/重命名/删除）→ 调用 service → 刷新列表
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { getSidebarService } from '../services';
+import { requestDeduplicator } from '@/shared/utils';
 import type { Project } from '../types';
 import { STORAGE_KEYS } from '../constants';
 import type { ProjectSortOrder, StarredProjects } from '../types';
@@ -112,21 +122,30 @@ export function useProjects(initialProjects?: Project[] | null): UseProjectsRetu
     saveSortOrder(order);
   }, []);
 
-  // Fetch projects
+  /**
+   * Fetch/refresh projects
+   *
+   * 注意：此函数通常不会被直接调用，因为 Sidebar 的 handleRefresh
+   * 优先使用父组件传入的 onRefresh (即 useProjectManager.handleSidebarRefresh)。
+   * 此函数作为 fallback，用于没有传入 onRefresh 的场景。
+   */
   const refresh = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+    // 使用统一的请求去重器，key: 'sidebar:refresh'
+    return requestDeduplicator.dedupe('sidebar:refresh', async () => {
+      setIsLoading(true);
+      setError(null);
 
-    try {
-      const fetchedProjects = await service.getProjects();
-      setProjects(fetchedProjects);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch projects';
-      setError(errorMessage);
-      console.error('Error fetching projects:', err);
-    } finally {
-      setIsLoading(false);
-    }
+      try {
+        const fetchedProjects = await service.getProjects();
+        setProjects(fetchedProjects);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to fetch projects';
+        setError(errorMessage);
+        console.error('Error fetching projects:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    });
   }, [service]);
 
   // Create project

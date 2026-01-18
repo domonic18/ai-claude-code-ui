@@ -1,5 +1,21 @@
+/**
+ * Auth Context
+ *
+ * 提供全局认证状态和方法（登录、注册、登出、状态检查）。
+ *
+ * ## 调用时序
+ * 1. App 启动 → AuthProvider 挂载
+ * 2. useEffect 触发 → checkAuthStatus() 检查登录状态
+ * 3. 检查完成 → 设置 user/needsSetup 状态
+ * 4. 子组件通过 useAuth() 获取状态并决定渲染内容
+ *
+ * ## 请求去重
+ * 使用 requestDeduplicator 防止 React StrictMode 导致的双重请求
+ */
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { api } from '@/shared/services';
+import { requestDeduplicator } from '@/shared/utils';
 import type { User } from '@/shared/types';
 
 export interface AuthResult {
@@ -34,11 +50,19 @@ export interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true); // 初始为 true，防止闪烁
   const [needsSetup, setNeedsSetup] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [hasChecked, setHasChecked] = useState<boolean>(false);
 
+  /**
+   * 初始化时检查认证状态
+   *
+   * 调用时序：
+   * 1. AuthProvider 挂载 → useEffect 执行
+   * 2. 检查 Platform 模式 → 如果是则直接设置用户
+   * 3. 否则调用 checkAuthStatus() → requestDeduplicator 确保不重复
+   */
   useEffect(() => {
     if (import.meta.env.VITE_IS_PLATFORM === 'true') {
       setUser({ username: 'platform-user', id: 'platform' });
@@ -47,56 +71,65 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setHasChecked(true);
       return;
     }
-
-    // 不再在应用启动时自动检查认证状态
-    // 只在需要时（访问受保护页面）才检查
-    setIsLoading(false);
-    setHasChecked(true);
+    
+    // 使用 requestDeduplicator 防止 StrictMode 导致的双重调用
+    if (!hasChecked) {
+      checkAuthStatus();
+    }
   }, []);
 
+  /**
+   * 检查认证状态
+   *
+   * 使用 requestDeduplicator 确保并发调用只执行一次请求。
+   * 这比使用 ref 更优雅，因为它基于 Promise 共享机制。
+   */
   const checkAuthStatus = async () => {
-    // 如果已经检查过，且用户已登录，则不再重复检查
-    if (hasChecked && user) {
+    // 如果已经检查过，直接返回
+    if (hasChecked) {
       return;
     }
 
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      const statusResponse = await api.auth.status();
-      const statusData = await statusResponse.json();
-
-      if (statusData.data?.needsSetup) {
-        setNeedsSetup(true);
-        setHasChecked(true);
-        setIsLoading(false);
-        return;
-      }
-
+    // 使用统一的请求去重器，key: 'auth:checkStatus'
+    return requestDeduplicator.dedupe('auth:checkStatus', async () => {
       try {
-        const userResponse = await api.auth.user();
+        setIsLoading(true);
+        setError(null);
 
-        if (userResponse.ok) {
-          const userData = await userResponse.json();
-          setUser(userData.data);
-          setNeedsSetup(false);
-        } else {
-          // 401 是正常的未登录状态，不需要显示错误
+        const statusResponse = await api.auth.status();
+        const statusData = await statusResponse.json();
+
+        if (statusData.data?.needsSetup) {
+          setNeedsSetup(true);
+          setHasChecked(true);
+          setIsLoading(false);
+          return;
+        }
+
+        try {
+          const userResponse = await api.auth.user();
+
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            setUser(userData.data);
+            setNeedsSetup(false);
+          } else {
+            // 401 是正常的未登录状态，不需要显示错误
+            setUser(null);
+          }
+        } catch (err) {
+          // 网络错误时静默处理
           setUser(null);
         }
       } catch (err) {
-        // 网络错误时静默处理
-        setUser(null);
+        // 只在真正的错误时才记录
+        console.error('Auth status check failed:', err);
+        setError('Failed to check authentication status');
+      } finally {
+        setIsLoading(false);
+        setHasChecked(true);
       }
-    } catch (err) {
-      // 只在真正的错误时才记录
-      console.error('Auth status check failed:', err);
-      setError('Failed to check authentication status');
-    } finally {
-      setIsLoading(false);
-      setHasChecked(true);
-    }
+    });
   };
 
   const login = async (username: string, password: string): Promise<AuthResult> => {

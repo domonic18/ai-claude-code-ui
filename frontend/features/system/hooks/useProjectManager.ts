@@ -3,11 +3,22 @@
  *
  * Hook for managing projects and sessions.
  * Handles project fetching, selection, and management operations.
+ *
+ * ## 请求去重机制
+ * 使用统一的 requestDeduplicator 防止 React StrictMode 或重复渲染导致的多次请求。
+ *
+ * ## 调用时序
+ * 1. 用户登录成功 → AuthContext.user 变化
+ * 2. useEffect 检测到 user 变化 → 调用 fetchProjects()
+ * 3. fetchProjects 使用 requestDeduplicator.dedupe('projects:fetch', ...) 确保不重复请求
+ * 4. 获取项目列表后，为每个项目并行获取 Cursor sessions
+ * 5. 更新 projects 状态，触发 UI 渲染
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, authenticatedFetch } from '@/shared/services';
+import { requestDeduplicator } from '@/shared/utils';
 import type { Project } from '@/features/sidebar/types/sidebar.types';
 import type {
   ProjectManagementState,
@@ -23,6 +34,7 @@ export interface UseProjectManagerReturn extends ProjectManagementState, Project
 
 /**
  * Check if projects have changed
+ * 用于优化 React 状态更新，避免不必要的重渲染
  */
 function hasProjectsChanged(
   prevProjects: Project[],
@@ -71,6 +83,9 @@ export function useProjectManager(
 
   // Ref to track latest selectedProject for stable callbacks
   const selectedProjectRef = useRef<Project | null>(null);
+  
+  // Ref 防止 StrictMode 或重复渲染导致的多次 fetchProjects 调用
+  const hasFetchedRef = useRef<boolean>(false);
 
   // Update ref when selectedProject changes
   useEffect(() => {
@@ -79,75 +94,99 @@ export function useProjectManager(
 
   /**
    * Fetch projects from API
+   *
+   * 调用时序：
+   * 1. useEffect 检测到 user 变化时调用
+   * 2. requestDeduplicator 确保同一时间只有一个请求
+   * 3. 获取项目列表 → 并行获取各项目的 Cursor sessions → 更新状态
    */
   const fetchProjects = useCallback(async (isRetry = false) => {
-    try {
-      if (!isRetry) {
-        setIsLoadingProjects(true);
-      }
-      const response = await api.projects();
+    // 使用请求去重器，key: 'projects:fetch'
+    return requestDeduplicator.dedupe('projects:fetch', async () => {
+      try {
+        if (!isRetry) {
+          setIsLoadingProjects(true);
+        }
+        const response = await api.projects();
 
-      if (!response.ok) {
-        console.error('Failed to fetch projects:', response.status, response.statusText);
-        setProjects([]);
-        return;
-      }
+        if (!response.ok) {
+          console.error('Failed to fetch projects:', response.status, response.statusText);
+          setProjects([]);
+          return;
+        }
 
-      const responseData = await response.json();
-      const data = responseData.data;
+        const responseData = await response.json();
+        let data: Project[] = [];
+        
+        if (responseData && typeof responseData === 'object') {
+          if (Array.isArray(responseData.data)) {
+            data = responseData.data;
+          } else if (Array.isArray(responseData.projects)) {
+            data = responseData.projects;
+          } else if (Array.isArray(responseData)) {
+            data = responseData;
+          }
+        }
 
-      if (!isRetry && data.length === 0 && user) {
-        console.log('[useProjectManager] No projects found, container may be initializing. Scheduling retry...');
-        setTimeout(() => {
-          console.log('[useProjectManager] Retrying project fetch...');
-          fetchProjects(true);
-        }, 2000);
-        return;
-      }
+        if (!isRetry && data.length === 0 && user) {
+          console.log('[useProjectManager] No projects found, container may be initializing. Scheduling retry...');
+          setTimeout(() => {
+            console.log('[useProjectManager] Retrying project fetch...');
+            hasFetchedRef.current = false; // 允许重试
+            fetchProjects(true);
+          }, 2000);
+          return;
+        }
 
-      // Always fetch Cursor sessions for each project
-      for (let project of data) {
-        try {
-          const url = `/api/cursor/sessions?projectPath=${encodeURIComponent(project.fullPath || project.path || '')}`;
-          const cursorResponse = await authenticatedFetch(url);
-          if (cursorResponse.ok) {
-            const cursorData = await cursorResponse.json();
-            if (cursorData.success && cursorData.sessions) {
-              (project as any).cursorSessions = cursorData.sessions;
+        // Always fetch Cursor sessions for each project
+        // 使用 Promise.all 并行请求，提高性能
+        await Promise.all(data.map(async (project) => {
+          try {
+            const url = `/api/cursor/sessions?projectPath=${encodeURIComponent(project.fullPath || (project as any).path || '')}`;
+            const cursorResponse = await authenticatedFetch(url);
+            if (cursorResponse.ok) {
+              const cursorData = await cursorResponse.json();
+              if (cursorData.success && cursorData.sessions) {
+                (project as any).cursorSessions = cursorData.sessions;
+              } else {
+                (project as any).cursorSessions = [];
+              }
             } else {
               (project as any).cursorSessions = [];
             }
-          } else {
+          } catch (error) {
+            console.error(`Error fetching Cursor sessions for project ${project.name}:`, error);
             (project as any).cursorSessions = [];
           }
-        } catch (error) {
-          console.error(`Error fetching Cursor sessions for project ${project.name}:`, error);
-          (project as any).cursorSessions = [];
-        }
+        }));
+
+        setProjects(prevProjects => {
+          if (prevProjects.length === 0) {
+            return data;
+          }
+
+          const hasChanges = hasProjectsChanged(prevProjects, data);
+          return hasChanges ? data : prevProjects;
+        });
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+      } finally {
+        setIsLoadingProjects(false);
       }
-
-      setProjects(prevProjects => {
-        if (prevProjects.length === 0) {
-          return data;
-        }
-
-        const hasChanges = hasProjectsChanged(prevProjects, data);
-        return hasChanges ? data : prevProjects;
-      });
-    } catch (error) {
-      console.error('Error fetching projects:', error);
-    } finally {
-      setIsLoadingProjects(false);
-    }
+    });
   }, [user]);
 
   /**
    * Handle project selection
    */
-  const handleProjectSelect = useCallback((project: Project) => {
+  const handleProjectSelect = useCallback((project: Project, shouldNavigate = true) => {
     setSelectedProject(project);
     setSelectedSession(null);
-    navigate('/');
+    
+    // 只有在明确要求导航且不在 /chat 路径下时，才进行导航
+    if (shouldNavigate && window.location.pathname !== '/chat') {
+      navigate('/chat');
+    }
 
     if (config.onProjectSelect) {
       config.onProjectSelect(project);
@@ -175,7 +214,11 @@ export function useProjectManager(
       }
     }
 
-    navigate(`/session/${session.id}`);
+    // 只有在不在对应 session 路径时才跳转
+    const targetPath = `/session/${session.id}`;
+    if (window.location.pathname !== targetPath) {
+      navigate(targetPath);
+    }
 
     if (config.onSessionSelect) {
       config.onSessionSelect(session);
@@ -190,7 +233,9 @@ export function useProjectManager(
     if (project) {
       setSelectedProject(project);
       setSelectedSession(null);
-      navigate('/');
+      if (window.location.pathname !== '/chat') {
+        navigate('/chat');
+      }
       if (config.onProjectSelect) {
         config.onProjectSelect(project);
       }
@@ -203,7 +248,9 @@ export function useProjectManager(
   const handleSessionDelete = useCallback((deletedSessionId: string) => {
     if (selectedSession?.id === deletedSessionId) {
       setSelectedSession(null);
-      navigate('/');
+      if (window.location.pathname !== '/chat') {
+        navigate('/chat');
+      }
     }
 
     setProjects(prevProjects =>
@@ -220,42 +267,60 @@ export function useProjectManager(
 
   /**
    * Handle sidebar refresh
+   *
+   * 调用时序：
+   * 1. 用户点击刷新按钮 → Sidebar.handleRefresh → 调用此函数
+   * 2. requestDeduplicator 确保同一时间只有一个请求
+   * 3. 获取最新项目列表 → 更新状态 → 同步选中的项目/会话
    */
   const handleSidebarRefresh = useCallback(async () => {
-    try {
-      const response = await api.projects();
+    // 使用请求去重器，key: 'projects:refresh'
+    return requestDeduplicator.dedupe('projects:refresh', async () => {
+      try {
+        const response = await api.projects();
 
-      if (!response.ok) {
-        console.error('Failed to refresh projects:', response.status, response.statusText);
-        return;
-      }
+        if (!response.ok) {
+          console.error('Failed to refresh projects:', response.status, response.statusText);
+          return;
+        }
 
-      const responseData = await response.json();
-      const freshProjects = responseData.data ?? responseData;
-
-      setProjects(prevProjects => {
-        const hasChanges = hasProjectsChanged(prevProjects, freshProjects);
-        return hasChanges ? freshProjects : prevProjects;
-      });
-
-      if (selectedProject) {
-        const refreshedProject = freshProjects.find((p: Project) => p.name === selectedProject.name);
-        if (refreshedProject) {
-          if (JSON.stringify(refreshedProject) !== JSON.stringify(selectedProject)) {
-            setSelectedProject(refreshedProject);
+        const responseData = await response.json();
+        let freshProjects: Project[] = [];
+        
+        if (responseData && typeof responseData === 'object') {
+          if (Array.isArray(responseData.data)) {
+            freshProjects = responseData.data;
+          } else if (Array.isArray(responseData.projects)) {
+            freshProjects = responseData.projects;
+          } else if (Array.isArray(responseData)) {
+            freshProjects = responseData;
           }
+        }
 
-          if (selectedSession) {
-            const refreshedSession = refreshedProject.sessions?.find(s => s.id === selectedSession.id);
-            if (refreshedSession && JSON.stringify(refreshedSession) !== JSON.stringify(selectedSession)) {
-              setSelectedSession(refreshedSession);
+        setProjects(prevProjects => {
+          const hasChanges = hasProjectsChanged(prevProjects, freshProjects);
+          return hasChanges ? freshProjects : prevProjects;
+        });
+
+        if (selectedProject) {
+          const refreshedProject = freshProjects.find((p: Project) => p.name === selectedProject.name);
+          if (refreshedProject) {
+            if (JSON.stringify(refreshedProject) !== JSON.stringify(selectedProject)) {
+              setSelectedProject(refreshedProject);
+            }
+
+            if (selectedSession) {
+              const refreshedSession = refreshedProject.sessions?.find(s => s.id === selectedSession.id);
+              if (refreshedSession && JSON.stringify(refreshedSession) !== JSON.stringify(selectedSession)) {
+                setSelectedSession(refreshedSession);
+              }
             }
           }
         }
+      } catch (error) {
+        console.error('Error refreshing sidebar:', error);
       }
-    } catch (error) {
-      console.error('Error refreshing sidebar:', error);
-    }
+    });
   }, [selectedProject, selectedSession]);
 
   /**
@@ -265,7 +330,9 @@ export function useProjectManager(
     if (selectedProject?.name === projectName) {
       setSelectedProject(null);
       setSelectedSession(null);
-      navigate('/');
+      if (window.location.pathname !== '/chat') {
+        navigate('/chat');
+      }
     }
 
     setProjects(prevProjects =>
@@ -304,10 +371,12 @@ export function useProjectManager(
 
   /**
    * Fetch projects when user logs in
+   * 使用 ref 防止 StrictMode 或重复渲染导致的多次调用
    */
   useEffect(() => {
-    if (user) {
+    if (user && !hasFetchedRef.current) {
       console.log('[useProjectManager] User logged in, fetching projects...');
+      hasFetchedRef.current = true;
       fetchProjects();
     }
   }, [user]);  // 移除 fetchProjects 依赖，只依赖 user
