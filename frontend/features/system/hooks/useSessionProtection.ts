@@ -203,10 +203,18 @@ export function useSessionProtection(
     }
   }, [externalMessageUpdate]);
 
+  /**
+   * Increment external message update counter
+   */
+  const incrementExternalMessageUpdate = useCallback(() => {
+    setExternalMessageUpdate(prev => prev + 1);
+  }, []);
+
   return {
     activeSessions,
     processingSessions,
     externalMessageUpdate,
+    incrementExternalMessageUpdate,
     markSessionAsActive,
     markSessionAsInactive,
     markSessionAsProcessing,

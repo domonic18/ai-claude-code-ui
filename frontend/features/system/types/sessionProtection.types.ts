@@ -26,4 +26,6 @@ export interface SessionProtectionActions {
   hasActiveSession: (sessionId?: string) => boolean;
   isSessionActive: (sessionId: string) => boolean;
   isSessionProcessing: (sessionId: string) => boolean;
+  incrementExternalMessageUpdate: () => void;
+  shouldSkipUpdate: (currentProjects: any[], updatedProjects: any[]) => boolean;
 }

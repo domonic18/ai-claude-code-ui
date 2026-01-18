@@ -5,7 +5,7 @@
  * Handles project fetching, selection, and management operations.
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, authenticatedFetch } from '@/shared/services';
 import type { Project } from '@/features/sidebar/types/sidebar.types';
@@ -68,6 +68,14 @@ export function useProjectManager(
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+
+  // Ref to track latest selectedProject for stable callbacks
+  const selectedProjectRef = useRef<Project | null>(null);
+
+  // Update ref when selectedProject changes
+  useEffect(() => {
+    selectedProjectRef.current = selectedProject;
+  }, [selectedProject]);
 
   /**
    * Fetch projects from API
@@ -159,7 +167,8 @@ export function useProjectManager(
 
     if (isMobile) {
       const sessionProjectName = session.__projectName;
-      const currentProjectName = selectedProject?.name;
+      // Use ref to get latest selectedProject without including in dependencies
+      const currentProjectName = selectedProjectRef.current?.name;
 
       if (sessionProjectName !== currentProjectName) {
         // Sidebar will be closed by caller if needed
@@ -171,7 +180,7 @@ export function useProjectManager(
     if (config.onSessionSelect) {
       config.onSessionSelect(session);
     }
-  }, [navigate, selectedProject, isMobile, config]);
+  }, [navigate, isMobile, config]);
 
   /**
    * Handle new session creation
@@ -301,7 +310,7 @@ export function useProjectManager(
       console.log('[useProjectManager] User logged in, fetching projects...');
       fetchProjects();
     }
-  }, [user, fetchProjects]);
+  }, [user]);  // 移除 fetchProjects 依赖，只依赖 user
 
   // Expose fetchProjects globally for debugging
   useEffect(() => {

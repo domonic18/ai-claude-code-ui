@@ -24,3 +24,14 @@ export type {
   TaskStatus,
   TaskPriority
 } from './TaskMasterContext';
+
+export { AppProvider, useAppContext } from './AppContext';
+export type {
+  AppContextType,
+  AppProviderProps,
+  AppState,
+  AppActions,
+  VersionUpgradeState,
+  PWAState,
+  UIState
+} from './AppContext';
