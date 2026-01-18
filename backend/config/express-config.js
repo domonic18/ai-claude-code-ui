@@ -16,7 +16,7 @@ import { FILES, SERVER } from './config.js';
 
 // 路由导入 - 新结构（按功能分组）
 import { auth, settings, users } from '../routes/core/index.js';
-import { projects, sessions, files, git, userSettings, mcpServers } from '../routes/api/index.js';
+import { projects, sessions, files, git, userSettings, mcpServers, extensions } from '../routes/api/index.js';
 import { claude, cursor, codex, mcp, taskmaster, agent } from '../routes/integrations/index.js';
 import { commands, system, uploads } from '../routes/tools/index.js';
 
@@ -90,6 +90,9 @@ export function configureExpress(app, wss) {
     app.use('/api/users', authenticateToken, users);
     app.use('/api/users', authenticateToken, userSettings);
     app.use('/api/users', authenticateToken, mcpServers);
+
+    // ===== 扩展管理路由 =====
+    app.use('/api/extensions', authenticateToken, extensions);
 
     // ===== 资源路由 =====
     // 注意：files 路由必须在 projects 之前注册，以避免路由冲突

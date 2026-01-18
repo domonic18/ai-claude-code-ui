@@ -17,6 +17,7 @@ import { ContainerConfigBuilder } from './ContainerConfig.js';
 import { ContainerHealthMonitor } from './ContainerHealth.js';
 import { ContainerStateMachine, ContainerState } from './ContainerStateMachine.js';
 import containerStateStore from './ContainerStateStore.js';
+import { syncExtensions } from '../../extensions/extension-sync.js';
 
 const { Container } = repositories;
 
@@ -261,7 +262,21 @@ export class ContainerLifecycleManager {
       await fs.promises.mkdir(userDataDir, { recursive: true });
       console.log(`[Lifecycle] Created user data directory: ${userDataDir}`);
 
-      // 2. 构建容器配置
+      // 2. 创建 .claude 目录并同步预置扩展
+      const claudeDir = path.join(userDataDir, '.claude');
+      await fs.promises.mkdir(claudeDir, { recursive: true });
+      console.log(`[Lifecycle] Created .claude directory: ${claudeDir}`);
+
+      // 同步预置扩展（agents, commands, skills）
+      try {
+        await syncExtensions(claudeDir, { overwriteUserFiles: true });
+        console.log(`[Lifecycle] Synced extensions for user ${userId}`);
+      } catch (syncError) {
+        // 扩展同步失败不应阻止容器创建，只记录错误
+        console.warn(`[Lifecycle] Failed to sync extensions for user ${userId}:`, syncError.message);
+      }
+
+      // 3. 构建容器配置
       const containerConfig = this.configBuilder.buildConfig({
         name: containerName,
         userDataDir,
