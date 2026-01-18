@@ -332,9 +332,7 @@ function MainContent({
                 {activeTab === 'chat' && selectedSession ? (
                   <div className="min-w-0">
                     <h2 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white whitespace-nowrap overflow-x-auto scrollbar-hide">
-                      {selectedSession.__provider === 'cursor' 
-                        ? (selectedSession.name || (selectedSession as any).title || 'Untitled Session') 
-                        : (selectedSession.summary || (selectedSession as any).title || 'New Session')}
+                      {selectedSession.summary || selectedSession.name || (selectedSession as any).title || (selectedSession.__provider === 'cursor' ? 'Untitled Session' : 'New Session')}
                     </h2>
                     <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                       {selectedProject.displayName}
