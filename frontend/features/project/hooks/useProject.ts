@@ -47,7 +47,7 @@ export function useProject(): UseProjectReturn {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.project.list();
+      const response = await api.projects.list();
       if (response.ok) {
         const data = await response.json();
         setProjects(data.data || []);
@@ -70,7 +70,7 @@ export function useProject(): UseProjectReturn {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.project.create(options);
+      const response = await api.projects.create(options);
       if (response.ok) {
         const data = await response.json();
         const newProject = data.data as Project;
@@ -104,7 +104,7 @@ export function useProject(): UseProjectReturn {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.project.delete(project.name);
+      const response = await api.projects.delete(project.name);
       if (!response.ok) {
         throw new Error('Failed to delete project');
       }
@@ -132,7 +132,7 @@ export function useProject(): UseProjectReturn {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.project.rename(project.name, displayName);
+      const response = await api.projects.rename(project.name, displayName);
       if (!response.ok) {
         throw new Error('Failed to rename project');
       }
@@ -162,7 +162,7 @@ export function useProject(): UseProjectReturn {
    */
   const getProjectFiles = useCallback(async (project: Project): Promise<ProjectFile[]> => {
     try {
-      const response = await api.project.files(project.name);
+      const response = await api.projects.files(project.name);
       if (response.ok) {
         const data = await response.json();
         return data.data || [];
@@ -179,7 +179,7 @@ export function useProject(): UseProjectReturn {
    */
   const getProjectSessions = useCallback(async (project: Project): Promise<Session[]> => {
     try {
-      const response = await api.project.sessions(project.name);
+      const response = await api.projects.sessions(project.name);
       if (response.ok) {
         const data = await response.json();
         return data.data || [];
@@ -240,7 +240,7 @@ export function useProjectFiles(project: Project | null): UseProjectFilesReturn 
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.project.files(project.name);
+      const response = await api.projects.files(project.name);
       if (response.ok) {
         const data = await response.json();
         setFiles(data.data || []);
@@ -262,7 +262,7 @@ export function useProjectFiles(project: Project | null): UseProjectFilesReturn 
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.project.createFile(project.name, path);
+      const response = await api.projects.createFile(project.name, path);
       if (response.ok) {
         await refreshFiles();
       } else {
@@ -283,7 +283,7 @@ export function useProjectFiles(project: Project | null): UseProjectFilesReturn 
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.project.deleteFile(project.name, path);
+      const response = await api.projects.deleteFile(project.name, path);
       if (response.ok) {
         await refreshFiles();
       } else {
@@ -304,7 +304,7 @@ export function useProjectFiles(project: Project | null): UseProjectFilesReturn 
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.project.renameFile(project.name, oldPath, newPath);
+      const response = await api.projects.renameFile(project.name, oldPath, newPath);
       if (response.ok) {
         await refreshFiles();
       } else {
@@ -353,7 +353,7 @@ export function useWorkspace(): UseWorkspaceReturn {
 
   const addProjectToWorkspace = useCallback(async (workspace: Project, projectPath: string) => {
     try {
-      const response = await api.project.addProjectToWorkspace(workspace.name, projectPath);
+      const response = await api.projects.addProjectToWorkspace(workspace.name, projectPath);
       if (!response.ok) {
         throw new Error('Failed to add project to workspace');
       }
@@ -365,7 +365,7 @@ export function useWorkspace(): UseWorkspaceReturn {
 
   const removeProjectFromWorkspace = useCallback(async (workspace: Project, projectPath: string) => {
     try {
-      const response = await api.project.removeProjectFromWorkspace(workspace.name, projectPath);
+      const response = await api.projects.removeProjectFromWorkspace(workspace.name, projectPath);
       if (!response.ok) {
         throw new Error('Failed to remove project from workspace');
       }
@@ -377,7 +377,7 @@ export function useWorkspace(): UseWorkspaceReturn {
 
   const getWorkspaceProjects = useCallback(async (workspace: Project): Promise<Project[]> => {
     try {
-      const response = await api.project.getWorkspaceProjects(workspace.name);
+      const response = await api.projects.getWorkspaceProjects(workspace.name);
       if (response.ok) {
         const data = await response.json();
         return data.data || [];
@@ -423,7 +423,7 @@ export function useProjectSessions(project: Project | null): UseProjectSessionsR
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.project.sessions(project.name);
+      const response = await api.projects.sessions(project.name);
       if (response.ok) {
         const data = await response.json();
         setSessions(data.data || []);
@@ -445,7 +445,7 @@ export function useProjectSessions(project: Project | null): UseProjectSessionsR
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.project.deleteSession(project.name, sessionId);
+      const response = await api.projects.deleteSession(project.name, sessionId);
       if (response.ok) {
         setSessions(prev => prev.filter(s => s.id !== sessionId));
       } else {
@@ -464,7 +464,7 @@ export function useProjectSessions(project: Project | null): UseProjectSessionsR
     if (!project) return;
 
     try {
-      await api.project.resumeSession(project.name, sessionId);
+      await api.projects.resumeSession(project.name, sessionId);
     } catch (err) {
       console.error('Failed to resume session:', err);
       throw err;

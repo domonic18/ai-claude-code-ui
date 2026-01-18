@@ -62,19 +62,21 @@ export function useVersionUpgrade(
           isUpdating: false,
         }));
       } else {
-        setUpdateProgress({
+        setUpdateProgress(prev => ({
+          ...prev,
           isUpdating: false,
-          output: prev => prev.output + '\n❌ Update failed: ' + (result.error || 'Unknown error') + '\n',
+          output: prev.output + '\n❌ Update failed: ' + (result.error || 'Unknown error') + '\n',
           error: result.error || 'Update failed',
-        });
+        }));
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      setUpdateProgress({
+      setUpdateProgress(prev => ({
+        ...prev,
         isUpdating: false,
-        output: prev => prev.output + '\n❌ Update failed: ' + errorMessage + '\n',
+        output: prev.output + '\n❌ Update failed: ' + errorMessage + '\n',
         error: errorMessage,
-      });
+      }));
     }
   }, []);
 

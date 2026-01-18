@@ -117,17 +117,13 @@ export function parseAnsiColors(text: string): Array<{
   }> = [];
 
   let lastIndex = 0;
-  let currentStyle = {};
-
-  const styleMap: Record<number, keyof typeof currentStyle> = {
-    0: 'reset',
-    1: 'bold',
-    3: 'italic',
-    4: 'underline',
-    22: 'bold',
-    23: 'italic',
-    24: 'underline',
-  };
+  let currentStyle: {
+    color?: string;
+    backgroundColor?: string;
+    bold?: boolean;
+    italic?: boolean;
+    underline?: boolean;
+  } = {};
 
   const colorMap: Record<number, string> = {
     30: 'black',
@@ -169,17 +165,16 @@ export function parseAnsiColors(text: string): Array<{
       if (code === 0) {
         // Reset
         currentStyle = {};
-      } else if (code in styleMap) {
-        const style = styleMap[code];
-        if (style === 'reset') {
-          currentStyle = {};
-        } else {
-          (currentStyle as Record<string, unknown>)[style] = true;
-        }
+      } else if (code === 1) {
+        currentStyle.bold = true;
+      } else if (code === 3) {
+        currentStyle.italic = true;
+      } else if (code === 4) {
+        currentStyle.underline = true;
       } else if (code in colorMap) {
-        currentStyle.color = colorMap[code as number];
+        currentStyle.color = colorMap[code];
       } else if (code in bgColorMap) {
-        currentStyle.backgroundColor = bgColorMap[code as number];
+        currentStyle.backgroundColor = bgColorMap[code];
       }
     }
 
@@ -339,7 +334,31 @@ export function getTerminalThemeColors(theme: TerminalTheme): {
   brightCyan: string;
   brightWhite: string;
 } {
-  const themes: Record<TerminalTheme, Record<string, string>> = {
+  type ThemeColors = {
+    background: string;
+    foreground: string;
+    cursor: string;
+    cursorAccent: string;
+    selection: string;
+    black: string;
+    red: string;
+    green: string;
+    yellow: string;
+    blue: string;
+    magenta: string;
+    cyan: string;
+    white: string;
+    brightBlack: string;
+    brightRed: string;
+    brightGreen: string;
+    brightYellow: string;
+    brightBlue: string;
+    brightMagenta: string;
+    brightCyan: string;
+    brightWhite: string;
+  };
+
+  const themes: Record<TerminalTheme, ThemeColors> = {
     default: {
       background: '#1e1e1e',
       foreground: '#d4d4d4',
@@ -457,7 +476,7 @@ export function getTerminalThemeColors(theme: TerminalTheme): {
     },
   };
 
-  return (themes[theme] || themes.default) as Record<string, string>;
+  return themes[theme] || themes.default;
 }
 
 /**

@@ -36,7 +36,7 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
   useEffect(() => {
     const savedViewMode = localStorage.getItem('file-tree-view-mode');
     if (savedViewMode && ['simple', 'detailed', 'compact'].includes(savedViewMode)) {
-      setViewMode(savedViewMode);
+      setViewMode(savedViewMode as FileViewMode);
     }
   }, []);
 
@@ -148,7 +148,7 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
     return past.toLocaleDateString();
   };
 
-  const renderFileTree = (items, level = 0) => {
+  const renderFileTree = (items: FileNode[], level = 0) => {
     return items.map((item) => (
       <div key={item.path} className="select-none">
         <Button

@@ -249,6 +249,7 @@ export const Sidebar = memo(function Sidebar({
       {/* Project Creation Wizard Modal */}
       {showNewProject && ReactDOM.createPortal(
         <ProjectCreationWizard
+          isOpen={showNewProject}
           onClose={() => setShowNewProject(false)}
           onProjectCreated={async (newProject) => {
             try {

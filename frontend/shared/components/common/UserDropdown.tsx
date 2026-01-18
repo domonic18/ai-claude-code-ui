@@ -64,7 +64,7 @@ export function UserDropdown({ className = '' }: UserDropdownProps) {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold truncate">
-                  {user?.name || 'User'}
+                  {user?.displayName || user?.username || 'User'}
                 </p>
                 <p className="text-sm text-muted-foreground truncate">
                   {user?.email}

@@ -46,11 +46,12 @@ export function formatDate(date: string | Date | null | undefined, format: 'shor
 
   const dateObj = typeof date === 'string' ? new Date(date) : date;
 
-  const options: Intl.DateTimeFormatOptions = {
-    short: { year: 'numeric', month: 'numeric', day: 'numeric' },
-    long: { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' },
-    full: { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' },
-  }[format];
+  const options: Intl.DateTimeFormatOptions =
+    format === 'short'
+      ? { year: 'numeric', month: 'numeric', day: 'numeric' }
+      : format === 'long'
+        ? { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }
+        : { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
 
   return dateObj.toLocaleDateString(undefined, options);
 }
