@@ -13,6 +13,7 @@
  */
 
 import React, { memo, KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FolderOpen, Folder, Check, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import QuickActions from './QuickActions';
@@ -74,6 +75,8 @@ export const ProjectCardDesktop = memo(function ProjectCardDesktop({
   editingSessionName: string;
   onSetEditingSessionName: any;
 }) {
+  const { t } = useTranslation();
+
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       onSaveName(editingName);
@@ -113,7 +116,7 @@ export const ProjectCardDesktop = memo(function ProjectCardDesktop({
                   value={editingName}
                   onChange={(e) => onSetEditingName(e.target.value)}
                   className="w-full px-2 py-1 text-sm border border-border rounded bg-background text-foreground focus:ring-2 focus:ring-primary/20"
-                  placeholder="Project name"
+                  placeholder={t('sidebar.projectName')}
                   autoFocus
                   onKeyDown={handleKeyDown}
                 />

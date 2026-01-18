@@ -10,6 +10,7 @@
  */
 
 import React, { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
 import type { VersionBannerProps } from '../types/sidebar.types';
@@ -23,6 +24,8 @@ export const VersionBanner = memo(function VersionBanner({
   currentVersion,
   onShowVersionModal,
 }: VersionBannerProps) {
+  const { t } = useTranslation();
+
   if (!updateAvailable) {
     return null;
   }
@@ -32,11 +35,11 @@ export const VersionBanner = memo(function VersionBanner({
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <Badge variant="outline" className="shrink-0">
-            New Version
+            {t('sidebar.newVersion')}
           </Badge>
           <span className="text-sm text-foreground truncate">
-            {latestVersion} available
-            {currentVersion && ` (you have ${currentVersion})`}
+            {latestVersion} {t('sidebar.available')}
+            {currentVersion && ` (${t('sidebar.youHave')} ${currentVersion})`}
           </span>
         </div>
         {onShowVersionModal && (
@@ -46,7 +49,7 @@ export const VersionBanner = memo(function VersionBanner({
             onClick={onShowVersionModal}
             className="shrink-0 h-7 text-xs"
           >
-            View
+            {t('sidebar.view')}
           </Button>
         )}
       </div>

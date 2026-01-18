@@ -11,6 +11,7 @@
  */
 
 import React, { memo, useCallback, useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ScrollArea } from '@/shared/components/ui/ScrollArea';
 import { formatTimeAgo, getAllSessions } from '../utils/timeFormatters';
 import type { ProjectListProps, Project, Session, SessionProvider } from '../types/sidebar.types';
@@ -52,6 +53,8 @@ export const ProjectList = memo(function ProjectList({
   editingSessionName,
   onNewSession,
 }: ProjectListProps) {
+  const { t } = useTranslation();
+
   // Track initial sessions loaded state per project
   const [initialSessionsLoaded, setInitialSessionsLoaded] = useState<Set<string>>(new Set());
 
@@ -135,7 +138,7 @@ export const ProjectList = memo(function ProjectList({
           ))
         ) : projects.length === 0 ? (
           <div className="py-8 text-center text-muted-foreground">
-            <p className="text-sm">No projects found</p>
+            <p className="text-sm">{t('sidebar.noProjectsFound')}</p>
           </div>
         ) : (
           projects.map((project) => {

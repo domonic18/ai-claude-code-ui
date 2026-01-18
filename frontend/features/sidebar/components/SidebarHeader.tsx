@@ -13,6 +13,7 @@
  */
 
 import React, { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MessageSquare, RefreshCw, FolderPlus, ChevronLeft } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import type { SidebarHeaderProps } from '../types/sidebar.types';
@@ -29,6 +30,8 @@ export const SidebarHeader = memo(function SidebarHeader({
   isMobile = false,
   onToggleSidebar,
 }: SidebarHeaderProps) {
+  const { t } = useTranslation();
+
   const handleRefresh = async () => {
     await onRefresh();
   };
@@ -142,16 +145,16 @@ export const SidebarHeader = memo(function SidebarHeader({
         <button
           className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary-foreground shadow rounded-md px-3 flex-1 h-8 text-xs bg-primary hover:bg-primary/90 transition-all duration-200"
           onClick={onShowNewProject}
-          title="Create new project"
+          title={t('sidebar.createProject')}
         >
           <FolderPlus className="w-3.5 h-3.5 mr-1.5" />
-          New Project
+          {t('sidebar.newProject')}
         </button>
         <button
           className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input bg-background shadow-sm hover:text-accent-foreground rounded-md text-xs h-8 w-8 px-0 hover:bg-accent transition-colors duration-200 group"
           onClick={handleRefresh}
           disabled={isRefreshing}
-          title="Refresh projects and sessions (Ctrl+R)"
+          title={t('sidebar.refreshProjects')}
         >
           <RefreshCw className={`w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-300 ${isRefreshing ? 'animate-spin' : ''}`} />
         </button>

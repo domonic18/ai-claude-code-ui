@@ -11,6 +11,7 @@
  */
 
 import React, { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, Plus } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import SessionItem from './SessionItem';
@@ -82,6 +83,7 @@ export const SessionList = memo(function SessionList({
   onSetEditingSessionName,
   onNewSession,
 }: SessionListProps) {
+  const { t } = useTranslation();
   const allSessions = getAllSessions({ sessions, cursorSessions, codexSessions });
 
   const handleLoadMore = useCallback(async () => {
@@ -114,7 +116,7 @@ export const SessionList = memo(function SessionList({
   if (allSessions.length === 0 && !isLoadingSessions) {
     return (
       <div className="py-2 px-3 text-left">
-        <p className="text-xs text-muted-foreground">No sessions yet</p>
+        <p className="text-xs text-muted-foreground">{t('sidebar.noSessionsYet')}</p>
       </div>
     );
   }
@@ -163,12 +165,12 @@ export const SessionList = memo(function SessionList({
           {isLoadingSessions ? (
             <>
               <div className="w-3 h-3 animate-spin rounded-full border border-muted-foreground border-t-transparent" />
-              Loading...
+              {t('common.loading')}
             </>
           ) : (
             <>
               <ChevronDown className="w-3 h-3" />
-              Show more sessions
+              {t('sidebar.showMoreSessions')}
             </>
           )}
         </Button>
@@ -185,7 +187,7 @@ export const SessionList = memo(function SessionList({
               <path d="M5 12h14"></path>
               <path d="M12 5v14"></path>
             </svg>
-            New Session
+            {t('sidebar.newSession')}
           </button>
         </div>
       )}
@@ -199,7 +201,7 @@ export const SessionList = memo(function SessionList({
           onClick={onNewSession}
         >
           <Plus className="w-3 h-3" />
-          New Session
+          {t('sidebar.newSession')}
         </Button>
       )}
     </div>
