@@ -96,13 +96,14 @@
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
     box-sizing: border-box;
     transition: none;
   }
-  
+
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     margin: 0;
     padding: 0;
@@ -327,7 +328,7 @@
   
   /* Ensure checkbox styling is preserved */
   input[type="checkbox"] {
-    @apply accent-blue-600;
+    accent-color: rgb(37 99 235); /* blue-600 */
     opacity: 1;
   }
   
@@ -533,26 +534,36 @@
     
     /* Better mobile touch targets */
     .mobile-touch-target {
-      @apply min-h-[44px] min-w-[44px];
+      min-height: 44px;
+      min-width: 44px;
     }
-    
+
     /* Chat message improvements */
     .chat-message.user {
-      @apply justify-end;
+      justify-content: flex-end;
     }
-    
+
     .chat-message.user > div {
-      @apply max-w-[85%];
+      max-width: 85%;
     }
-    
+
     .chat-message.assistant > div,
     .chat-message.error > div {
-      @apply w-full sm:max-w-[95%];
+      width: 100%;
     }
-    
+
+    @media (min-width: 640px) {
+      .chat-message.assistant > div,
+      .chat-message.error > div {
+        max-width: 95%;
+      }
+    }
+
     /* Session name truncation on mobile */
     .session-name-mobile {
-      @apply truncate;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
       max-width: calc(100vw - 120px); /* Account for sidebar padding and buttons */
     }
     

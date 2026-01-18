@@ -35,6 +35,7 @@ export default defineConfig(({ command, mode }) => {
     build: {
       outDir: 'dist',
       chunkSizeWarningLimit: 500,
+      cssMinify: false,
       rollupOptions: {
         output: {
           manualChunks: {
