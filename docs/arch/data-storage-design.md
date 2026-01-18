@@ -603,16 +603,11 @@ const storageQuotas = {
 │   │       │           ├── metadata.json
 │   │       │           └── messages.jsonl
 │   │       ├── my-workspace/          # 默认工作区（项目代码）
-│   │       │   ├── .claude/           # 项目级配置（覆盖用户级）
-│   │       │   │   ├── CLAUDE.md      # 项目上下文
-│   │       │   │   ├── settings.local.json
-│   │       │   │   ├── commands/      # 项目级命令
-│   │       │   │   └── skills/        # 项目级 Skills
 │   │       │   ├── src/
 │   │       │   ├── package.json
 │   │       │   └── README.md
 │   │       ├── project-2/             # 其他项目
-│   │       │   └── .claude/           # 项目级配置
+│   │       │   └── src/            
 │   │       └── ...
 │   ├── user_2/
 │   │   └── data/
