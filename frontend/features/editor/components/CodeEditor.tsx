@@ -11,7 +11,9 @@ import { githubLight } from '@uiw/codemirror-theme-github';
 import { unifiedMergeView, getChunks } from '@codemirror/merge';
 import { showMinimap } from '@replit/codemirror-minimap';
 import { EditorView, showPanel, ViewPlugin } from '@codemirror/view';
-import { X, Save, Download, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Save, Download, Maximize2, Minimize2, Eye, Edit } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { api } from '@/shared/services';
 import type { CodeEditorComponentProps, EditorFile, EditorLanguage } from '../types/editor.types';
 
@@ -53,7 +55,14 @@ function CodeEditor({
   const [fontSize, setFontSize] = useState<string>(() => {
     return localStorage.getItem('codeEditorFontSize') || '14';
   });
+  const [previewMode, setPreviewMode] = useState<'edit' | 'preview' | 'split'>('edit');
   const editorRef = useRef<EditorView | null>(null);
+
+  // Check if current file is a markdown file
+  const isMarkdownFile = useMemo(() => {
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    return ext === 'md' || ext === 'markdown';
+  }, [file.name]);
 
   // Create minimap extension with chunk-based gutters
   const minimapExtension = useMemo(() => {
@@ -602,6 +611,47 @@ function CodeEditor({
           </div>
 
           <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
+            {/* Markdown preview toggle */}
+            {isMarkdownFile && (
+              <div className="hidden md:flex items-center bg-gray-100 dark:bg-gray-800 rounded-md p-1">
+                <button
+                  onClick={() => setPreviewMode('edit')}
+                  className={`p-1.5 rounded transition-colors ${
+                    previewMode === 'edit'
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
+                  title="Edit mode"
+                >
+                  <Edit className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setPreviewMode('split')}
+                  className={`p-1.5 rounded transition-colors ${
+                    previewMode === 'split'
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
+                  title="Split view"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7h6m0 10v-3m-3 3h.01M9 17h.01M15 7h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setPreviewMode('preview')}
+                  className={`p-1.5 rounded transition-colors ${
+                    previewMode === 'preview'
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
+                  title="Preview mode"
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
             <button
               onClick={handleDownload}
               className="p-2 md:p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center"
@@ -655,38 +705,41 @@ function CodeEditor({
         </div>
 
         {/* Editor */}
-        <div className="flex-1 overflow-hidden">
-          <CodeMirror
-            ref={editorRef}
-            value={content}
-            onChange={setContent}
-            extensions={[
-              ...getLanguageExtension(file.name),
-              // Always show the toolbar
-              ...editorToolbarPanel,
-              // Only show diff-related extensions when diff is enabled
-              ...(file.diffInfo && showDiff && file.diffInfo.old_string !== undefined
-                ? [
-                    unifiedMergeView({
-                      original: file.diffInfo.old_string,
-                      mergeControls: false,
-                      highlightChanges: true,
-                      syntaxHighlightDeletions: false,
-                      gutter: true
-                      // NOTE: NO collapseUnchanged - this shows the full file!
-                    }),
-                    ...minimapExtension,
-                    ...scrollToFirstChunkExtension
-                  ]
-                : []),
-              ...(wordWrap ? [EditorView.lineWrapping] : [])
-            ]}
-            theme={isDarkMode ? oneDark : githubLight}
-            height="100%"
-            style={{
-              fontSize: `${fontSize}px`,
-              height: '100%',
-            }}
+        <div className="flex-1 overflow-hidden flex">
+          {/* Editor Panel */}
+          {(previewMode === 'edit' || previewMode === 'split') && (
+            <div className={previewMode === 'split' ? 'w-1/2 border-r border-border' : 'w-full'}>
+              <CodeMirror
+                ref={editorRef}
+                value={content}
+                onChange={setContent}
+                extensions={[
+                  ...getLanguageExtension(file.name),
+                  // Always show the toolbar
+                  ...editorToolbarPanel,
+                  // Only show diff-related extensions when diff is enabled
+                  ...(file.diffInfo && showDiff && file.diffInfo.old_string !== undefined
+                    ? [
+                        unifiedMergeView({
+                          original: file.diffInfo.old_string,
+                          mergeControls: false,
+                          highlightChanges: true,
+                          syntaxHighlightDeletions: false,
+                          gutter: true
+                          // NOTE: NO collapseUnchanged - this shows the full file!
+                        }),
+                        ...minimapExtension,
+                        ...scrollToFirstChunkExtension
+                      ]
+                    : []),
+                  ...(wordWrap ? [EditorView.lineWrapping] : [])
+                ]}
+                theme={isDarkMode ? oneDark : githubLight}
+                height="100%"
+                style={{
+                  fontSize: `${fontSize}px`,
+                  height: '100%',
+                }}
             basicSetup={{
               lineNumbers: showLineNumbers,
               foldGutter: true,
@@ -700,6 +753,43 @@ function CodeEditor({
               searchKeymap: true,
             }}
           />
+            </div>
+          )}
+
+          {/* Preview Panel */}
+          {(previewMode === 'preview' || previewMode === 'split') && isMarkdownFile && (
+            <div className={previewMode === 'split' ? 'w-1/2' : 'w-full'}>
+              <div className="h-full overflow-auto p-6 bg-white dark:bg-gray-900">
+                <div className="max-w-none prose prose-sm dark:prose-invert">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      code: ({node, className, children, ...props}: any) => {
+                        const match = /language-(\w+)/.exec(className || '');
+                        const isInline = !className && !match;
+                        return isInline ? (
+                          <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-sm" {...props}>
+                            {children}
+                          </code>
+                        ) : (
+                          <code className={className} {...props}>
+                            {children}
+                          </code>
+                        );
+                      },
+                      a: ({node, children, ...props}: any) => (
+                        <a className="text-blue-600 dark:text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer" {...props}>
+                          {children}
+                        </a>
+                      ),
+                    }}
+                  >
+                    {content}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

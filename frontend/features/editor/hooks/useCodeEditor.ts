@@ -384,6 +384,7 @@ export function useLanguageDetection(): UseLanguageDetectionReturn {
       rust: ['.rs'],
       php: ['.php'],
       ruby: ['.rb'],
+      perl: ['.pl', '.pm'],
       sql: ['.sql'],
       yaml: ['.yaml', '.yml'],
       json: ['.json'],

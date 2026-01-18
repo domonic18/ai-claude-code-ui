@@ -5,4 +5,5 @@
  */
 
 export * from './useCodeEditor';
-export * from './usePRDEditor';
+// DEPRECATED: PRDEditor functionality is being removed
+// export * from './usePRDEditor';

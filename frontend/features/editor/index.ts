@@ -1,16 +1,16 @@
 /**
  * Editor Module
  *
- * Code and PRD editor components for editing files and documents.
+ * Code editor components for editing files.
  * Organized following the standard feature module structure.
  *
  * @example
  * ```ts
  * // Import components
- * import { CodeEditor, PRDEditor } from '@/features/editor';
+ * import { CodeEditor } from '@/features/editor';
  *
  * // Import hooks
- * import { useCodeEditor, usePRDEditor } from '@/features/editor/hooks';
+ * import { useCodeEditor } from '@/features/editor/hooks';
  *
  * // Import types
  * import type { EditorLanguage, EditorTheme, CodeEditorConfig } from '@/features/editor/types';

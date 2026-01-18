@@ -1,7 +1,7 @@
 /**
  * Editor Module Types
  *
- * Type definitions for code and PRD editors.
+ * Type definitions for code editors.
  */
 
 /**
@@ -62,52 +62,6 @@ export interface CodeEditorConfig {
 }
 
 /**
- * PRD (Product Requirements Document) section
- */
-export interface PRDSection {
-  id: string;
-  title: string;
-  content: string;
-  order: number;
-}
-
-/**
- * PRD document structure
- */
-export interface PRDDocument {
-  id: string;
-  title: string;
-  sections: PRDSection[];
-  metadata?: {
-    version?: string;
-    author?: string;
-    lastModified?: Date | string;
-    created?: Date | string;
-  };
-}
-
-/**
- * PRD file item
- */
-export interface PRDItem {
-  name: string;
-  path?: string;
-  content?: string;
-  modified?: string;
-  created?: Date | string;
-}
-
-/**
- * PRD editor state
- */
-export interface PRDEditorState {
-  document: PRDDocument | null;
-  currentSection: string | null;
-  isEditing: boolean;
-  hasUnsavedChanges: boolean;
-}
-
-/**
  * Code editor props (generic)
  */
 export interface CodeEditorProps {
@@ -157,38 +111,6 @@ export interface CodeEditorComponentProps {
   isSidebar?: boolean;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
-  className?: string;
-}
-
-/**
- * PRD editor props
- */
-export interface PRDEditorProps {
-  document: PRDDocument | null;
-  onChange?: (document: PRDDocument) => void;
-  onSave?: (document: PRDDocument) => void;
-  readOnly?: boolean;
-  showOutline?: boolean;
-  className?: string;
-}
-
-/**
- * PRD editor component props (actual usage)
- */
-export interface PRDEditorComponentProps {
-  currentProject?: {
-    name: string;
-    path: string;
-    fullPath?: string;
-  } | null;
-  initialPRD?: {
-    name?: string;
-    content?: string;
-    path?: string;
-    isExisting?: boolean;
-  };
-  onClose?: () => void;
-  onSave?: () => void;
   className?: string;
 }
 
