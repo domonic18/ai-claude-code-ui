@@ -18,7 +18,6 @@ export const ROUTES = {
    * Public routes
    */
   HOME: '/',
-  ONBOARDING: '/onboarding',
 
   /**
    * Main application routes
@@ -84,7 +83,6 @@ export const ROUTES = {
  */
 export const ROUTE_TITLES: Record<keyof Omit<typeof ROUTES, 'PROJECT' | 'PROJECT_SESSIONS' | 'PROJECT_SESSION' | 'SESSION' | 'TASK' | 'FILE' | 'LEGACY'>, string> = {
   HOME: 'Home',
-  ONBOARDING: 'Getting Started',
   APP: 'App',
   CHAT: 'Chat',
   SESSIONS: 'Sessions',
@@ -122,12 +120,6 @@ export const ROUTE_META: Record<string, RouteMeta> = {
     title: 'Claude Code UI',
     description: 'Multi-user Web Interface for Claude Code CLI',
     requiresAuth: false,
-    hideFromNav: true,
-  },
-  [ROUTES.ONBOARDING]: {
-    title: 'Getting Started',
-    description: 'Set up your Claude Code UI environment',
-    requiresAuth: true,
     hideFromNav: true,
   },
   [ROUTES.APP]: {
@@ -310,7 +302,6 @@ export function buildRoute(
 export const REDIRECTS = {
   AFTER_LOGIN: ROUTES.APP,
   AFTER_LOGOUT: ROUTES.HOME,
-  AFTER_ONBOARDING: ROUTES.APP,
   UNAUTHORIZED: ROUTES.UNAUTHORIZED,
   FORBIDDEN: ROUTES.FORBIDDEN,
 } as const;
