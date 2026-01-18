@@ -6,6 +6,7 @@
  */
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 export type PermissionMode = 'default' | 'acceptEdits' | 'plan';
 
@@ -46,7 +47,25 @@ export function PermissionModeSelector({
   onModeChange,
   disabled = false,
 }: PermissionModeSelectorProps) {
-  const config = MODE_CONFIG[mode];
+  const { t } = useTranslation();
+
+  const config = {
+    default: {
+      label: t('permissionMode.default'),
+      color: 'orange',
+      description: t('permissionMode.description'),
+    },
+    acceptEdits: {
+      label: t('permissionMode.acceptEdits'),
+      color: 'green',
+      description: t('permissionMode.acceptEditsDescription'),
+    },
+    plan: {
+      label: t('permissionMode.plan'),
+      color: 'purple',
+      description: t('permissionMode.planDescription'),
+    },
+  }[mode];
   const colorClass = {
     orange: 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-600 hover:bg-orange-100 dark:hover:bg-orange-900/30',
     green: 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-300 dark:border-green-600 hover:bg-green-100 dark:hover:bg-green-900/30',

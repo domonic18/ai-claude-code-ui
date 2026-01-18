@@ -12,6 +12,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CLAUDE_MODELS } from '../../../../shared/modelConstants';
 import type { TokenBudget } from './TokenDisplay';
 
@@ -56,6 +57,7 @@ export function ModelSelector({
   compact = false,
   tokenBudget,
 }: ModelSelectorProps) {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -159,7 +161,7 @@ export function ModelSelector({
               : 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400'
             }
           `}
-          title={`Token usage: ${tokenPercentage}%`}
+          title={t('chat.tokenUsage', { percentage: tokenPercentage })}
         >
           {tokenPercentage}%
         </div>
@@ -203,7 +205,7 @@ export function ModelSelector({
                       )}
                       {model.contextWindow && (
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                          Context: {model.contextWindow.toLocaleString()} tokens
+                          {t('chat.context', { tokens: model.contextWindow.toLocaleString() })}
                         </p>
                       )}
                     </div>
