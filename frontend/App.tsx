@@ -30,8 +30,6 @@ import { VersionUpgradeModal, useProjectManager, useSessionProtection } from './
 
 import { ThemeProvider } from '@/shared/contexts/ThemeContext';
 import { AuthProvider, useAuth } from '@/shared/contexts/AuthContext';
-import { TaskMasterProvider } from '@/shared/contexts/TaskMasterContext';
-import { TasksSettingsProvider } from '@/shared/contexts/TasksSettingsContext';
 import { WebSocketProvider, useWebSocketContext } from '@/shared/contexts/WebSocketContext';
 import { QueryClientProvider, queryClient } from '@/shared/libs/query';
 import { ProtectedRoute } from '@/router';
@@ -573,34 +571,30 @@ function App() {
       <ThemeProvider>
         <AuthProvider>
           <WebSocketProvider>
-            <TasksSettingsProvider>
-              <TaskMasterProvider>
-                <Router future={{
-                  v7_startTransition: true,
-                  v7_relativeSplatPath: true
-                }}>
-                  <Routes>
-                    {/* Public routes - outside ProtectedRoute */}
-                    <Route path="/homepage" element={<Homepage />} />
-                    <Route path="/login" element={<LoginForm />} />
-                    <Route path="/register" element={<SetupForm />} />
+            <Router future={{
+              v7_startTransition: true,
+              v7_relativeSplatPath: true
+            }}>
+              <Routes>
+                {/* Public routes - outside ProtectedRoute */}
+                <Route path="/homepage" element={<Homepage />} />
+                <Route path="/login" element={<LoginForm />} />
+                <Route path="/register" element={<SetupForm />} />
 
-                    {/* Root path - redirect based on auth status */}
-                    <Route path="/" element={<RootRedirect />} />
+                {/* Root path - redirect based on auth status */}
+                <Route path="/" element={<RootRedirect />} />
 
-                    {/* Protected routes */}
-                    <Route element={<ProtectedRoute />}>
-                      <Route path="/chat" element={<AppContent />} />
-                      <Route path="/session/:sessionId" element={<AppContent />} />
-                      <Route path="/settings" element={<SettingsPage />} />
-                    </Route>
+                {/* Protected routes */}
+                <Route element={<ProtectedRoute />}>
+                  <Route path="/chat" element={<AppContent />} />
+                  <Route path="/session/:sessionId" element={<AppContent />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                </Route>
 
-                    {/* 404 page - must be last */}
-                    <Route path="*" element={<NotFoundPage />} />
-                  </Routes>
-                </Router>
-              </TaskMasterProvider>
-            </TasksSettingsProvider>
+                {/* 404 page - must be last */}
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </Router>
           </WebSocketProvider>
         </AuthProvider>
       </ThemeProvider>

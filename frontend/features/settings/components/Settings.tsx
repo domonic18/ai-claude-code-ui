@@ -25,7 +25,6 @@ import { SETTINGS_TABS } from '../constants/settings.constants';
 import { AppearanceTab } from './AppearanceTab';
 import { AgentTab } from './AgentTab';
 import { ApiTab } from './ApiTab';
-import { TasksTab } from './TasksTab';
 
 // Create a context to expose save functionality to child tabs
 interface SettingsContextValue {
@@ -86,9 +85,6 @@ export function Settings({
 
           {/* Content Area */}
           <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 md:space-y-8 pb-safe-area-inset-bottom">
-            {/* Newly refactored: Tasks tab */}
-            {activeTab === 'tasks' && <TasksTab />}
-
             {/* Newly refactored: Appearance tab */}
             {activeTab === 'appearance' && <AppearanceTab />}
 

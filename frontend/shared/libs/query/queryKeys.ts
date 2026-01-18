@@ -104,20 +104,6 @@ export const settingsKeys = {
 };
 
 /**
- * TaskMaster 相关的 Query Keys
- */
-export const taskMasterKeys = {
-  /** 所有 TaskMaster 相关查询的根 key */
-  all: ['taskmaster'] as const,
-  
-  /** 安装状态 */
-  installationStatus: () => [...taskMasterKeys.all, 'installation-status'] as const,
-  
-  /** 服务器状态 */
-  server: () => [...taskMasterKeys.all, 'server'] as const,
-};
-
-/**
  * 统一导出的 Query Keys
  */
 export const queryKeys = {
@@ -126,7 +112,6 @@ export const queryKeys = {
   sessions: sessionKeys,
   cursor: cursorKeys,
   settings: settingsKeys,
-  taskMaster: taskMasterKeys,
 };
 
 export default queryKeys;

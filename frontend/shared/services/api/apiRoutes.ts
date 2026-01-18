@@ -102,36 +102,6 @@ export const api = {
       headers: {}, // Let browser set Content-Type for FormData
     }),
 
-  // TaskMaster endpoints
-  taskmaster: {
-    init: (projectName: string) =>
-      authenticatedFetch(`/api/taskmaster/init/${projectName}`, {
-        method: 'POST',
-      }),
-    addTask: (projectName: string, { prompt, title, description, priority, dependencies }: any) =>
-      authenticatedFetch(`/api/taskmaster/add-task/${projectName}`, {
-        method: 'POST',
-        body: JSON.stringify({ prompt, title, description, priority, dependencies }),
-      }),
-    parsePRD: (projectName: string, { fileName, numTasks, append }: any) =>
-      authenticatedFetch(`/api/taskmaster/parse-prd/${projectName}`, {
-        method: 'POST',
-        body: JSON.stringify({ fileName, numTasks, append }),
-      }),
-    getTemplates: () =>
-      authenticatedFetch('/api/taskmaster/prd-templates'),
-    applyTemplate: (projectName: string, { templateId, fileName, customizations }: any) =>
-      authenticatedFetch(`/api/taskmaster/apply-template/${projectName}`, {
-        method: 'POST',
-        body: JSON.stringify({ templateId, fileName, customizations }),
-      }),
-    updateTask: (projectName: string, taskId: string, updates: any) =>
-      authenticatedFetch(`/api/taskmaster/update-task/${projectName}/${taskId}`, {
-        method: 'PUT',
-        body: JSON.stringify(updates),
-      }),
-  },
-
   // Browse filesystem for project suggestions
   browseFilesystem: (dirPath: string | null = null) => {
     const params = new URLSearchParams();

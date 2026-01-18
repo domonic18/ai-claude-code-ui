@@ -22,11 +22,9 @@ export { Settings } from './components/Settings';
 export { AppearanceTab } from './components/AppearanceTab';
 export { AgentTab } from './components/AgentTab';
 export { ApiTab } from './components/ApiTab';
-export { TasksTab } from './components/TasksTab';
 export type { AgentTabHandle } from './components/AgentTab';
 
 // Migrated components
-export { default as TasksSettings } from './components/TasksSettings';
 export { default as ApiKeysSettings } from './components/ApiKeysSettings';
 export { default as CredentialsSettings } from './components/CredentialsSettings';
 export { default as QuickSettingsPanel } from './components/QuickSettingsPanel';

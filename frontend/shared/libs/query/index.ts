@@ -86,7 +86,7 @@ export {
 } from './queryClient';
 
 // Export query keys
-export { queryKeys, authKeys, projectKeys, sessionKeys, cursorKeys, settingsKeys, taskMasterKeys } from './queryKeys';
+export { queryKeys, authKeys, projectKeys, sessionKeys, cursorKeys, settingsKeys } from './queryKeys';
 
 // Export custom hooks
 export * from './hooks';
