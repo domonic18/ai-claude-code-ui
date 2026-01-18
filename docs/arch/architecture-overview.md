@@ -1,7 +1,8 @@
-# 多用户 Claude Code 系统 - 架构概述
+# Claude Code UI - 架构概述
 
-> **文档版本**: 1.0
+> **文档版本**: 1.1
 > **创建时间**: 2026-01-10
+> **更新时间**: 2026-01-18
 > **方案类型**: Docker + Seccomp 容器隔离
 > **项目版本**: 基于 main 分支
 
@@ -32,12 +33,16 @@
 
 | 组件 | 技术 | 说明 |
 |------|------|------|
+| 前端框架 | React 18.3 + Vite 7.0 | 现代化前端框架和构建工具 |
+| 后端框架 | Express.js 4.18 + Node.js | 稳定的 Web 服务器框架 |
 | 容器运行时 | Docker 24.x | 成熟稳定的容器技术 |
 | 安全策略 | Seccomp + AppArmor | 系统调用过滤和强制访问控制 |
-| 容器编排 | Docker Compose (起步) | 简化部署和管理 |
+| 容器编排 | Docker Compose | 简化部署和管理 |
 | 网络隔离 | Docker Bridge + User Network | 容器间网络隔离 |
 | 存储卷 | Docker Volume | 持久化用户数据 |
-| 容器管理 | Dockerode (Node.js) | Docker API 封装 |
+| 容器管理 | Dockerode 4.0 | Docker API 封装 |
+| WebSocket | ws 8.14 | 实时双向通信 |
+| 数据库 | SQLite 3 + better-sqlite3 | 轻量级关系型数据库 |
 
 ### 1.3 架构原则
 
@@ -115,15 +120,16 @@
 - **SQLite DB**：用户认证和会话管理
 
 **主要文件**：
-- `server/index.js` - 主服务入口
-- `server/claude-sdk.js` - Claude SDK 集成（需改造）
-- `server/routes/*` - API 路由
+- `backend/index.js` - 主服务入口
+- `backend/services/` - 业务服务层（容器、会话、文件等）
+- `backend/routes/` - API 路由
+- `backend/websocket/` - WebSocket 服务
 
 #### 2.2.2 容器管理层 (Container Management Layer)
 
 **新增模块**：负责容器生命周期管理
 
-**核心模块**：`server/container-manager.js`
+**核心模块**：`backend/services/container/ContainerManager.js`
 
 ```javascript
 class ContainerManager {
@@ -387,3 +393,4 @@ class ContainerManager {
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
 | 1.0 | 2026-01-10 | Claude | 初始版本 |
+| 1.1 | 2026-01-18 | Claude | 更新技术栈和文件路径 |

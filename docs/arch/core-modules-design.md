@@ -1,7 +1,8 @@
-# 多用户 Claude Code 系统 - 核心模块设计
+# Claude Code UI - 核心模块设计
 
-> **文档版本**: 1.0
+> **文档版本**: 1.1
 > **创建时间**: 2026-01-10
+> **更新时间**: 2026-01-18
 > **所属架构**: Docker + Seccomp 容器隔离
 
 ---
@@ -244,7 +245,7 @@
 
 ```javascript
 /**
- * server/services/container/ContainerManager.js
+ * backend/services/container/ContainerManager.js
  *
  * 容器生命周期管理模块
  */
@@ -543,7 +544,7 @@ export default ContainerManager;
 #### 2.1.2 使用示例
 
 ```javascript
-import ContainerManager from './services/container/ContainerManager.js';
+import ContainerManager from './backend/services/container/ContainerManager.js';
 
 // 创建容器管理器实例
 const containerManager = new ContainerManager({
@@ -607,7 +608,7 @@ CMD ["sh"]
 
 ```javascript
 /**
- * server/websocket-manager.js
+ * backend/websocket/server.js
  *
  * WebSocket 连接管理器
  */
@@ -717,7 +718,7 @@ export default WebSocketManager;
 
 ```javascript
 /**
- * server/services/container/FileContainer.js
+ * backend/services/files/FileContainer.js
  *
  * 容器内文件操作服务
  */
@@ -837,3 +838,4 @@ export default FileContainer;
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
 | 1.0 | 2026-01-10 | Claude | 初始版本 |
+| 1.1 | 2026-01-18 | Claude | 更新文件路径 |
