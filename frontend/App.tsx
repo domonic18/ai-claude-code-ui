@@ -310,7 +310,8 @@ function AppContent() {
         // Search in Claude sessions
         const session = project.sessions?.find(s => s.id === sessionId);
         if (session) {
-          handleProjectSelect(project, false); // 传入 false，避免在加载 Session 时跳回 /chat
+          // IMPORTANT: Pass preventAutoSession = true to avoid selecting session 1
+          handleProjectSelect(project, false, true); 
           setSelectedSession({ 
             ...session, 
             __provider: 'claude',
@@ -323,7 +324,8 @@ function AppContent() {
         // Search in Cursor sessions
         const cSession = project.cursorSessions?.find(s => s.id === sessionId);
         if (cSession) {
-          handleProjectSelect(project, false); // 传入 false，避免在加载 Session 时跳回 /chat
+          // IMPORTANT: Pass preventAutoSession = true to avoid selecting session 1
+          handleProjectSelect(project, false, true);
           setSelectedSession({ 
             ...cSession, 
             __provider: 'cursor',
@@ -336,7 +338,8 @@ function AppContent() {
         // Search in Codex sessions
         const codexSession = (project as any).codexSessions?.find((s: any) => s.id === sessionId);
         if (codexSession) {
-          handleProjectSelect(project, false);
+          // IMPORTANT: Pass preventAutoSession = true to avoid selecting session 1
+          handleProjectSelect(project, false, true);
           setSelectedSession({
             ...codexSession,
             __provider: 'codex',
@@ -347,7 +350,7 @@ function AppContent() {
         }
       }
     }
-  }, [sessionId, projects, selectedSession?.id]); // 只依赖 selectedSession.id，避免对象引用变化导致循环
+  }, [sessionId, projects, selectedSession?.id, handleProjectSelect, setSelectedSession]);
 
   // Version Upgrade Modal (now using extracted component from features/system)
   // Note: The modal component has been extracted to features/system/components/VersionUpgradeModal.tsx

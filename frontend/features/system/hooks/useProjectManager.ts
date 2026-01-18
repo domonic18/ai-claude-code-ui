@@ -11,7 +11,7 @@
  * 1. 用户登录成功 → AuthContext.user 变化
  * 2. useEffect 检测到 user 变化 → 调用 fetchProjects()
  * 3. fetchProjects 使用 requestDeduplicator.dedupe('projects:fetch', ...) 确保不重复请求
- * 4. 获取项目列表后，为每个项目并行获取 Cursor sessions
+ * 4. 获取项目列表 after fetching projects
  * 5. 更新 projects 状态，触发 UI 渲染
  */
 
@@ -94,20 +94,39 @@ export function useProjectManager(
 
   /**
    * Handle session selection
+   * 
+   * @param session - The session to select
+   * @param projectName - Optional project name context (to avoid stale ref)
    */
-  const handleSessionSelect = useCallback((session: Session) => {
+  const handleSessionSelect = useCallback((session: Session, projectName?: string) => {
+    const currentProjectName = projectName || session.__projectName || selectedProjectRef.current?.name;
+    
+    // Determine provider if not present
+    let provider = session.__provider;
+    if (!provider && selectedProjectRef.current) {
+      if (selectedProjectRef.current.sessions?.some(s => s.id === session.id)) {
+        provider = 'claude';
+      } else if ((selectedProjectRef.current as any).cursorSessions?.some((s: any) => s.id === session.id)) {
+        provider = 'cursor';
+      } else if ((selectedProjectRef.current as any).codexSessions?.some((s: any) => s.id === session.id)) {
+        provider = 'codex';
+      }
+    }
+    
     // Ensure session has required metadata if possible
     const enrichedSession = {
       ...session,
-      __projectName: session.__projectName || selectedProjectRef.current?.name,
-      __provider: session.__provider || (selectedProjectRef.current?.sessions?.some(s => s.id === session.id) ? 'claude' : 'cursor')
+      __projectName: currentProjectName,
+      __provider: provider || 'claude'
     };
     
+    const sessionTitle = enrichedSession.summary || enrichedSession.title;
+    console.log('[useProjectManager] Selecting session:', enrichedSession.id, 'title:', sessionTitle, 'project:', enrichedSession.__projectName);
     setSelectedSession(enrichedSession);
 
-    const provider = enrichedSession.__provider || 'claude';
-    localStorage.setItem('selected-provider', provider);
-    if (provider === 'cursor') {
+    const finalProvider = enrichedSession.__provider || 'claude';
+    localStorage.setItem('selected-provider', finalProvider);
+    if (finalProvider === 'cursor') {
       sessionStorage.setItem('cursorSessionId', session.id);
     }
 
@@ -124,14 +143,8 @@ export function useProjectManager(
 
   /**
    * Fetch projects from API
-   *
-   * 调用时序：
-   * 1. useEffect 检测到 user 变化时调用
-   * 2. requestDeduplicator 确保同一时间只有一个请求
-   * 3. 获取项目列表 → 并行获取各项目的 Cursor sessions → 更新状态
    */
   const fetchProjects = useCallback(async (isRetry = false) => {
-    // 使用请求去重器，key: 'projects:fetch'
     return requestDeduplicator.dedupe('projects:fetch', async () => {
       try {
         if (!isRetry) {
@@ -168,8 +181,7 @@ export function useProjectManager(
           return;
         }
 
-        // Always fetch Cursor sessions for each project
-        // 使用 Promise.all 并行请求，提高性能
+        // Fetch Cursor sessions for each project
         await Promise.all(data.map(async (project) => {
           try {
             const url = `/api/cursor/sessions?projectPath=${encodeURIComponent(project.fullPath || (project as any).path || '')}`;
@@ -178,22 +190,16 @@ export function useProjectManager(
               const cursorData = await cursorResponse.json();
               if (cursorData.success && cursorData.sessions) {
                 (project as any).cursorSessions = cursorData.sessions;
-              } else {
-                (project as any).cursorSessions = [];
               }
-            } else {
-              (project as any).cursorSessions = [];
             }
           } catch (error) {
             console.error(`Error fetching Cursor sessions for project ${project.name}:`, error);
-            (project as any).cursorSessions = [];
           }
         }));
 
         setProjects(prevProjects => {
           if (prevProjects.length === 0) {
-            // First time loading projects - if no session selected and we have data,
-            // try to select the first session of the first project
+            // Auto-select logic for initial load
             if (data.length > 0 && !selectedSession && !window.location.pathname.startsWith('/session/')) {
               const firstProject = data[0];
               const firstSession = firstProject.sessions?.[0] || 
@@ -201,17 +207,13 @@ export function useProjectManager(
                                   (firstProject as any).codexSessions?.[0];
               
               if (firstSession) {
-                console.log('[useProjectManager] Auto-selecting first session:', firstSession.id);
-                // We use setTimeout to ensure this happens after the state update
+                console.log('[useProjectManager] Auto-selecting initial session:', firstSession.id);
                 setTimeout(() => {
                   setSelectedProject(firstProject);
                   handleSessionSelect({ 
                     ...firstSession, 
-                    __projectName: firstProject.name,
-                    __provider: (firstSession as any).__provider || 
-                               (firstProject.sessions?.some(s => s.id === (firstSession as any).id) ? 'claude' : 
-                                (firstProject as any).cursorSessions?.some(s => s.id === (firstSession as any).id) ? 'cursor' : 'codex')
-                  });
+                    __projectName: firstProject.name
+                  } as Session, firstProject.name);
                 }, 0);
               }
             }
@@ -219,7 +221,41 @@ export function useProjectManager(
           }
 
           const hasChanges = hasProjectsChanged(prevProjects, data);
-          return hasChanges ? data : prevProjects;
+          const updatedProjects = hasChanges ? data : prevProjects;
+
+          // If session is already selected, update it from fresh data to keep summary in sync
+          if (selectedSession) {
+            const currentSelectedProject = updatedProjects.find(p => p.name === (selectedSession.__projectName || selectedProjectRef.current?.name));
+            if (currentSelectedProject) {
+              const allSessions = [
+                ...(currentSelectedProject.sessions || []),
+                ...((currentSelectedProject as any).cursorSessions || []),
+                ...((currentSelectedProject as any).codexSessions || [])
+              ];
+              const freshSession = allSessions.find(s => s.id === selectedSession.id);
+              if (freshSession) {
+                const freshTitle = freshSession.summary || freshSession.title;
+                const selectedTitle = selectedSession.summary || selectedSession.title;
+                const freshActivity = (freshSession as any).lastActivity || (freshSession as any).updated_at;
+                const selectedActivity = selectedSession.lastActivity || selectedSession.updated_at;
+                
+                const sessionUnchanged = 
+                  freshTitle === selectedTitle &&
+                  freshActivity === selectedActivity;
+                
+                if (!sessionUnchanged) {
+                  console.log('[useProjectManager] Updating selected session with fresh data:', freshTitle);
+                  setSelectedSession({
+                    ...freshSession,
+                    __projectName: currentSelectedProject.name,
+                    __provider: selectedSession.__provider
+                  } as Session);
+                }
+              }
+            }
+          }
+
+          return updatedProjects;
         });
       } catch (error) {
         console.error('Error fetching projects:', error);
@@ -231,29 +267,33 @@ export function useProjectManager(
 
   /**
    * Handle project selection
+   * 
+   * @param project - The project to select
+   * @param shouldNavigate - Whether to navigate to /chat
+   * @param preventAutoSession - Whether to skip auto-selecting the first session
    */
-  const handleProjectSelect = useCallback((project: Project, shouldNavigate = true) => {
+  const handleProjectSelect = useCallback((project: Project, shouldNavigate = true, preventAutoSession = false) => {
+    console.log('[useProjectManager] Project selected:', project.name, 'preventAutoSession:', preventAutoSession);
     setSelectedProject(project);
     
-    // Auto-select first session if available
-    const firstSession = project.sessions?.[0] || 
-                        (project as any).cursorSessions?.[0] || 
-                        (project as any).codexSessions?.[0];
-    
-    if (firstSession) {
-      handleSessionSelect({
-        ...firstSession,
-        __projectName: project.name,
-        __provider: firstSession.__provider || 
-                   (project.sessions?.some(s => s.id === firstSession.id) ? 'claude' : 
-                    (project as any).cursorSessions?.some((s: any) => s.id === firstSession.id) ? 'cursor' : 'codex')
-      });
-    } else {
-      setSelectedSession(null);
+    if (!preventAutoSession) {
+      // Auto-select first session if available
+      const firstSession = project.sessions?.[0] || 
+                          (project as any).cursorSessions?.[0] || 
+                          (project as any).codexSessions?.[0];
+      
+      if (firstSession) {
+        handleSessionSelect({
+          ...firstSession,
+          __projectName: project.name
+        } as Session, project.name);
+      } else {
+        setSelectedSession(null);
+      }
     }
     
     // 只有在明确要求导航且不在 /chat 路径下时，才进行导航
-    if (shouldNavigate && window.location.pathname !== '/chat' && !firstSession) {
+    if (shouldNavigate && window.location.pathname !== '/chat') {
       navigate('/chat');
     }
 
@@ -268,15 +308,11 @@ export function useProjectManager(
   const handleNewSession = useCallback((projectName: string) => {
     const project = projects.find(p => p.name === projectName);
     if (project) {
-      // 1. 如果当前不在 /chat，先跳转
       if (window.location.pathname !== '/chat') {
         navigate('/chat');
       }
-      
-      // 2. 更新选中的项目和会话
       setSelectedProject(project);
       setSelectedSession(null);
-      
       if (config.onProjectSelect) {
         config.onProjectSelect(project);
       }
@@ -300,7 +336,6 @@ export function useProjectManager(
         
         if (isSelectedProject && selectedSession?.id === deletedSessionId) {
           targetProject = project;
-          // Try to find the next best session to select in the same project
           nextSessionToSelect = remainingSessions[0] || remainingCursorSessions[0] || remainingCodexSessions[0] || null;
         }
 
@@ -316,19 +351,14 @@ export function useProjectManager(
         };
       });
 
-      // After updating projects, if we need to switch sessions, do it
       if (selectedSession?.id === deletedSessionId) {
         if (nextSessionToSelect && targetProject) {
-          const sessionWithMetadata = {
-            ...nextSessionToSelect,
-            __projectName: (targetProject as Project).name,
-            __provider: (nextSessionToSelect as any).__provider || 
-                        ((targetProject as Project).sessions?.some(s => s.id === (nextSessionToSelect as any).id) ? 'claude' : 
-                         (targetProject as Project).cursorSessions?.some(s => s.id === (nextSessionToSelect as any).id) ? 'cursor' : 'codex')
-          };
-          // Use setTimeout to ensure this happens after the projects state is updated
+          const sessionToSelect = nextSessionToSelect as any;
           setTimeout(() => {
-            handleSessionSelect(sessionWithMetadata);
+            handleSessionSelect({
+              ...sessionToSelect,
+              __projectName: (targetProject as any).name
+            }, (targetProject as any).name);
           }, 0);
         } else {
           setSelectedSession(null);
@@ -343,15 +373,26 @@ export function useProjectManager(
   }, [selectedSession, navigate, handleSessionSelect]);
 
   /**
+   * Handle project deletion
+   */
+  const handleProjectDelete = useCallback((projectName: string) => {
+    if (selectedProject?.name === projectName) {
+      setSelectedProject(null);
+      setSelectedSession(null);
+      if (window.location.pathname !== '/chat') {
+        navigate('/chat');
+      }
+    }
+
+    setProjects(prevProjects =>
+      prevProjects.filter(project => project.name !== projectName)
+    );
+  }, [selectedProject, navigate]);
+
+  /**
    * Handle sidebar refresh
-   *
-   * 调用时序：
-   * 1. 用户点击刷新按钮 → Sidebar.handleRefresh → 调用此函数
-   * 2. requestDeduplicator 确保同一时间只有一个请求
-   * 3. 获取最新项目列表 → 更新状态 → 同步选中的项目/会话
    */
   const handleSidebarRefresh = useCallback(async () => {
-    // 使用请求去重器，key: 'projects:refresh'
     return requestDeduplicator.dedupe('projects:refresh', async () => {
       try {
         const response = await api.projects();
@@ -376,24 +417,34 @@ export function useProjectManager(
 
         setProjects(prevProjects => {
           const hasChanges = hasProjectsChanged(prevProjects, freshProjects);
-          return hasChanges ? freshProjects : prevProjects;
-        });
+          const updatedProjects = hasChanges ? freshProjects : prevProjects;
 
-        if (selectedProject) {
-          const refreshedProject = freshProjects.find((p: Project) => p.name === selectedProject.name);
-          if (refreshedProject) {
-            if (JSON.stringify(refreshedProject) !== JSON.stringify(selectedProject)) {
-              setSelectedProject(refreshedProject);
-            }
+          if (selectedProject) {
+            const refreshedProject = updatedProjects.find((p: Project) => p.name === selectedProject.name);
+            if (refreshedProject) {
+              if (JSON.stringify(refreshedProject) !== JSON.stringify(selectedProject)) {
+                setSelectedProject(refreshedProject);
+              }
 
-            if (selectedSession) {
-              const refreshedSession = refreshedProject.sessions?.find(s => s.id === selectedSession.id);
-              if (refreshedSession && JSON.stringify(refreshedSession) !== JSON.stringify(selectedSession)) {
-                setSelectedSession(refreshedSession);
+              if (selectedSession) {
+                const allSessions = [
+                  ...(refreshedProject.sessions || []),
+                  ...((refreshedProject as any).cursorSessions || []),
+                  ...((refreshedProject as any).codexSessions || [])
+                ];
+                const refreshedSession = allSessions.find(s => s.id === selectedSession.id);
+                if (refreshedSession && JSON.stringify(refreshedSession) !== JSON.stringify(selectedSession)) {
+                  setSelectedSession({
+                    ...refreshedSession,
+                    __projectName: refreshedProject.name,
+                    __provider: selectedSession.__provider
+                  } as Session);
+                }
               }
             }
           }
-        }
+          return updatedProjects;
+        });
       } catch (error) {
         console.error('Error refreshing sidebar:', error);
       }
@@ -401,25 +452,7 @@ export function useProjectManager(
   }, [selectedProject, selectedSession]);
 
   /**
-   * Handle project deletion
-   */
-  const handleProjectDelete = useCallback((projectName: string) => {
-    if (selectedProject?.name === projectName) {
-      setSelectedProject(null);
-      setSelectedSession(null);
-      if (window.location.pathname !== '/chat') {
-        navigate('/chat');
-      }
-    }
-
-    setProjects(prevProjects =>
-      prevProjects.filter(project => project.name !== projectName)
-    );
-  }, [selectedProject, navigate]);
-
-  /**
    * Update projects from WebSocket message
-   * This is called when a WebSocket message is received with updated project data
    */
   const updateProjectsFromWebSocket = useCallback((updatedProjects: Project[]) => {
     setProjects(updatedProjects);
@@ -437,8 +470,16 @@ export function useProjectManager(
             ...(updatedSelectedProject.codexSessions || []),
             ...(updatedSelectedProject.cursorSessions || [])
           ];
-          const updatedSelectedSession = allSessions.find(s => s.id === selectedSession.id);
-          if (!updatedSelectedSession) {
+          const freshSession = allSessions.find(s => s.id === selectedSession.id);
+          if (freshSession) {
+            if (JSON.stringify(freshSession) !== JSON.stringify(selectedSession)) {
+              setSelectedSession({
+                ...freshSession,
+                __projectName: updatedSelectedProject.name,
+                __provider: selectedSession.__provider
+              } as Session);
+            }
+          } else {
             setSelectedSession(null);
           }
         }
@@ -448,7 +489,6 @@ export function useProjectManager(
 
   /**
    * Fetch projects when user logs in
-   * 使用 ref 防止 StrictMode 或重复渲染导致的多次调用
    */
   useEffect(() => {
     if (user && !hasFetchedRef.current) {

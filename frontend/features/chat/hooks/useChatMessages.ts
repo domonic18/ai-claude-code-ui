@@ -7,7 +7,7 @@
  * - Message CRUD operations
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import type { ChatMessage } from '../types';
 import { MAX_STORED_MESSAGES, MIN_STORED_MESSAGES } from '../constants';
 
@@ -143,6 +143,26 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     return initialMessages;
   });
 
+  // Reload messages when projectName changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && projectName) {
+      const saved = safeLocalStorage.getItem(`chat_messages_${projectName}`);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setMessages(parsed);
+          return;
+        } catch (e) {
+          console.error('Error parsing saved messages on project change:', e);
+        }
+      }
+    }
+    // If no saved messages and no external messages being synced, clear
+    if (!externalMessages) {
+      setMessages(initialMessages);
+    }
+  }, [projectName, initialMessages, externalMessages]);
+
   // Ref to track messages for scroll restoration
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
@@ -155,12 +175,11 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   }, [projectName]);
 
   // Sync with external messages
-  /*eslint-disable react-hooks/exhaustive-deps*/
-  /* eslint-disable */
-  if (externalMessages && externalMessages !== messages) {
-    setMessages(externalMessages);
-  }
-  /* eslint-enable */
+  useEffect(() => {
+    if (externalMessages && externalMessages !== messages) {
+      setMessages(externalMessages);
+    }
+  }, [externalMessages, messages]);
 
   /**
    * Add a new message to the chat
