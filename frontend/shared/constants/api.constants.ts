@@ -60,8 +60,6 @@ export const API_ENDPOINTS = {
 
   // User
   USER_GIT_CONFIG: '/api/user/git-config',
-  USER_ONBOARDING_STATUS: '/api/users/onboarding-status',
-  USER_COMPLETE_ONBOARDING: '/api/users/complete-onboarding',
 
   // Settings
   USER_SETTINGS: '/api/users/settings',

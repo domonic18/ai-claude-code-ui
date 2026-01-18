@@ -132,8 +132,6 @@ export const STORAGE_KEYS = {
 
   // User data
   USER_SETTINGS: 'claude-code-ui.userSettings',
-  ONBOARDING_COMPLETED: 'claude-code-ui.onboardingCompleted',
-  GIT_CONFIG: 'claude-code-ui.gitConfig',
 
   // TaskMaster
   TASKMASTER_VIEW_MODE: 'claude-code-ui.taskmaster.viewMode',

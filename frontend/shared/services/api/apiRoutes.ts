@@ -148,11 +148,6 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ gitName, gitEmail }),
       }),
-    onboardingStatus: () => authenticatedFetch('/api/users/onboarding-status'),
-    completeOnboarding: () =>
-      authenticatedFetch('/api/users/complete-onboarding', {
-        method: 'POST',
-      }),
 
     // User Settings API
     settings: {

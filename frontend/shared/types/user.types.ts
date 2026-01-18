@@ -43,12 +43,3 @@ export interface UserPreferences {
   autoSave: boolean;
   [key: string]: any;
 }
-
-/**
- * Onboarding status
- */
-export interface OnboardingStatus {
-  completed: boolean;
-  step?: number;
-  skipped?: boolean;
-}
