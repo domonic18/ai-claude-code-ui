@@ -30,8 +30,6 @@ export interface UseAuthReturn {
   register: (data: RegistrationData) => Promise<AuthResponse>;
   updateUser: (updates: Partial<User>) => Promise<void>;
   refreshUser: () => Promise<void>;
-  hasCompletedOnboarding: boolean;
-  refreshOnboardingStatus: () => Promise<void>;
 }
 
 /**
@@ -82,8 +80,6 @@ export function useAuth(): UseAuthReturn {
     register,
     updateUser,
     refreshUser,
-    hasCompletedOnboarding: sharedAuth.hasCompletedOnboarding,
-    refreshOnboardingStatus: sharedAuth.refreshOnboardingStatus,
   };
 }
 

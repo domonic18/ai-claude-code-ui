@@ -1,7 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '@/shared/contexts/AuthContext';
 import { SetupForm, LoginForm } from '@/features/auth';
-import { OnboardingPage } from '@/pages/Onboarding';
 import { MessageSquare } from 'lucide-react';
 
 export interface ProtectedRouteProps {
@@ -28,15 +27,18 @@ const LoadingScreen = () => (
 );
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { user, isLoading, needsSetup, hasCompletedOnboarding, refreshOnboardingStatus } = useAuth();
+  const { user, isLoading, needsSetup, checkAuthStatus } = useAuth();
+
+  // 当访问受保护路由时，才触发认证检查
+  useEffect(() => {
+    if (import.meta.env.VITE_IS_PLATFORM !== 'true') {
+      checkAuthStatus();
+    }
+  }, []);
 
   if (import.meta.env.VITE_IS_PLATFORM === 'true') {
     if (isLoading) {
       return <LoadingScreen />;
-    }
-
-    if (!hasCompletedOnboarding) {
-      return <OnboardingPage onComplete={refreshOnboardingStatus} />;
     }
 
     return <>{children}</>;
@@ -52,10 +54,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   if (!user) {
     return <LoginForm />;
-  }
-
-  if (!hasCompletedOnboarding) {
-    return <OnboardingPage onComplete={refreshOnboardingStatus} />;
   }
 
   return <>{children}</>;

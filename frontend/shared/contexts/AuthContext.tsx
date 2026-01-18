@@ -12,6 +12,7 @@ export interface AuthContextValue {
   login: (username: string, password: string) => Promise<AuthResult>;
   register: (username: string, password: string) => Promise<AuthResult>;
   logout: () => Promise<void>;
+  checkAuthStatus: () => Promise<void>;
   isLoading: boolean;
   needsSetup: boolean;
   error: string | null;
@@ -33,22 +34,32 @@ export interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [needsSetup, setNeedsSetup] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasChecked, setHasChecked] = useState<boolean>(false);
 
   useEffect(() => {
     if (import.meta.env.VITE_IS_PLATFORM === 'true') {
       setUser({ username: 'platform-user', id: 'platform' });
       setNeedsSetup(false);
       setIsLoading(false);
+      setHasChecked(true);
       return;
     }
 
-    checkAuthStatus();
+    // 不再在应用启动时自动检查认证状态
+    // 只在需要时（访问受保护页面）才检查
+    setIsLoading(false);
+    setHasChecked(true);
   }, []);
 
   const checkAuthStatus = async () => {
+    // 如果已经检查过，且用户已登录，则不再重复检查
+    if (hasChecked && user) {
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError(null);
@@ -58,6 +69,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (statusData.data?.needsSetup) {
         setNeedsSetup(true);
+        setHasChecked(true);
         setIsLoading(false);
         return;
       }
@@ -70,17 +82,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setUser(userData.data);
           setNeedsSetup(false);
         } else {
+          // 401 是正常的未登录状态，不需要显示错误
           setUser(null);
         }
       } catch (err) {
-        console.error('User fetch failed:', err);
+        // 网络错误时静默处理
         setUser(null);
       }
     } catch (err) {
+      // 只在真正的错误时才记录
       console.error('Auth status check failed:', err);
       setError('Failed to check authentication status');
     } finally {
       setIsLoading(false);
+      setHasChecked(true);
     }
   };
 
@@ -150,6 +165,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     register,
     logout,
+    checkAuthStatus,
     isLoading,
     needsSetup,
     error
