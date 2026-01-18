@@ -7,3 +7,6 @@ export type { ContainerProps } from './Container';
 
 export { default as MainContent } from './MainContent';
 // MainContentProps is exported directly from MainContent.tsx
+
+export { AppHeader } from './AppHeader';
+export type { AppHeaderProps } from './AppHeader';
