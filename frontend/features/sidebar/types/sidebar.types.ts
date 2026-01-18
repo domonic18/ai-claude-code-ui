@@ -20,8 +20,12 @@ export type ProjectSortOrder = 'name' | 'recent';
 export interface Session {
   id: string;
   summary?: string;
+  title?: string;
+  name?: string;
   lastActivity: string;
   createdAt?: string;
+  created_at?: string;
+  updated_at?: string;
   __provider?: SessionProvider;
   messageCount?: number;
 }

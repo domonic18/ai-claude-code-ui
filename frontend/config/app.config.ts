@@ -23,7 +23,7 @@ export const APP_CONFIG = {
 export const FEATURE_FLAGS = {
   // Enable/disable features based on environment or user settings
   enableTaskMaster: true,
-  enablePRDEditor: true,
+  enablePRDEditor: false, // DEPRECATED: PRDEditor functionality is being removed
   enableFileExplorer: true,
   enableTerminal: true,
   enableCollaboration: false, // Future feature

@@ -14,6 +14,34 @@ export type FileType =
   | 'special';
 
 /**
+ * Editor language type (imported from editor types)
+ */
+export type EditorLanguage =
+  | 'javascript'
+  | 'typescript'
+  | 'python'
+  | 'java'
+  | 'cpp'
+  | 'csharp'
+  | 'go'
+  | 'rust'
+  | 'php'
+  | 'ruby'
+  | 'perl'
+  | 'sql'
+  | 'yaml'
+  | 'json'
+  | 'markdown'
+  | 'html'
+  | 'css'
+  | 'scss'
+  | 'xml'
+  | 'text'
+  | 'bash'
+  | 'powershell'
+  | 'dockerfile';
+
+/**
  * File node interface
  */
 export interface FileNode {
@@ -28,7 +56,7 @@ export interface FileNode {
   isSelected?: boolean;
   level?: number;
   extension?: string;
-  language?: string;
+  language?: EditorLanguage;
 }
 
 /**
@@ -77,18 +105,21 @@ export interface SelectedFile {
   path: string;
   name: string;
   content?: string;
-  language?: string;
+  language?: EditorLanguage;
   extension?: string;
   type?: FileType;
+  projectPath?: string;
+  projectName?: string;
 }
 
 /**
  * Selected image state
  */
 export interface SelectedImage {
-  url: string;
   name: string;
   path: string;
+  projectPath?: string;
+  projectName: string;
 }
 
 /**

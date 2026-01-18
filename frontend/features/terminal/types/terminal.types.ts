@@ -57,7 +57,7 @@ export interface TerminalProps {
   sessionId?: string;
   command?: string;
   shell?: ShellConfig;
-  onProcessComplete?: (process: TerminalProcess) => void;
+  onProcessComplete?: (exitCode: number) => void;
   onOutput?: (output: TerminalOutput) => void;
   readOnly?: boolean;
   maxHeight?: string | number;
@@ -71,16 +71,22 @@ export interface ShellProps {
   selectedProject?: {
     name: string;
     path: string;
+    fullPath?: string;
+    displayName?: string;
   } | null;
   selectedSession?: {
     id: string;
+    __provider?: string;
+    name?: string;
+    summary?: string;
   } | null;
   initialCommand?: string;
   isPlainShell?: boolean;
-  onProcessComplete?: (process: TerminalProcess) => void;
+  onProcessComplete?: (exitCode: number) => void;
   minimal?: boolean;
   autoConnect?: boolean;
   isActive?: boolean;
+  className?: string;
 }
 
 /**

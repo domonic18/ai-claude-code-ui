@@ -87,6 +87,8 @@ export interface ProjectListProps {
  */
 export interface ProjectCreationWizardProps {
   isOpen: boolean;
+  onClose?: () => void;
+  onProjectCreated?: (project: Project) => void;
   onComplete?: (project: Project) => void;
   onCancel?: () => void;
   mode?: 'create' | 'workspace';
