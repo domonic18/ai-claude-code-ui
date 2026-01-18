@@ -5,6 +5,22 @@
  */
 
 /**
+ * User role enum
+ */
+export type UserRole = 'admin' | 'user' | 'guest';
+
+/**
+ * User settings
+ */
+export interface UserSettings {
+  theme?: 'light' | 'dark' | 'auto';
+  language?: string;
+  timezone?: string;
+  notifications?: boolean;
+  autoSave?: boolean;
+}
+
+/**
  * User profile
  */
 export interface User {
@@ -13,7 +29,10 @@ export interface User {
   email?: string;
   displayName?: string;
   avatar?: string;
-  createdAt?: string;
+  role?: UserRole;
+  settings?: UserSettings;
+  createdAt?: Date;
+  lastLogin?: Date;
 }
 
 /**
@@ -30,7 +49,8 @@ export interface UserCredentials {
 export interface AuthSession {
   user: User;
   token?: string;
-  expiresAt?: string;
+  expiresAt?: Date;
+  isAuthenticated: boolean;
 }
 
 /**

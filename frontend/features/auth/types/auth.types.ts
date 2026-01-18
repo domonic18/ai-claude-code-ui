@@ -4,23 +4,9 @@
  * Type definitions for authentication and authorization.
  */
 
-/**
- * User role enum
- */
-export type UserRole = 'admin' | 'user' | 'guest';
-
-/**
- * User interface
- */
-export interface User {
-  id: string;
-  username: string;
-  email?: string;
-  role?: UserRole;
-  createdAt?: Date;
-  lastLogin?: Date;
-  settings?: UserSettings;
-}
+// Import shared User type to avoid duplication
+import type { User } from '@/shared/types/user.types';
+export type { User };
 
 /**
  * User settings
@@ -81,6 +67,7 @@ export interface LoginModalProps {
   project?: {
     name: string;
     path: string;
+    displayName?: string;
   };
   onComplete?: (exitCode: number) => void;
 }
