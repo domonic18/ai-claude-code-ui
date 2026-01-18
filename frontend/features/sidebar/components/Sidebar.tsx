@@ -282,16 +282,6 @@ export const Sidebar = memo(function Sidebar({
           onToggleSidebar={onToggleSidebar}
         />
 
-        {/* Version Banner */}
-        {(updateAvailable || latestVersion) && (
-          <VersionBanner
-            updateAvailable={updateAvailable ?? false}
-            latestVersion={latestVersion}
-            currentVersion={currentVersion}
-            onShowVersionModal={onShowVersionModal}
-          />
-        )}
-
         {/* Search */}
         <div className="px-4 py-2 border-b border-border">
           <ProjectSearch
@@ -335,7 +325,13 @@ export const Sidebar = memo(function Sidebar({
 
         {/* User Menu Footer */}
         <div className="p-2 border-t border-border flex-shrink-0">
-          <UserMenu onShowSettings={onShowSettings} />
+          <UserMenu
+            onShowSettings={onShowSettings}
+            updateAvailable={updateAvailable ?? false}
+            latestVersion={latestVersion}
+            currentVersion={currentVersion}
+            onShowVersionModal={onShowVersionModal}
+          />
         </div>
       </div>
     </>

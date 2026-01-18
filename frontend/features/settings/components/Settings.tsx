@@ -16,6 +16,7 @@
  */
 
 import React, { useState, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Key } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import type { SettingsTab, SettingsProps } from '../types/settings.types';
@@ -41,6 +42,7 @@ export function Settings({
   onClose,
   initialTab = 'agents',
 }: SettingsProps) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
   const agentTabRef = useRef<any>(null);
 
@@ -102,13 +104,13 @@ export function Settings({
               onClick={handleCancel}
               className="touch-manipulation"
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               onClick={handleSave}
               className="touch-manipulation"
             >
-              Save
+              {t('common.save')}
             </Button>
           </div>
         </div>
@@ -125,6 +127,7 @@ interface SettingsHeaderProps {
 }
 
 function SettingsHeader({ onClose }: SettingsHeaderProps) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center justify-between p-4 md:p-6 border-b border-border flex-shrink-0">
       <div className="flex items-center gap-3">
@@ -133,7 +136,7 @@ function SettingsHeader({ onClose }: SettingsHeaderProps) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
         <h2 className="text-lg md:text-xl font-semibold text-foreground">
-          Settings
+          {t('common.settings')}
         </h2>
       </div>
       <Button
@@ -157,6 +160,7 @@ interface SettingsNavigationProps {
 }
 
 function SettingsNavigation({ activeTab, onTabChange }: SettingsNavigationProps) {
+  const { t } = useTranslation();
   return (
     <div className="border-b border-border">
       <div className="flex px-4 md:px-6 overflow-x-auto">
@@ -171,7 +175,7 @@ function SettingsNavigation({ activeTab, onTabChange }: SettingsNavigationProps)
             }`}
           >
             {tab.id === 'api' && <Key className="w-4 h-4 inline mr-2" />}
-            {tab.label}
+            {t(`settings.tabs.${tab.id}` as any)}
           </button>
         ))}
       </div>
