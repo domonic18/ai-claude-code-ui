@@ -14,3 +14,8 @@ export { default as LoadingPage } from './LoadingPage';
 export type { LoadingPageProps } from './LoadingPage';
 
 export { default as OnboardingPage } from './Onboarding/OnboardingPage';
+
+// New pages
+export { Homepage } from './Homepage';
+export { ChatPage } from './Chat';
+export { SettingsPage } from './Settings';

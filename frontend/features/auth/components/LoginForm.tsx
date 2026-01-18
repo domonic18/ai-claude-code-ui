@@ -1,8 +1,19 @@
+/**
+ * Login Form Component
+ *
+ * User authentication form with internationalization support.
+ */
+
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/shared/contexts/AuthContext';
 import { MessageSquare, UserPlus } from 'lucide-react';
+import { LanguageSwitcher } from '@/shared/components/common/LanguageSwitcher';
 
 const LoginForm: React.FC = () => {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -19,7 +30,7 @@ const LoginForm: React.FC = () => {
     setError('');
 
     if (!username || !password) {
-      setError('Please enter both username and password');
+      setError(t('login.error'));
       return;
     }
 
@@ -27,15 +38,22 @@ const LoginForm: React.FC = () => {
 
     const result = await login(username, password);
 
-    if (!result.success) {
-      setError(result.error || 'Login failed');
+    if (result.success) {
+      // Redirect to chat page on successful login
+      navigate('/chat');
+    } else {
+      setError(result.error || t('login.error'));
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      {/* Language Switcher */}
+      <div className="fixed top-4 right-4 z-50">
+        <LanguageSwitcher variant="button" />
+      </div>
+
       <div className="w-full max-w-md">
         <div className="bg-card rounded-lg shadow-lg border border-border p-8 space-y-6">
           {/* Logo and Title */}
@@ -45,9 +63,9 @@ const LoginForm: React.FC = () => {
                 <MessageSquare className="w-8 h-8 text-primary-foreground" />
               </div>
             </div>
-            <h1 className="text-2xl font-bold text-foreground">Welcome Back</h1>
+            <h1 className="text-2xl font-bold text-foreground">{t('login.welcome')}</h1>
             <p className="text-muted-foreground mt-2">
-              Sign in to your Claude Code UI account
+              {t('login.subtitle')}
             </p>
           </div>
 
@@ -55,7 +73,7 @@ const LoginForm: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-foreground mb-1">
-                Username
+                {t('login.username')}
               </label>
               <input
                 type="text"
@@ -63,7 +81,7 @@ const LoginForm: React.FC = () => {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter your username"
+                placeholder={t('login.usernamePlaceholder')}
                 autoComplete="username"
                 required
                 disabled={isLoading}
@@ -72,7 +90,7 @@ const LoginForm: React.FC = () => {
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-foreground mb-1">
-                Password
+                {t('login.password')}
               </label>
               <input
                 type="password"
@@ -80,7 +98,7 @@ const LoginForm: React.FC = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter your password"
+                placeholder={t('login.passwordPlaceholder')}
                 autoComplete="current-password"
                 required
                 disabled={isLoading}
@@ -92,7 +110,7 @@ const LoginForm: React.FC = () => {
                 <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
                 {error.includes('Invalid username or password') && (
                   <p className="text-xs text-red-600 dark:text-red-400 mt-2">
-                    If this is your first time, the system may need to be initialized. Please refresh the page.
+                    {t('login.setupHint')}
                   </p>
                 )}
               </div>
@@ -103,13 +121,13 @@ const LoginForm: React.FC = () => {
               disabled={isLoading}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200"
             >
-              {isLoading ? 'Signing in...' : 'Sign In'}
+              {isLoading ? t('login.signingIn') : t('login.signIn')}
             </button>
           </form>
 
           <div className="text-center space-y-2">
             <p className="text-sm text-muted-foreground">
-              Enter your credentials to access Claude Code UI
+              {t('login.credentials')}
             </p>
             <button
               type="button"
@@ -117,7 +135,7 @@ const LoginForm: React.FC = () => {
               className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center justify-center gap-1 mx-auto"
             >
               <UserPlus className="w-3 h-3" />
-              First time? Create an account
+              {t('login.firstTime')}
             </button>
           </div>
         </div>

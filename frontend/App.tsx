@@ -37,6 +37,11 @@ import { ProtectedRoute } from '@/router';
 import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import useLocalStorage from '@/shared/hooks/useLocalStorage';
 import { api, authenticatedFetch } from '@/shared/services';
+import { Homepage, ChatPage, SettingsPage } from '@/pages';
+import { LoginForm } from '@/features/auth';
+
+// Initialize i18n
+import '@/shared/i18n';
 import type { Project, Session as SidebarSession } from './features/sidebar/types/sidebar.types';
 import type { SettingsTab } from './features/settings/types/settings.types';
 
@@ -532,17 +537,24 @@ function App() {
         <WebSocketProvider>
           <TasksSettingsProvider>
             <TaskMasterProvider>
-              <ProtectedRoute>
                 <Router future={{
                   v7_startTransition: true,
                   v7_relativeSplatPath: true
                 }}>
                   <Routes>
-                    <Route path="/" element={<AppContent />} />
-                    <Route path="/session/:sessionId" element={<AppContent />} />
+                    {/* Public routes - outside ProtectedRoute */}
+                    <Route path="/homepage" element={<Homepage />} />
+                    <Route path="/login" element={<LoginForm />} />
+
+                    {/* Protected routes */}
+                    <Route element={<ProtectedRoute />}>
+                      <Route path="/" element={<AppContent />} />
+                      <Route path="/chat" element={<AppContent />} />
+                      <Route path="/session/:sessionId" element={<AppContent />} />
+                      <Route path="/settings" element={<SettingsPage />} />
+                    </Route>
                   </Routes>
                 </Router>
-              </ProtectedRoute>
             </TaskMasterProvider>
           </TasksSettingsProvider>
         </WebSocketProvider>
