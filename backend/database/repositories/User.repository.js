@@ -65,6 +65,15 @@ export const User = {
     },
 
     /**
+     * 获取所有用户
+     * @returns {Array}
+     */
+    getAll() {
+        const rows = db().prepare('SELECT id, username, created_at, last_login FROM users WHERE is_active = 1').all();
+        return rows;
+    },
+
+    /**
      * 更新最后登录时间
      * @param {number} userId
      */
