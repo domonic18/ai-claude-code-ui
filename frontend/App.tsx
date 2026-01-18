@@ -19,8 +19,8 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useParams } from 'react-router-dom';
-import { Settings as SettingsIcon, Sparkles } from 'lucide-react';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Navigate } from 'react-router-dom';
+import { Settings as SettingsIcon, Sparkles, MessageSquare } from 'lucide-react';
 import { Sidebar } from './features/sidebar/components';
 import MainContent from '@/shared/components/layout/MainContent';
 import MobileNav from '@/shared/components/layout/MobileNav';
@@ -37,8 +37,8 @@ import { ProtectedRoute } from '@/router';
 import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import useLocalStorage from '@/shared/hooks/useLocalStorage';
 import { api, authenticatedFetch } from '@/shared/services';
-import { Homepage, ChatPage, SettingsPage } from '@/pages';
-import { LoginForm } from '@/features/auth';
+import { Homepage, ChatPage, SettingsPage, NotFoundPage } from '@/pages';
+import { LoginForm, SetupForm } from '@/features/auth';
 
 // Initialize i18n
 import '@/shared/i18n';
@@ -529,6 +529,39 @@ function AppContent() {
   );
 }
 
+// Root redirect component - handles the root path based on auth status
+function RootRedirect() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="flex justify-center mb-4">
+            <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center shadow-sm">
+              <MessageSquare className="w-8 h-8 text-primary-foreground" />
+            </div>
+          </div>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Claude Code UI</h1>
+          <div className="flex items-center justify-center space-x-2">
+            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+          </div>
+          <p className="text-muted-foreground mt-2">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect based on auth status
+  return user ? (
+    <Navigate to="/chat" replace />
+  ) : (
+    <Navigate to="/homepage" replace />
+  );
+}
+
 // Root App component with router
 function App() {
   return (
@@ -545,14 +578,20 @@ function App() {
                     {/* Public routes - outside ProtectedRoute */}
                     <Route path="/homepage" element={<Homepage />} />
                     <Route path="/login" element={<LoginForm />} />
+                    <Route path="/register" element={<SetupForm />} />
+
+                    {/* Root path - redirect based on auth status */}
+                    <Route path="/" element={<RootRedirect />} />
 
                     {/* Protected routes */}
                     <Route element={<ProtectedRoute />}>
-                      <Route path="/" element={<AppContent />} />
                       <Route path="/chat" element={<AppContent />} />
                       <Route path="/session/:sessionId" element={<AppContent />} />
                       <Route path="/settings" element={<SettingsPage />} />
                     </Route>
+
+                    {/* 404 page - must be last */}
+                    <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                 </Router>
             </TaskMasterProvider>

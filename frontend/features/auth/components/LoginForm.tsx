@@ -22,7 +22,7 @@ const LoginForm: React.FC = () => {
   const { login } = useAuth();
 
   const handleFirstTimeSetup = () => {
-    window.location.reload();
+    navigate('/register');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

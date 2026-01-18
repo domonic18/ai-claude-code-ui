@@ -14,8 +14,6 @@ export interface AuthContextValue {
   logout: () => Promise<void>;
   isLoading: boolean;
   needsSetup: boolean;
-  hasCompletedOnboarding: boolean;
-  refreshOnboardingStatus: () => Promise<void>;
   error: string | null;
 }
 
@@ -37,45 +35,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [needsSetup, setNeedsSetup] = useState<boolean>(false);
-  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (import.meta.env.VITE_IS_PLATFORM === 'true') {
       setUser({ username: 'platform-user', id: 'platform' });
       setNeedsSetup(false);
-      checkOnboardingStatus();
       setIsLoading(false);
       return;
     }
 
     checkAuthStatus();
   }, []);
-
-  const checkOnboardingStatus = async () => {
-    try {
-      const response = await api.user.onboardingStatus();
-
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.warn('[AuthContext] onboarding-status returned non-JSON response');
-        setHasCompletedOnboarding(true);
-        return;
-      }
-
-      if (response.ok) {
-        const data = await response.json();
-        setHasCompletedOnboarding(data.data.hasCompletedOnboarding);
-      }
-    } catch (err) {
-      console.error('Error checking onboarding status:', err);
-      setHasCompletedOnboarding(true);
-    }
-  };
-
-  const refreshOnboardingStatus = async () => {
-    await checkOnboardingStatus();
-  };
 
   const checkAuthStatus = async () => {
     try {
@@ -98,7 +69,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const userData = await userResponse.json();
           setUser(userData.data);
           setNeedsSetup(false);
-          await checkOnboardingStatus();
         } else {
           setUser(null);
         }
@@ -107,7 +77,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(null);
       }
     } catch (err) {
-      console.error('[AuthContext] Auth status check failed:', err);
+      console.error('Auth status check failed:', err);
       setError('Failed to check authentication status');
     } finally {
       setIsLoading(false);
@@ -182,8 +152,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     isLoading,
     needsSetup,
-    hasCompletedOnboarding,
-    refreshOnboardingStatus,
     error
   };
 
