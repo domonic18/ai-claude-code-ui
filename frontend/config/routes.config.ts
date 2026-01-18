@@ -262,9 +262,9 @@ export function isHiddenFromNav(path: string): boolean {
 
 /**
  * Get page title for a route
- * Note: This is defined later in the file after APP_NAME is defined
+ * Note: Implementation is below after APP_NAME is defined
  */
-export declare function getPageTitle(path: string): string;
+// Function implementation is below
 
 /**
  * Build a route with query parameters

@@ -67,13 +67,19 @@ export const projectKeys = {
 export const sessionKeys = {
   /** 所有会话相关查询的根 key */
   all: ['sessions'] as const,
-  
+
+  /** 会话列表 */
+  lists: (projectName?: string) => [...sessionKeys.all, 'list', projectName] as const,
+
+  /** 带过滤条件的会话列表 */
+  list: (projectName?: string, filters?: Record<string, unknown>) => [...sessionKeys.lists(projectName), filters] as const,
+
   /** 所有会话详情查询的根 key */
   details: () => [...sessionKeys.all, 'detail'] as const,
-  
+
   /** 单个会话详情 */
   detail: (sessionId: string) => [...sessionKeys.details(), sessionId] as const,
-  
+
   /** 会话消息历史 */
   messages: (sessionId: string) => [...sessionKeys.detail(sessionId), 'messages'] as const,
 };
