@@ -12,7 +12,8 @@ export {
   abortSession as abortClaudeSDKSessionInContainer,
   isSessionActive as isClaudeSDKSessionActiveInContainer,
   getActiveSessions as getActiveClaudeSDKSessionsInContainer,
-  getSession as getContainerSessionInfo
+  getSession as getContainerSessionInfo,
+  setSessionStream
 } from './SessionManager.js';
 
 

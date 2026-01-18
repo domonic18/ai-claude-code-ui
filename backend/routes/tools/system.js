@@ -15,6 +15,7 @@ import path from 'path';
 import { spawn } from 'child_process';
 import { authenticateToken } from '../../middleware/auth.js';
 import containerManager from '../../services/container/core/index.js';
+import { readStreamOutput } from '../../services/files/utils/file-utils.js';
 
 const router = express.Router();
 
@@ -90,7 +91,7 @@ router.post('/update', authenticateToken, async (req, res) => {
 });
 
 /**
- * GET /api/browse-filesystem
+ * GET /api/system/browse-filesystem
  * 浏览容器内的文件系统，返回目录建议
  * 用于项目创建向导中的路径自动完成
  */
@@ -105,76 +106,54 @@ router.get('/browse-filesystem', authenticateToken, async (req, res) => {
     // 在容器中执行 ls 命令列出目录内容
     const { stream } = await containerManager.execInContainer(userId, `ls -la "${inputPath}" 2>/dev/null || echo "DIRECTORY_NOT_FOUND"`);
 
-    return new Promise((resolve) => {
-      let output = '';
-      let errorOutput = '';
+    // 使用 readStreamOutput 辅助函数读取流输出
+    const output = await readStreamOutput(stream, { timeout: 5000 });
 
-      stream.stdout.on('data', (chunk) => {
-        output += chunk.toString();
+    // 检查目录是否存在
+    if (output.includes('DIRECTORY_NOT_FOUND')) {
+      return res.json({
+        success: true,
+        data: {
+          suggestions: [],
+          message: 'Directory not found'
+        }
       });
+    }
 
-      stream.stderr.on('data', (chunk) => {
-        errorOutput += chunk.toString();
-      });
+    // 解析 ls 输出
+    const lines = output.split('\n');
+    const suggestions = [];
 
-      stream.on('error', (err) => {
-        console.error('[browse-filesystem] Error:', err);
-        res.status(500).json({
-          success: false,
-          error: 'Failed to browse filesystem'
-        });
-        resolve();
-      });
+    for (const line of lines) {
+      // 跳过标题行（total N）和空行
+      if (!line.trim() || line.startsWith('total')) {
+        continue;
+      }
 
-      stream.on('end', () => {
-        if (output.includes('DIRECTORY_NOT_FOUND') || errorOutput.includes('No such file')) {
-          // 目录不存在，返回空建议
-          res.json({
-            success: true,
-            data: {
-              suggestions: [],
-              message: 'Directory not found'
-            }
-          });
-        } else {
-          // 解析 ls 输出
-          const lines = output.split('\n');
-          const suggestions = [];
-
-          for (const line of lines) {
-            // 跳过标题行（total N）和空行
-            if (!line.trim() || line.startsWith('total')) {
-              continue;
-            }
-
-            // ls -la 输出格式：
-            // drwxr-xr-x 2 user group 4096 Jan 13 10:00 dirname
-            // -rw-r--r-- 1 user group  123 Jan 13 10:00 filename
-            const parts = line.trim().split(/\s+/);
-            if (parts.length >= 9) {
-              const name = parts.slice(8).join(' ');
-              // 跳过 . 和 ..
-              if (name !== '.' && name !== '..') {
-                const isDir = parts[0].startsWith('d');
-                suggestions.push({
-                  name,
-                  path: `${inputPath}/${name}`,
-                  type: isDir ? 'directory' : 'file'
-                });
-              }
-            }
-          }
-
-          res.json({
-            success: true,
-            data: {
-              suggestions,
-              currentPath: inputPath
-            }
+      // ls -la 输出格式：
+      // drwxr-xr-x 2 user group 4096 Jan 13 10:00 dirname
+      // -rw-r--r-- 1 user group  123 Jan 13 10:00 filename
+      const parts = line.trim().split(/\s+/);
+      if (parts.length >= 9) {
+        const name = parts.slice(8).join(' ');
+        // 跳过 . 和 ..
+        if (name !== '.' && name !== '..') {
+          const isDir = parts[0].startsWith('d');
+          suggestions.push({
+            name,
+            path: `${inputPath}/${name}`,
+            type: isDir ? 'directory' : 'file'
           });
         }
-        resolve();
-      });
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        suggestions,
+        currentPath: inputPath
+      }
     });
   } catch (error) {
     console.error('[browse-filesystem] Error:', error);

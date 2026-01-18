@@ -1,0 +1,186 @@
+{
+  "common": {
+    "login": "Login",
+    "logout": "Logout",
+    "settings": "Settings",
+    "language": "Language",
+    "back": "Back",
+    "save": "Save",
+    "cancel": "Cancel",
+    "loading": "Loading...",
+    "user": "User",
+    "userMenu": "User menu",
+    "loggedInAs": "Logged in as"
+  },
+  "homepage": {
+    "title": "Claude Code UI",
+    "subtitle": "Multi-user Web Interface for AI Coding",
+    "description": "A powerful web-based interface for Claude Code CLI, Cursor CLI, and OpenAI Codex. Collaborate with your team and leverage AI-powered code assistance.",
+    "features": {
+      "title": "Key Features",
+      "chat": {
+        "title": "Real-time Chat",
+        "description": "Interactive AI chat interface with streaming responses"
+      },
+      "collaboration": {
+        "title": "Team Collaboration",
+        "description": "Multi-user support with project-based organization"
+      },
+      "multiModel": {
+        "title": "Multi-Model Support",
+        "description": "Works with Claude, Cursor, and OpenAI Codex"
+      },
+      "fileManager": {
+        "title": "File Explorer",
+        "description": "Integrated file browser with syntax highlighting"
+      },
+      "terminal": {
+        "title": "Web Terminal",
+        "description": "Full-featured terminal directly in your browser"
+      },
+      "tasks": {
+        "title": "Task Management",
+        "description": "Track progress and manage development tasks"
+      }
+    },
+    "cta": {
+      "title": "Ready to Get Started?",
+      "description": "Join thousands of developers using AI to write better code faster. Sign up now and experience the future of programming.",
+      "login": "Get Started",
+      "getStarted": "Get Started Now"
+    },
+    "footer": {
+      "copyright": "© 2025 Claude Code UI. All rights reserved."
+    }
+  },
+  "login": {
+    "welcome": "Welcome Back",
+    "subtitle": "Sign in to your Claude Code UI account",
+    "username": "Username",
+    "usernamePlaceholder": "Enter your username",
+    "password": "Password",
+    "passwordPlaceholder": "Enter your password",
+    "signIn": "Sign In",
+    "signingIn": "Signing in...",
+    "error": "Please enter both username and password",
+    "firstTime": "First time? Create an account",
+    "credentials": "Enter your credentials to access Claude Code UI",
+    "setupHint": "If this is your first time, the system may need to be initialized. Please refresh the page."
+  },
+  "register": {
+    "title": "Create Your Account",
+    "subtitle": "Set up your account to get started",
+    "password": "Password",
+    "passwordPlaceholder": "Enter your password",
+    "confirmPassword": "Confirm Password",
+    "confirmPasswordPlaceholder": "Confirm your password",
+    "passwordMismatch": "Passwords do not match",
+    "usernameTooShort": "Username must be at least 3 characters long",
+    "passwordTooShort": "Password must be at least 6 characters long",
+    "failed": "Registration failed",
+    "creating": "Creating account...",
+    "createAccount": "Create Account",
+    "hasAccount": "Already have an account?",
+    "backToLogin": "Back to login"
+  },
+  "chat": {
+    "newSession": "New Session",
+    "send": "Send",
+    "attachFile": "Attach File",
+    "typeMessage": "Type your message...",
+    "thinking": "Thinking...",
+    "messageAbout": "Message about {{project}}...",
+    "selectProject": "Select a project to start chatting...",
+    "pressCtrlEnter": "Press",
+    "toSend": "to send",
+    "pressEnter": "Press",
+    "forNewLine": "for new line",
+    "typeForCommands": "type",
+    "forCommands": "for commands",
+    "or": "or",
+    "forFiles": "for files",
+    "stop": "Stop",
+    "tokenUsage": "Token usage: {{percentage}}%",
+    "context": "Context: {{tokens}} tokens"
+  },
+  "permissionMode": {
+    "default": "Bypass Permissions",
+    "acceptEdits": "Accept Edits",
+    "plan": "Plan Mode",
+    "description": "Click to change permission mode (or press Tab in input)",
+    "acceptEditsDescription": "Auto-accept file edits suggested by AI",
+    "planDescription": "Planning mode - review before executing"
+  },
+  "settings": {
+    "title": "Settings",
+    "backToChat": "Back to Chat",
+    "saveChanges": "Save Changes",
+    "tabs": {
+      "agents": "Agents",
+      "appearance": "Appearance",
+      "api": "API & Tokens",
+      "tasks": "Tasks"
+    },
+    "appearance": {
+      "darkMode": "Dark Mode",
+      "darkModeDescription": "Toggle between light and dark themes",
+      "toggleDarkMode": "Toggle dark mode",
+      "projectSorting": "Project Sorting",
+      "projectSortingDescription": "How projects are ordered in the sidebar",
+      "alphabetical": "Alphabetical",
+      "recentActivity": "Recent Activity",
+      "codeEditor": "Code Editor",
+      "editorTheme": "Editor Theme",
+      "editorThemeDescription": "Default theme for the code editor",
+      "toggleEditorTheme": "Toggle editor theme",
+      "wordWrap": "Word Wrap",
+      "wordWrapDescription": "Enable word wrapping by default in the editor",
+      "toggleWordWrap": "Toggle word wrap",
+      "showMinimap": "Show Minimap",
+      "showMinimapDescription": "Display a minimap for easier navigation in diff view",
+      "toggleMinimap": "Toggle minimap",
+      "showLineNumbers": "Show Line Numbers",
+      "showLineNumbersDescription": "Display line numbers in the editor",
+      "toggleLineNumbers": "Toggle line numbers",
+      "fontSize": "Font Size",
+      "fontSizeDescription": "Editor font size in pixels"
+    }
+  },
+  "sidebar": {
+    "searchPlaceholder": "Search projects...",
+    "noProjectsFound": "No projects found",
+    "createProject": "Create Project",
+    "newProject": "New Project",
+    "refresh": "Refresh",
+    "refreshProjects": "Refresh projects",
+    "settings": "Settings",
+    "updateAvailable": "Update Available",
+    "sessions": "Sessions",
+    "noSessionsYet": "No sessions yet",
+    "total": "Total",
+    "loadMore": "Load More",
+    "showMoreSessions": "Show more sessions",
+    "rename": "Rename",
+    "delete": "Delete",
+    "renameProject": "Rename project",
+    "deleteProject": "Delete Project",
+    "deleteEmptyProject": "Delete empty project (Delete)",
+    "renameSession": "Rename Session",
+    "deleteSession": "Delete Session",
+    "confirmDeleteProject": "Are you sure you want to delete this project? This action cannot be undone.",
+    "confirmDeleteSession": "Are you sure you want to delete this session? This action cannot be undone.",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "newSession": "New Session",
+    "open": "Open",
+    "toggleSidebar": "Toggle Sidebar",
+    "clearSearch": "Clear search",
+    "newVersion": "New Version",
+    "available": "available",
+    "view": "View",
+    "projectName": "Project name",
+    "addToFavorites": "Add to favorites",
+    "removeFromFavorites": "Remove from favorites",
+    "youHave": "you have"
+  }
+}

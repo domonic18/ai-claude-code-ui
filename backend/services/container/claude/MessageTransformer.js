@@ -26,19 +26,27 @@ function extractTokenBudget(sdkMessage) {
   if (sdkMessage.type !== 'result' || !sdkMessage.modelUsage) {
     return null;
   }
-  
+
   const modelKey = Object.keys(sdkMessage.modelUsage)[0];
   const modelData = sdkMessage.modelUsage[modelKey];
-  
+
   if (!modelData) {
     return null;
   }
-  
+
+  // 计算总使用的 token 数量
+  const inputTokens = modelData.inputTokens || modelData.cumulativeInputTokens || 0;
+  const outputTokens = modelData.outputTokens || modelData.cumulativeOutputTokens || 0;
+  const cacheReadTokens = modelData.cacheReadInputTokens || modelData.cumulativeCacheReadInputTokens || 0;
+  const cacheCreationTokens = modelData.cacheCreationInputTokens || modelData.cumulativeCacheCreationInputTokens || 0;
+
+  const totalUsed = inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens;
+  const contextWindow = parseInt(process.env.CONTEXT_WINDOW) || 200000;
+
+  // 返回前端期望的格式
   return {
-    inputTokens: modelData.inputTokens || 0,
-    outputTokens: modelData.outputTokens || 0,
-    cacheReadInputTokens: modelData.cacheReadInputTokens || 0,
-    cacheCreationInputTokens: modelData.cacheCreationInputTokens || 0
+    used: totalUsed,
+    total: contextWindow
   };
 }
 
