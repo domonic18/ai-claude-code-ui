@@ -2,9 +2,10 @@ import React, { useEffect } from 'react';
 import { useAuth } from '@/shared/contexts/AuthContext';
 import { SetupForm, LoginForm } from '@/features/auth';
 import { MessageSquare } from 'lucide-react';
+import { Outlet } from 'react-router-dom';
 
 export interface ProtectedRouteProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 const LoadingScreen = () => (
@@ -56,7 +57,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <LoginForm />;
   }
 
-  return <>{children}</>;
+  return children ? <>{children}</> : <Outlet />;
 };
 
 export default ProtectedRoute;

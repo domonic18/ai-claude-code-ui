@@ -187,12 +187,15 @@ function AppContent() {
   }, []);
 
   // Fetch projects when user logs in
+  // 已在 useProjectManager 中处理，此处移除以避免双重请求
+  /*
   useEffect(() => {
     if (user) {
       console.log('[App] User logged in, fetching projects...');
       fetchProjects();
     }
   }, [user]);
+  */
 
   // Auto-refresh projects periodically
   useEffect(() => {
@@ -304,14 +307,14 @@ function AppContent() {
       for (const project of projects) {
         const session = project.sessions?.find(s => s.id === sessionId);
         if (session) {
-          handleProjectSelect(project);
+          handleProjectSelect(project, false); // 传入 false，避免在加载 Session 时跳回 /chat
           setSelectedSession({ ...session, __provider: 'claude' });
           setActiveTab('chat');
           return;
         }
         const cSession = project.cursorSessions?.find(s => s.id === sessionId);
         if (cSession) {
-          handleProjectSelect(project);
+          handleProjectSelect(project, false); // 传入 false，避免在加载 Session 时跳回 /chat
           setSelectedSession({ ...cSession, __provider: 'cursor' });
           setActiveTab('chat');
           return;

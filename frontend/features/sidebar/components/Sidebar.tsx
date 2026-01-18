@@ -141,9 +141,12 @@ export const Sidebar = memo(function Sidebar({
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      await refreshProjects();
+      // 优先调用外部传入的刷新逻辑（即父组件 useProjectManager 的刷新），
+      // 它会同步状态到 props，而内部 Hook useProjects 已经监听了 props 同步。
       if (onRefresh) {
         await onRefresh();
+      } else {
+        await refreshProjects();
       }
     } finally {
       setIsRefreshing(false);
