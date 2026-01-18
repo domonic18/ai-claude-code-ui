@@ -207,6 +207,8 @@ export interface MarkdownRendererProps {
   enableMath?: boolean;
   /** Custom components for markdown elements */
   components?: Record<string, React.ComponentType<any>>;
+  /** Whether this is terminal output (bash/shell command results) */
+  isTerminalOutput?: boolean;
 }
 
 /**
