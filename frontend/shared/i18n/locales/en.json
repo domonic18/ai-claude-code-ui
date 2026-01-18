@@ -64,6 +64,22 @@
     "credentials": "Enter your credentials to access Claude Code UI",
     "setupHint": "If this is your first time, the system may need to be initialized. Please refresh the page."
   },
+  "register": {
+    "title": "Create Your Account",
+    "subtitle": "Set up your account to get started",
+    "password": "Password",
+    "passwordPlaceholder": "Enter your password",
+    "confirmPassword": "Confirm Password",
+    "confirmPasswordPlaceholder": "Confirm your password",
+    "passwordMismatch": "Passwords do not match",
+    "usernameTooShort": "Username must be at least 3 characters long",
+    "passwordTooShort": "Password must be at least 6 characters long",
+    "failed": "Registration failed",
+    "creating": "Creating account...",
+    "createAccount": "Create Account",
+    "hasAccount": "Already have an account?",
+    "backToLogin": "Back to login"
+  },
   "chat": {
     "newSession": "New Session",
     "send": "Send",

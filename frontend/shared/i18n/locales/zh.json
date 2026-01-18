@@ -64,6 +64,22 @@
     "credentials": "输入您的凭据以访问 Claude Code UI",
     "setupHint": "如果是首次使用，系统可能需要初始化。请刷新页面。"
   },
+  "register": {
+    "title": "创建您的账户",
+    "subtitle": "设置您的账户以开始使用",
+    "password": "密码",
+    "passwordPlaceholder": "请输入密码",
+    "confirmPassword": "确认密码",
+    "confirmPasswordPlaceholder": "请再次输入密码",
+    "passwordMismatch": "两次输入的密码不一致",
+    "usernameTooShort": "用户名至少需要3个字符",
+    "passwordTooShort": "密码至少需要6个字符",
+    "failed": "注册失败",
+    "creating": "创建账户中...",
+    "createAccount": "创建账户",
+    "hasAccount": "已有账户？",
+    "backToLogin": "返回登录"
+  },
   "chat": {
     "newSession": "新会话",
     "send": "发送",
