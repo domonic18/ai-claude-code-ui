@@ -18,9 +18,7 @@ import { CodeEditor } from '@/features/editor';
 import { StandaloneShell } from '@/features/terminal';
 import ErrorBoundary from '@/shared/components/common/ErrorBoundary';
 import { ClaudeLogo, CursorLogo } from '@/shared/assets/icons';
-import { PRDEditor } from '@/features/editor';
 import Tooltip from '@/shared/components/ui/Tooltip';
-import { api } from '@/shared/services';
 import type { Project as SidebarProject } from '@/features/sidebar/types/sidebar.types';
 
 // Types
@@ -40,12 +38,6 @@ interface File {
   path: string;
   projectName?: string;
   diffInfo?: any;
-}
-
-interface PRDFile {
-  name: string;
-  content?: string;
-  isExisting?: boolean;
 }
 
 export interface MainContentProps {
@@ -87,7 +79,7 @@ function MainContent({
   sendMessage,
   messages,
   isMobile,
-  isPWA,
+  isPWA: _isPWA,
   onMenuClick,
   isLoading,
   onInputFocusChange,
@@ -130,38 +122,6 @@ function MainContent({
       __provider: selectedSession.__provider
     };
   }, [selectedSession]);
-
-  // PRD Editor state
-  const [showPRDEditor, setShowPRDEditor] = useState(false);
-  const [selectedPRD, setSelectedPRD] = useState<PRDFile | null>(null);
-  const [existingPRDs, setExistingPRDs] = useState<any[]>([]);
-  const [prdNotification, setPRDNotification] = useState<string | null>(null);
-
-  // Load existing PRDs when selected project changes
-  useEffect(() => {
-    const loadExistingPRDs = async () => {
-      if (!selectedProject?.name) {
-        setExistingPRDs([]);
-        return;
-      }
-
-      try {
-        const response = await api.get(`/taskmaster/prd/${encodeURIComponent(selectedProject.name)}`);
-        if (response.ok) {
-          const responseData = await response.json();
-          const data = responseData.data;
-          setExistingPRDs(data?.prdFiles || []);
-        } else {
-          setExistingPRDs([]);
-        }
-      } catch (error) {
-        console.error('Failed to load existing PRDs:', error);
-        setExistingPRDs([]);
-      }
-    };
-
-    loadExistingPRDs();
-  }, [selectedProject?.name]);
 
   const handleFileOpen = (filePath: string, diffInfo: any = null) => {
     const file: File = {
@@ -506,53 +466,6 @@ function MainContent({
           projectPath={selectedProject?.fullPath}
           isSidebar={false}
         />
-      )}
-
-      {/* PRD Editor Modal */}
-      {showPRDEditor && (
-        <PRDEditor
-          project={selectedProject as any}
-          projectPath={selectedProject?.fullPath}
-          onClose={() => {
-            setShowPRDEditor(false);
-            setSelectedPRD(null);
-          }}
-          isNewFile={!selectedPRD?.isExisting}
-          file={{
-            name: selectedPRD?.name || 'prd.txt',
-            path: selectedPRD?.name || '',
-            content: selectedPRD?.content || ''
-          } as any}
-          onSave={async () => {
-            setShowPRDEditor(false);
-            setSelectedPRD(null);
-
-            try {
-              const response = await api.get(`/taskmaster/prd/${encodeURIComponent(selectedProject.name)}`);
-              if (response.ok) {
-                const responseData = await response.json();
-                const data = responseData.data;
-                setExistingPRDs(data?.prdFiles || []);
-                setPRDNotification('PRD saved successfully!');
-                setTimeout(() => setPRDNotification(null), 3000);
-              }
-            } catch (error) {
-              console.error('Failed to refresh PRDs:', error);
-            }
-          }}
-        />
-      )}
-
-      {/* PRD Notification */}
-      {prdNotification && (
-        <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-2 duration-300">
-          <div className="bg-green-600 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            <span className="font-medium">{prdNotification}</span>
-          </div>
-        </div>
       )}
     </div>
   );
