@@ -107,7 +107,7 @@ export const api = {
     const params = new URLSearchParams();
     if (dirPath) params.append('path', dirPath);
 
-    return authenticatedFetch(`/api/browse-filesystem?${params}`);
+    return authenticatedFetch(`/api/system/browse-filesystem?${params}`);
   },
 
   // User endpoints
