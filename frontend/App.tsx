@@ -295,62 +295,8 @@ function AppContent() {
     setShowSettings(true);
   }, []);
 
-  // Handle URL-based session loading
-  useEffect(() => {
-    // 只有在路径为 /session/:sessionId 时才从 URL 同步 Session
-    const isSessionPath = window.location.pathname.startsWith('/session/');
-    
-    if (isSessionPath && sessionId && projects.length > 0) {
-      // Skip if already viewing the correct session
-      if (selectedSession?.id === sessionId) {
-        return;
-      }
-
-      for (const project of projects) {
-        // Search in Claude sessions
-        const session = project.sessions?.find(s => s.id === sessionId);
-        if (session) {
-          // IMPORTANT: Pass preventAutoSession = true to avoid selecting session 1
-          handleProjectSelect(project, false, true); 
-          setSelectedSession({ 
-            ...session, 
-            __provider: 'claude',
-            __projectName: project.name
-          });
-          setActiveTab('chat');
-          return;
-        }
-        
-        // Search in Cursor sessions
-        const cSession = project.cursorSessions?.find(s => s.id === sessionId);
-        if (cSession) {
-          // IMPORTANT: Pass preventAutoSession = true to avoid selecting session 1
-          handleProjectSelect(project, false, true);
-          setSelectedSession({ 
-            ...cSession, 
-            __provider: 'cursor',
-            __projectName: project.name
-          });
-          setActiveTab('chat');
-          return;
-        }
-
-        // Search in Codex sessions
-        const codexSession = (project as any).codexSessions?.find((s: any) => s.id === sessionId);
-        if (codexSession) {
-          // IMPORTANT: Pass preventAutoSession = true to avoid selecting session 1
-          handleProjectSelect(project, false, true);
-          setSelectedSession({
-            ...codexSession,
-            __provider: 'codex',
-            __projectName: project.name
-          });
-          setActiveTab('chat');
-          return;
-        }
-      }
-    }
-  }, [sessionId, projects, selectedSession?.id, handleProjectSelect, setSelectedSession]);
+  // URL-based session loading is now handled in useProjectManager
+  // This ensures a single source of truth for session selection
 
   // Version Upgrade Modal (now using extracted component from features/system)
   // Note: The modal component has been extracted to features/system/components/VersionUpgradeModal.tsx
