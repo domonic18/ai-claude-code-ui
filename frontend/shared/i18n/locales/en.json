@@ -101,6 +101,30 @@
       "appearance": "Appearance",
       "api": "API & Tokens",
       "tasks": "Tasks"
+    },
+    "appearance": {
+      "darkMode": "Dark Mode",
+      "darkModeDescription": "Toggle between light and dark themes",
+      "toggleDarkMode": "Toggle dark mode",
+      "projectSorting": "Project Sorting",
+      "projectSortingDescription": "How projects are ordered in the sidebar",
+      "alphabetical": "Alphabetical",
+      "recentActivity": "Recent Activity",
+      "codeEditor": "Code Editor",
+      "editorTheme": "Editor Theme",
+      "editorThemeDescription": "Default theme for the code editor",
+      "toggleEditorTheme": "Toggle editor theme",
+      "wordWrap": "Word Wrap",
+      "wordWrapDescription": "Enable word wrapping by default in the editor",
+      "toggleWordWrap": "Toggle word wrap",
+      "showMinimap": "Show Minimap",
+      "showMinimapDescription": "Display a minimap for easier navigation in diff view",
+      "toggleMinimap": "Toggle minimap",
+      "showLineNumbers": "Show Line Numbers",
+      "showLineNumbersDescription": "Display line numbers in the editor",
+      "toggleLineNumbers": "Toggle line numbers",
+      "fontSize": "Font Size",
+      "fontSizeDescription": "Editor font size in pixels"
     }
   },
   "sidebar": {

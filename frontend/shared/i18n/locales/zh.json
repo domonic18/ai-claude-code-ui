@@ -101,6 +101,30 @@
       "appearance": "外观",
       "api": "API 和令牌",
       "tasks": "任务"
+    },
+    "appearance": {
+      "darkMode": "深色模式",
+      "darkModeDescription": "在浅色和深色主题之间切换",
+      "toggleDarkMode": "切换深色模式",
+      "projectSorting": "项目排序",
+      "projectSortingDescription": "侧边栏中项目的排序方式",
+      "alphabetical": "按字母顺序",
+      "recentActivity": "最近活动",
+      "codeEditor": "代码编辑器",
+      "editorTheme": "编辑器主题",
+      "editorThemeDescription": "代码编辑器的默认主题",
+      "toggleEditorTheme": "切换编辑器主题",
+      "wordWrap": "自动换行",
+      "wordWrapDescription": "在编辑器中默认启用自动换行",
+      "toggleWordWrap": "切换自动换行",
+      "showMinimap": "显示缩略图",
+      "showMinimapDescription": "显示缩略图以便在差异视图中更容易导航",
+      "toggleMinimap": "切换缩略图",
+      "showLineNumbers": "显示行号",
+      "showLineNumbersDescription": "在编辑器中显示行号",
+      "toggleLineNumbers": "切换行号",
+      "fontSize": "字体大小",
+      "fontSizeDescription": "编辑器字体大小（像素）"
     }
   },
   "sidebar": {
