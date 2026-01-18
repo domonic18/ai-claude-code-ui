@@ -36,7 +36,7 @@ import { ProtectedRoute } from '@/router';
 import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import useLocalStorage from '@/shared/hooks/useLocalStorage';
 import { api, authenticatedFetch } from '@/shared/services';
-import { Homepage, ChatPage, SettingsPage, NotFoundPage } from '@/pages';
+import { Homepage, ChatPage, SettingsPage, AdminPage, NotFoundPage } from '@/pages';
 import { LoginForm, SetupForm } from '@/features/auth';
 
 // Initialize i18n
@@ -565,6 +565,7 @@ function App() {
                   <Route path="/chat" element={<AppContent />} />
                   <Route path="/session/:sessionId" element={<AppContent />} />
                   <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/admin" element={<AdminPage />} />
                 </Route>
 
                 {/* 404 page - must be last */}

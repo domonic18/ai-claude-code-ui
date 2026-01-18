@@ -17,3 +17,4 @@ export type { LoadingPageProps } from './LoadingPage';
 export { Homepage } from './Homepage';
 export { ChatPage } from './Chat';
 export { SettingsPage } from './Settings';
+export { AdminPage } from './Admin';

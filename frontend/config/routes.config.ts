@@ -51,6 +51,12 @@ export const ROUTES = {
   SETTINGS_PROFILE: '/settings/profile',
 
   /**
+   * Admin routes
+   */
+  ADMIN: '/admin',
+  ADMIN_EXTENSIONS: '/admin/extensions',
+
+  /**
    * TaskMaster routes
    */
   TASKS: '/tasks',
@@ -93,6 +99,8 @@ export const ROUTE_TITLES: Record<keyof Omit<typeof ROUTES, 'PROJECT' | 'PROJECT
   SETTINGS_MCP_SERVERS: 'MCP Servers',
   SETTINGS_CREDENTIALS: 'Credentials',
   SETTINGS_PROFILE: 'Profile',
+  ADMIN: 'Admin',
+  ADMIN_EXTENSIONS: 'Extension Management',
   TASKS: 'Tasks',
   FILES: 'Files',
   NOT_FOUND: 'Page Not Found',
@@ -175,6 +183,18 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   [ROUTES.SETTINGS_PROFILE]: {
     title: 'Profile',
     description: 'User profile settings',
+    requiresAuth: true,
+    hideFromNav: true,
+  },
+  [ROUTES.ADMIN]: {
+    title: 'Admin',
+    description: 'Admin control panel',
+    requiresAuth: true,
+    hideFromNav: true,
+  },
+  [ROUTES.ADMIN_EXTENSIONS]: {
+    title: 'Extension Management',
+    description: 'Manage pre-configured extensions',
     requiresAuth: true,
     hideFromNav: true,
   },

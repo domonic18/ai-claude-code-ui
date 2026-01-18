@@ -11,7 +11,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Settings, LogOut, User, Languages, ChevronUp, Info } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Settings, LogOut, User, Languages, ChevronUp, Info, Shield } from 'lucide-react';
 import { LanguageSwitcher } from '@/shared/components/common/LanguageSwitcher';
 import { useAuth } from '@/shared/contexts/AuthContext';
 
@@ -32,6 +33,7 @@ export const UserMenu = ({
 }: UserMenuProps) => {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -150,6 +152,16 @@ export const UserMenu = ({
                 <span className="text-sm text-foreground">{t('common.settings')}</span>
               </button>
             )}
+
+            {/* 管理控制台 */}
+            <Link
+              to="/admin"
+              onClick={() => setIsOpen(false)}
+              className="w-full px-4 py-2 flex items-center gap-3 hover:bg-accent/50 transition-colors"
+            >
+              <Shield className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm text-foreground">管理控制台</span>
+            </Link>
 
             {/* 退出登录 */}
             <button
