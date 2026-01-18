@@ -11,18 +11,15 @@
  * No session protection logic is implemented here - it's purely a props bridge.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ChatInterface } from '@/features/chat/components';
 import { FileTree } from '@/features/file-explorer';
 import { CodeEditor } from '@/features/editor';
 import { StandaloneShell } from '@/features/terminal';
 import ErrorBoundary from '@/shared/components/common/ErrorBoundary';
 import { ClaudeLogo, CursorLogo } from '@/shared/assets/icons';
-import { TaskList, TaskDetail } from '@/features/tasks';
 import { PRDEditor } from '@/features/editor';
 import Tooltip from '@/shared/components/ui/Tooltip';
-import { useTaskMaster } from '@/shared/contexts/TaskMasterContext';
-import { useTasksSettings } from '@/shared/contexts/TasksSettingsContext';
 import { api } from '@/shared/services';
 import type { Project as SidebarProject } from '@/features/sidebar/types/sidebar.types';
 
@@ -43,12 +40,6 @@ interface File {
   path: string;
   projectName?: string;
   diffInfo?: any;
-}
-
-interface Task {
-  id: string;
-  title?: string;
-  [key: string]: any;
 }
 
 interface PRDFile {
@@ -116,12 +107,29 @@ function MainContent({
   externalMessageUpdate
 }: MainContentProps) {
   const [editingFile, setEditingFile] = useState<File | null>(null);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [showTaskDetail, setShowTaskDetail] = useState(false);
   const [editorWidth, setEditorWidth] = useState(600);
   const [isResizing, setIsResizing] = useState(false);
   const [editorExpanded, setEditorExpanded] = useState(false);
   const resizeRef = useRef<HTMLDivElement>(null);
+
+  // Memoize selectedProject for ChatInterface to prevent unnecessary re-renders
+  const chatProject = useMemo(() => {
+    if (!selectedProject) return undefined;
+    return {
+      name: selectedProject.name,
+      path: selectedProject.fullPath
+    };
+  }, [selectedProject?.name, selectedProject?.fullPath]);
+
+  // Memoize selectedSession for ChatInterface to prevent unnecessary re-renders
+  const chatSession = useMemo(() => {
+    if (!selectedSession) return undefined;
+    const id = (selectedSession as any).id || (selectedSession as any).summary || 'temp';
+    return {
+      id,
+      __provider: selectedSession.__provider
+    };
+  }, [selectedSession]);
 
   // PRD Editor state
   const [showPRDEditor, setShowPRDEditor] = useState(false);
@@ -129,47 +137,16 @@ function MainContent({
   const [existingPRDs, setExistingPRDs] = useState<any[]>([]);
   const [prdNotification, setPRDNotification] = useState<string | null>(null);
 
-  // TaskMaster context
-  const { tasks, currentProject, refreshTasks, setCurrentProject } = useTaskMaster();
-  const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
-
-  // Only show tasks tab if TaskMaster is installed and enabled
-  const shouldShowTasksTab = tasksEnabled && isTaskMasterInstalled;
-
-  // Sync selectedProject with TaskMaster context
-  useEffect(() => {
-    if (selectedProject && selectedProject.name !== currentProject?.name) {
-      // Convert SidebarProject to TaskMasterProject by mapping fullPath to path
-      const project = selectedProject as any;
-      setCurrentProject({
-        name: selectedProject.name,
-        path: selectedProject.fullPath,
-        taskmaster: project.taskmaster,
-        taskMasterConfigured: project.taskMasterConfigured,
-        taskMasterStatus: project.taskMasterStatus,
-        taskCount: project.taskCount,
-        completedCount: project.completedCount
-      });
-    }
-  }, [selectedProject, currentProject, setCurrentProject]);
-
-  // Switch away from tasks tab when tasks are disabled or TaskMaster is not installed
-  useEffect(() => {
-    if (!shouldShowTasksTab && activeTab === 'tasks') {
-      setActiveTab('chat');
-    }
-  }, [shouldShowTasksTab, activeTab, setActiveTab]);
-
-  // Load existing PRDs when current project changes
+  // Load existing PRDs when selected project changes
   useEffect(() => {
     const loadExistingPRDs = async () => {
-      if (!currentProject?.name) {
+      if (!selectedProject?.name) {
         setExistingPRDs([]);
         return;
       }
 
       try {
-        const response = await api.get(`/taskmaster/prd/${encodeURIComponent(currentProject.name)}`);
+        const response = await api.get(`/taskmaster/prd/${encodeURIComponent(selectedProject.name)}`);
         if (response.ok) {
           const responseData = await response.json();
           const data = responseData.data;
@@ -184,7 +161,7 @@ function MainContent({
     };
 
     loadExistingPRDs();
-  }, [currentProject?.name]);
+  }, [selectedProject?.name]);
 
   const handleFileOpen = (filePath: string, diffInfo: any = null) => {
     const file: File = {
@@ -203,29 +180,6 @@ function MainContent({
 
   const handleToggleEditorExpand = () => {
     setEditorExpanded(!editorExpanded);
-  };
-
-  const handleTaskClick = (task: Task | string) => {
-    if (typeof task === 'object' && task.id && !task.title) {
-      const fullTask = tasks?.find((t: Task) => t.id === task.id);
-      if (fullTask) {
-        setSelectedTask(fullTask);
-        setShowTaskDetail(true);
-      }
-    } else {
-      setSelectedTask(task as Task);
-      setShowTaskDetail(true);
-    }
-  };
-
-  const handleTaskDetailClose = () => {
-    setShowTaskDetail(false);
-    setSelectedTask(null);
-  };
-
-  const handleTaskStatusChange = (taskId: string, newStatus: string) => {
-    console.log('Update task status:', taskId, newStatus);
-    refreshTasks?.();
   };
 
   // Handle resize functionality
@@ -378,7 +332,9 @@ function MainContent({
                 {activeTab === 'chat' && selectedSession ? (
                   <div className="min-w-0">
                     <h2 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white whitespace-nowrap overflow-x-auto scrollbar-hide">
-                      {selectedSession.__provider === 'cursor' ? (selectedSession.name || 'Untitled Session') : (selectedSession.summary || 'New Session')}
+                      {selectedSession.__provider === 'cursor' 
+                        ? (selectedSession.name || (selectedSession as any).title || 'Untitled Session') 
+                        : (selectedSession.summary || (selectedSession as any).title || 'New Session')}
                     </h2>
                     <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                       {selectedProject.displayName}
@@ -396,9 +352,7 @@ function MainContent({
                 ) : (
                   <div className="min-w-0">
                     <h2 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">
-                      {activeTab === 'files' ? 'Project Files' :
-                       (activeTab === 'tasks' && shouldShowTasksTab) ? 'TaskMaster' :
-                       'Project'}
+                      {activeTab === 'files' ? 'Project Files' : 'Project'}
                     </h2>
                     <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                       {selectedProject.displayName}
@@ -463,25 +417,6 @@ function MainContent({
                   </span>
                 </button>
               </Tooltip>
-              {shouldShowTasksTab && (
-                <Tooltip content="Tasks" position="bottom">
-                  <button
-                    onClick={() => setActiveTab('tasks')}
-                    className={`relative px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-all duration-200 ${
-                      activeTab === 'tasks'
-                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    <span className="flex items-center gap-1 sm:gap-1.5">
-                      <svg className="w-3 sm:w-3.5 h-3 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                      </svg>
-                      <span className="hidden md:hidden lg:inline">Tasks</span>
-                    </span>
-                  </button>
-                </Tooltip>
-              )}
             </div>
           </div>
         </div>
@@ -494,17 +429,11 @@ function MainContent({
           <div className={`h-full ${activeTab === 'chat' ? 'block' : 'hidden'}`}>
             <ErrorBoundary showDetails={true}>
               <ChatInterface
-                selectedProject={selectedProject ? {
-                  name: selectedProject.name,
-                  path: selectedProject.fullPath
-                } : undefined}
-                selectedSession={selectedSession ? {
-                  id: (selectedSession as any).id || (selectedSession as any).summary || 'temp',
-                  __provider: selectedSession.__provider
-                } : undefined}
+                selectedProject={chatProject}
+                selectedSession={chatSession}
                 ws={ws}
                 sendMessage={sendMessage}
-                wsMessages={messages}
+                wsMessages={selectedSession ? messages : []}
                 onFileOpen={handleFileOpen}
                 onInputFocusChange={onInputFocusChange}
                 onSessionActive={onSessionActive}
@@ -512,10 +441,7 @@ function MainContent({
                 onSessionProcessing={onSessionProcessing}
                 onSessionNotProcessing={onSessionNotProcessing}
                 processingSessions={processingSessions}
-                onReplaceTemporarySession={onReplaceTemporarySession ? (realSessionId: string) => {
-                  // Wrap the two-parameter function to match the expected signature
-                  onReplaceTemporarySession('', realSessionId);
-                } : undefined}
+                onReplaceTemporarySession={onReplaceTemporarySession}
                 onNavigateToSession={onNavigateToSession}
                 onShowSettings={onShowSettings}
                 autoExpandTools={autoExpandTools}
@@ -524,56 +450,21 @@ function MainContent({
                 autoScrollToBottom={autoScrollToBottom}
                 sendByCtrlEnter={sendByCtrlEnter}
                 externalMessageUpdate={externalMessageUpdate}
-                onShowAllTasks={tasksEnabled ? () => setActiveTab('tasks') : null}
               />
             </ErrorBoundary>
           </div>
           {activeTab === 'files' && (
             <div className="h-full overflow-hidden">
-              <FileTree selectedProject={selectedProject} />
+              <FileTree selectedProject={selectedProject as any} />
             </div>
           )}
           {activeTab === 'shell' && (
             <div className="h-full w-full overflow-hidden">
               <StandaloneShell
-                project={selectedProject}
-                session={selectedSession}
+                project={selectedProject as any}
+                session={selectedSession as any}
                 showHeader={false}
               />
-            </div>
-          )}
-          {shouldShowTasksTab && (
-            <div className={`h-full ${activeTab === 'tasks' ? 'block' : 'hidden'}`}>
-              <div className="h-full flex flex-col overflow-hidden">
-                <TaskList
-                  tasks={tasks || []}
-                  onTaskClick={handleTaskClick}
-                  showParentTasks={true}
-                  className="flex-1 overflow-y-auto p-4"
-                  currentProject={currentProject}
-                  onTaskCreated={refreshTasks}
-                  onShowPRDEditor={(prd = null) => {
-                    setSelectedPRD(prd);
-                    setShowPRDEditor(true);
-                  }}
-                  existingPRDs={existingPRDs}
-                  onRefreshPRDs={(showNotification = false) => {
-                    if (currentProject?.name) {
-                      api.get(`/taskmaster/prd/${encodeURIComponent(currentProject.name)}`)
-                        .then(response => response.ok ? response.json() : Promise.reject())
-                        .then(responseData => {
-                          const data = responseData.data;
-                          setExistingPRDs(data?.prdFiles || []);
-                          if (showNotification) {
-                            setPRDNotification('PRD saved successfully!');
-                            setTimeout(() => setPRDNotification(null), 3000);
-                          }
-                        })
-                        .catch(error => console.error('Failed to refresh PRDs:', error));
-                    }
-                  }}
-                />
-              </div>
             </div>
           )}
         </div>
@@ -619,22 +510,11 @@ function MainContent({
         />
       )}
 
-      {/* Task Detail Modal */}
-      {shouldShowTasksTab && showTaskDetail && selectedTask && (
-        <TaskDetail
-          task={selectedTask}
-          isOpen={showTaskDetail}
-          onClose={handleTaskDetailClose}
-          onStatusChange={handleTaskStatusChange}
-          onTaskClick={handleTaskClick}
-        />
-      )}
-
       {/* PRD Editor Modal */}
       {showPRDEditor && (
         <PRDEditor
-          project={currentProject}
-          projectPath={currentProject?.path}
+          project={selectedProject as any}
+          projectPath={selectedProject?.fullPath}
           onClose={() => {
             setShowPRDEditor(false);
             setSelectedPRD(null);
@@ -643,13 +523,13 @@ function MainContent({
           file={{
             name: selectedPRD?.name || 'prd.txt',
             content: selectedPRD?.content || ''
-          }}
+          } as any}
           onSave={async () => {
             setShowPRDEditor(false);
             setSelectedPRD(null);
 
             try {
-              const response = await api.get(`/taskmaster/prd/${encodeURIComponent(currentProject.name)}`);
+              const response = await api.get(`/taskmaster/prd/${encodeURIComponent(selectedProject.name)}`);
               if (response.ok) {
                 const responseData = await response.json();
                 const data = responseData.data;
@@ -660,8 +540,6 @@ function MainContent({
             } catch (error) {
               console.error('Failed to refresh PRDs:', error);
             }
-
-            refreshTasks?.();
           }}
         />
       )}

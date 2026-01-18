@@ -1,8 +1,7 @@
 import React from 'react';
-import { MessageSquare, Folder, Terminal, Globe, CheckSquare } from 'lucide-react';
-import { useTasksSettings } from '@/shared/contexts/TasksSettingsContext';
+import { MessageSquare, Folder, Terminal } from 'lucide-react';
 
-export type MobileNavTab = 'chat' | 'shell' | 'files' | 'tasks';
+export type MobileNavTab = 'chat' | 'shell' | 'files';
 
 export interface MobileNavProps {
   activeTab: string;
@@ -17,8 +16,6 @@ interface NavItem {
 }
 
 function MobileNav({ activeTab, setActiveTab, isInputFocused }: MobileNavProps) {
-  const { tasksEnabled } = useTasksSettings();
-
   const navItems: NavItem[] = [
     {
       id: 'chat',
@@ -35,11 +32,6 @@ function MobileNav({ activeTab, setActiveTab, isInputFocused }: MobileNavProps) 
       icon: Folder,
       onClick: () => setActiveTab('files')
     },
-    ...(tasksEnabled ? [{
-      id: 'tasks' as const,
-      icon: CheckSquare,
-      onClick: () => setActiveTab('tasks')
-    }] : [])
   ];
 
   return (

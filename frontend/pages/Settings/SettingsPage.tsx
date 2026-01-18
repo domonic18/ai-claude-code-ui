@@ -16,7 +16,6 @@ import { SETTINGS_TABS } from '@/features/settings/constants/settings.constants'
 import { AppearanceTab } from '@/features/settings/components/AppearanceTab';
 import { AgentTab } from '@/features/settings/components/AgentTab';
 import { ApiTab } from '@/features/settings/components/ApiTab';
-import { TasksTab } from '@/features/settings/components/TasksTab';
 import type { SettingsPageProps } from './types/settings.types';
 
 /**
@@ -101,9 +100,6 @@ export function SettingsPage({ initialTab = 'agents' }: SettingsPageProps) {
       {/* Content Area */}
       <main className="max-w-6xl mx-auto px-4 py-8">
         <div className="space-y-8">
-          {/* Tasks tab */}
-          {activeTab === 'tasks' && <TasksTab />}
-
           {/* Appearance tab */}
           {activeTab === 'appearance' && <AppearanceTab />}
 
