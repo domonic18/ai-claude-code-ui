@@ -14,6 +14,7 @@ import { loadProjectConfig, saveProjectConfig } from '../config/index.js';
 import { deleteSessionInContainer, getSessionsInContainer } from '../../sessions/container/ContainerSessions.js';
 import containerManager from '../../container/core/index.js';
 import { CONTAINER } from '../../../config/config.js';
+import { readStreamOutput } from '../../files/utils/file-utils.js';
 
 /**
  * 重命名项目的显示名称
@@ -140,10 +141,8 @@ async function addProjectManually(userId, projectName, displayName = null) {
       `mkdir -p "${projectPath}"`
     );
 
-    await new Promise((resolve, reject) => {
-      stream.on('error', reject);
-      stream.on('end', resolve);
-    });
+    // 使用 readStreamOutput 辅助函数，设置超时
+    await readStreamOutput(stream, { timeout: 5000 });
 
     // Add to config as manually added project
     const config = await loadProjectConfig();
