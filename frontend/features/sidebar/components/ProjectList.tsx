@@ -1,12 +1,11 @@
 /**
  * ProjectList Component
  *
- * Container for displaying a list of projects with their sessions.
+ * Container for displaying a list of sessions (without project folders).
  *
  * Features:
- * - Scrollable area for project list
- * - Renders both mobile and desktop project cards
- * - Handles project selection and expansion
+ * - Scrollable area for session list
+ * - Displays all sessions from all projects in a flat list
  * - Manages session loading and pagination
  */
 
@@ -16,8 +15,7 @@ import { ScrollArea } from '@/shared/components/ui/ScrollArea';
 import { formatTimeAgo, getAllSessions } from '../utils/timeFormatters';
 import type { ProjectListProps, Project, Session, SessionProvider } from '../types/sidebar.types';
 import { cn } from '../../../lib/utils';
-import ProjectCard from './ProjectCard';
-import ProjectCardDesktop from './ProjectCardDesktop';
+import SessionList from './SessionList';
 import { SKELETON_COUNT } from '../constants/sidebar.constants';
 
 /**
@@ -128,7 +126,7 @@ export const ProjectList = memo(function ProjectList({
           Array.from({ length: SKELETON_COUNT }).map((_, i) => (
             <div key={i} className="p-2 space-y-2">
               <div className="flex items-center gap-3">
-                <div className="w-4 h-4 bg-muted rounded animate-pulse flex-shrink-0" />
+                <div className="w-3 h-3 bg-muted rounded-full animate-pulse flex-shrink-0" />
                 <div className="flex-1 space-y-1">
                   <div className="h-3 bg-muted rounded animate-pulse w-3/4" />
                   <div className="h-2 bg-muted rounded animate-pulse w-1/2" />
@@ -141,64 +139,41 @@ export const ProjectList = memo(function ProjectList({
             <p className="text-sm">{t('sidebar.noProjectsFound')}</p>
           </div>
         ) : (
+          // Display all sessions from all projects in a flat list
           projects.map((project) => {
-            const isExpanded = expandedProjects.has(project.name);
-            const isStarred = starredProjects.has(project.name);
-            const isEditing = editingProject === project.name;
-            const isSelected = selectedProject?.name === project.name;
             const allSessions = getAllSessions(project);
-            const sessionCount = allSessions.length;
             const hasMoreSessions = project.sessionMeta?.hasMore !== false;
             const isLoadingSessionsForProject = loadingSessions[project.name];
 
-            // Common props for both card versions
-            const commonCardProps = {
-              project,
-              isSelected,
-              isStarred,
-              isExpanded,
-              isEditing,
-              editingName,
-              sessionCount,
-              hasMoreSessions,
-              onToggleExpand: () => onToggleProject(project.name),
-              onStartEdit: () => onStartEditing(project),
-              onCancelEdit: onCancelEditing,
-              onSetEditingName: onSetEditingName,
-              onSaveName: (newName: string) => handleSaveProjectName(project.name, newName),
-              onToggleStar: () => handleToggleStar(project.name),
-              onDelete: () => handleDeleteProject(project.name),
-              onSelect: () => handleSelectProject(project),
-              // Session props
-              projectName: project.name,
-              sessions: project.sessions,
-              cursorSessions: project.cursorSessions,
-              codexSessions: project.codexSessions,
-              selectedSessionId: selectedSession?.id,
-              currentTime,
-              isLoadingSessions: isLoadingSessionsForProject,
-              initialSessionsLoaded: initialSessionsLoaded.has(project.name),
-              onSessionClick: (session: Session) => handleSessionClick(session, project.name),
-              onSessionDelete: (projectName: string, sessionId: string, provider?: SessionProvider) =>
-                handleSessionDelete(projectName, sessionId, provider),
-              onSessionRename: (projectName: string, sessionId: string, summary: string) =>
-                handleSessionRename(projectName, sessionId, summary),
-              onLoadMoreSessions: () => handleLoadMoreSessions(project),
-              editingSession,
-              onSetEditingSession,
-              editingSessionName,
-              onSetEditingSessionName,
-              onNewSession: () => handleNewSession(project.name),
-            };
+            // Skip projects with no sessions
+            if (allSessions.length === 0 && !isLoadingSessionsForProject) {
+              return null;
+            }
 
             return (
-              <div key={project.name}>
-                {/* Mobile Card */}
-                <ProjectCard {...commonCardProps} />
-
-                {/* Desktop Card */}
-                <ProjectCardDesktop {...commonCardProps} />
-              </div>
+              <SessionList
+                key={project.name}
+                projectName={project.name}
+                sessions={project.sessions}
+                cursorSessions={project.cursorSessions}
+                codexSessions={project.codexSessions}
+                selectedSessionId={selectedSession?.id}
+                currentTime={currentTime}
+                isLoadingSessions={isLoadingSessionsForProject}
+                initialSessionsLoaded={initialSessionsLoaded.has(project.name)}
+                hasMoreSessions={hasMoreSessions}
+                onSessionClick={(session: Session) => handleSessionClick(session, project.name)}
+                onSessionDelete={(projectName: string, sessionId: string, provider?: SessionProvider) =>
+                  handleSessionDelete(projectName, sessionId, provider)}
+                onSessionRename={(projectName: string, sessionId: string, summary: string) =>
+                  handleSessionRename(projectName, sessionId, summary)}
+                onLoadMoreSessions={() => handleLoadMoreSessions(project)}
+                editingSession={editingSession}
+                onSetEditingSession={onSetEditingSession}
+                editingSessionName={editingSessionName}
+                onSetEditingSessionName={onSetEditingSessionName}
+                onNewSession={() => handleNewSession(project.name)}
+              />
             );
           })
         )}
