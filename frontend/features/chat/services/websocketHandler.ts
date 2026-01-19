@@ -524,7 +524,6 @@ function handleClaudeComplete(
   }
 
   // If we have a pending session ID and the conversation completed successfully, use it
-  const pendingSessionId = safeLocalStorage.getItem('pendingSessionId');
   if (pendingSessionId && !currentSessionId && message.exitCode === 0) {
     callbacks.onSetSessionId(pendingSessionId);
     safeLocalStorage.removeItem('pendingSessionId');
