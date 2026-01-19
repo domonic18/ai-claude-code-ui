@@ -326,8 +326,8 @@ export interface SidebarHeaderProps {
   isRefreshing: boolean;
   /** On refresh callback */
   onRefresh: () => void | Promise<void>;
-  /** Show new project modal callback */
-  onShowNewProject: () => void;
+  /** On new session callback (optional) */
+  onNewSession?: () => void;
   /** Whether is PWA */
   isPWA?: boolean;
   /** Whether is mobile */
