@@ -30,7 +30,6 @@ export const ProjectList = memo(function ProjectList({
   editingProject,
   editingName,
   loadingSessions,
-  additionalSessions,
   currentTime,
   isLoading,
   onToggleProject,
