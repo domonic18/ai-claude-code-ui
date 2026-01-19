@@ -34,7 +34,6 @@ export interface MessageHandlerCallbacks {
   onSetLoading: (loading: boolean) => void;
   onSetSessionId: (sessionId: string) => void;
   onReplaceTemporarySession?: (tempId: string, realId: string) => void;
-  onNavigateToSession?: (sessionId: string) => void;
 
   // Session lifecycle
   onSessionActive?: (sessionId: string) => void;
@@ -197,17 +196,25 @@ function handleSessionCreated(
   callbacks: MessageHandlerCallbacks,
   currentSessionId: string | null
 ): boolean {
-  if (message.sessionId && !currentSessionId) {
-    safeLocalStorage.setItem('pendingSessionId', message.sessionId);
+  // Handle session-created when:
+  // 1. No current session (new chat)
+  // 2. Current session is a temporary ID (temp-xxx)
+  const isTemporarySession = !currentSessionId || currentSessionId.startsWith('temp-');
+  
+  if (message.sessionId && isTemporarySession) {
+    console.log('[WS] Session created:', message.sessionId, '(replacing:', currentSessionId, ')');
 
+    // Store to localStorage for persistence
+    safeLocalStorage.setItem('pendingSessionId', message.sessionId);
+    safeLocalStorage.setItem('lastSessionId', message.sessionId);
+
+    // Update internal state (no navigation)
+    callbacks.onSetSessionId(message.sessionId);
+
+    // Notify session protection system
     if (callbacks.onReplaceTemporarySession) {
-      // Use currentSessionId as tempId if it exists, otherwise empty string
-      // The hook will clear all temporary prefixes anyway
       callbacks.onReplaceTemporarySession(currentSessionId || '', message.sessionId);
     }
-    
-    // Also update the current session ID in the chat interface
-    callbacks.onSetSessionId(message.sessionId);
   }
   return true;
 }
@@ -255,6 +262,8 @@ function handleTodoWrite(message: WebSocketMessage, callbacks: MessageHandlerCal
  */
 function handleClaudeResponse(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
   const messageData = message.data?.message || message.data;
+  
+  console.log('[WS] handleClaudeResponse - data type:', message.data?.type, 'messageData type:', messageData?.type);
 
   if (messageData && typeof messageData === 'object') {
     // Handle Cursor streaming format (content_block_delta / content_block_stop)
@@ -370,18 +379,17 @@ function handleCursorSystem(
   try {
     const cdata = message.data;
     if (cdata && cdata.type === 'system' && cdata.subtype === 'init' && cdata.session_id) {
+      // Log the session detection but don't navigate
       if (currentSessionId && cdata.session_id !== currentSessionId) {
         console.log('🔄 Cursor session switch detected:', { originalSession: currentSessionId, newSession: cdata.session_id });
-        if (callbacks.onNavigateToSession) {
-          callbacks.onNavigateToSession(cdata.session_id);
-        }
+        // Update internal state only (no navigation)
+        callbacks.onSetSessionId(cdata.session_id);
         return true;
       }
       if (!currentSessionId) {
         console.log('🔄 Cursor new session init detected:', { newSession: cdata.session_id });
-        if (callbacks.onNavigateToSession) {
-          callbacks.onNavigateToSession(cdata.session_id);
-        }
+        // Update internal state only (no navigation)
+        callbacks.onSetSessionId(cdata.session_id);
         return true;
       }
     }
@@ -489,9 +497,21 @@ function handleClaudeComplete(
   currentSessionId: string | null
 ): boolean {
   const completedSessionId = message.sessionId || currentSessionId || safeLocalStorage.getItem('pendingSessionId');
-
-  // Update UI state if this is the current session OR if we don't have a session ID yet
-  if (completedSessionId === currentSessionId || !currentSessionId) {
+  const pendingSessionId = safeLocalStorage.getItem('pendingSessionId');
+  
+  // Determine if this completion belongs to the current session
+  // Cases to handle:
+  // 1. completedSessionId matches currentSessionId (normal case)
+  // 2. No currentSessionId yet (new session before session-created received)
+  // 3. completedSessionId is a temp-xxx ID and we have a pending real session ID (new session after session-created)
+  const isCurrentSession = 
+    completedSessionId === currentSessionId || 
+    !currentSessionId ||
+    (completedSessionId?.startsWith('temp-') && (pendingSessionId === currentSessionId || pendingSessionId));
+  
+  // Update UI state if this is the current session
+  if (isCurrentSession) {
+    console.log('[WS] Completing stream for session:', completedSessionId, 'current:', currentSessionId);
     callbacks.onSetLoading(false);
     // Complete the streaming state
     callbacks.completeStream?.();
