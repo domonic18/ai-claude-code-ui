@@ -162,13 +162,6 @@ export const SessionItem = memo(function SessionItem({
             <span className="text-xs text-muted-foreground">
               {timeAgo}
             </span>
-
-            {/* Message Count Badge */}
-            {(session.messageCount ?? 0) > 0 && (
-              <Badge variant="secondary" className="text-xs px-1 py-0 ml-auto">
-                {session.messageCount}
-              </Badge>
-            )}
           </div>
 
           {/* Active Indicator */}
