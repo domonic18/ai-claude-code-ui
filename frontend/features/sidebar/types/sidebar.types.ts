@@ -180,14 +180,6 @@ export interface SidebarProps extends SidebarCallbacks {
   selectedSession: Session | null;
   /** Loading state (optional - hook manages internally if not provided) */
   isLoading?: boolean;
-  /** Version update information */
-  updateAvailable?: boolean;
-  latestVersion?: string;
-  currentVersion?: string;
-  /** Release info (optional - reserved for future use) */
-  releaseInfo?: any;
-  /** Called to show version modal */
-  onShowVersionModal?: () => void;
   /** Whether running as PWA */
   isPWA?: boolean;
   /** Whether on mobile view */
