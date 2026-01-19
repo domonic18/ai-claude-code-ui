@@ -5,7 +5,7 @@
  * Refactored to use custom hooks for state management.
  *
  * Features:
- * - Project list with search and filtering
+ * - Project list
  * - Session management
  * - Version update banner
  * - Responsive design (mobile/desktop)
@@ -15,7 +15,6 @@ import React, { useState, useEffect, useCallback, memo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import ReactDOM from 'react-dom';
 import SidebarHeader from './SidebarHeader';
-import ProjectSearch from './ProjectSearch';
 import VersionBanner from './VersionBanner';
 import ProjectList from './ProjectList';
 import ProjectCreationWizard from './ProjectCreationWizard';
@@ -24,7 +23,6 @@ import { TIMESTAMP_UPDATE_INTERVAL } from '../constants/sidebar.constants';
 import type { SidebarProps, ExpandedProjects } from '../types/sidebar.types';
 import { useProjects } from '../hooks';
 import { useSessions } from '../hooks';
-import { useProjectSearch } from '../hooks';
 import { useStarredProjects } from '../hooks';
 
 /**
@@ -69,12 +67,6 @@ export const Sidebar = memo(function Sidebar({
     deleteSession,
     additionalSessions,
   } = useSessions();
-
-  const {
-    searchFilter,
-    setSearchFilter,
-    filteredProjects,
-  } = useProjectSearch();
 
   const {
     starredProjects,
@@ -127,11 +119,8 @@ export const Sidebar = memo(function Sidebar({
     }
   }, [selectedSession?.id, selectedProject?.name]);
 
-  // Filter and sort projects
-  const filteredAndSortedProjects = getSortedProjects(starredProjects);
-  const displayProjects = searchFilter
-    ? filteredProjects(filteredAndSortedProjects)
-    : filteredAndSortedProjects;
+  // Sort projects
+  const displayProjects = getSortedProjects(starredProjects);
 
   // Handlers
   const handleRefresh = useCallback(async () => {
@@ -281,15 +270,6 @@ export const Sidebar = memo(function Sidebar({
           isMobile={isMobile}
           onToggleSidebar={onToggleSidebar}
         />
-
-        {/* Search */}
-        <div className="px-4 py-2 border-b border-border">
-          <ProjectSearch
-            searchFilter={searchFilter}
-            onSearchChange={setSearchFilter}
-            onClearSearch={() => setSearchFilter('')}
-          />
-        </div>
 
         {/* Project List */}
         <ProjectList
