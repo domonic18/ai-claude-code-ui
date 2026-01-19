@@ -62,7 +62,6 @@ export interface MainContentProps {
   onSessionNotProcessing?: (sessionId: string) => void;
   processingSessions?: Set<string>;
   onReplaceTemporarySession?: (tempId: string, realId: string) => void;
-  onNavigateToSession?: (sessionId: string) => void;
   onShowSettings?: () => void;
   autoExpandTools?: boolean;
   showRawParameters?: boolean;
@@ -91,7 +90,6 @@ function MainContent({
   onSessionNotProcessing,
   processingSessions,
   onReplaceTemporarySession,
-  onNavigateToSession,
   onShowSettings,
   autoExpandTools = false,
   showRawParameters = false,
@@ -397,7 +395,7 @@ function MainContent({
                 selectedSession={chatSession}
                 ws={ws}
                 sendMessage={sendMessage}
-                wsMessages={selectedSession ? messages : []}
+                wsMessages={messages}
                 onFileOpen={handleFileOpen}
                 onInputFocusChange={onInputFocusChange}
                 onSessionActive={onSessionActive}
@@ -406,7 +404,6 @@ function MainContent({
                 onSessionNotProcessing={onSessionNotProcessing}
                 processingSessions={processingSessions}
                 onReplaceTemporarySession={onReplaceTemporarySession}
-                onNavigateToSession={onNavigateToSession}
                 onShowSettings={onShowSettings}
                 autoExpandTools={autoExpandTools}
                 showRawParameters={showRawParameters}
