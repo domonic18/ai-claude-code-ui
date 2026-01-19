@@ -1,8 +1,8 @@
 /**
  * Extension Sync Service
  *
- * Manages synchronization of pre-configured extensions (agents, commands, skills)
- * from the project root extensions/ directory to user .claude/ directories.
+ * Manages synchronization of pre-configured extensions (agents, commands, skills, hooks, knowledge)
+ * from the project root extensions/.claude/ directory to user .claude/ directories.
  *
  * @module services/extensions/extension-sync
  */
@@ -19,7 +19,7 @@ const __dirname = dirname(__filename);
 // This file is at: backend/services/extensions/extension-sync.js
 // Project root is 4 levels up: extensions -> services -> backend -> project_root
 const PROJECT_ROOT = path.resolve(__dirname, '../../..');
-const EXTENSIONS_DIR = path.join(PROJECT_ROOT, 'extensions');
+const EXTENSIONS_DIR = path.join(PROJECT_ROOT, 'extensions', '.claude');
 
 /**
  * Synchronize pre-configured extensions to user directory
@@ -35,7 +35,9 @@ export async function syncExtensions(targetDir, options = {}) {
   const results = {
     agents: { synced: 0, errors: [] },
     commands: { synced: 0, errors: [] },
-    skills: { synced: 0, errors: [] }
+    skills: { synced: 0, errors: [] },
+    hooks: { synced: 0, errors: [] },
+    knowledge: { synced: 0, errors: [] }
   };
 
   try {
@@ -43,11 +45,15 @@ export async function syncExtensions(targetDir, options = {}) {
     await fs.mkdir(path.join(targetDir, 'agents'), { recursive: true });
     await fs.mkdir(path.join(targetDir, 'commands'), { recursive: true });
     await fs.mkdir(path.join(targetDir, 'skills'), { recursive: true });
+    await fs.mkdir(path.join(targetDir, 'hooks'), { recursive: true });
+    await fs.mkdir(path.join(targetDir, 'knowledge'), { recursive: true });
 
     // Sync each type of extension
     await syncResourceType('agents', targetDir, results.agents, overwriteUserFiles);
     await syncResourceType('commands', targetDir, results.commands, overwriteUserFiles);
     await syncResourceType('skills', targetDir, results.skills, overwriteUserFiles);
+    await syncResourceType('hooks', targetDir, results.hooks, overwriteUserFiles);
+    await syncResourceType('knowledge', targetDir, results.knowledge, overwriteUserFiles);
 
     return results;
   } catch (error) {
@@ -60,7 +66,7 @@ export async function syncExtensions(targetDir, options = {}) {
  * Sync a specific type of resource
  *
  * @private
- * @param {string} type - Resource type: 'agents', 'commands', or 'skills'
+ * @param {string} type - Resource type: 'agents', 'commands', 'skills', 'hooks', or 'knowledge'
  * @param {string} targetDir - Target .claude directory
  * @param {Object} results - Results object to update
  * @param {boolean} overwrite - Whether to overwrite existing files
@@ -75,6 +81,14 @@ async function syncResourceType(type, targetDir, results, overwrite) {
   }
 
   const entries = await fs.readdir(sourceDir, { withFileTypes: true });
+
+  // File extension mapping for different resource types
+  const fileExtensions = {
+    agents: ['.json'],
+    commands: ['.md'],
+    hooks: ['.js', '.md'],
+    knowledge: ['.md', '.txt']
+  };
 
   for (const entry of entries) {
     // Skip README files and hidden files
@@ -98,6 +112,39 @@ async function syncResourceType(type, targetDir, results, overwrite) {
           await copyDirectory(sourcePath, targetPath);
           results.synced++;
           console.log(`[ExtensionSync] Synced skill: ${entry.name}`);
+        }
+      } else if (type === 'hooks' || type === 'knowledge') {
+        // Hooks and Knowledge support both files and directories
+        if (entry.isFile()) {
+          const ext = path.extname(entry.name);
+          const allowedExts = fileExtensions[type] || [];
+
+          if (allowedExts.includes(ext)) {
+            const sourcePath = path.join(sourceDir, entry.name);
+            const targetPath = path.join(targetSubDir, entry.name);
+
+            if (!overwrite && await fileExists(targetPath)) {
+              console.log(`[ExtensionSync] Skipping existing ${type.slice(0, -1)}: ${entry.name}`);
+              continue;
+            }
+
+            await fs.copyFile(sourcePath, targetPath);
+            results.synced++;
+            console.log(`[ExtensionSync] Synced ${type.slice(0, -1)}: ${entry.name}`);
+          }
+        } else if (entry.isDirectory()) {
+          // Support subdirectories (useful for knowledge categorization)
+          const sourcePath = path.join(sourceDir, entry.name);
+          const targetPath = path.join(targetSubDir, entry.name);
+
+          if (!overwrite && await directoryExists(targetPath)) {
+            console.log(`[ExtensionSync] Skipping existing directory: ${entry.name}`);
+            continue;
+          }
+
+          await copyDirectory(sourcePath, targetPath);
+          results.synced++;
+          console.log(`[ExtensionSync] Synced ${type.slice(0, -1)} directory: ${entry.name}`);
         }
       } else {
         // Agents and Commands are files
@@ -166,15 +213,17 @@ export async function syncToAllUsers(options = {}) {
 }
 
 /**
- * Get all available extensions from the extensions/ directory
+ * Get all available extensions from the extensions/.claude/ directory
  *
- * @returns {Promise<Object>} Object containing agents, commands, and skills arrays
+ * @returns {Promise<Object>} Object containing agents, commands, skills, hooks, and knowledge arrays
  */
 export async function getAllExtensions() {
   const extensions = {
     agents: [],
     commands: [],
-    skills: []
+    skills: [],
+    hooks: [],
+    knowledge: []
   };
 
   // Read Agents
@@ -238,6 +287,85 @@ export async function getAllExtensions() {
         extensions.skills.push({
           name: entry.name,
           description
+        });
+      }
+    }
+  }
+
+  // Read Hooks (.js and .md files)
+  const hooksDir = path.join(EXTENSIONS_DIR, 'hooks');
+  if (await directoryExists(hooksDir)) {
+    const entries = await fs.readdir(hooksDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isFile()) {
+        const ext = path.extname(entry.name);
+        if (ext === '.js' || ext === '.md') {
+          const filePath = path.join(hooksDir, entry.name);
+
+          let description = '';
+          try {
+            const content = await fs.readFile(filePath, 'utf-8');
+            // For .js files, try to extract description from JSDoc comments
+            if (ext === '.js') {
+              const match = content.match(/\/\*\*\s*([^*]|\*(?!\/))*\*\//);
+              description = match ? match[0].substring(2, match[0].length - 2).trim().substring(0, 100) : 'JavaScript Hook';
+            } else {
+              // For .md files, extract first heading
+              const match = content.match(/^#\s+(.+)$/m);
+              description = match ? match[1] : '';
+            }
+          } catch {
+            description = ext === '.js' ? 'JavaScript Hook' : 'Markdown Hook';
+          }
+
+          extensions.hooks.push({
+            filename: entry.name,
+            name: entry.name.replace(/\.(js|md)$/, ''),
+            type: ext.substring(1),
+            description
+          });
+        }
+      }
+    }
+  }
+
+  // Read Knowledge (.md and .txt files and directories)
+  const knowledgeDir = path.join(EXTENSIONS_DIR, 'knowledge');
+  if (await directoryExists(knowledgeDir)) {
+    const entries = await fs.readdir(knowledgeDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isFile()) {
+        const ext = path.extname(entry.name);
+        if (ext === '.md' || ext === '.txt') {
+          const filePath = path.join(knowledgeDir, entry.name);
+
+          let description = '';
+          try {
+            const content = await fs.readFile(filePath, 'utf-8');
+            if (ext === '.md') {
+              const match = content.match(/^#\s+(.+)$/m);
+              description = match ? match[1] : content.substring(0, 100).trim();
+            } else {
+              description = content.substring(0, 100).trim();
+            }
+          } catch {
+            description = 'Knowledge File';
+          }
+
+          extensions.knowledge.push({
+            filename: entry.name,
+            name: entry.name.replace(/\.(md|txt)$/, ''),
+            type: ext.substring(1),
+            description
+          });
+        }
+      } else if (entry.isDirectory() && !entry.name.startsWith('.')) {
+        // Knowledge subdirectories
+        extensions.knowledge.push({
+          filename: entry.name + '/',
+          name: entry.name,
+          type: 'dir',
+          description: 'Knowledge Directory'
         });
       }
     }
