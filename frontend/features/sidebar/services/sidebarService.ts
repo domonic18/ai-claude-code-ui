@@ -75,6 +75,7 @@ export class SidebarService {
     offset: number = 0
   ): Promise<PaginatedSessionsResponse> {
     try {
+      console.log('[SidebarService] Fetching sessions:', { projectName, limit, offset });
       const response = await api.sessions(projectName, limit, offset);
 
       if (!response.ok) {
@@ -86,9 +87,22 @@ export class SidebarService {
       }
 
       const result = await response.json();
+      console.log('[SidebarService] Received response:', result);
+
+      // Handle different response formats
+      // API returns: {success: true, data: [...], meta: {pagination: {...}}}
+      const sessions = Array.isArray(result.data) ? result.data : result.sessions || [];
+      const hasMore = result.meta?.pagination?.hasMore !== undefined
+        ? result.meta.pagination.hasMore
+        : result.hasMore !== undefined
+        ? result.hasMore
+        : undefined;
+
+      console.log('[SidebarService] Parsed result:', { sessions, hasMore, sessionCount: sessions.length });
+
       return {
-        sessions: result.sessions || [],
-        hasMore: result.hasMore,
+        sessions,
+        hasMore,
       };
     } catch (error) {
       if (error instanceof SidebarServiceError) {
