@@ -19,7 +19,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { Settings as SettingsIcon, Sparkles, MessageSquare } from 'lucide-react';
 import { Sidebar } from './features/sidebar/components';
 import MainContent from '@/shared/components/layout/MainContent';
@@ -78,7 +78,6 @@ interface User {
 // Main App component with routing
 function AppContent() {
   const navigate = useNavigate();
-  const { sessionId } = useParams();
   const { user } = useAuth();
 
   const { updateAvailable, latestVersion, currentVersion, releaseInfo } = useVersionCheck('siteboon', 'claudecodeui');
@@ -139,7 +138,7 @@ function AppContent() {
     isSessionActive,
     isSessionProcessing,
     shouldSkipUpdate,
-  } = useSessionProtection(selectedProject, selectedSession as SidebarSession | null, handleSidebarRefresh, (sessionId) => navigate(`/session/${sessionId}`));
+  } = useSessionProtection(selectedProject, selectedSession as SidebarSession | null, handleSidebarRefresh);
 
   const { ws, sendMessage, messages } = useWebSocketContext();
 
@@ -448,7 +447,6 @@ function AppContent() {
           onSessionNotProcessing={markSessionAsNotProcessing}
           processingSessions={processingSessions}
           onReplaceTemporarySession={replaceTemporarySession}
-          onNavigateToSession={(sessionId) => navigate(`/session/${sessionId}`)}
           onShowSettings={() => setShowSettings(true)}
           autoExpandTools={autoExpandTools}
           showRawParameters={showRawParameters}
@@ -563,7 +561,6 @@ function App() {
                 {/* Protected routes */}
                 <Route element={<ProtectedRoute />}>
                   <Route path="/chat" element={<AppContent />} />
-                  <Route path="/session/:sessionId" element={<AppContent />} />
                   <Route path="/settings" element={<SettingsPage />} />
                   <Route path="/admin" element={<AdminPage />} />
                 </Route>
