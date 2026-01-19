@@ -356,8 +356,6 @@ export interface ProjectListProps {
   editingName: string;
   /** Loading sessions */
   loadingSessions: LoadingSessions;
-  /** Additional sessions */
-  additionalSessions: AdditionalSessions;
   /** Current time */
   currentTime: Date;
   /** Whether projects are loading */
