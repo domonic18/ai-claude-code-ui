@@ -324,11 +324,6 @@ function AppContent() {
                 isLoading={isLoadingProjects}
                 onRefresh={handleSidebarRefresh}
                 onShowSettings={() => setShowSettings(true)}
-                updateAvailable={updateAvailable}
-                latestVersion={latestVersion}
-                currentVersion={currentVersion}
-                releaseInfo={releaseInfo}
-                onShowVersionModal={() => setShowVersionModal(true)}
                 isPWA={isPWA}
                 isMobile={isMobile}
                 onToggleSidebar={() => setSidebarVisible(false)}
@@ -414,11 +409,6 @@ function AppContent() {
               isLoading={isLoadingProjects}
               onRefresh={handleSidebarRefresh}
               onShowSettings={() => setShowSettings(true)}
-              updateAvailable={updateAvailable}
-              latestVersion={latestVersion}
-              currentVersion={currentVersion}
-              releaseInfo={releaseInfo}
-              onShowVersionModal={() => setShowVersionModal(true)}
               isPWA={isPWA}
               isMobile={isMobile}
               onToggleSidebar={() => setSidebarVisible(false)}
