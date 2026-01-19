@@ -64,24 +64,34 @@ export const SidebarHeader = memo(function SidebarHeader({
           </div>
         </div>
       )}
-      {onToggleSidebar && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 w-8 px-0 hover:bg-accent transition-colors duration-200"
-          onClick={onToggleSidebar}
-          title="Hide sidebar"
+      <div className="flex items-center gap-2">
+        <button
+          className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:text-accent-foreground rounded-md text-xs h-8 w-8 px-0 hover:bg-accent transition-colors duration-200"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          title={t('sidebar.refreshConversations') || 'Refresh conversations'}
         >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+          <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+        </button>
+        {onToggleSidebar && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 px-0 hover:bg-accent transition-colors duration-200"
+            onClick={onToggleSidebar}
+            title="Hide sidebar"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </Button>
-      )}
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </Button>
+        )}
+      </div>
     </div>
   );
 
@@ -118,14 +128,6 @@ export const SidebarHeader = memo(function SidebarHeader({
           </div>
         )}
         <div className="flex gap-2">
-          <button
-            className="w-8 h-8 rounded-md bg-background border border-border flex items-center justify-center active:scale-95 transition-all duration-150"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            title="Refresh conversations"
-          >
-            <RefreshCw className={`w-4 h-4 text-foreground ${isRefreshing ? 'animate-spin' : ''}`} />
-          </button>
           {onNewSession && (
             <button
               className="w-8 h-8 rounded-md bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-all duration-150"
@@ -135,33 +137,15 @@ export const SidebarHeader = memo(function SidebarHeader({
               <Plus className="w-4 h-4" />
             </button>
           )}
-        </div>
-      </div>
-    </div>
-  );
-
-  // Desktop Action Bar (New Session + Refresh buttons)
-  const desktopActionBar = (
-    <div className="hidden md:block px-4 py-2 border-b border-border">
-      <div className="flex gap-2">
-        {onNewSession && (
           <button
-            className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary-foreground shadow rounded-md px-3 flex-1 h-8 text-xs bg-primary hover:bg-primary/90"
-            onClick={onNewSession}
-            title={t('sidebar.newSession')}
+            className="w-8 h-8 rounded-md bg-background border border-border flex items-center justify-center active:scale-95 transition-all duration-150"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            title="Refresh conversations"
           >
-            <Plus className="w-3.5 h-3.5 mr-1.5" />
-            {t('sidebar.newSession')}
+            <RefreshCw className={`w-4 h-4 text-foreground ${isRefreshing ? 'animate-spin' : ''}`} />
           </button>
-        )}
-        <button
-          className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input bg-background shadow-sm hover:text-accent-foreground rounded-md text-xs h-8 w-8 px-0 hover:bg-accent group"
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          title={t('sidebar.refreshConversations') || 'Refresh conversations'}
-        >
-          <RefreshCw className={`w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-300 ${isRefreshing ? 'animate-spin' : ''}`} />
-        </button>
+        </div>
       </div>
     </div>
   );
@@ -172,7 +156,6 @@ export const SidebarHeader = memo(function SidebarHeader({
         {desktopHeader}
         {mobileHeader}
       </div>
-      {desktopActionBar}
     </>
   );
 });
