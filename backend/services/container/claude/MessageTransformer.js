@@ -69,7 +69,9 @@ export function processOutputLine(line, writer, sessionId, state) {
     const sdkMessage = jsonData.chunk;
     
     // 从第一条消息捕获并发送 session-created
-    if (sdkMessage.session_id && !state.sessionCreatedSent && !sessionId) {
+    // 条件：SDK 返回了 session_id，且尚未发送过，且传入的 sessionId 是临时 ID 或为空
+    const isTemporarySession = !sessionId || sessionId.startsWith('temp-');
+    if (sdkMessage.session_id && !state.sessionCreatedSent && isTemporarySession) {
       state.sessionCreatedSent = true;
       console.log('[MessageTransformer] Sending session-created:', sdkMessage.session_id);
       writer.send({
