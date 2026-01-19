@@ -18,7 +18,7 @@
     "currentVersion": "Current version"
   },
   "homepage": {
-    "title": "Claude Code UI",
+    "title": "Synapse Core",
     "subtitle": "Multi-user Web Interface for AI Coding",
     "description": "A powerful web-based interface for Claude Code CLI, Cursor CLI, and OpenAI Codex. Collaborate with your team and leverage AI-powered code assistance.",
     "features": {
@@ -55,12 +55,12 @@
       "getStarted": "Get Started Now"
     },
     "footer": {
-      "copyright": "© 2025 Claude Code UI. All rights reserved."
+      "copyright": "© 2025 Synapse Core. All rights reserved."
     }
   },
   "login": {
     "welcome": "Welcome Back",
-    "subtitle": "Sign in to your Claude Code UI account",
+    "subtitle": "Sign in to your Synapse Core account",
     "username": "Username",
     "usernamePlaceholder": "Enter your username",
     "password": "Password",
@@ -69,7 +69,7 @@
     "signingIn": "Signing in...",
     "error": "Please enter both username and password",
     "firstTime": "First time? Create an account",
-    "credentials": "Enter your credentials to access Claude Code UI",
+    "credentials": "Enter your credentials to access Synapse Core",
     "setupHint": "If this is your first time, the system may need to be initialized. Please refresh the page."
   },
   "register": {

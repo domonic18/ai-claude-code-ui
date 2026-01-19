@@ -18,7 +18,7 @@
     "currentVersion": "当前版本"
   },
   "homepage": {
-    "title": "Claude Code UI",
+    "title": "企业大脑",
     "subtitle": "AI 编码的多用户 Web 界面",
     "description": "一个强大的基于 Web 的 Claude Code CLI、Cursor CLI 和 OpenAI Codex 界面。与您的团队协作，利用 AI 驱动的代码辅助功能。",
     "features": {
@@ -55,12 +55,12 @@
       "getStarted": "立即开始"
     },
     "footer": {
-      "copyright": "© 2025 Claude Code UI. 保留所有权利。"
+      "copyright": "© 2025 企业大脑. 保留所有权利。"
     }
   },
   "login": {
     "welcome": "欢迎回来",
-    "subtitle": "登录您的 Claude Code UI 账户",
+    "subtitle": "登录您的 企业大脑 账户",
     "username": "用户名",
     "usernamePlaceholder": "请输入用户名",
     "password": "密码",
@@ -69,7 +69,7 @@
     "signingIn": "登录中...",
     "error": "请输入用户名和密码",
     "firstTime": "首次使用？创建账户",
-    "credentials": "输入您的凭据以访问 Claude Code UI",
+    "credentials": "输入您的凭据以访问 企业大脑",
     "setupHint": "如果是首次使用，系统可能需要初始化。请刷新页面。"
   },
   "register": {
