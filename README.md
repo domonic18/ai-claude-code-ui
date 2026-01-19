@@ -42,6 +42,9 @@
 git clone https://github.com/domonic18/ai-claude-code-ui.git
 cd ai-claude-code-ui
 
+# 拉取 extensions 子模块（按需）
+git submodule update --init --recursive
+
 # 安装依赖
 npm install
 
@@ -50,6 +53,15 @@ docker build -f docker/Dockerfile.runtime -t claude-code-runtime:latest .
 
 # 启动开发服务
 npm run dev
+```
+
+### 子模块操作
+
+本项目使用 Git 子模块管理 extensions 目录，以下是一些常用操作：
+
+```bash
+# 更新子模块到最新版本
+git submodule update --remote --merge
 ```
 
 # ⚙️ 配置说明
