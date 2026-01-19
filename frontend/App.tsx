@@ -111,6 +111,7 @@ function AppContent() {
     selectedProject,
     selectedSession,
     isLoadingProjects,
+    newSessionCounter,
     fetchProjects,
     handleProjectSelect,
     handleSessionSelect,
@@ -431,6 +432,7 @@ function AppContent() {
         <MainContent
           selectedProject={selectedProject}
           selectedSession={selectedSession}
+          newSessionCounter={newSessionCounter}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           ws={ws}

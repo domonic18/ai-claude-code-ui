@@ -45,6 +45,7 @@ interface File {
 export interface MainContentProps {
   selectedProject?: Project | null;
   selectedSession?: Session | null;
+  newSessionCounter?: number;
   activeTab: string;
   setActiveTab: (tab: string) => void;
   ws?: any;
@@ -74,6 +75,7 @@ export interface MainContentProps {
 function MainContent({
   selectedProject,
   selectedSession,
+  newSessionCounter = 0,
   activeTab,
   setActiveTab,
   ws,
@@ -393,6 +395,7 @@ function MainContent({
               <ChatInterface
                 selectedProject={chatProject}
                 selectedSession={chatSession}
+                newSessionCounter={newSessionCounter}
                 ws={ws}
                 sendMessage={sendMessage}
                 wsMessages={messages}
