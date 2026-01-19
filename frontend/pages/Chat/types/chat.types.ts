@@ -61,7 +61,6 @@ export interface ChatPageProps {
   onSessionNotProcessing?: (sessionId: string) => void;
   processingSessions?: Set<string>;
   onReplaceTemporarySession?: (realSessionId: string) => Promise<void>;
-  onNavigateToSession?: (sessionId: string) => void;
 
   // UI handlers
   onShowSettings?: () => void;

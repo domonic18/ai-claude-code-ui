@@ -37,7 +37,6 @@ export function ChatPage({
   onSessionNotProcessing,
   processingSessions,
   onReplaceTemporarySession,
-  onNavigateToSession,
   onShowSettings,
   onInputFocusChange,
   autoExpandTools,
@@ -200,7 +199,6 @@ export function ChatPage({
           onSessionNotProcessing={onSessionNotProcessing}
           processingSessions={processingSessions}
           onReplaceTemporarySession={onReplaceTemporarySession}
-          onNavigateToSession={onNavigateToSession}
           onShowSettings={onShowSettings}
           autoExpandTools={autoExpandTools}
           showRawParameters={showRawParameters}
