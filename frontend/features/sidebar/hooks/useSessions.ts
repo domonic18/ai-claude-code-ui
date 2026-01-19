@@ -58,22 +58,36 @@ export function useSessions(): UseSessionsReturn {
   ): Promise<void> => {
     // Check if already loading
     if (loadingSessions[projectName]) {
+      console.log('[useSessions] Already loading sessions for:', projectName);
       return;
     }
+
+    console.log('[useSessions] Loading more sessions:', { projectName, limit, offset });
 
     setLoadingSessions(prev => ({ ...prev, [projectName]: true }));
 
     try {
       const result: PaginatedSessionsResponse = await service.getSessions(projectName, limit, offset);
 
+      console.log('[useSessions] Received sessions:', {
+        projectName,
+        count: result.sessions?.length || 0,
+        hasMore: result.hasMore,
+        sessions: result.sessions
+      });
+
       // Update sessions
-      setAdditionalSessions(prev => ({
-        ...prev,
-        [projectName]: [
-          ...(prev[projectName] || []),
-          ...result.sessions,
-        ],
-      }));
+      setAdditionalSessions(prev => {
+        const updated = {
+          ...prev,
+          [projectName]: [
+            ...(prev[projectName] || []),
+            ...result.sessions,
+          ],
+        };
+        console.log('[useSessions] Updated additionalSessions:', updated);
+        return updated;
+      });
 
       // Update hasMore status
       if (result.hasMore !== undefined) {
