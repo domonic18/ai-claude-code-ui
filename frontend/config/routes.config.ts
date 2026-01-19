@@ -126,7 +126,7 @@ export interface RouteMeta {
 export const ROUTE_META: Record<string, RouteMeta> = {
   [ROUTES.HOME]: {
     title: 'Synapse Core',
-    description: 'Multi-user Web Interface for Claude Code CLI',
+    description: 'AI Agent Platform Empowering Enterprises with WebUI',
     requiresAuth: false,
     hideFromNav: true,
   },

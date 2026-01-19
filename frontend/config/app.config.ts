@@ -11,9 +11,9 @@
 export const APP_CONFIG = {
   name: 'Synapse Core',
   version: import.meta.env.VITE_APP_VERSION || '1.13.6',
-  description: 'Multi-user Web Interface for Claude Code CLI, Cursor CLI and OpenAI Codex',
-  repository: 'https://github.com/anthropics/claude-code-ui',
-  author: 'Anthropic',
+  description: 'AI Agent Platform Empowering Enterprises with WebUI',
+  repository: 'https://github.com/domonic18/ai-claude-code-ui',
+  author: 'domonic18',
 } as const;
 
 /**
