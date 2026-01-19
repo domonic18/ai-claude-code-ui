@@ -36,6 +36,7 @@ import { ProtectedRoute } from '@/router';
 import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import useLocalStorage from '@/shared/hooks/useLocalStorage';
 import { api, authenticatedFetch } from '@/shared/services';
+import { APP_NAME } from '@/shared/constants/app.constants';
 import { Homepage, ChatPage, SettingsPage, AdminPage, NotFoundPage } from '@/pages';
 import { LoginForm, SetupForm } from '@/features/auth';
 
@@ -510,7 +511,7 @@ function RootRedirect() {
               <MessageSquare className="w-8 h-8 text-primary-foreground" />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-foreground mb-2">Claude Code UI</h1>
+          <h1 className="text-2xl font-bold text-foreground mb-2">{APP_NAME}</h1>
           <div className="flex items-center justify-center space-x-2">
             <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
             <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
