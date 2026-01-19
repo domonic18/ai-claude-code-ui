@@ -1,7 +1,7 @@
 /**
  * ExtensionManagement Component
  *
- * Admin interface for managing pre-configured extensions (agents, commands, skills).
+ * Admin interface for managing pre-configured extensions (agents, commands, skills, hooks, knowledge).
  * Provides functionality to view available extensions and sync them to all users.
  *
  * @module features/admin/components/ExtensionManagement
@@ -29,10 +29,26 @@ interface Skill {
   description: string;
 }
 
+interface Hook {
+  filename: string;
+  name: string;
+  type: string;
+  description: string;
+}
+
+interface Knowledge {
+  filename: string;
+  name: string;
+  type: string;
+  description: string;
+}
+
 interface ExtensionsData {
   agents: Agent[];
   commands: Command[];
   skills: Skill[];
+  hooks?: Hook[];
+  knowledge?: Knowledge[];
 }
 
 interface SyncResults {
@@ -154,7 +170,7 @@ export function ExtensionManagement() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">扩展预置管理</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            管理和同步预置的 agents、commands 和 skills 到所有用户
+            管理和同步预置的 agents、commands、skills、hooks 和 knowledge 到所有用户
           </p>
         </div>
         <button
@@ -167,7 +183,7 @@ export function ExtensionManagement() {
       </div>
 
       {/* Statistics Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 dark:from-blue-500/20 dark:to-blue-600/20 border border-blue-500/20 dark:border-blue-500/30 rounded-lg p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -200,6 +216,30 @@ export function ExtensionManagement() {
             </div>
             <div className="w-12 h-12 bg-purple-500/20 dark:bg-purple-500/30 rounded-full flex items-center justify-center">
               <span className="text-2xl">🎯</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-orange-500/10 to-orange-600/10 dark:from-orange-500/20 dark:to-orange-600/20 border border-orange-500/20 dark:border-orange-500/30 rounded-lg p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-orange-600 dark:text-orange-400">Hooks</p>
+              <p className="text-3xl font-bold text-orange-700 dark:text-orange-300 mt-1">{extensions.hooks?.length || 0}</p>
+            </div>
+            <div className="w-12 h-12 bg-orange-500/20 dark:bg-orange-500/30 rounded-full flex items-center justify-center">
+              <span className="text-2xl">🪝</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-teal-500/10 to-teal-600/10 dark:from-teal-500/20 dark:to-teal-600/20 border border-teal-500/20 dark:border-teal-500/30 rounded-lg p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-teal-600 dark:text-teal-400">Knowledge</p>
+              <p className="text-3xl font-bold text-teal-700 dark:text-teal-300 mt-1">{extensions.knowledge?.length || 0}</p>
+            </div>
+            <div className="w-12 h-12 bg-teal-500/20 dark:bg-teal-500/30 rounded-full flex items-center justify-center">
+              <span className="text-2xl">📚</span>
             </div>
           </div>
         </div>
@@ -276,7 +316,7 @@ export function ExtensionManagement() {
       </div>
 
       {/* Extensions List */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         {/* Agents */}
         <div className="bg-card border border-border rounded-lg">
           <div className="p-4 border-b border-border">
@@ -340,6 +380,68 @@ export function ExtensionManagement() {
                   <li key={skill.name} className="text-sm">
                     <div className="font-medium text-foreground">{skill.name}</div>
                     <div className="text-muted-foreground text-xs mt-1">{skill.description}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        {/* Hooks */}
+        <div className="bg-card border border-border rounded-lg">
+          <div className="p-4 border-b border-border">
+            <h2 className="text-lg font-bold text-foreground">Hooks</h2>
+            <p className="text-sm text-muted-foreground">{extensions.hooks?.length || 0} 个可用</p>
+          </div>
+          <div className="p-4 max-h-96 overflow-y-auto">
+            {!extensions.hooks || extensions.hooks.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">暂无 Hook</p>
+            ) : (
+              <ul className="space-y-2">
+                {extensions.hooks.map((hook) => (
+                  <li
+                    key={hook.name}
+                    className="text-sm py-2 px-3 bg-muted hover:bg-accent rounded-md transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-foreground">{hook.name}</span>
+                      <span className="text-xs px-1.5 py-0.5 bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded">
+                        {hook.type}
+                      </span>
+                    </div>
+                    <div className="text-muted-foreground text-xs mt-1 line-clamp-2">{hook.description}</div>
+                    <div className="text-muted-foreground/60 text-xs mt-1">{hook.filename}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        {/* Knowledge */}
+        <div className="bg-card border border-border rounded-lg">
+          <div className="p-4 border-b border-border">
+            <h2 className="text-lg font-bold text-foreground">Knowledge</h2>
+            <p className="text-sm text-muted-foreground">{extensions.knowledge?.length || 0} 个可用</p>
+          </div>
+          <div className="p-4 max-h-96 overflow-y-auto">
+            {!extensions.knowledge || extensions.knowledge.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">暂无知识库</p>
+            ) : (
+              <ul className="space-y-2">
+                {extensions.knowledge.map((knowledge) => (
+                  <li
+                    key={knowledge.name}
+                    className="text-sm py-2 px-3 bg-muted hover:bg-accent rounded-md transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-foreground">{knowledge.name}</span>
+                      <span className="text-xs px-1.5 py-0.5 bg-teal-500/20 text-teal-600 dark:text-teal-400 rounded">
+                        {knowledge.type}
+                      </span>
+                    </div>
+                    <div className="text-muted-foreground text-xs mt-1 line-clamp-2">{knowledge.description}</div>
+                    <div className="text-muted-foreground/60 text-xs mt-1">{knowledge.filename}</div>
                   </li>
                 ))}
               </ul>
