@@ -1,8 +1,8 @@
 # 扩展功能预置方案
 
-> **文档版本**: 2.0
+> **文档版本**: 2.1
 > **创建时间**: 2026-01-18
-> **最后更新**: 2026-01-18
+> **最后更新**: 2026-01-19
 > **所属架构**: Docker + Seccomp 容器隔离
 
 ---
@@ -38,6 +38,8 @@ Docker 容器中运行的 AI 代码助手（Claude Code、OpenCode 等）支持 
 | **Agents** | Subagent 配置，定义专用代理行为 | `.claude/agents/` | `.json` |
 | **Commands** | 自定义斜杠命令 | `.claude/commands/` | `.md` |
 | **Skills** | Agent 技能，增强 AI 能力 | `.claude/skills/{name}/` | `SKILL.md` |
+| **Hooks** | 钩子脚本，自定义事件处理 | `.claude/hooks/` | `.js` / `.md` |
+| **Knowledge** | 知识库文件，提供领域知识 | `.claude/knowledge/` | `.md` / `.txt` |
 
 ### 1.3 配置作用域
 
@@ -101,10 +103,16 @@ Docker 容器中运行的 AI 代码助手（Claude Code、OpenCode 等）支持 
                     │   ├── review.md
                     │   ├── test.md
                     │   └── explain.md
-                    └── skills/             # 同步自 extensions/.claude/skills/
-                        ├── code-analysis/
-                        ├── git-workflow/
-                        └── best-practices/
+                    ├── skills/             # 同步自 extensions/.claude/skills/
+                    │   ├── code-analysis/
+                    │   ├── git-workflow/
+                    │   └── best-practices/
+                    ├── hooks/              # 同步自 extensions/.claude/hooks/
+                    │   ├── pre-command.js
+                    │   └── post-response.md
+                    └── knowledge/          # 同步自 extensions/.claude/knowledge/
+                        ├── best-practices.md
+                        └── api-reference.txt
 ```
 
 ### 2.2 目录说明
@@ -115,8 +123,8 @@ Docker 容器中运行的 AI 代码助手（Claude Code、OpenCode 等）支持 
 | **extensions/.claude/agents/** | 预置 Agents | `.json` 格式的 Subagent 配置文件 |
 | **extensions/.claude/commands/** | 预置 Commands | `.md` 格式的斜杠命令定义 |
 | **extensions/.claude/skills/** | 预置 Skills | 包含 `SKILL.md` 的目录 |
-| **extensions/.claude/hooks/** | 预置 Hooks（可选） | Hook 配置文件 |
-| **extensions/.claude/knowledge/** | 预置知识库（可选） | 知识库文件 |
+| **extensions/.claude/hooks/** | 预置 Hooks（可选） | `.js` 或 `.md` 格式的钩子脚本 |
+| **extensions/.claude/knowledge/** | 预置知识库（可选） | `.md` 或 `.txt` 格式的知识库文件 |
 
 ### 2.3 扩展来源管理
 
@@ -140,6 +148,8 @@ git submodule update --remote extensions
 cp /path/to/custom-agent.json extensions/.claude/agents/
 cp /path/to/custom-command.md extensions/.claude/commands/
 cp -r /path/to/custom-skill extensions/.claude/skills/
+cp /path/to/custom-hook.js extensions/.claude/hooks/
+cp /path/to/custom-knowledge.md extensions/.claude/knowledge/
 ```
 
 ### 2.4 目录权限与命名规范
@@ -159,13 +169,15 @@ cp -r /path/to/custom-skill extensions/.claude/skills/
 ```markdown
 # AI 代码助手扩展
 
-本目录包含平台预置的 agents、commands、skills 扩展。
+本目录包含平台预置的 agents、commands、skills、hooks、knowledge 扩展。
 
 ## 添加新扩展
 
 1. 将 Agent 文件放到 `agents/` 目录
 2. 将 Command 文件放到 `commands/` 目录
 3. 将 Skill 目录放到 `skills/` 目录
+4. 将 Hook 文件放到 `hooks/` 目录
+5. 将 Knowledge 文件放到 `knowledge/` 目录
 
 ---
 
@@ -211,6 +223,8 @@ export async function createUser(userData) {
   await fs.mkdir(path.join(claudeDir, 'agents'), { recursive: true });
   await fs.mkdir(path.join(claudeDir, 'commands'), { recursive: true });
   await fs.mkdir(path.join(claudeDir, 'skills'), { recursive: true });
+  await fs.mkdir(path.join(claudeDir, 'hooks'), { recursive: true });
+  await fs.mkdir(path.join(claudeDir, 'knowledge'), { recursive: true });
 
   // 🆕 合并同步所有组织的扩展
   await syncExtensions(claudeDir);
@@ -272,13 +286,17 @@ export async function syncToAllUsers(options = {}) {
 │  ├── extensions/.claude/     ← 预置扩展源目录                    │
 │  │   ├── agents/                                                │
 │  │   ├── commands/                                              │
-│  │   └── skills/                                                │
+│  │   ├── skills/                                                │
+│  │   ├── hooks/                                                 │
+│  │   └── knowledge/                                             │
 │  │                                                              │
 │  └── workspace/users/user_1/                                     │
 │      └── data/.claude/         ← 同步目标目录                    │
 │          ├── agents/            同步自 extensions/.claude/agents/        │
 │          ├── commands/          同步自 extensions/.claude/commands/      │
-│          └── skills/            同步自 extensions/.claude/skills/        │
+│          ├── skills/            同步自 extensions/.claude/skills/        │
+│          ├── hooks/             同步自 extensions/.claude/hooks/         │
+│          └── knowledge/         同步自 extensions/.claude/knowledge/     │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
                             │
@@ -323,6 +341,8 @@ sequenceDiagram
     Backend->>HostFS: 复制 extensions/.claude/agents/* →<br/>workspace/users/user_N/data/.claude/agents/
     Backend->>HostFS: 复制 extensions/.claude/commands/* →<br/>workspace/users/user_N/data/.claude/commands/
     Backend->>HostFS: 复制 extensions/.claude/skills/* →<br/>workspace/users/user_N/data/.claude/skills/
+    Backend->>HostFS: 复制 extensions/.claude/hooks/* →<br/>workspace/users/user_N/data/.claude/hooks/
+    Backend->>HostFS: 复制 extensions/.claude/knowledge/* →<br/>workspace/users/user_N/data/.claude/knowledge/
 
     Backend->>Backend: 启动 Docker 容器<br/>bind mount: workspace/users/user_N/data → /workspace
 
@@ -389,14 +409,18 @@ sequenceDiagram
 │   └── .claude/             ← 预置扩展目录
 │       ├── agents/
 │       ├── commands/
-│       └── skills/
+│       ├── skills/
+│       ├── hooks/
+│       └── knowledge/
 │
 └── workspace/users/        ← 用户数据（可写，同步目标）
     └── user_1/data/
         └── .claude/         ← 同步目标，bind mount 到容器的 /workspace
             ├── agents/     ← 从 extensions/.claude/agents/ 同步
             ├── commands/   ← 从 extensions/.claude/commands/ 同步
-            └── skills/     ← 从 extensions/.claude/skills/ 同步
+            ├── skills/     ← 从 extensions/.claude/skills/ 同步
+            ├── hooks/      ← 从 extensions/.claude/hooks/ 同步
+            └── knowledge/  ← 从 extensions/.claude/knowledge/ 同步
 ```
 
 **Docker 容器启动配置**（参考）：
@@ -453,7 +477,9 @@ export async function syncExtensions(targetDir, options = {}) {
   const results = {
     agents: { synced: 0, errors: [] },
     commands: { synced: 0, errors: [] },
-    skills: { synced: 0, errors: [] }
+    skills: { synced: 0, errors: [] },
+    hooks: { synced: 0, errors: [] },
+    knowledge: { synced: 0, errors: [] }
   };
 
   try {
@@ -461,6 +487,8 @@ export async function syncExtensions(targetDir, options = {}) {
     await fs.mkdir(path.join(targetDir, 'agents'), { recursive: true });
     await fs.mkdir(path.join(targetDir, 'commands'), { recursive: true });
     await fs.mkdir(path.join(targetDir, 'skills'), { recursive: true });
+    await fs.mkdir(path.join(targetDir, 'hooks'), { recursive: true });
+    await fs.mkdir(path.join(targetDir, 'knowledge'), { recursive: true });
 
     // 同步 Agents
     await syncResourceType('agents', targetDir, results.agents, overwriteUserFiles);
@@ -470,6 +498,12 @@ export async function syncExtensions(targetDir, options = {}) {
 
     // 同步 Skills
     await syncResourceType('skills', targetDir, results.skills, overwriteUserFiles);
+
+    // 同步 Hooks
+    await syncResourceType('hooks', targetDir, results.hooks, overwriteUserFiles);
+
+    // 同步 Knowledge
+    await syncResourceType('knowledge', targetDir, results.knowledge, overwriteUserFiles);
 
     return results;
   } catch (error) {
@@ -491,6 +525,14 @@ async function syncResourceType(type, targetDir, results, overwrite) {
 
   const entries = await fs.readdir(sourceDir, { withFileTypes: true });
 
+  // 文件类型扩展名映射
+  const fileExtensions = {
+    agents: ['.json'],
+    commands: ['.md'],
+    hooks: ['.js', '.md'],
+    knowledge: ['.md', '.txt']
+  };
+
   for (const entry of entries) {
     if (entry.name === 'README.md' || entry.name.startsWith('.')) {
       continue;
@@ -500,6 +542,35 @@ async function syncResourceType(type, targetDir, results, overwrite) {
       if (type === 'skills') {
         // Skills 是目录
         if (entry.isDirectory()) {
+          const sourcePath = path.join(sourceDir, entry.name);
+          const targetPath = path.join(targetSubDir, entry.name);
+
+          if (!overwrite && await directoryExists(targetPath)) {
+            continue;
+          }
+
+          await copyDirectory(sourcePath, targetPath);
+          results.synced++;
+        }
+      } else if (type === 'hooks' || type === 'knowledge') {
+        // Hooks 和 Knowledge 支持文件和目录
+        if (entry.isFile()) {
+          const ext = path.extname(entry.name);
+          const allowedExts = fileExtensions[type] || [];
+
+          if (allowedExts.includes(ext)) {
+            const sourcePath = path.join(sourceDir, entry.name);
+            const targetPath = path.join(targetSubDir, entry.name);
+
+            if (!overwrite && await fileExists(targetPath)) {
+              continue;
+            }
+
+            await fs.copyFile(sourcePath, targetPath);
+            results.synced++;
+          }
+        } else if (entry.isDirectory()) {
+          // 支持子目录（用于知识库分类）
           const sourcePath = path.join(sourceDir, entry.name);
           const targetPath = path.join(targetSubDir, entry.name);
 
@@ -584,7 +655,9 @@ export async function getAllExtensions() {
   const extensions = {
     agents: [],
     commands: [],
-    skills: []
+    skills: [],
+    hooks: [],
+    knowledge: []
   };
 
   // 读取 Agents
@@ -644,6 +717,85 @@ export async function getAllExtensions() {
         extensions.skills.push({
           name: entry.name,
           description
+        });
+      }
+    }
+  }
+
+  // 读取 Hooks (.js 和 .md 文件)
+  const hooksDir = path.join(EXTENSIONS_DIR, 'hooks');
+  if (await directoryExists(hooksDir)) {
+    const entries = await fs.readdir(hooksDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isFile()) {
+        const ext = path.extname(entry.name);
+        if (ext === '.js' || ext === '.md') {
+          const filePath = path.join(hooksDir, entry.name);
+
+          let description = '';
+          try {
+            const content = await fs.readFile(filePath, 'utf-8');
+            // 对于 .js 文件，尝试提取注释中的描述
+            if (ext === '.js') {
+              const match = content.match(/\/\*\*\s*([^*]|\*(?!\/))*\*\//);
+              description = match ? match[0].substring(2, match[0].length - 2).trim().substring(0, 100) : 'JavaScript Hook';
+            } else {
+              // 对于 .md 文件，提取第一个标题
+              const match = content.match(/^#\s+(.+)$/m);
+              description = match ? match[1] : '';
+            }
+          } catch {
+            description = ext === '.js' ? 'JavaScript Hook' : 'Markdown Hook';
+          }
+
+          extensions.hooks.push({
+            filename: entry.name,
+            name: entry.name.replace(/\.(js|md)$/, ''),
+            type: ext.substring(1),
+            description
+          });
+        }
+      }
+    }
+  }
+
+  // 读取 Knowledge (.md 和 .txt 文件及目录)
+  const knowledgeDir = path.join(EXTENSIONS_DIR, 'knowledge');
+  if (await directoryExists(knowledgeDir)) {
+    const entries = await fs.readdir(knowledgeDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isFile()) {
+        const ext = path.extname(entry.name);
+        if (ext === '.md' || ext === '.txt') {
+          const filePath = path.join(knowledgeDir, entry.name);
+
+          let description = '';
+          try {
+            const content = await fs.readFile(filePath, 'utf-8');
+            if (ext === '.md') {
+              const match = content.match(/^#\s+(.+)$/m);
+              description = match ? match[1] : content.substring(0, 100).trim();
+            } else {
+              description = content.substring(0, 100).trim();
+            }
+          } catch {
+            description = 'Knowledge File';
+          }
+
+          extensions.knowledge.push({
+            filename: entry.name,
+            name: entry.name.replace(/\.(md|txt)$/, ''),
+            type: ext.substring(1),
+            description
+          });
+        }
+      } else if (entry.isDirectory() && !entry.name.startsWith('.')) {
+        // 知识库子目录
+        extensions.knowledge.push({
+          filename: entry.name + '/',
+          name: entry.name,
+          type: 'dir',
+          description: 'Knowledge Directory'
         });
       }
     }
@@ -740,6 +892,8 @@ interface ExtensionsData {
   agents: Array<{ name: string; description: string }>;
   commands: Array<{ name: string }>;
   skills: Array<{ name: string; description: string }>;
+  hooks: Array<{ name: string; type: string; description: string }>;
+  knowledge: Array<{ name: string; type: string; description: string }>;
 }
 
 export function ExtensionManagement() {
@@ -776,7 +930,7 @@ export function ExtensionManagement() {
       <h1 className="text-2xl font-bold mb-6">扩展预置管理</h1>
 
       {/* 统计概览 */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-5 gap-4 mb-6">
         <div className="p-4 bg-blue-50 rounded-lg">
           <div className="text-2xl font-bold text-blue-600">{extensions.agents.length}</div>
           <div className="text-sm text-gray-600">Agents</div>
@@ -788,6 +942,14 @@ export function ExtensionManagement() {
         <div className="p-4 bg-purple-50 rounded-lg">
           <div className="text-2xl font-bold text-purple-600">{extensions.skills.length}</div>
           <div className="text-sm text-gray-600">Skills</div>
+        </div>
+        <div className="p-4 bg-orange-50 rounded-lg">
+          <div className="text-2xl font-bold text-orange-600">{extensions.hooks.length}</div>
+          <div className="text-sm text-gray-600">Hooks</div>
+        </div>
+        <div className="p-4 bg-teal-50 rounded-lg">
+          <div className="text-2xl font-bold text-teal-600">{extensions.knowledge.length}</div>
+          <div className="text-sm text-gray-600">Knowledge</div>
         </div>
       </div>
 
@@ -809,7 +971,7 @@ export function ExtensionManagement() {
       </div>
 
       {/* 扩展列表 */}
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-5 gap-6">
         {/* Agents */}
         <div className="p-4 border rounded-lg">
           <h2 className="text-lg font-bold mb-4">Agents ({extensions.agents.length})</h2>
@@ -841,6 +1003,38 @@ export function ExtensionManagement() {
               <li key={skill.name} className="text-sm">
                 <div className="font-medium">{skill.name}</div>
                 <div className="text-gray-500">{skill.description}</div>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Hooks */}
+        <div className="p-4 border rounded-lg">
+          <h2 className="text-lg font-bold mb-4">Hooks ({extensions.hooks.length})</h2>
+          <ul className="space-y-2">
+            {extensions.hooks.map(hook => (
+              <li key={hook.name} className="text-sm">
+                <div className="flex items-center gap-1">
+                  <span className="font-medium">{hook.name}</span>
+                  <span className="text-xs px-1 py-0 bg-gray-200 rounded">{hook.type}</span>
+                </div>
+                <div className="text-gray-500 text-xs">{hook.description}</div>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Knowledge */}
+        <div className="p-4 border rounded-lg">
+          <h2 className="text-lg font-bold mb-4">Knowledge ({extensions.knowledge.length})</h2>
+          <ul className="space-y-2">
+            {extensions.knowledge.map(knowledge => (
+              <li key={knowledge.name} className="text-sm">
+                <div className="flex items-center gap-1">
+                  <span className="font-medium">{knowledge.name}</span>
+                  <span className="text-xs px-1 py-0 bg-gray-200 rounded">{knowledge.type}</span>
+                </div>
+                <div className="text-gray-500 text-xs">{knowledge.description}</div>
               </li>
             ))}
           </ul>
