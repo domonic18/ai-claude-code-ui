@@ -7,7 +7,7 @@
 /**
  * App name and version
  */
-export const APP_NAME = 'Claude Code UI';
+export const APP_NAME = 'Synapse Core';
 export const APP_VERSION = import.meta.env.VITE_APP_VERSION || '0.0.0';
 
 /**

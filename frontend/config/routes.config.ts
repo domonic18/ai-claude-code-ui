@@ -125,7 +125,7 @@ export interface RouteMeta {
  */
 export const ROUTE_META: Record<string, RouteMeta> = {
   [ROUTES.HOME]: {
-    title: 'Claude Code UI',
+    title: 'Synapse Core',
     description: 'Multi-user Web Interface for Claude Code CLI',
     requiresAuth: false,
     hideFromNav: true,
@@ -329,7 +329,7 @@ export const REDIRECTS = {
 /**
  * Application name for page titles
  */
-export const APP_NAME = 'Claude Code UI';
+export const APP_NAME = 'Synapse Core';
 
 /**
  * Get page title for a route

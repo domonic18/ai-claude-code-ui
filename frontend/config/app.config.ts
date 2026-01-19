@@ -9,7 +9,7 @@
  * Application metadata
  */
 export const APP_CONFIG = {
-  name: 'Claude Code UI',
+  name: 'Synapse Core',
   version: import.meta.env.VITE_APP_VERSION || '1.13.6',
   description: 'Multi-user Web Interface for Claude Code CLI, Cursor CLI and OpenAI Codex',
   repository: 'https://github.com/anthropics/claude-code-ui',
