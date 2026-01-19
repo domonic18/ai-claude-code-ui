@@ -12,24 +12,16 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
-import { Settings, LogOut, User, Languages, ChevronUp, Info, Shield } from 'lucide-react';
+import { Settings, LogOut, Languages, ChevronUp, Shield } from 'lucide-react';
 import { LanguageSwitcher } from '@/shared/components/common/LanguageSwitcher';
 import { useAuth } from '@/shared/contexts/AuthContext';
 
 export interface UserMenuProps {
   onShowSettings?: () => void;
-  updateAvailable?: boolean;
-  latestVersion?: string;
-  currentVersion?: string;
-  onShowVersionModal?: () => void;
 }
 
 export const UserMenu = ({
   onShowSettings,
-  updateAvailable = false,
-  latestVersion,
-  currentVersion,
-  onShowVersionModal
 }: UserMenuProps) => {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
@@ -61,11 +53,6 @@ export const UserMenu = ({
 
   const handleSettings = () => {
     onShowSettings?.();
-    setIsOpen(false);
-  };
-
-  const handleVersionClick = () => {
-    onShowVersionModal?.();
     setIsOpen(false);
   };
 
@@ -121,26 +108,6 @@ export const UserMenu = ({
                 <LanguageSwitcher variant="text" />
               </div>
             </div>
-
-            {/* 版本信息 */}
-            {(updateAvailable || latestVersion) && (
-              <button
-                onClick={handleVersionClick}
-                className="w-full px-4 py-2 flex items-center gap-3 hover:bg-accent/50 transition-colors"
-              >
-                <Info className="w-4 h-4 text-muted-foreground" />
-                <div className="flex-1 text-left">
-                  <p className="text-sm text-foreground">
-                    {updateAvailable ? t('sidebar.newVersion') : t('common.version')}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {updateAvailable && latestVersion
-                      ? `${latestVersion} ${t('sidebar.available')}`
-                      : currentVersion || t('common.currentVersion')}
-                  </p>
-                </div>
-              </button>
-            )}
 
             {/* 设置 */}
             {onShowSettings && (
