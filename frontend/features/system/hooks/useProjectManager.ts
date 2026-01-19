@@ -100,6 +100,7 @@ export function useProjectManager(
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+  const [newSessionCounter, setNewSessionCounter] = useState(0);
 
   // Refs to track latest state for stable callbacks and preventing stale closures
   const selectedProjectRef = useRef<Project | null>(null);
@@ -351,6 +352,8 @@ export function useProjectManager(
     if (project) {
       setSelectedProject(project);
       setSelectedSession(null);
+      // Increment counter to force state reset in ChatInterface
+      setNewSessionCounter(prev => prev + 1);
       // Clear localStorage since we're starting a new session
       localStorage.removeItem('lastSessionId');
       localStorage.removeItem('lastProjectName');
@@ -571,6 +574,7 @@ export function useProjectManager(
     selectedProject,
     selectedSession,
     isLoadingProjects,
+    newSessionCounter,
     fetchProjects,
     handleProjectSelect,
     handleSessionSelect,
