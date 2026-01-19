@@ -194,6 +194,9 @@
     "projectName": "Project name",
     "addToFavorites": "Add to favorites",
     "removeFromFavorites": "Remove from favorites",
-    "youHave": "you have"
+    "youHave": "you have",
+    "noConversations": "No conversations yet",
+    "startANewConversation": "Start chatting with AI",
+    "refreshConversations": "Refresh conversations"
   }
 }

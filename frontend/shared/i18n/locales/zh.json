@@ -194,6 +194,9 @@
     "projectName": "项目名称",
     "addToFavorites": "添加到收藏",
     "removeFromFavorites": "从收藏移除",
-    "youHave": "当前版本"
+    "youHave": "当前版本",
+    "noConversations": "暂无会话",
+    "startANewConversation": "开始与 AI 对话",
+    "refreshConversations": "刷新会话列表"
   }
 }
