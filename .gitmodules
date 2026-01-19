@@ -1,0 +1,3 @@
+[submodule "extensions"]
+	path = extensions
+	url = https://github.com/fangfang023/claude-agent-orchestrator.git
