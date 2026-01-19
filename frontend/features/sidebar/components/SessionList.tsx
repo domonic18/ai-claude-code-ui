@@ -123,6 +123,35 @@ export const SessionList = memo(function SessionList({
 
   return (
     <div className="space-y-1">
+      {/* New Session Button - Mobile */}
+      {onNewSession && (
+        <div className="md:hidden px-3 pt-2 pb-1">
+          <button
+            onClick={onNewSession}
+            className="w-full h-8 bg-primary hover:bg-primary/90 text-primary-foreground rounded-md flex items-center justify-center gap-2 font-medium text-xs active:scale-[0.98] transition-all duration-150"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
+              <path d="M5 12h14"></path>
+              <path d="M12 5v14"></path>
+            </svg>
+            {t('sidebar.newSession')}
+          </button>
+        </div>
+      )}
+
+      {/* New Session Button - Desktop */}
+      {onNewSession && (
+        <Button
+          variant="default"
+          size="sm"
+          className="hidden md:flex w-full justify-start gap-2 mb-1 h-8 text-xs font-medium bg-primary hover:bg-primary/90 text-primary-foreground transition-colors"
+          onClick={onNewSession}
+        >
+          <Plus className="w-3 h-3" />
+          {t('sidebar.newSession')}
+        </Button>
+      )}
+
       {allSessions.map((session) => {
         const isSelected = selectedSessionId === session.id;
         const isActive = currentTime.getTime() - new Date(session.lastActivity).getTime() < 10 * 60 * 1000;
@@ -173,35 +202,6 @@ export const SessionList = memo(function SessionList({
               {t('sidebar.showMoreSessions')}
             </>
           )}
-        </Button>
-      )}
-
-      {/* New Session Button - Mobile */}
-      {onNewSession && (
-        <div className="md:hidden px-3 pb-2">
-          <button
-            onClick={onNewSession}
-            className="w-full h-8 bg-primary hover:bg-primary/90 text-primary-foreground rounded-md flex items-center justify-center gap-2 font-medium text-xs active:scale-[0.98] transition-all duration-150"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
-              <path d="M5 12h14"></path>
-              <path d="M12 5v14"></path>
-            </svg>
-            {t('sidebar.newSession')}
-          </button>
-        </div>
-      )}
-
-      {/* New Session Button - Desktop */}
-      {onNewSession && (
-        <Button
-          variant="default"
-          size="sm"
-          className="hidden md:flex w-full justify-start gap-2 mt-1 h-8 text-xs font-medium bg-primary hover:bg-primary/90 text-primary-foreground transition-colors"
-          onClick={onNewSession}
-        >
-          <Plus className="w-3 h-3" />
-          {t('sidebar.newSession')}
         </Button>
       )}
     </div>
