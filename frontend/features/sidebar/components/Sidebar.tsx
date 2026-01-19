@@ -352,10 +352,6 @@ export const Sidebar = memo(function Sidebar({
         <div className="p-2 border-t border-border flex-shrink-0">
           <UserMenu
             onShowSettings={onShowSettings}
-            updateAvailable={updateAvailable ?? false}
-            latestVersion={latestVersion}
-            currentVersion={currentVersion}
-            onShowVersionModal={onShowVersionModal}
           />
         </div>
       </div>
