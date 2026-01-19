@@ -51,7 +51,7 @@ export const SidebarHeader = memo(function SidebarHeader({
           </div>
           <div>
             <h1 className="text-lg font-bold text-foreground">{APP_NAME}</h1>
-            <p className="text-sm text-muted-foreground">AI coding assistant interface</p>
+            <p className="text-sm text-muted-foreground">{t('app.tagline')}</p>
           </div>
         </a>
       ) : (
@@ -61,7 +61,7 @@ export const SidebarHeader = memo(function SidebarHeader({
           </div>
           <div>
             <h1 className="text-lg font-bold text-foreground">{APP_NAME}</h1>
-            <p className="text-sm text-muted-foreground">AI coding assistant interface</p>
+            <p className="text-sm text-muted-foreground">{t('app.tagline')}</p>
           </div>
         </div>
       )}
@@ -114,7 +114,7 @@ export const SidebarHeader = memo(function SidebarHeader({
             </div>
             <div>
               <h1 className="text-lg font-semibold text-foreground">{APP_NAME}</h1>
-              <p className="text-sm text-muted-foreground">Conversations</p>
+              <p className="text-sm text-muted-foreground">{t('app.conversations')}</p>
             </div>
           </a>
         ) : (
@@ -124,7 +124,7 @@ export const SidebarHeader = memo(function SidebarHeader({
             </div>
             <div>
               <h1 className="text-lg font-semibold text-foreground">{APP_NAME}</h1>
-              <p className="text-sm text-muted-foreground">Conversations</p>
+              <p className="text-sm text-muted-foreground">{t('app.conversations')}</p>
             </div>
           </div>
         )}
