@@ -17,6 +17,10 @@
     "version": "Version",
     "currentVersion": "Current version"
   },
+  "app": {
+    "tagline": "AI Agent Platform Empowering Enterprises",
+    "conversations": "Conversations"
+  },
   "homepage": {
     "title": "Synapse Core",
     "subtitle": "AI Agent Platform Empowering Enterprises",

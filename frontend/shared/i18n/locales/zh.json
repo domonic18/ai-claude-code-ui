@@ -17,14 +17,18 @@
     "version": "版本",
     "currentVersion": "当前版本"
   },
+  "app": {
+    "tagline": "提供 WebUI 的智能体为企业赋能",
+    "conversations": "会话列表"
+  },
   "homepage": {
     "title": "企业大脑",
-    "subtitle": "AI 编码的多用户 Web 界面",
-    "description": "一个强大的基于 Web 的 Claude Code CLI、Cursor CLI 和 OpenAI Codex 界面。与您的团队协作，利用 AI 驱动的代码辅助功能。",
+    "subtitle": "提供 WebUI 的智能体为企业赋能",
+    "description": "一个集成 WebUI 的智能体平台，通过 AI 驱动的解决方案为企业赋能，简化工作流程并提升生产力。",
     "features": {
-      "title": "核心功能",
+      "title": "核心能力",
       "chat": {
-        "title": "实时聊天",
+        "title": "实时对话",
         "description": "交互式 AI 聊天界面，支持流式响应"
       },
       "collaboration": {
@@ -50,7 +54,7 @@
     },
     "cta": {
       "title": "准备开始了吗？",
-      "description": "加入成千上万使用 AI 编写更好代码的开发者。立即注册，体验编程的未来。",
+      "description": "通过 AI 驱动的解决方案为您的企业赋能。立即注册，改变您的工作方式。",
       "login": "开始使用",
       "getStarted": "立即开始"
     },
