@@ -201,24 +201,6 @@ frontend/
 │   │   │       └── index.ts
 │   │   │
 │   │   │
-│   │   ├── tasks/                   # 任务功能模块
-│   │   │   ├── components/
-│   │   │   │   ├── TaskList.tsx
-│   │   │   │   ├── TaskItem.tsx
-│   │   │   │   ├── TaskFilters.tsx
-│   │   │   │   ├── TaskCreator.tsx
-│   │   │   │   └── index.ts
-│   │   │   ├── hooks/
-│   │   │   │   ├── useTasks.ts
-│   │   │   │   ├── useTaskFilters.ts
-│   │   │   │   └── index.ts
-│   │   │   ├── services/
-│   │   │   │   └── index.ts
-│   │   │   ├── types/
-│   │   │   │   └── index.ts
-│   │   │   └── constants/
-│   │   │       └── index.ts
-│   │   │
 │   │   ├── file-explorer/           # 文件浏览器模块
 │   │   │   ├── components/
 │   │   │   │   ├── FileExplorer.tsx
