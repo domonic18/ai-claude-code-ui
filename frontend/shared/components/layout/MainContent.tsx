@@ -21,6 +21,7 @@ import { StandaloneShell } from '@/features/terminal';
 import ErrorBoundary from '@/shared/components/common/ErrorBoundary';
 import { ClaudeLogo, CursorLogo } from '@/shared/assets/icons';
 import Tooltip from '@/shared/components/ui/Tooltip';
+import { APP_NAME } from '@/shared/constants/app.constants';
 import type { Project as SidebarProject } from '@/features/sidebar/types/sidebar.types';
 
 // Types
@@ -217,7 +218,7 @@ function MainContent({
                 }}
               />
             </div>
-            <h2 className="text-xl font-semibold mb-2">Loading Claude Code UI</h2>
+            <h2 className="text-xl font-semibold mb-2">Loading {APP_NAME}</h2>
             <p>Setting up your workspace...</p>
           </div>
         </div>

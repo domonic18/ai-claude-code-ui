@@ -18,6 +18,7 @@ import { MessageSquare, RefreshCw, Plus } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import type { SidebarHeaderProps } from '../types/sidebar.types';
 import { IS_PLATFORM, PLATFORM_DASHBOARD_URL } from '../constants/sidebar.constants';
+import { APP_NAME } from '@/shared/constants/app.constants';
 
 /**
  * SidebarHeader Component
@@ -49,7 +50,7 @@ export const SidebarHeader = memo(function SidebarHeader({
             <MessageSquare className="w-4 h-4 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-foreground">Claude Code UI</h1>
+            <h1 className="text-lg font-bold text-foreground">{APP_NAME}</h1>
             <p className="text-sm text-muted-foreground">AI coding assistant interface</p>
           </div>
         </a>
@@ -59,7 +60,7 @@ export const SidebarHeader = memo(function SidebarHeader({
             <MessageSquare className="w-4 h-4 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-foreground">Claude Code UI</h1>
+            <h1 className="text-lg font-bold text-foreground">{APP_NAME}</h1>
             <p className="text-sm text-muted-foreground">AI coding assistant interface</p>
           </div>
         </div>
@@ -112,7 +113,7 @@ export const SidebarHeader = memo(function SidebarHeader({
               <MessageSquare className="w-4 h-4 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-foreground">Claude Code UI</h1>
+              <h1 className="text-lg font-semibold text-foreground">{APP_NAME}</h1>
               <p className="text-sm text-muted-foreground">Conversations</p>
             </div>
           </a>
@@ -122,7 +123,7 @@ export const SidebarHeader = memo(function SidebarHeader({
               <MessageSquare className="w-4 h-4 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-foreground">Claude Code UI</h1>
+              <h1 className="text-lg font-semibold text-foreground">{APP_NAME}</h1>
               <p className="text-sm text-muted-foreground">Conversations</p>
             </div>
           </div>
