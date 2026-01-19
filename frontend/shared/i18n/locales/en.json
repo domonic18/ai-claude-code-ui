@@ -19,10 +19,10 @@
   },
   "homepage": {
     "title": "Synapse Core",
-    "subtitle": "Multi-user Web Interface for AI Coding",
-    "description": "A powerful web-based interface for Claude Code CLI, Cursor CLI, and OpenAI Codex. Collaborate with your team and leverage AI-powered code assistance.",
+    "subtitle": "AI Agent Platform Empowering Enterprises",
+    "description": "An intelligent agent platform with WebUI that empowers enterprises with AI-driven solutions, streamlining workflows and boosting productivity.",
     "features": {
-      "title": "Key Features",
+      "title": "Core Capabilities",
       "chat": {
         "title": "Real-time Chat",
         "description": "Interactive AI chat interface with streaming responses"
@@ -50,7 +50,7 @@
     },
     "cta": {
       "title": "Ready to Get Started?",
-      "description": "Join thousands of developers using AI to write better code faster. Sign up now and experience the future of programming.",
+      "description": "Empower your enterprise with AI-driven solutions. Sign up now and transform the way you work.",
       "login": "Get Started",
       "getStarted": "Get Started Now"
     },
