@@ -73,8 +73,6 @@ interface ChatInterfaceProps {
   processingSessions?: Set<string>;
   /** Callback to replace temporary session ID */
   onReplaceTemporarySession?: (tempId: string, realSessionId: string) => void;
-  /** Callback to navigate to session */
-  onNavigateToSession?: (sessionId: string) => void;
   /** Callback to show settings */
   onShowSettings?: () => void;
   /** Auto-expand tools by default */
@@ -117,7 +115,6 @@ export function ChatInterface({
   onSessionNotProcessing,
   processingSessions,
   onReplaceTemporarySession,
-  onNavigateToSession,
   onShowSettings,
   autoExpandTools = false,
   showRawParameters = false,
@@ -269,21 +266,31 @@ export function ChatInterface({
     onSetMessages: setMessages,
   });
 
-  // Sync session ID when session changes
+  // Track previous session ID to detect actual session changes
+  const prevSelectedSessionIdRef = useRef<string | undefined>(selectedSession?.id);
+  
+  // Sync session ID when selected session changes (not when WebSocket updates currentSessionId)
   useEffect(() => {
-    if (selectedSession?.id) {
+    const prevId = prevSelectedSessionIdRef.current;
+    const newId = selectedSession?.id;
+    
+    // Update ref
+    prevSelectedSessionIdRef.current = newId;
+    
+    if (newId) {
       // Session selected - update current session ID
-      if (currentSessionId !== selectedSession.id) {
-        setCurrentSessionId(selectedSession.id);
+      if (currentSessionId !== newId) {
+        setCurrentSessionId(newId);
       }
-    } else {
-      // No session selected (new session) - clear current session ID and messages
-      if (currentSessionId !== null) {
-        setCurrentSessionId(null);
-        setMessages([]);
-      }
+    } else if (prevId !== undefined && newId === undefined) {
+      // Only clear when selectedSession actually changes FROM a session TO null
+      // (e.g., clicking "New Session" button), not when WebSocket updates currentSessionId
+      console.log('[ChatInterface] Session cleared, resetting messages');
+      setCurrentSessionId(null);
+      setMessages([]);
     }
-  }, [selectedSession?.id, currentSessionId, setMessages]);
+    // Note: Don't clear when both prevId and newId are undefined (staying in new session mode)
+  }, [selectedSession?.id, setMessages]); // Remove currentSessionId from deps to avoid clearing loop
 
   // Update provider from session
   useEffect(() => {
@@ -307,7 +314,6 @@ export function ChatInterface({
       onSetLoading: setIsLoading,
       onSetSessionId: setCurrentSessionId,
       onReplaceTemporarySession: onReplaceTemporarySession,
-      onNavigateToSession: onNavigateToSession,
       onSessionActive: onSessionActive,
       onSessionInactive: onSessionInactive,
       onSessionProcessing: onSessionProcessing,
