@@ -49,6 +49,8 @@ interface ChatInterfaceProps {
     id: string;
     __provider?: string;
   };
+  /** New session counter - increments when user clicks "New Session" */
+  newSessionCounter?: number;
   /** WebSocket connection */
   ws?: WebSocket | null;
   /** Send message via WebSocket */
@@ -103,6 +105,7 @@ interface ChatInterfaceProps {
 export function ChatInterface({
   selectedProject,
   selectedSession,
+  newSessionCounter = 0,
   ws,
   sendMessage,
   wsMessages: rawWsMessages,
@@ -129,6 +132,9 @@ export function ChatInterface({
   // Use stable reference for wsMessages to prevent unnecessary effect triggers
   const wsMessages = useMemo(() => rawWsMessages ?? EMPTY_WS_MESSAGES, [rawWsMessages]);
   const { t } = useTranslation();
+
+  // Track previous new session counter to detect when user clicks "New Session"
+  const prevNewSessionCounterRef = useRef(0);
 
   // State
   const [input, setInput] = useState('');
@@ -299,6 +305,17 @@ export function ChatInterface({
       localStorage.setItem('selected-provider', selectedSession.__provider);
     }
   }, [selectedSession]);
+
+  // Force state reset when new session counter changes (user clicked "New Session")
+  useEffect(() => {
+    if (newSessionCounter > prevNewSessionCounterRef.current) {
+      console.log('[ChatInterface] New session counter changed, forcing state reset');
+      prevNewSessionCounterRef.current = newSessionCounter;
+      setCurrentSessionId(null);
+      setMessages([]);
+      setInput('');
+    }
+  }, [newSessionCounter, setMessages]);
 
   // Handle WebSocket messages
   useEffect(() => {
