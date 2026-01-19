@@ -72,11 +72,4 @@ export interface ChatPageProps {
   autoScrollToBottom?: boolean;
   sendByCtrlEnter?: boolean;
   externalMessageUpdate?: number;
-
-  // Version info
-  updateAvailable?: boolean;
-  latestVersion?: string;
-  currentVersion?: string;
-  releaseInfo?: any;
-  onShowVersionModal?: () => void;
 }
