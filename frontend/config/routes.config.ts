@@ -57,12 +57,6 @@ export const ROUTES = {
   ADMIN_EXTENSIONS: '/admin/extensions',
 
   /**
-   * TaskMaster routes
-   */
-  TASKS: '/tasks',
-  TASK: (id: string) => `/tasks/${id}`,
-
-  /**
    * File routes
    */
   FILES: '/files',
@@ -87,7 +81,7 @@ export const ROUTES = {
 /**
  * Route titles for document title and breadcrumbs
  */
-export const ROUTE_TITLES: Record<keyof Omit<typeof ROUTES, 'PROJECT' | 'PROJECT_SESSIONS' | 'PROJECT_SESSION' | 'SESSION' | 'TASK' | 'FILE' | 'LEGACY'>, string> = {
+export const ROUTE_TITLES: Record<keyof Omit<typeof ROUTES, 'PROJECT' | 'PROJECT_SESSIONS' | 'PROJECT_SESSION' | 'SESSION' | 'FILE' | 'LEGACY'>, string> = {
   HOME: 'Home',
   APP: 'App',
   CHAT: 'Chat',
@@ -101,7 +95,6 @@ export const ROUTE_TITLES: Record<keyof Omit<typeof ROUTES, 'PROJECT' | 'PROJECT
   SETTINGS_PROFILE: 'Profile',
   ADMIN: 'Admin',
   ADMIN_EXTENSIONS: 'Extension Management',
-  TASKS: 'Tasks',
   FILES: 'Files',
   NOT_FOUND: 'Page Not Found',
   ERROR: 'Error',
@@ -198,11 +191,6 @@ export const ROUTE_META: Record<string, RouteMeta> = {
     requiresAuth: true,
     hideFromNav: true,
   },
-  [ROUTES.TASKS]: {
-    title: 'Tasks',
-    description: 'TaskMaster AI task management',
-    requiresAuth: true,
-  },
   [ROUTES.FILES]: {
     title: 'Files',
     description: 'File explorer',
@@ -242,7 +230,6 @@ export const NAV_ROUTES = [
   { path: ROUTES.CHAT, label: 'Chat', icon: 'MessageSquare' },
   { path: ROUTES.SESSIONS, label: 'Sessions', icon: 'History' },
   { path: ROUTES.PROJECTS, label: 'Projects', icon: 'Folder' },
-  { path: ROUTES.TASKS, label: 'Tasks', icon: 'CheckSquare' },
   { path: ROUTES.SETTINGS, label: 'Settings', icon: 'Settings' },
 ] as const;
 

@@ -103,7 +103,6 @@ export const ENV_CONFIG = {
    * Feature flags from environment
    */
   FEATURES: {
-    ENABLE_TASKMASTER: getEnvBool('VITE_ENABLE_TASKMASTER', true),
     ENABLE_PRD_EDITOR: getEnvBool('VITE_ENABLE_PRD_EDITOR', true),
     ENABLE_FILE_EXPLORER: getEnvBool('VITE_ENABLE_FILE_EXPLORER', true),
     ENABLE_TERMINAL: getEnvBool('VITE_ENABLE_TERMINAL', true),

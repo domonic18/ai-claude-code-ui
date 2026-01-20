@@ -111,7 +111,6 @@ export function handleWebSocketMessage(
   // Filter messages by session ID to prevent cross-session interference
   const globalMessageTypes = [
     'projects_updated',
-    'taskmaster-project-updated',
     'session-created',
     'claude-complete',
     'codex-complete'

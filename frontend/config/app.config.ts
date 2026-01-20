@@ -22,7 +22,6 @@ export const APP_CONFIG = {
  */
 export const FEATURE_FLAGS = {
   // Enable/disable features based on environment or user settings
-  enableTaskMaster: true,
   enablePRDEditor: false, // DEPRECATED: PRDEditor functionality is being removed
   enableFileExplorer: true,
   enableTerminal: true,
@@ -69,17 +68,6 @@ export const UI_DEFAULTS = {
   showThinking: false,
   autoScrollToBottom: true,
   sendByCtrlEnter: false,
-} as const;
-
-/**
- * TaskMaster defaults
- */
-export const TASKMASTER_DEFAULTS = {
-  maxTasksPerProject: 100,
-  defaultViewMode: 'kanban',
-  defaultSortBy: 'id',
-  defaultSortOrder: 'asc',
-  autoRefreshInterval: 30000, // 30 seconds
 } as const;
 
 /**
@@ -132,9 +120,6 @@ export const STORAGE_KEYS = {
 
   // User data
   USER_SETTINGS: 'claude-code-ui.userSettings',
-
-  // TaskMaster
-  TASKMASTER_VIEW_MODE: 'claude-code-ui.taskmaster.viewMode',
 } as const;
 
 /**
