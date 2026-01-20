@@ -33,7 +33,15 @@ export function runMigrations() {
             { column: 'has_completed_onboarding', sql: 'ALTER TABLE users ADD COLUMN has_completed_onboarding BOOLEAN DEFAULT 0' },
             { column: 'container_tier', sql: 'ALTER TABLE users ADD COLUMN container_tier TEXT DEFAULT \'free\'' },
             { column: 'container_config', sql: 'ALTER TABLE users ADD COLUMN container_config TEXT' },
-            { column: 'resource_quota', sql: 'ALTER TABLE users ADD COLUMN resource_quota TEXT' }
+            { column: 'resource_quota', sql: 'ALTER TABLE users ADD COLUMN resource_quota TEXT' },
+            // SSO 相关字段
+            { column: 'identity_provider', sql: 'ALTER TABLE users ADD COLUMN identity_provider TEXT DEFAULT \'local\'' },
+            { column: 'external_id', sql: 'ALTER TABLE users ADD COLUMN external_id TEXT' },
+            { column: 'sso_enabled', sql: 'ALTER TABLE users ADD COLUMN sso_enabled BOOLEAN DEFAULT 0' },
+            // SSO 用户显示名称字段
+            { column: 'display_name', sql: 'ALTER TABLE users ADD COLUMN display_name TEXT' },
+            { column: 'first_name', sql: 'ALTER TABLE users ADD COLUMN first_name TEXT' },
+            { column: 'last_name', sql: 'ALTER TABLE users ADD COLUMN last_name TEXT' }
         ];
 
         for (const migration of userMigrations) {
@@ -42,6 +50,9 @@ export function runMigrations() {
                 database.exec(migration.sql);
             }
         }
+
+        // 创建 SSO 相关索引
+        runSSOIndexMigrations(database);
 
         // 创建容器相关表
         runContainerMigrations(database);
@@ -53,6 +64,27 @@ export function runMigrations() {
     } catch (error) {
         console.error('运行迁移错误:', error.message);
         throw error;
+    }
+}
+
+/**
+ * 运行 SSO 相关索引的迁移
+ * @param {Database} database - 数据库实例
+ */
+function runSSOIndexMigrations(database) {
+    const indexes = database.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_users_%'").all();
+    const indexNames = indexes.map(idx => idx.name);
+
+    const ssoIndexes = [
+        { name: 'idx_users_external_id', sql: 'CREATE INDEX IF NOT EXISTS idx_users_external_id ON users(external_id)' },
+        { name: 'idx_users_identity_provider', sql: 'CREATE INDEX IF NOT EXISTS idx_users_identity_provider ON users(identity_provider)' }
+    ];
+
+    for (const index of ssoIndexes) {
+        if (!indexNames.includes(index.name)) {
+            console.log(`运行迁移: 创建索引 ${index.name}`);
+            database.exec(index.sql);
+        }
     }
 }
 

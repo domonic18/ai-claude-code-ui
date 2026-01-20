@@ -11,12 +11,18 @@ CREATE TABLE IF NOT EXISTS users (
     is_active BOOLEAN DEFAULT 1,
     git_name TEXT,
     git_email TEXT,
-    has_completed_onboarding BOOLEAN DEFAULT 0
+    has_completed_onboarding BOOLEAN DEFAULT 0,
+    -- SSO fields
+    identity_provider TEXT DEFAULT 'local',
+    external_id TEXT,
+    sso_enabled BOOLEAN DEFAULT 0
 );
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active);
+CREATE INDEX IF NOT EXISTS idx_users_external_id ON users(external_id);
+CREATE INDEX IF NOT EXISTS idx_users_identity_provider ON users(identity_provider);
 
 -- API Keys table for external API access
 CREATE TABLE IF NOT EXISTS api_keys (

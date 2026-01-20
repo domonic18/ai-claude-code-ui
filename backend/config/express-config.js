@@ -12,10 +12,10 @@ import path from 'path';
 import mime from 'mime-types';
 import fs from 'fs';
 import cookieParser from 'cookie-parser';
-import { FILES, SERVER } from './config.js';
+import { FILES, SERVER, CORS } from './config.js';
 
 // 路由导入 - 新结构（按功能分组）
-import { auth, settings, users } from '../routes/core/index.js';
+import { auth, settings, users, saml } from '../routes/core/index.js';
 import { projects, sessions, files, git, userSettings, mcpServers, extensions } from '../routes/api/index.js';
 import { claude, cursor, codex, mcp, taskmaster, agent } from '../routes/integrations/index.js';
 import { commands, system, uploads } from '../routes/tools/index.js';
@@ -40,7 +40,7 @@ export function configureExpress(app, wss) {
 
     // CORS 中间件 - 必须支持 credentials 以允许 cookie 认证
     app.use(cors({
-        origin: ['http://localhost:5173', 'http://localhost:3001', 'http://192.168.8.106:5173'],
+        origin: CORS.origins,
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization']
@@ -78,6 +78,11 @@ export function configureExpress(app, wss) {
     });
 
     // ===== 公共路由（无需身份验证）=====
+    // SAML 路由（必须在 validateApiKey 之前定义）
+    // 统一使用 /api/auth/saml 前缀：/api/auth/saml/sso-login, /api/auth/saml/callback, /api/auth/saml/status, /api/auth/saml/metadata, /api/auth/saml/logout
+    console.log('[CONFIG] Registering SAML routes...');
+    app.use('/api/auth/saml', saml);
+    console.log('[CONFIG] SAML routes registered successfully');
     // 认证路由必须在 validateApiKey 之前定义
     app.use('/api/auth', auth);
 
@@ -174,6 +179,7 @@ export function configureExpress(app, wss) {
 
     // ===== 错误处理中间件 =====
     // 必须在所有路由之后注册
+
     // 404 处理
     app.use('/api', notFoundHandler);
 

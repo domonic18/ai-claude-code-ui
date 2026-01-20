@@ -164,5 +164,102 @@ export const User = {
         } catch {
             return null;
         }
+    },
+
+    /**
+     * 根据 external_id 获取用户（SSO 用户）
+     * @param {string} externalId - 外部身份提供者的用户 ID
+     * @returns {Object|undefined}
+     */
+    getByExternalId(externalId) {
+        const row = db().prepare(
+            'SELECT * FROM users WHERE external_id = ? AND is_active = 1'
+        ).get(externalId);
+        return row;
+    },
+
+    /**
+     * 通过 SSO 创建新用户
+     * @param {Object} userData - 用户数据
+     * @param {string} userData.username - 用户名（通常是邮箱）
+     * @param {string} userData.email - 邮箱
+     * @param {string} userData.identity_provider - 身份提供者（如 'saml'）
+     * @param {string} userData.external_id - 外部用户 ID
+     * @param {string} userData.first_name - 名（可选）
+     * @param {string} userData.last_name - 姓（可选）
+     * @param {string} userData.display_name - 显示名称（可选）
+     * @returns {{id: number, username: string}}
+     */
+    createWithSSO({
+        username,
+        email,
+        identity_provider = 'saml',
+        external_id,
+        first_name = '',
+        last_name = '',
+        display_name = username
+    }) {
+        const stmt = db().prepare(`
+            INSERT INTO users (
+                username,
+                password_hash,
+                identity_provider,
+                external_id,
+                sso_enabled,
+                has_completed_onboarding,
+                display_name,
+                first_name,
+                last_name
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+
+        const result = stmt.run(
+            username,
+            '', // SSO 用户不需要密码
+            identity_provider,
+            external_id,
+            1, // sso_enabled = true
+            0, // has_completed_onboarding = false
+            display_name,
+            first_name,
+            last_name
+        );
+
+        return {
+            id: result.lastInsertRowid,
+            username,
+            email,
+            identity_provider,
+            external_id,
+            display_name,
+            first_name,
+            last_name
+        };
+    },
+
+    /**
+     * 更新用户 SSO 状态
+     * @param {number} userId
+     * @param {boolean} ssoEnabled
+     */
+    updateSsoEnabled(userId, ssoEnabled) {
+        const stmt = db().prepare('UPDATE users SET sso_enabled = ? WHERE id = ?');
+        stmt.run(ssoEnabled ? 1 : 0, userId);
+    },
+
+    /**
+     * 根据身份提供者和外部 ID 获取用户
+     * @param {string} identityProvider - 身份提供者
+     * @param {string} externalId - 外部用户 ID
+     * @returns {Object|undefined}
+     */
+    getByIdentityProviderAndExternalId(identityProvider, externalId) {
+        const row = db().prepare(`
+            SELECT * FROM users
+            WHERE identity_provider = ?
+            AND external_id = ?
+            AND is_active = 1
+        `).get(identityProvider, externalId);
+        return row;
     }
 };

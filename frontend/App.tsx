@@ -185,73 +185,22 @@ function AppContent() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Fetch projects when user logs in
-  // 已在 useProjectManager 中处理，此处移除以避免双重请求
-  /*
-  useEffect(() => {
-    if (user) {
-      console.log('[App] User logged in, fetching projects...');
-      fetchProjects();
-    }
-  }, [user]);
-  */
-
   // Auto-refresh projects periodically
   useEffect(() => {
     if (!autoRefreshInterval || autoRefreshInterval <= 0) {
       return;
     }
 
-    console.log(`[App] Auto-refresh enabled: checking for new projects every ${autoRefreshInterval} seconds`);
-
     const intervalId = setInterval(() => {
       if (activeSessions.size === 0) {
-        console.log('[App] Auto-refreshing projects...');
         fetchProjects();
-      } else {
-        console.log('[App] Skipping auto-refresh: active session detected');
       }
     }, (autoRefreshInterval as number) * 1000);
 
     return () => {
       clearInterval(intervalId);
-      console.log('[App] Auto-refresh stopped');
     };
-  }, [autoRefreshInterval, activeSessions]);
-
-  // Helper function to determine if an update is purely additive
-  const isUpdateAdditive = (
-    currentProjects: Project[],
-    updatedProjects: Project[],
-    selectedProject: Project | null,
-    selectedSession: Session | null
-  ): boolean => {
-    if (!selectedProject || !selectedSession) {
-      return true;
-    }
-
-    const currentSelectedProject = currentProjects?.find(p => p.name === selectedProject.name);
-    const updatedSelectedProject = updatedProjects?.find(p => p.name === selectedProject.name);
-
-    if (!currentSelectedProject || !updatedSelectedProject) {
-      return false;
-    }
-
-    const currentSelectedSession = currentSelectedProject.sessions?.find(s => s.id === selectedSession.id) as Session | undefined;
-    const updatedSelectedSession = updatedSelectedProject.sessions?.find(s => s.id === selectedSession.id) as Session | undefined;
-
-    if (!currentSelectedSession || !updatedSelectedSession) {
-      return false;
-    }
-
-    const sessionUnchanged =
-      currentSelectedSession.id === updatedSelectedSession.id &&
-      currentSelectedSession.title === updatedSelectedSession.title &&
-      currentSelectedSession.created_at === updatedSelectedSession.created_at &&
-      currentSelectedSession.updated_at === updatedSelectedSession.updated_at;
-
-    return sessionUnchanged;
-  };
+  }, [autoRefreshInterval, activeSessions, fetchProjects]);
 
   // Handle WebSocket messages for real-time project updates
   useEffect(() => {
@@ -509,7 +458,46 @@ function AppContent() {
 
 // Root redirect component - handles the root path based on auth status
 function RootRedirect() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, checkAuthStatus } = useAuth();
+  const [hasCheckedSaml, setHasCheckedSaml] = React.useState(false);
+
+  // 检查是否是 SAML 登录成功后的重定向
+  const urlParams = new URLSearchParams(window.location.search);
+  const isSamlSuccess = urlParams.get('saml') === 'success';
+
+  // 如果是 SAML 登录成功，强制重新检查认证状态
+  React.useEffect(() => {
+    if (isSamlSuccess && !hasCheckedSaml) {
+      setHasCheckedSaml(true);
+      checkAuthStatus(true).then(() => {
+        // 检查完成后，移除 URL 参数并重定向到 chat
+        window.history.replaceState({}, '', '/chat');
+        window.location.href = '/chat';
+      });
+    }
+  }, [isSamlSuccess, hasCheckedSaml, checkAuthStatus]);
+
+  // 如果是 SAML 登录成功，显示加载界面
+  if (isSamlSuccess) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="flex justify-center mb-4">
+            <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center shadow-sm">
+              <MessageSquare className="w-8 h-8 text-primary-foreground" />
+            </div>
+          </div>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Claude Code UI</h1>
+          <div className="flex items-center justify-center space-x-2">
+            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+          </div>
+          <p className="text-muted-foreground mt-2">Logging in...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
