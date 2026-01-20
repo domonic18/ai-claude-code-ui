@@ -13,6 +13,7 @@ import { repositories, db } from '../../database/db.js';
 import { generateToken } from '../../middleware/auth.middleware.js';
 import containerManager from '../../services/container/core/index.js';
 import { NotFoundError, UnauthorizedError, ValidationError } from '../../middleware/error-handler.middleware.js';
+import { SESSION_TIMEOUTS } from '../../config/config.js';
 
 const { User } = repositories;
 
@@ -96,7 +97,7 @@ export class AuthController extends BaseController {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax', // 使用 lax 以支持开发环境的跨端口请求
-        maxAge: 365 * 24 * 60 * 60 * 1000, // 1年
+        maxAge: SESSION_TIMEOUTS.cookieMaxAge, // 使用配置的 Cookie 过期时间
         path: '/'
       });
 
@@ -167,7 +168,7 @@ export class AuthController extends BaseController {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax', // 使用 lax 以支持开发环境的跨端口请求
-        maxAge: 365 * 24 * 60 * 60 * 1000, // 1年
+        maxAge: SESSION_TIMEOUTS.cookieMaxAge, // 使用配置的 Cookie 过期时间
         path: '/'
       });
 
