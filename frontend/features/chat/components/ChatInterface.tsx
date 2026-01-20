@@ -314,48 +314,62 @@ export function ChatInterface({
       setCurrentSessionId(null);
       setMessages([]);
       setInput('');
+      // Reset processed message count
+      processedCountRef.current = 0;
     }
   }, [newSessionCounter, setMessages]);
+
+  // Track processed message count to handle all new messages
+  const processedCountRef = useRef(0);
 
   // Handle WebSocket messages
   useEffect(() => {
     if (wsMessages.length === 0) return;
 
-    const latestMessage = wsMessages[wsMessages.length - 1];
+    // Process all new messages since last render
+    const newMessages = wsMessages.slice(processedCountRef.current);
+    if (newMessages.length === 0) return;
 
-    // Handle the message using our WebSocket handler service
-    handleWebSocketMessage(latestMessage, {
-      onAddMessage: addMessage,
-      onUpdateMessage: updateMessage,
-      onSetMessages: setMessages,
-      onSetLoading: setIsLoading,
-      onSetSessionId: setCurrentSessionId,
-      onReplaceTemporarySession: onReplaceTemporarySession,
-      onSessionActive: onSessionActive,
-      onSessionInactive: onSessionInactive,
-      onSessionProcessing: onSessionProcessing,
-      onSessionNotProcessing: onSessionNotProcessing,
-      onSetTokenBudget: (budget) => {
-        setTokenBudget(budget);
-        onSetTokenBudget?.(budget);
-      },
-      onSetTasks: setTasks,
-      // Streaming callbacks
-      completeStream: () => {
-        completeStream();
-      },
-      resetStream: () => {
-        resetStream();
-      },
-      updateStreamContent: (content) => {
-        updateStreamContent(content);
-      },
-      updateStreamThinking: (thinking) => {
-        updateStreamThinking(thinking);
-      },
-      getCurrentSessionId: () => currentSessionId,
-      getSelectedProjectName: () => selectedProject?.name,
-    });
+    console.log('[ChatInterface] Processing', newMessages.length, 'new messages (total:', wsMessages.length, ')');
+
+    for (const message of newMessages) {
+      // Handle the message using our WebSocket handler service
+      handleWebSocketMessage(message, {
+        onAddMessage: addMessage,
+        onUpdateMessage: updateMessage,
+        onSetMessages: setMessages,
+        onSetLoading: setIsLoading,
+        onSetSessionId: setCurrentSessionId,
+        onReplaceTemporarySession: onReplaceTemporarySession,
+        onSessionActive: onSessionActive,
+        onSessionInactive: onSessionInactive,
+        onSessionProcessing: onSessionProcessing,
+        onSessionNotProcessing: onSessionNotProcessing,
+        onSetTokenBudget: (budget) => {
+          setTokenBudget(budget);
+          onSetTokenBudget?.(budget);
+        },
+        onSetTasks: setTasks,
+        // Streaming callbacks
+        completeStream: () => {
+          completeStream();
+        },
+        resetStream: () => {
+          resetStream();
+        },
+        updateStreamContent: (content) => {
+          updateStreamContent(content);
+        },
+        updateStreamThinking: (thinking) => {
+          updateStreamThinking(thinking);
+        },
+        getCurrentSessionId: () => currentSessionId,
+        getSelectedProjectName: () => selectedProject?.name,
+      });
+    }
+
+    // Update processed count
+    processedCountRef.current = wsMessages.length;
   }, [wsMessages, currentSessionId, addMessage, updateMessage, completeStream, resetStream, updateStreamContent, updateStreamThinking]);
 
   /**

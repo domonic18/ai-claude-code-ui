@@ -14,6 +14,17 @@
 
 import type { ChatMessage } from '../types';
 
+// Message ID counter to ensure unique IDs
+let messageIdCounter = 0;
+
+/**
+ * Generate a unique message ID
+ * Uses a counter to avoid collisions when multiple messages arrive in the same millisecond
+ */
+function generateMessageId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${++messageIdCounter}`;
+}
+
 export interface WebSocketMessage {
   type: string;
   sessionId?: string;
@@ -261,8 +272,17 @@ function handleTodoWrite(message: WebSocketMessage, callbacks: MessageHandlerCal
  */
 function handleClaudeResponse(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
   const messageData = message.data?.message || message.data;
-  
-  console.log('[WS] handleClaudeResponse - data type:', message.data?.type, 'messageData type:', messageData?.type);
+
+  // More detailed logging for debugging
+  const sdkType = message.data?.type;
+  const dataType = messageData?.type;
+  const dataRole = messageData?.role;
+  console.log('[WS] handleClaudeResponse -', {
+    sdkType,
+    dataType,
+    dataRole,
+    hasContent: Array.isArray(messageData?.content)
+  });
 
   if (messageData && typeof messageData === 'object') {
     // Handle Cursor streaming format (content_block_delta / content_block_stop)
@@ -285,7 +305,9 @@ function handleClaudeResponse(message: WebSocketMessage, callbacks: MessageHandl
       (messageData.type === 'message' && messageData.role === 'assistant');
 
     if (isAssistantMessage && Array.isArray(messageData.content)) {
-      // Extract text from content blocks
+      let hasProcessedContent = false;
+
+      // Extract and process text blocks
       const textBlocks = messageData.content
         .filter((block: any) => block?.type === 'text' && block?.text)
         .map((block: any) => decodeHtmlEntities(block.text));
@@ -296,12 +318,31 @@ function handleClaudeResponse(message: WebSocketMessage, callbacks: MessageHandl
 
         // Also add as message for permanence
         callbacks.onAddMessage({
-          id: `assistant-${Date.now()}`,
+          id: generateMessageId('assistant'),
           type: 'assistant',
           content: fullText,
           timestamp: Date.now(),
           isStreaming: true
         });
+        hasProcessedContent = true;
+      }
+
+      // Extract and process tool_use blocks
+      const toolUseBlocks = messageData.content.filter((block: any) => block?.type === 'tool_use');
+      for (const toolBlock of toolUseBlocks) {
+        callbacks.onAddMessage({
+          id: generateMessageId('tool'),
+          type: 'assistant',
+          content: '',
+          timestamp: Date.now(),
+          isToolUse: true,
+          toolName: toolBlock.name,
+          toolInput: toolBlock.input ? JSON.stringify(toolBlock.input, null, 2) : undefined
+        });
+        hasProcessedContent = true;
+      }
+
+      if (hasProcessedContent) {
         return true;
       }
     }
@@ -310,6 +351,13 @@ function handleClaudeResponse(message: WebSocketMessage, callbacks: MessageHandl
     if (messageData.type === 'thinking' && messageData.thinking) {
       callbacks.updateStreamThinking?.(messageData.thinking);
       return true;
+    }
+
+    // Handle user messages (tool_result) - these are already shown so skip them
+    // Note: user messages have structure {type: "user", message: {role: "user", content: [...]}}
+    if (sdkType === 'user' || dataRole === 'user') {
+      console.log('[WS] Skipping user message (tool result)');
+      return true; // Return true to indicate we handled it (by ignoring)
     }
   }
 
@@ -327,7 +375,7 @@ function handleClaudeOutput(message: WebSocketMessage, callbacks: MessageHandler
 
     // Also add to message list
     callbacks.onAddMessage({
-      id: `assistant-${Date.now()}`,
+      id: generateMessageId('assistant'),
       type: 'assistant',
       content: cleaned,
       timestamp: Date.now(),
@@ -342,7 +390,7 @@ function handleClaudeOutput(message: WebSocketMessage, callbacks: MessageHandler
  */
 function handleClaudeInteractivePrompt(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
   callbacks.onAddMessage({
-    id: `assistant-${Date.now()}`,
+    id: generateMessageId('assistant'),
     type: 'assistant',
     content: message.data,
     timestamp: Date.now(),
@@ -359,7 +407,7 @@ function handleClaudeError(message: WebSocketMessage, callbacks: MessageHandlerC
   callbacks.completeStream?.();
 
   callbacks.onAddMessage({
-    id: `error-${Date.now()}`,
+    id: generateMessageId('error'),
     type: 'error',
     content: `Error: ${message.error}`,
     timestamp: Date.now()
@@ -403,7 +451,7 @@ function handleCursorSystem(
  */
 function handleCursorToolUse(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
   callbacks.onAddMessage({
-    id: `tool-${Date.now()}`,
+    id: generateMessageId('tool'),
     type: 'assistant',
     content: `Using tool: ${message.tool} ${message.input ? `with ${message.input}` : ''}`,
     timestamp: Date.now(),
@@ -419,7 +467,7 @@ function handleCursorToolUse(message: WebSocketMessage, callbacks: MessageHandle
  */
 function handleCursorError(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
   callbacks.onAddMessage({
-    id: `error-${Date.now()}`,
+    id: generateMessageId('error'),
     type: 'error',
     content: `Cursor error: ${message.error || 'Unknown error'}`,
     timestamp: Date.now()
@@ -456,7 +504,7 @@ function handleCursorResult(
 
       if (textResult.trim()) {
         callbacks.onAddMessage({
-          id: `assistant-${Date.now()}`,
+          id: generateMessageId('assistant'),
           type: 'assistant',
           content: textResult,
           timestamp: Date.now()
@@ -477,7 +525,7 @@ function handleCursorOutput(message: WebSocketMessage, callbacks: MessageHandler
   const cleaned = String(message.data || '');
   if (cleaned.trim()) {
     callbacks.onAddMessage({
-      id: `assistant-${Date.now()}`,
+      id: generateMessageId('assistant'),
       type: 'assistant',
       content: cleaned,
       timestamp: Date.now(),
@@ -551,7 +599,7 @@ function handleCodexResponse(message: WebSocketMessage, callbacks: MessageHandle
         if (codexData.message?.content?.trim()) {
           const content = decodeHtmlEntities(codexData.message.content);
           callbacks.onAddMessage({
-            id: `assistant-${Date.now()}`,
+            id: generateMessageId('assistant'),
             type: 'assistant',
             content: content,
             timestamp: Date.now()
@@ -563,7 +611,7 @@ function handleCodexResponse(message: WebSocketMessage, callbacks: MessageHandle
         if (codexData.message?.content?.trim()) {
           const content = decodeHtmlEntities(codexData.message.content);
           callbacks.onAddMessage({
-            id: `assistant-${Date.now()}`,
+            id: generateMessageId('assistant'),
             type: 'assistant',
             content: content,
             timestamp: Date.now(),
@@ -575,7 +623,7 @@ function handleCodexResponse(message: WebSocketMessage, callbacks: MessageHandle
       case 'command_execution':
         if (codexData.command) {
           callbacks.onAddMessage({
-            id: `tool-${Date.now()}`,
+            id: generateMessageId('tool'),
             type: 'assistant',
             content: '',
             timestamp: Date.now(),
@@ -592,7 +640,7 @@ function handleCodexResponse(message: WebSocketMessage, callbacks: MessageHandle
         if (codexData.changes?.length > 0) {
           const changesList = codexData.changes.map((c: any) => `${c.kind}: ${c.path}`).join('\n');
           callbacks.onAddMessage({
-            id: `tool-${Date.now()}`,
+            id: generateMessageId('tool'),
             type: 'assistant',
             content: '',
             timestamp: Date.now(),
