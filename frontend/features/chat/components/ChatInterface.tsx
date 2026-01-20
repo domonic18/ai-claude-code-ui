@@ -34,6 +34,7 @@ import { getChatService } from '../services';
 import { handleWebSocketMessage } from '../services/websocketHandler';
 import type { ChatMessage, FileAttachment } from '../types';
 import { calculateDiff } from '../utils/diffUtils';
+import { STORAGE_KEYS } from '../constants';
 
 // Stable empty array reference to prevent unnecessary effect triggers
 const EMPTY_WS_MESSAGES: any[] = [];
@@ -279,14 +280,19 @@ export function ChatInterface({
   useEffect(() => {
     const prevId = prevSelectedSessionIdRef.current;
     const newId = selectedSession?.id;
-    
+
     // Update ref
     prevSelectedSessionIdRef.current = newId;
-    
+
     if (newId) {
       // Session selected - update current session ID
       if (currentSessionId !== newId) {
         setCurrentSessionId(newId);
+        // Clear draft when switching to a different session
+        if (selectedProject?.name) {
+          const draftKey = STORAGE_KEYS.DRAFT_INPUT(selectedProject.name);
+          localStorage.removeItem(draftKey);
+        }
       }
     } else if (prevId !== undefined && newId === undefined) {
       // Only clear when selectedSession actually changes FROM a session TO null
@@ -294,9 +300,14 @@ export function ChatInterface({
       console.log('[ChatInterface] Session cleared, resetting messages');
       setCurrentSessionId(null);
       setMessages([]);
+      // Clear draft when clearing session
+      if (selectedProject?.name) {
+        const draftKey = STORAGE_KEYS.DRAFT_INPUT(selectedProject.name);
+        localStorage.removeItem(draftKey);
+      }
     }
     // Note: Don't clear when both prevId and newId are undefined (staying in new session mode)
-  }, [selectedSession?.id, setMessages]); // Remove currentSessionId from deps to avoid clearing loop
+  }, [selectedSession?.id, setMessages, currentSessionId, selectedProject?.name]); // Add currentSessionId and selectedProject to deps
 
   // Update provider from session
   useEffect(() => {
@@ -384,6 +395,12 @@ export function ChatInterface({
     // Clear input and attachments
     setInput('');
     setAttachedFiles([]);
+
+    // Clear draft from localStorage to prevent it from being restored on refresh/session switch
+    if (selectedProject?.name) {
+      const draftKey = STORAGE_KEYS.DRAFT_INPUT(selectedProject.name);
+      localStorage.removeItem(draftKey);
+    }
 
     // Mark session as active
     if (currentSessionId) {
