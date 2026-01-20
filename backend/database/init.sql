@@ -13,11 +13,11 @@ CREATE TABLE IF NOT EXISTS users (
     git_name TEXT,
     git_email TEXT,
     has_completed_onboarding BOOLEAN DEFAULT 0,
-    CHECK (role IN ('admin', 'user', 'guest'))
     -- SSO fields
     identity_provider TEXT DEFAULT 'local',
     external_id TEXT,
-    sso_enabled BOOLEAN DEFAULT 0
+    sso_enabled BOOLEAN DEFAULT 0,
+    CHECK (role IN ('admin', 'user', 'guest'))
 );
 
 -- Indexes for performance
