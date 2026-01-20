@@ -5,6 +5,7 @@
  */
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 export type CategoryType = 'permissions' | 'mcp';
 
@@ -20,6 +21,7 @@ export const CategoryTabs: React.FC<CategoryTabsProps> = ({
   selectedCategory,
   onSelectCategory
 }) => {
+  const { t } = useTranslation();
   return (
     <div className="border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
       <div className="flex px-2 md:px-4 overflow-x-auto">
@@ -31,7 +33,7 @@ export const CategoryTabs: React.FC<CategoryTabsProps> = ({
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
-          Permissions
+          {t('settings.agents.permission')}
         </button>
         <button
           onClick={() => onSelectCategory('mcp')}
@@ -41,7 +43,7 @@ export const CategoryTabs: React.FC<CategoryTabsProps> = ({
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
-          MCP Servers
+          {t('settings.agents.mcpServers')}
         </button>
       </div>
     </div>

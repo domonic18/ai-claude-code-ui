@@ -46,7 +46,7 @@ function convertModelIdToBackend(modelId: string): string {
  * @returns Model selection state and handlers
  */
 export function useModelSelection(options: UseModelSelectionOptions = {}): UseModelSelectionResult {
-  const { initialModel = 'claude-sonnet-4' } = options;
+  const { initialModel = 'claude-custom' } = options;
 
   const [selectedModel, setSelectedModel] = useState(() => {
     if (typeof window !== 'undefined') {

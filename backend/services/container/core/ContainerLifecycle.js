@@ -12,11 +12,12 @@
 import path from 'path';
 import fs from 'fs';
 import { repositories } from '../../../database/db.js';
-import { getWorkspaceDir, CONTAINER } from '../../../config/config.js';
+import { getWorkspaceDir, CONTAINER, CONTAINER_TIMEOUTS } from '../../../config/config.js';
 import { ContainerConfigBuilder } from './ContainerConfig.js';
 import { ContainerHealthMonitor } from './ContainerHealth.js';
 import { ContainerStateMachine, ContainerState } from './ContainerStateMachine.js';
 import containerStateStore from './ContainerStateStore.js';
+import { syncExtensions } from '../../extensions/extension-sync.js';
 
 const { Container } = repositories;
 
@@ -86,7 +87,7 @@ export class ContainerLifecycleManager {
    * @param {number} timeout - 超时时间（毫秒）
    * @returns {Promise<ContainerStateMachine>}
    */
-  async _waitForReady(userId, timeout = 120000) {
+  async _waitForReady(userId, timeout = CONTAINER_TIMEOUTS.ready) {
     const stateMachine = await this._getStateMachine(userId);
 
     // 如果已经就绪，直接返回
@@ -261,7 +262,39 @@ export class ContainerLifecycleManager {
       await fs.promises.mkdir(userDataDir, { recursive: true });
       console.log(`[Lifecycle] Created user data directory: ${userDataDir}`);
 
-      // 2. 构建容器配置
+      // 2. 创建 .claude 目录并同步预置扩展
+      const claudeDir = path.join(userDataDir, '.claude');
+      await fs.promises.mkdir(claudeDir, { recursive: true });
+      console.log(`[Lifecycle] Created .claude directory: ${claudeDir}`);
+
+      // 2.1. 创建默认工作区 my-workspace
+      const myWorkspaceDir = path.join(userDataDir, 'my-workspace');
+      await fs.promises.mkdir(myWorkspaceDir, { recursive: true });
+      const readmePath = path.join(myWorkspaceDir, 'README.md');
+      await fs.promises.writeFile(readmePath, `# My Workspace
+
+Welcome to your Claude Code workspace! This is your default project where you can start coding.
+
+## Getting Started
+
+- Use the chat interface to ask Claude to help you with coding tasks
+- Use the file explorer to browse and edit files
+- Use the terminal to run commands
+
+Happy coding!
+`, 'utf8');
+      console.log(`[Lifecycle] Created default workspace: ${myWorkspaceDir}`);
+
+      // 同步预置扩展（agents, commands, skills）
+      try {
+        await syncExtensions(claudeDir, { overwriteUserFiles: true });
+        console.log(`[Lifecycle] Synced extensions for user ${userId}`);
+      } catch (syncError) {
+        // 扩展同步失败不应阻止容器创建，只记录错误
+        console.warn(`[Lifecycle] Failed to sync extensions for user ${userId}:`, syncError.message);
+      }
+
+      // 3. 构建容器配置
       const containerConfig = this.configBuilder.buildConfig({
         name: containerName,
         userDataDir,
@@ -352,7 +385,7 @@ export class ContainerLifecycleManager {
    * @param {number} timeout - 超时时间（毫秒）
    * @returns {Promise<void>}
    */
-  async _waitForContainerRemoved(containerName, timeout = 10000) {
+  async _waitForContainerRemoved(containerName, timeout = CONTAINER_TIMEOUTS.remove) {
     const start = Date.now();
 
     while (Date.now() - start < timeout) {
@@ -377,7 +410,7 @@ export class ContainerLifecycleManager {
    * @param {number} timeout - 超时时间（秒）
    * @returns {Promise<void>}
    */
-  async stopContainer(userId, timeout = 10) {
+  async stopContainer(userId, timeout = CONTAINER_TIMEOUTS.stop) {
     const containerInfo = this.containers.get(userId);
     if (!containerInfo) {
       return;

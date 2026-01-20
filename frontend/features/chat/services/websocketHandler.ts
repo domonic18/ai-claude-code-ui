@@ -14,6 +14,17 @@
 
 import type { ChatMessage } from '../types';
 
+// Message ID counter to ensure unique IDs
+let messageIdCounter = 0;
+
+/**
+ * Generate a unique message ID
+ * Uses a counter to avoid collisions when multiple messages arrive in the same millisecond
+ */
+function generateMessageId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${++messageIdCounter}`;
+}
+
 export interface WebSocketMessage {
   type: string;
   sessionId?: string;
@@ -34,7 +45,6 @@ export interface MessageHandlerCallbacks {
   onSetLoading: (loading: boolean) => void;
   onSetSessionId: (sessionId: string) => void;
   onReplaceTemporarySession?: (tempId: string, realId: string) => void;
-  onNavigateToSession?: (sessionId: string) => void;
 
   // Session lifecycle
   onSessionActive?: (sessionId: string) => void;
@@ -112,7 +122,6 @@ export function handleWebSocketMessage(
   // Filter messages by session ID to prevent cross-session interference
   const globalMessageTypes = [
     'projects_updated',
-    'taskmaster-project-updated',
     'session-created',
     'claude-complete',
     'codex-complete'
@@ -197,17 +206,25 @@ function handleSessionCreated(
   callbacks: MessageHandlerCallbacks,
   currentSessionId: string | null
 ): boolean {
-  if (message.sessionId && !currentSessionId) {
-    safeLocalStorage.setItem('pendingSessionId', message.sessionId);
+  // Handle session-created when:
+  // 1. No current session (new chat)
+  // 2. Current session is a temporary ID (temp-xxx)
+  const isTemporarySession = !currentSessionId || currentSessionId.startsWith('temp-');
+  
+  if (message.sessionId && isTemporarySession) {
+    console.log('[WS] Session created:', message.sessionId, '(replacing:', currentSessionId, ')');
 
+    // Store to localStorage for persistence
+    safeLocalStorage.setItem('pendingSessionId', message.sessionId);
+    safeLocalStorage.setItem('lastSessionId', message.sessionId);
+
+    // Update internal state (no navigation)
+    callbacks.onSetSessionId(message.sessionId);
+
+    // Notify session protection system
     if (callbacks.onReplaceTemporarySession) {
-      // Use currentSessionId as tempId if it exists, otherwise empty string
-      // The hook will clear all temporary prefixes anyway
       callbacks.onReplaceTemporarySession(currentSessionId || '', message.sessionId);
     }
-    
-    // Also update the current session ID in the chat interface
-    callbacks.onSetSessionId(message.sessionId);
   }
   return true;
 }
@@ -256,6 +273,17 @@ function handleTodoWrite(message: WebSocketMessage, callbacks: MessageHandlerCal
 function handleClaudeResponse(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
   const messageData = message.data?.message || message.data;
 
+  // More detailed logging for debugging
+  const sdkType = message.data?.type;
+  const dataType = messageData?.type;
+  const dataRole = messageData?.role;
+  console.log('[WS] handleClaudeResponse -', {
+    sdkType,
+    dataType,
+    dataRole,
+    hasContent: Array.isArray(messageData?.content)
+  });
+
   if (messageData && typeof messageData === 'object') {
     // Handle Cursor streaming format (content_block_delta / content_block_stop)
     if (messageData.type === 'content_block_delta' && messageData.delta?.text) {
@@ -277,7 +305,9 @@ function handleClaudeResponse(message: WebSocketMessage, callbacks: MessageHandl
       (messageData.type === 'message' && messageData.role === 'assistant');
 
     if (isAssistantMessage && Array.isArray(messageData.content)) {
-      // Extract text from content blocks
+      let hasProcessedContent = false;
+
+      // Extract and process text blocks
       const textBlocks = messageData.content
         .filter((block: any) => block?.type === 'text' && block?.text)
         .map((block: any) => decodeHtmlEntities(block.text));
@@ -288,12 +318,31 @@ function handleClaudeResponse(message: WebSocketMessage, callbacks: MessageHandl
 
         // Also add as message for permanence
         callbacks.onAddMessage({
-          id: `assistant-${Date.now()}`,
+          id: generateMessageId('assistant'),
           type: 'assistant',
           content: fullText,
           timestamp: Date.now(),
           isStreaming: true
         });
+        hasProcessedContent = true;
+      }
+
+      // Extract and process tool_use blocks
+      const toolUseBlocks = messageData.content.filter((block: any) => block?.type === 'tool_use');
+      for (const toolBlock of toolUseBlocks) {
+        callbacks.onAddMessage({
+          id: generateMessageId('tool'),
+          type: 'assistant',
+          content: '',
+          timestamp: Date.now(),
+          isToolUse: true,
+          toolName: toolBlock.name,
+          toolInput: toolBlock.input ? JSON.stringify(toolBlock.input, null, 2) : undefined
+        });
+        hasProcessedContent = true;
+      }
+
+      if (hasProcessedContent) {
         return true;
       }
     }
@@ -302,6 +351,13 @@ function handleClaudeResponse(message: WebSocketMessage, callbacks: MessageHandl
     if (messageData.type === 'thinking' && messageData.thinking) {
       callbacks.updateStreamThinking?.(messageData.thinking);
       return true;
+    }
+
+    // Handle user messages (tool_result) - these are already shown so skip them
+    // Note: user messages have structure {type: "user", message: {role: "user", content: [...]}}
+    if (sdkType === 'user' || dataRole === 'user') {
+      console.log('[WS] Skipping user message (tool result)');
+      return true; // Return true to indicate we handled it (by ignoring)
     }
   }
 
@@ -319,7 +375,7 @@ function handleClaudeOutput(message: WebSocketMessage, callbacks: MessageHandler
 
     // Also add to message list
     callbacks.onAddMessage({
-      id: `assistant-${Date.now()}`,
+      id: generateMessageId('assistant'),
       type: 'assistant',
       content: cleaned,
       timestamp: Date.now(),
@@ -334,7 +390,7 @@ function handleClaudeOutput(message: WebSocketMessage, callbacks: MessageHandler
  */
 function handleClaudeInteractivePrompt(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
   callbacks.onAddMessage({
-    id: `assistant-${Date.now()}`,
+    id: generateMessageId('assistant'),
     type: 'assistant',
     content: message.data,
     timestamp: Date.now(),
@@ -351,7 +407,7 @@ function handleClaudeError(message: WebSocketMessage, callbacks: MessageHandlerC
   callbacks.completeStream?.();
 
   callbacks.onAddMessage({
-    id: `error-${Date.now()}`,
+    id: generateMessageId('error'),
     type: 'error',
     content: `Error: ${message.error}`,
     timestamp: Date.now()
@@ -370,18 +426,17 @@ function handleCursorSystem(
   try {
     const cdata = message.data;
     if (cdata && cdata.type === 'system' && cdata.subtype === 'init' && cdata.session_id) {
+      // Log the session detection but don't navigate
       if (currentSessionId && cdata.session_id !== currentSessionId) {
         console.log('🔄 Cursor session switch detected:', { originalSession: currentSessionId, newSession: cdata.session_id });
-        if (callbacks.onNavigateToSession) {
-          callbacks.onNavigateToSession(cdata.session_id);
-        }
+        // Update internal state only (no navigation)
+        callbacks.onSetSessionId(cdata.session_id);
         return true;
       }
       if (!currentSessionId) {
         console.log('🔄 Cursor new session init detected:', { newSession: cdata.session_id });
-        if (callbacks.onNavigateToSession) {
-          callbacks.onNavigateToSession(cdata.session_id);
-        }
+        // Update internal state only (no navigation)
+        callbacks.onSetSessionId(cdata.session_id);
         return true;
       }
     }
@@ -396,7 +451,7 @@ function handleCursorSystem(
  */
 function handleCursorToolUse(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
   callbacks.onAddMessage({
-    id: `tool-${Date.now()}`,
+    id: generateMessageId('tool'),
     type: 'assistant',
     content: `Using tool: ${message.tool} ${message.input ? `with ${message.input}` : ''}`,
     timestamp: Date.now(),
@@ -412,7 +467,7 @@ function handleCursorToolUse(message: WebSocketMessage, callbacks: MessageHandle
  */
 function handleCursorError(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
   callbacks.onAddMessage({
-    id: `error-${Date.now()}`,
+    id: generateMessageId('error'),
     type: 'error',
     content: `Cursor error: ${message.error || 'Unknown error'}`,
     timestamp: Date.now()
@@ -449,7 +504,7 @@ function handleCursorResult(
 
       if (textResult.trim()) {
         callbacks.onAddMessage({
-          id: `assistant-${Date.now()}`,
+          id: generateMessageId('assistant'),
           type: 'assistant',
           content: textResult,
           timestamp: Date.now()
@@ -470,7 +525,7 @@ function handleCursorOutput(message: WebSocketMessage, callbacks: MessageHandler
   const cleaned = String(message.data || '');
   if (cleaned.trim()) {
     callbacks.onAddMessage({
-      id: `assistant-${Date.now()}`,
+      id: generateMessageId('assistant'),
       type: 'assistant',
       content: cleaned,
       timestamp: Date.now(),
@@ -489,9 +544,21 @@ function handleClaudeComplete(
   currentSessionId: string | null
 ): boolean {
   const completedSessionId = message.sessionId || currentSessionId || safeLocalStorage.getItem('pendingSessionId');
-
-  // Update UI state if this is the current session OR if we don't have a session ID yet
-  if (completedSessionId === currentSessionId || !currentSessionId) {
+  const pendingSessionId = safeLocalStorage.getItem('pendingSessionId');
+  
+  // Determine if this completion belongs to the current session
+  // Cases to handle:
+  // 1. completedSessionId matches currentSessionId (normal case)
+  // 2. No currentSessionId yet (new session before session-created received)
+  // 3. completedSessionId is a temp-xxx ID and we have a pending real session ID (new session after session-created)
+  const isCurrentSession = 
+    completedSessionId === currentSessionId || 
+    !currentSessionId ||
+    (completedSessionId?.startsWith('temp-') && (pendingSessionId === currentSessionId || pendingSessionId));
+  
+  // Update UI state if this is the current session
+  if (isCurrentSession) {
+    console.log('[WS] Completing stream for session:', completedSessionId, 'current:', currentSessionId);
     callbacks.onSetLoading(false);
     // Complete the streaming state
     callbacks.completeStream?.();
@@ -504,7 +571,6 @@ function handleClaudeComplete(
   }
 
   // If we have a pending session ID and the conversation completed successfully, use it
-  const pendingSessionId = safeLocalStorage.getItem('pendingSessionId');
   if (pendingSessionId && !currentSessionId && message.exitCode === 0) {
     callbacks.onSetSessionId(pendingSessionId);
     safeLocalStorage.removeItem('pendingSessionId');
@@ -533,7 +599,7 @@ function handleCodexResponse(message: WebSocketMessage, callbacks: MessageHandle
         if (codexData.message?.content?.trim()) {
           const content = decodeHtmlEntities(codexData.message.content);
           callbacks.onAddMessage({
-            id: `assistant-${Date.now()}`,
+            id: generateMessageId('assistant'),
             type: 'assistant',
             content: content,
             timestamp: Date.now()
@@ -545,7 +611,7 @@ function handleCodexResponse(message: WebSocketMessage, callbacks: MessageHandle
         if (codexData.message?.content?.trim()) {
           const content = decodeHtmlEntities(codexData.message.content);
           callbacks.onAddMessage({
-            id: `assistant-${Date.now()}`,
+            id: generateMessageId('assistant'),
             type: 'assistant',
             content: content,
             timestamp: Date.now(),
@@ -557,7 +623,7 @@ function handleCodexResponse(message: WebSocketMessage, callbacks: MessageHandle
       case 'command_execution':
         if (codexData.command) {
           callbacks.onAddMessage({
-            id: `tool-${Date.now()}`,
+            id: generateMessageId('tool'),
             type: 'assistant',
             content: '',
             timestamp: Date.now(),
@@ -574,7 +640,7 @@ function handleCodexResponse(message: WebSocketMessage, callbacks: MessageHandle
         if (codexData.changes?.length > 0) {
           const changesList = codexData.changes.map((c: any) => `${c.kind}: ${c.path}`).join('\n');
           callbacks.onAddMessage({
-            id: `tool-${Date.now()}`,
+            id: generateMessageId('tool'),
             type: 'assistant',
             content: '',
             timestamp: Date.now(),

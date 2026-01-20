@@ -10,14 +10,24 @@
     "loading": "Loading...",
     "user": "User",
     "userMenu": "User menu",
-    "loggedInAs": "Logged in as"
+    "loggedInAs": "Logged in as",
+    "chat": "Chat",
+    "shell": "Shell",
+    "files": "Files",
+    "version": "Version",
+    "currentVersion": "Current version",
+    "adminConsole": "Admin Console"
+  },
+  "app": {
+    "tagline": "AI-Driven, All on One Screen",
+    "conversations": "Conversations"
   },
   "homepage": {
-    "title": "Claude Code UI",
-    "subtitle": "Multi-user Web Interface for AI Coding",
-    "description": "A powerful web-based interface for Claude Code CLI, Cursor CLI, and OpenAI Codex. Collaborate with your team and leverage AI-powered code assistance.",
+    "title": "Synapse Core",
+    "subtitle": "AI Agent Platform Empowering Enterprises",
+    "description": "An intelligent agent platform with WebUI that empowers enterprises with AI-driven solutions, streamlining workflows and boosting productivity.",
     "features": {
-      "title": "Key Features",
+      "title": "Core Capabilities",
       "chat": {
         "title": "Real-time Chat",
         "description": "Interactive AI chat interface with streaming responses"
@@ -45,17 +55,17 @@
     },
     "cta": {
       "title": "Ready to Get Started?",
-      "description": "Join thousands of developers using AI to write better code faster. Sign up now and experience the future of programming.",
+      "description": "Empower your enterprise with AI-driven solutions. Sign up now and transform the way you work.",
       "login": "Get Started",
       "getStarted": "Get Started Now"
     },
     "footer": {
-      "copyright": "© 2025 Claude Code UI. All rights reserved."
+      "copyright": "© 2025 Synapse Core. All rights reserved."
     }
   },
   "login": {
     "welcome": "Welcome Back",
-    "subtitle": "Sign in to your Claude Code UI account",
+    "subtitle": "Sign in to your Synapse Core account",
     "username": "Username",
     "usernamePlaceholder": "Enter your username",
     "password": "Password",
@@ -64,7 +74,7 @@
     "signingIn": "Signing in...",
     "error": "Please enter both username and password",
     "firstTime": "First time? Create an account",
-    "credentials": "Enter your credentials to access Claude Code UI",
+    "credentials": "Enter your credentials to access Synapse Core",
     "setupHint": "If this is your first time, the system may need to be initialized. Please refresh the page."
   },
   "register": {
@@ -120,6 +130,14 @@
       "appearance": "Appearance",
       "api": "API & Tokens",
       "tasks": "Tasks"
+    },
+    "agents": {
+      "title": "Agent Settings",
+      "description": "Configure AI model behavior and permissions",
+      "permission": "Permission Mode",
+      "permissionDescription": "Control how Claude interacts with your files and system",
+      "mcpServers": "MCP Servers",
+      "mcpServersDescription": "Manage Model Context Protocol servers for extended capabilities"
     },
     "appearance": {
       "darkMode": "Dark Mode",
@@ -181,6 +199,9 @@
     "projectName": "Project name",
     "addToFavorites": "Add to favorites",
     "removeFromFavorites": "Remove from favorites",
-    "youHave": "you have"
+    "youHave": "you have",
+    "noConversations": "No conversations yet",
+    "startANewConversation": "Start chatting with AI",
+    "refreshConversations": "Refresh conversations"
   }
 }

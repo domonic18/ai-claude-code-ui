@@ -58,8 +58,7 @@ function isUpdateAdditive(
 export function useSessionProtection(
   selectedProject: Project | null,
   selectedSession: SidebarSession | null,
-  onRefresh?: () => Promise<void>,
-  onNavigate?: (sessionId: string) => void
+  onRefresh?: () => Promise<void>
 ): UseSessionProtectionReturn {
   const [activeSessions, setActiveSessions] = useState<Set<string>>(new Set());
   const [processingSessions, setProcessingSessions] = useState<Set<string>>(new Set());
@@ -163,13 +162,19 @@ export function useSessionProtection(
         return newSet;
       });
 
-      // If no session is currently selected and we have a selected project
-      if (selectedProject && !selectedSession && onRefresh && onNavigate) {
+      // Store to localStorage for persistence
+      localStorage.setItem('lastSessionId', realSessionId);
+      if (selectedProject) {
+        localStorage.setItem('lastProjectName', selectedProject.name);
+      }
+      
+      // Refresh sidebar to show the new session
+      if (onRefresh) {
+        console.log('[SessionProtection] Refreshing sidebar to show new session');
         await onRefresh();
-        onNavigate(realSessionId);
       }
     }
-  }, [selectedProject, selectedSession, onRefresh, onNavigate]);
+  }, [selectedProject, selectedSession, onRefresh]);
 
   /**
    * Check if project update should be skipped due to active sessions

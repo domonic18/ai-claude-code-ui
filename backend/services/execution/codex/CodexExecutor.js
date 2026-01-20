@@ -14,6 +14,7 @@
  */
 
 import { Codex } from '@openai/codex-sdk';
+import { CODEX_TIMEOUTS } from '../../../config/config.js';
 
 // 跟踪活动会话
 const activeCodexSessions = new Map();
@@ -376,7 +377,7 @@ function sendMessage(ws, data) {
 // 定期清理旧的已完成会话
 setInterval(() => {
   const now = Date.now();
-  const maxAge = 30 * 60 * 1000; // 30 分钟
+  const maxAge = CODEX_TIMEOUTS.completedSessionAge; // 使用配置的会话保留时间
 
   for (const [id, session] of activeCodexSessions.entries()) {
     if (session.status !== 'running') {
@@ -386,4 +387,4 @@ setInterval(() => {
       }
     }
   }
-}, 5 * 60 * 1000); // 每 5 分钟
+}, CODEX_TIMEOUTS.cleanupInterval); // 使用配置的清理间隔

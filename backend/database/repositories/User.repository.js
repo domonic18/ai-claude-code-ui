@@ -27,12 +27,13 @@ export const User = {
      * 创建新用户
      * @param {string} username - 用户名
      * @param {string} passwordHash - 密码哈希
-     * @returns {{id: number, username: string}}
+     * @param {string} role - 用户角色 ('admin', 'user', 'guest')
+     * @returns {{id: number, username: string, role: string}}
      */
-    create(username, passwordHash) {
-        const stmt = db().prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)');
-        const result = stmt.run(username, passwordHash);
-        return { id: result.lastInsertRowid, username };
+    create(username, passwordHash, role = 'user') {
+        const stmt = db().prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)');
+        const result = stmt.run(username, passwordHash, role);
+        return { id: result.lastInsertRowid, username, role };
     },
 
     /**
@@ -41,7 +42,7 @@ export const User = {
      * @returns {Object|undefined}
      */
     getByUsername(username) {
-        const row = db().prepare('SELECT * FROM users WHERE username = ? AND is_active = 1').get(username);
+        const row = db().prepare('SELECT id, username, password_hash, role, created_at, last_login FROM users WHERE username = ? AND is_active = 1').get(username);
         return row;
     },
 
@@ -51,7 +52,7 @@ export const User = {
      * @returns {Object|undefined}
      */
     getById(userId) {
-        const row = db().prepare('SELECT id, username, created_at, last_login FROM users WHERE id = ? AND is_active = 1').get(userId);
+        const row = db().prepare('SELECT id, username, role, created_at, last_login FROM users WHERE id = ? AND is_active = 1').get(userId);
         return row;
     },
 
@@ -62,6 +63,15 @@ export const User = {
     getFirst() {
         const row = db().prepare('SELECT id, username, created_at, last_login FROM users WHERE is_active = 1 LIMIT 1').get();
         return row;
+    },
+
+    /**
+     * 获取所有用户
+     * @returns {Array}
+     */
+    getAll() {
+        const rows = db().prepare('SELECT id, username, created_at, last_login FROM users WHERE is_active = 1').all();
+        return rows;
     },
 
     /**

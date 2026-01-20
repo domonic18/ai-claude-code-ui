@@ -180,14 +180,6 @@ export interface SidebarProps extends SidebarCallbacks {
   selectedSession: Session | null;
   /** Loading state (optional - hook manages internally if not provided) */
   isLoading?: boolean;
-  /** Version update information */
-  updateAvailable?: boolean;
-  latestVersion?: string;
-  currentVersion?: string;
-  /** Release info (optional - reserved for future use) */
-  releaseInfo?: any;
-  /** Called to show version modal */
-  onShowVersionModal?: () => void;
   /** Whether running as PWA */
   isPWA?: boolean;
   /** Whether on mobile view */
@@ -326,8 +318,8 @@ export interface SidebarHeaderProps {
   isRefreshing: boolean;
   /** On refresh callback */
   onRefresh: () => void | Promise<void>;
-  /** Show new project modal callback */
-  onShowNewProject: () => void;
+  /** On new session callback (optional) */
+  onNewSession?: () => void;
   /** Whether is PWA */
   isPWA?: boolean;
   /** Whether is mobile */
@@ -356,8 +348,6 @@ export interface ProjectListProps {
   editingName: string;
   /** Loading sessions */
   loadingSessions: LoadingSessions;
-  /** Additional sessions */
-  additionalSessions: AdditionalSessions;
   /** Current time */
   currentTime: Date;
   /** Whether projects are loading */

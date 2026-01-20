@@ -51,10 +51,10 @@ export const ROUTES = {
   SETTINGS_PROFILE: '/settings/profile',
 
   /**
-   * TaskMaster routes
+   * Admin routes
    */
-  TASKS: '/tasks',
-  TASK: (id: string) => `/tasks/${id}`,
+  ADMIN: '/admin',
+  ADMIN_EXTENSIONS: '/admin/extensions',
 
   /**
    * File routes
@@ -81,7 +81,7 @@ export const ROUTES = {
 /**
  * Route titles for document title and breadcrumbs
  */
-export const ROUTE_TITLES: Record<keyof Omit<typeof ROUTES, 'PROJECT' | 'PROJECT_SESSIONS' | 'PROJECT_SESSION' | 'SESSION' | 'TASK' | 'FILE' | 'LEGACY'>, string> = {
+export const ROUTE_TITLES: Record<keyof Omit<typeof ROUTES, 'PROJECT' | 'PROJECT_SESSIONS' | 'PROJECT_SESSION' | 'SESSION' | 'FILE' | 'LEGACY'>, string> = {
   HOME: 'Home',
   APP: 'App',
   CHAT: 'Chat',
@@ -93,7 +93,8 @@ export const ROUTE_TITLES: Record<keyof Omit<typeof ROUTES, 'PROJECT' | 'PROJECT
   SETTINGS_MCP_SERVERS: 'MCP Servers',
   SETTINGS_CREDENTIALS: 'Credentials',
   SETTINGS_PROFILE: 'Profile',
-  TASKS: 'Tasks',
+  ADMIN: 'Admin',
+  ADMIN_EXTENSIONS: 'Extension Management',
   FILES: 'Files',
   NOT_FOUND: 'Page Not Found',
   ERROR: 'Error',
@@ -117,8 +118,8 @@ export interface RouteMeta {
  */
 export const ROUTE_META: Record<string, RouteMeta> = {
   [ROUTES.HOME]: {
-    title: 'Claude Code UI',
-    description: 'Multi-user Web Interface for Claude Code CLI',
+    title: 'Synapse Core',
+    description: 'AI Agent Platform Empowering Enterprises with WebUI',
     requiresAuth: false,
     hideFromNav: true,
   },
@@ -178,10 +179,17 @@ export const ROUTE_META: Record<string, RouteMeta> = {
     requiresAuth: true,
     hideFromNav: true,
   },
-  [ROUTES.TASKS]: {
-    title: 'Tasks',
-    description: 'TaskMaster AI task management',
+  [ROUTES.ADMIN]: {
+    title: 'Admin',
+    description: 'Admin control panel',
     requiresAuth: true,
+    hideFromNav: true,
+  },
+  [ROUTES.ADMIN_EXTENSIONS]: {
+    title: 'Extension Management',
+    description: 'Manage pre-configured extensions',
+    requiresAuth: true,
+    hideFromNav: true,
   },
   [ROUTES.FILES]: {
     title: 'Files',
@@ -222,7 +230,6 @@ export const NAV_ROUTES = [
   { path: ROUTES.CHAT, label: 'Chat', icon: 'MessageSquare' },
   { path: ROUTES.SESSIONS, label: 'Sessions', icon: 'History' },
   { path: ROUTES.PROJECTS, label: 'Projects', icon: 'Folder' },
-  { path: ROUTES.TASKS, label: 'Tasks', icon: 'CheckSquare' },
   { path: ROUTES.SETTINGS, label: 'Settings', icon: 'Settings' },
 ] as const;
 
@@ -309,7 +316,7 @@ export const REDIRECTS = {
 /**
  * Application name for page titles
  */
-export const APP_NAME = 'Claude Code UI';
+export const APP_NAME = 'Synapse Core';
 
 /**
  * Get page title for a route

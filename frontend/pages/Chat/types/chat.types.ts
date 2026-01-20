@@ -17,7 +17,6 @@ export interface Project extends SidebarProject {
  * Extended Session type for ChatPage
  */
 export interface Session extends SidebarSession {
-  __provider?: string;
   name?: string;
   summary?: string;
   [key: string]: any;
@@ -60,8 +59,7 @@ export interface ChatPageProps {
   onSessionProcessing?: (sessionId: string) => void;
   onSessionNotProcessing?: (sessionId: string) => void;
   processingSessions?: Set<string>;
-  onReplaceTemporarySession?: (realSessionId: string) => Promise<void>;
-  onNavigateToSession?: (sessionId: string) => void;
+  onReplaceTemporarySession?: (tempId: string, realSessionId: string) => void | Promise<void>;
 
   // UI handlers
   onShowSettings?: () => void;
@@ -74,11 +72,4 @@ export interface ChatPageProps {
   autoScrollToBottom?: boolean;
   sendByCtrlEnter?: boolean;
   externalMessageUpdate?: number;
-
-  // Version info
-  updateAvailable?: boolean;
-  latestVersion?: string;
-  currentVersion?: string;
-  releaseInfo?: any;
-  onShowVersionModal?: () => void;
 }

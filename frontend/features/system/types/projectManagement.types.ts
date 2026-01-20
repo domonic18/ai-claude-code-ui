@@ -33,6 +33,8 @@ export interface ProjectManagementState {
   selectedProject: Project | null;
   selectedSession: Session | null;
   isLoadingProjects: boolean;
+  /** Counter that increments when a new session is requested, used to force state resets */
+  newSessionCounter: number;
 }
 
 /**

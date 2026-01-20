@@ -5,18 +5,16 @@
  * Refactored to use custom hooks for state management.
  *
  * Features:
- * - Project list with search and filtering
+ * - Project list
  * - Session management
  * - Version update banner
  * - Responsive design (mobile/desktop)
  */
 
-import React, { useState, useEffect, useCallback, memo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import ReactDOM from 'react-dom';
 import SidebarHeader from './SidebarHeader';
-import ProjectSearch from './ProjectSearch';
-import VersionBanner from './VersionBanner';
 import ProjectList from './ProjectList';
 import ProjectCreationWizard from './ProjectCreationWizard';
 import UserMenu from './UserMenu';
@@ -24,7 +22,6 @@ import { TIMESTAMP_UPDATE_INTERVAL } from '../constants/sidebar.constants';
 import type { SidebarProps, ExpandedProjects } from '../types/sidebar.types';
 import { useProjects } from '../hooks';
 import { useSessions } from '../hooks';
-import { useProjectSearch } from '../hooks';
 import { useStarredProjects } from '../hooks';
 
 /**
@@ -42,10 +39,6 @@ export const Sidebar = memo(function Sidebar({
   onRefresh,
   onNewSession,
   onShowSettings,
-  updateAvailable,
-  latestVersion,
-  currentVersion,
-  onShowVersionModal,
   isPWA,
   isMobile,
   onToggleSidebar,
@@ -54,7 +47,6 @@ export const Sidebar = memo(function Sidebar({
 
   // Custom hooks
   const {
-    projects,
     refresh: refreshProjects,
     createProject,
     renameProject,
@@ -69,12 +61,6 @@ export const Sidebar = memo(function Sidebar({
     deleteSession,
     additionalSessions,
   } = useSessions();
-
-  const {
-    searchFilter,
-    setSearchFilter,
-    filteredProjects,
-  } = useProjectSearch();
 
   const {
     starredProjects,
@@ -100,7 +86,7 @@ export const Sidebar = memo(function Sidebar({
     return () => clearInterval(timer);
   }, []);
 
-  // Auto-expand project when a session is selected
+  // Auto-expand project when a project is selected or a session is selected
   // Use ref to track previous session/project to avoid unnecessary updates
   const prevSelectionRef = useRef<{ sessionId?: string; projectName?: string } | null>(null);
 
@@ -115,7 +101,8 @@ export const Sidebar = memo(function Sidebar({
                        prevSelectionRef.current.sessionId !== currentSelection.sessionId ||
                        prevSelectionRef.current.projectName !== currentSelection.projectName;
 
-    if (hasChanged && selectedSession && selectedProject) {
+    // Auto-expand when project is selected (even without session) or when session is selected
+    if (hasChanged && selectedProject) {
       setExpandedProjects(prev => {
         // Only update if project is not already expanded
         if (prev.has(selectedProject.name)) {
@@ -127,11 +114,26 @@ export const Sidebar = memo(function Sidebar({
     }
   }, [selectedSession?.id, selectedProject?.name]);
 
-  // Filter and sort projects
-  const filteredAndSortedProjects = getSortedProjects(starredProjects);
-  const displayProjects = searchFilter
-    ? filteredProjects(filteredAndSortedProjects)
-    : filteredAndSortedProjects;
+  // Sort projects
+  const displayProjects = getSortedProjects(starredProjects);
+
+  // Merge additional sessions into projects (since we only have one project now)
+  const mergedProjects = useMemo(() => {
+    return displayProjects.map(project => {
+      const additional = additionalSessions[project.name] || [];
+      if (additional.length === 0) {
+        return project;
+      }
+
+      // Merge sessions by provider
+      return {
+        ...project,
+        sessions: [...(project.sessions || []), ...additional.filter(s => !s.__provider || s.__provider === 'claude')],
+        cursorSessions: [...(project.cursorSessions || []), ...additional.filter(s => s.__provider === 'cursor')],
+        codexSessions: [...(project.codexSessions || []), ...additional.filter(s => s.__provider === 'codex')],
+      };
+    });
+  }, [displayProjects, additionalSessions]);
 
   // Handlers
   const handleRefresh = useCallback(async () => {
@@ -242,8 +244,38 @@ export const Sidebar = memo(function Sidebar({
   }, [renameSession, onRefresh]);
 
   const handleLoadMoreSessions = useCallback(async (project: any) => {
-    await loadMoreSessions(project.name);
-  }, [loadMoreSessions]);
+    // Find the original project from displayProjects (not merged)
+    const originalProject = displayProjects.find(p => p.name === project.name);
+    if (!originalProject) {
+      console.warn('[Sidebar] Project not found for loading more sessions:', project.name);
+      return;
+    }
+
+    // Calculate offset based on original project sessions + already loaded additional sessions
+    const baseSessionCount = (originalProject.sessions || []).length;
+    const additionalSessionCount = (additionalSessions[project.name] || []).length;
+
+    // Total sessions already loaded
+    const currentSessionCount = baseSessionCount + additionalSessionCount;
+    const offset = currentSessionCount;
+
+    console.log('[Sidebar] Loading more sessions:', {
+      projectName: project.name,
+      baseSessionCount,
+      additionalSessionCount,
+      offset,
+    });
+
+    await loadMoreSessions(project.name, 5, offset);
+  }, [displayProjects, additionalSessions, loadMoreSessions]);
+
+  // Since we only have one project now, create a wrapper for onNewSession
+  // that doesn't require projectName parameter
+  const handleNewSession = useCallback(() => {
+    if (onNewSession && selectedProject) {
+      onNewSession(selectedProject.name);
+    }
+  }, [onNewSession, selectedProject]);
 
   return (
     <>
@@ -276,34 +308,15 @@ export const Sidebar = memo(function Sidebar({
         <SidebarHeader
           isRefreshing={isRefreshing}
           onRefresh={handleRefresh}
-          onShowNewProject={() => setShowNewProject(true)}
+          onNewSession={handleNewSession}
           isPWA={isPWA}
           isMobile={isMobile}
           onToggleSidebar={onToggleSidebar}
         />
 
-        {/* Version Banner */}
-        {(updateAvailable || latestVersion) && (
-          <VersionBanner
-            updateAvailable={updateAvailable ?? false}
-            latestVersion={latestVersion}
-            currentVersion={currentVersion}
-            onShowVersionModal={onShowVersionModal}
-          />
-        )}
-
-        {/* Search */}
-        <div className="px-4 py-2 border-b border-border">
-          <ProjectSearch
-            searchFilter={searchFilter}
-            onSearchChange={setSearchFilter}
-            onClearSearch={() => setSearchFilter('')}
-          />
-        </div>
-
         {/* Project List */}
         <ProjectList
-          projects={displayProjects}
+          projects={mergedProjects}
           selectedProject={selectedProject}
           selectedSession={selectedSession}
           expandedProjects={expandedProjects}
@@ -311,7 +324,6 @@ export const Sidebar = memo(function Sidebar({
           editingProject={editingProject}
           editingName={editingName}
           loadingSessions={loadingSessions}
-          additionalSessions={additionalSessions}
           currentTime={currentTime}
           isLoading={isLoading}
           onToggleProject={handleToggleProject}
@@ -335,7 +347,9 @@ export const Sidebar = memo(function Sidebar({
 
         {/* User Menu Footer */}
         <div className="p-2 border-t border-border flex-shrink-0">
-          <UserMenu onShowSettings={onShowSettings} />
+          <UserMenu
+            onShowSettings={onShowSettings}
+          />
         </div>
       </div>
     </>

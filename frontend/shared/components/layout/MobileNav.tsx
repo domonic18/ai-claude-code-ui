@@ -1,7 +1,7 @@
 import React from 'react';
-import { MessageSquare, Folder, Terminal } from 'lucide-react';
+import { MessageSquare, Folder } from 'lucide-react';
 
-export type MobileNavTab = 'chat' | 'shell' | 'files';
+export type MobileNavTab = 'chat' | 'files';
 
 export interface MobileNavProps {
   activeTab: string;
@@ -21,11 +21,6 @@ function MobileNav({ activeTab, setActiveTab, isInputFocused }: MobileNavProps) 
       id: 'chat',
       icon: MessageSquare,
       onClick: () => setActiveTab('chat')
-    },
-    {
-      id: 'shell',
-      icon: Terminal,
-      onClick: () => setActiveTab('shell')
     },
     {
       id: 'files',

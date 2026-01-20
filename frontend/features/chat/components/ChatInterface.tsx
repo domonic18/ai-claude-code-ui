@@ -34,6 +34,7 @@ import { getChatService } from '../services';
 import { handleWebSocketMessage } from '../services/websocketHandler';
 import type { ChatMessage, FileAttachment } from '../types';
 import { calculateDiff } from '../utils/diffUtils';
+import { STORAGE_KEYS } from '../constants';
 
 // Stable empty array reference to prevent unnecessary effect triggers
 const EMPTY_WS_MESSAGES: any[] = [];
@@ -49,6 +50,8 @@ interface ChatInterfaceProps {
     id: string;
     __provider?: string;
   };
+  /** New session counter - increments when user clicks "New Session" */
+  newSessionCounter?: number;
   /** WebSocket connection */
   ws?: WebSocket | null;
   /** Send message via WebSocket */
@@ -73,8 +76,6 @@ interface ChatInterfaceProps {
   processingSessions?: Set<string>;
   /** Callback to replace temporary session ID */
   onReplaceTemporarySession?: (tempId: string, realSessionId: string) => void;
-  /** Callback to navigate to session */
-  onNavigateToSession?: (sessionId: string) => void;
   /** Callback to show settings */
   onShowSettings?: () => void;
   /** Auto-expand tools by default */
@@ -105,6 +106,7 @@ interface ChatInterfaceProps {
 export function ChatInterface({
   selectedProject,
   selectedSession,
+  newSessionCounter = 0,
   ws,
   sendMessage,
   wsMessages: rawWsMessages,
@@ -117,7 +119,6 @@ export function ChatInterface({
   onSessionNotProcessing,
   processingSessions,
   onReplaceTemporarySession,
-  onNavigateToSession,
   onShowSettings,
   autoExpandTools = false,
   showRawParameters = false,
@@ -132,6 +133,9 @@ export function ChatInterface({
   // Use stable reference for wsMessages to prevent unnecessary effect triggers
   const wsMessages = useMemo(() => rawWsMessages ?? EMPTY_WS_MESSAGES, [rawWsMessages]);
   const { t } = useTranslation();
+
+  // Track previous new session counter to detect when user clicks "New Session"
+  const prevNewSessionCounterRef = useRef(0);
 
   // State
   const [input, setInput] = useState('');
@@ -269,21 +273,41 @@ export function ChatInterface({
     onSetMessages: setMessages,
   });
 
-  // Sync session ID when session changes
+  // Track previous session ID to detect actual session changes
+  const prevSelectedSessionIdRef = useRef<string | undefined>(selectedSession?.id);
+  
+  // Sync session ID when selected session changes (not when WebSocket updates currentSessionId)
   useEffect(() => {
-    if (selectedSession?.id) {
+    const prevId = prevSelectedSessionIdRef.current;
+    const newId = selectedSession?.id;
+
+    // Update ref
+    prevSelectedSessionIdRef.current = newId;
+
+    if (newId) {
       // Session selected - update current session ID
-      if (currentSessionId !== selectedSession.id) {
-        setCurrentSessionId(selectedSession.id);
+      if (currentSessionId !== newId) {
+        setCurrentSessionId(newId);
+        // Clear draft when switching to a different session
+        if (selectedProject?.name) {
+          const draftKey = STORAGE_KEYS.DRAFT_INPUT(selectedProject.name);
+          localStorage.removeItem(draftKey);
+        }
       }
-    } else {
-      // No session selected (new session) - clear current session ID and messages
-      if (currentSessionId !== null) {
-        setCurrentSessionId(null);
-        setMessages([]);
+    } else if (prevId !== undefined && newId === undefined) {
+      // Only clear when selectedSession actually changes FROM a session TO null
+      // (e.g., clicking "New Session" button), not when WebSocket updates currentSessionId
+      console.log('[ChatInterface] Session cleared, resetting messages');
+      setCurrentSessionId(null);
+      setMessages([]);
+      // Clear draft when clearing session
+      if (selectedProject?.name) {
+        const draftKey = STORAGE_KEYS.DRAFT_INPUT(selectedProject.name);
+        localStorage.removeItem(draftKey);
       }
     }
-  }, [selectedSession?.id, currentSessionId, setMessages]);
+    // Note: Don't clear when both prevId and newId are undefined (staying in new session mode)
+  }, [selectedSession?.id, setMessages, currentSessionId, selectedProject?.name]); // Add currentSessionId and selectedProject to deps
 
   // Update provider from session
   useEffect(() => {
@@ -293,46 +317,70 @@ export function ChatInterface({
     }
   }, [selectedSession]);
 
+  // Force state reset when new session counter changes (user clicked "New Session")
+  useEffect(() => {
+    if (newSessionCounter > prevNewSessionCounterRef.current) {
+      console.log('[ChatInterface] New session counter changed, forcing state reset');
+      prevNewSessionCounterRef.current = newSessionCounter;
+      setCurrentSessionId(null);
+      setMessages([]);
+      setInput('');
+      // Reset processed message count
+      processedCountRef.current = 0;
+    }
+  }, [newSessionCounter, setMessages]);
+
+  // Track processed message count to handle all new messages
+  const processedCountRef = useRef(0);
+
   // Handle WebSocket messages
   useEffect(() => {
     if (wsMessages.length === 0) return;
 
-    const latestMessage = wsMessages[wsMessages.length - 1];
+    // Process all new messages since last render
+    const newMessages = wsMessages.slice(processedCountRef.current);
+    if (newMessages.length === 0) return;
 
-    // Handle the message using our WebSocket handler service
-    handleWebSocketMessage(latestMessage, {
-      onAddMessage: addMessage,
-      onUpdateMessage: updateMessage,
-      onSetMessages: setMessages,
-      onSetLoading: setIsLoading,
-      onSetSessionId: setCurrentSessionId,
-      onReplaceTemporarySession: onReplaceTemporarySession,
-      onNavigateToSession: onNavigateToSession,
-      onSessionActive: onSessionActive,
-      onSessionInactive: onSessionInactive,
-      onSessionProcessing: onSessionProcessing,
-      onSessionNotProcessing: onSessionNotProcessing,
-      onSetTokenBudget: (budget) => {
-        setTokenBudget(budget);
-        onSetTokenBudget?.(budget);
-      },
-      onSetTasks: setTasks,
-      // Streaming callbacks
-      completeStream: () => {
-        completeStream();
-      },
-      resetStream: () => {
-        resetStream();
-      },
-      updateStreamContent: (content) => {
-        updateStreamContent(content);
-      },
-      updateStreamThinking: (thinking) => {
-        updateStreamThinking(thinking);
-      },
-      getCurrentSessionId: () => currentSessionId,
-      getSelectedProjectName: () => selectedProject?.name,
-    });
+    console.log('[ChatInterface] Processing', newMessages.length, 'new messages (total:', wsMessages.length, ')');
+
+    for (const message of newMessages) {
+      // Handle the message using our WebSocket handler service
+      handleWebSocketMessage(message, {
+        onAddMessage: addMessage,
+        onUpdateMessage: updateMessage,
+        onSetMessages: setMessages,
+        onSetLoading: setIsLoading,
+        onSetSessionId: setCurrentSessionId,
+        onReplaceTemporarySession: onReplaceTemporarySession,
+        onSessionActive: onSessionActive,
+        onSessionInactive: onSessionInactive,
+        onSessionProcessing: onSessionProcessing,
+        onSessionNotProcessing: onSessionNotProcessing,
+        onSetTokenBudget: (budget) => {
+          setTokenBudget(budget);
+          onSetTokenBudget?.(budget);
+        },
+        onSetTasks: setTasks,
+        // Streaming callbacks
+        completeStream: () => {
+          completeStream();
+        },
+        resetStream: () => {
+          resetStream();
+        },
+        updateStreamContent: (content) => {
+          updateStreamContent(content);
+        },
+        updateStreamThinking: (thinking) => {
+          updateStreamThinking(thinking);
+        },
+        getCurrentSessionId: () => currentSessionId,
+        getSelectedProjectName: () => selectedProject?.name,
+      });
+    }
+
+    // Update processed count
+    processedCountRef.current = wsMessages.length;
   }, [wsMessages, currentSessionId, addMessage, updateMessage, completeStream, resetStream, updateStreamContent, updateStreamThinking]);
 
   /**
@@ -347,6 +395,12 @@ export function ChatInterface({
     // Clear input and attachments
     setInput('');
     setAttachedFiles([]);
+
+    // Clear draft from localStorage to prevent it from being restored on refresh/session switch
+    if (selectedProject?.name) {
+      const draftKey = STORAGE_KEYS.DRAFT_INPUT(selectedProject.name);
+      localStorage.removeItem(draftKey);
+    }
 
     // Mark session as active
     if (currentSessionId) {

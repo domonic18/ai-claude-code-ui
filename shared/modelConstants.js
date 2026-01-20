@@ -18,16 +18,12 @@
  */
 export const CLAUDE_MODELS = {
   // Models in SDK format (what the actual SDK accepts)
+  // Only custom model is supported - uses ANTHROPIC_MODEL environment variable
   OPTIONS: [
-    { value: 'sonnet', label: 'Sonnet' },
-    { value: 'opus', label: 'Opus' },
-    { value: 'haiku', label: 'Haiku' },
-    { value: 'opusplan', label: 'Opus Plan' },
-    { value: 'sonnet[1m]', label: 'Sonnet [1M]' },
     { value: 'custom', label: 'Custom (from ANTHROPIC_MODEL env var)' }
   ],
 
-  DEFAULT: 'sonnet'
+  DEFAULT: 'custom'
 };
 
 /**

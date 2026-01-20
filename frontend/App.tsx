@@ -19,7 +19,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useParams, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { Settings as SettingsIcon, Sparkles, MessageSquare } from 'lucide-react';
 import { Sidebar } from './features/sidebar/components';
 import MainContent from '@/shared/components/layout/MainContent';
@@ -36,7 +36,8 @@ import { ProtectedRoute } from '@/router';
 import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import useLocalStorage from '@/shared/hooks/useLocalStorage';
 import { api, authenticatedFetch } from '@/shared/services';
-import { Homepage, ChatPage, SettingsPage, NotFoundPage } from '@/pages';
+import { APP_NAME } from '@/shared/constants/app.constants';
+import { Homepage, ChatPage, SettingsPage, AdminPage, NotFoundPage } from '@/pages';
 import { LoginForm, SetupForm } from '@/features/auth';
 
 // Initialize i18n
@@ -78,7 +79,6 @@ interface User {
 // Main App component with routing
 function AppContent() {
   const navigate = useNavigate();
-  const { sessionId } = useParams();
   const { user } = useAuth();
 
   const { updateAvailable, latestVersion, currentVersion, releaseInfo } = useVersionCheck('siteboon', 'claudecodeui');
@@ -112,6 +112,7 @@ function AppContent() {
     selectedProject,
     selectedSession,
     isLoadingProjects,
+    newSessionCounter,
     fetchProjects,
     handleProjectSelect,
     handleSessionSelect,
@@ -139,7 +140,7 @@ function AppContent() {
     isSessionActive,
     isSessionProcessing,
     shouldSkipUpdate,
-  } = useSessionProtection(selectedProject, selectedSession as SidebarSession | null, handleSidebarRefresh, (sessionId) => navigate(`/session/${sessionId}`));
+  } = useSessionProtection(selectedProject, selectedSession as SidebarSession | null, handleSidebarRefresh);
 
   const { ws, sendMessage, messages } = useWebSocketContext();
 
@@ -324,11 +325,6 @@ function AppContent() {
                 isLoading={isLoadingProjects}
                 onRefresh={handleSidebarRefresh}
                 onShowSettings={() => setShowSettings(true)}
-                updateAvailable={updateAvailable}
-                latestVersion={latestVersion}
-                currentVersion={currentVersion}
-                releaseInfo={releaseInfo}
-                onShowVersionModal={() => setShowVersionModal(true)}
                 isPWA={isPWA}
                 isMobile={isMobile}
                 onToggleSidebar={() => setSidebarVisible(false)}
@@ -414,11 +410,6 @@ function AppContent() {
               isLoading={isLoadingProjects}
               onRefresh={handleSidebarRefresh}
               onShowSettings={() => setShowSettings(true)}
-              updateAvailable={updateAvailable}
-              latestVersion={latestVersion}
-              currentVersion={currentVersion}
-              releaseInfo={releaseInfo}
-              onShowVersionModal={() => setShowVersionModal(true)}
               isPWA={isPWA}
               isMobile={isMobile}
               onToggleSidebar={() => setSidebarVisible(false)}
@@ -432,6 +423,7 @@ function AppContent() {
         <MainContent
           selectedProject={selectedProject}
           selectedSession={selectedSession}
+          newSessionCounter={newSessionCounter}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           ws={ws}
@@ -448,7 +440,6 @@ function AppContent() {
           onSessionNotProcessing={markSessionAsNotProcessing}
           processingSessions={processingSessions}
           onReplaceTemporarySession={replaceTemporarySession}
-          onNavigateToSession={(sessionId) => navigate(`/session/${sessionId}`)}
           onShowSettings={() => setShowSettings(true)}
           autoExpandTools={autoExpandTools}
           showRawParameters={showRawParameters}
@@ -520,7 +511,7 @@ function RootRedirect() {
               <MessageSquare className="w-8 h-8 text-primary-foreground" />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-foreground mb-2">Claude Code UI</h1>
+          <h1 className="text-2xl font-bold text-foreground mb-2">{APP_NAME}</h1>
           <div className="flex items-center justify-center space-x-2">
             <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
             <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -563,8 +554,8 @@ function App() {
                 {/* Protected routes */}
                 <Route element={<ProtectedRoute />}>
                   <Route path="/chat" element={<AppContent />} />
-                  <Route path="/session/:sessionId" element={<AppContent />} />
                   <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/admin" element={<AdminPage />} />
                 </Route>
 
                 {/* 404 page - must be last */}

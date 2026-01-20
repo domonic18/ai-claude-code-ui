@@ -13,6 +13,7 @@ import { repositories, db } from '../../database/db.js';
 import { generateToken } from '../../middleware/auth.middleware.js';
 import containerManager from '../../services/container/core/index.js';
 import { NotFoundError, UnauthorizedError, ValidationError } from '../../middleware/error-handler.middleware.js';
+import { SESSION_TIMEOUTS } from '../../config/config.js';
 
 const { User } = repositories;
 
@@ -69,8 +70,12 @@ export class AuthController extends BaseController {
       const saltRounds = 12;
       const passwordHash = await bcrypt.hash(password, saltRounds);
 
+      // 第一个注册的用户自动成为管理员
+      const hasUsers = User.hasUsers();
+      const role = hasUsers ? 'user' : 'admin';
+
       // 创建用户
-      const user = User.create(username, passwordHash);
+      const user = User.create(username, passwordHash, role);
 
       // 生成令牌
       const token = generateToken(user);
@@ -92,13 +97,14 @@ export class AuthController extends BaseController {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax', // 使用 lax 以支持开发环境的跨端口请求
-        maxAge: 365 * 24 * 60 * 60 * 1000, // 1年
+        maxAge: SESSION_TIMEOUTS.cookieMaxAge, // 使用配置的 Cookie 过期时间
         path: '/'
       });
 
       this._success(res, {
         id: user.id,
         username: user.username,
+        role: user.role,
         createdAt: user.createdAt,
         lastLoginAt: user.lastLoginAt
       }, 'Registration successful', 201);
@@ -162,13 +168,14 @@ export class AuthController extends BaseController {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax', // 使用 lax 以支持开发环境的跨端口请求
-        maxAge: 365 * 24 * 60 * 60 * 1000, // 1年
+        maxAge: SESSION_TIMEOUTS.cookieMaxAge, // 使用配置的 Cookie 过期时间
         path: '/'
       });
 
       this._success(res, {
         id: user.id,
         username: user.username,
+        role: user.role,
         createdAt: user.createdAt,
         lastLoginAt: user.lastLoginAt
       }, 'Login successful');
@@ -195,6 +202,7 @@ export class AuthController extends BaseController {
       this._success(res, {
         id: user.id,
         username: user.username,
+        role: user.role,
         createdAt: user.createdAt,
         lastLoginAt: user.lastLoginAt
       });

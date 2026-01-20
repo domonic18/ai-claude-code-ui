@@ -60,10 +60,12 @@ COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 COPY --from=builder --chown=node:node /app/package*.json ./
 
 # Copy application files
-COPY --chown=node:node server ./server
+COPY --chown=node:node backend ./backend
 COPY --chown=node:node shared ./shared
 
-# Create workspace and config directories (node user already exists in base image)
+# Create workspace and config directories
+# Note: /workspace/my-workspace is created at runtime on host filesystem
+# to ensure it persists with the bind mount
 RUN mkdir -p /workspace /app /workspace/.claude/projects && \
     chown -R node:node /workspace /app
 
@@ -86,4 +88,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 EXPOSE 3001
 
 # Container entrypoint - keeps container running and provides health check
-CMD ["node", "/app/server/container-entrypoint.js"]
+CMD ["node", "/app/backend/container-entrypoint.js"]

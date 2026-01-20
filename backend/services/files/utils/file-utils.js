@@ -7,6 +7,8 @@
  * @module files/utils/file-utils
  */
 
+import { FILE_TIMEOUTS } from '../../../config/config.js';
+
 /**
  * 文件大小常量 (字节)
  */
@@ -279,12 +281,12 @@ export function createTreeNode({ name, path, type, children = undefined }) {
  *
  * @param {Object} stream - 命令输出流
  * @param {Object} [options] - 选项
- * @param {number} [options.timeout=3000] - 超时时间（毫秒）
+ * @param {number} [options.timeout] - 超时时间（毫秒），默认使用配置值
  * @param {Function} [options.onError] - 自定义错误处理
  * @returns {Promise<string>} 命令输出内容
  */
 export function readStreamOutput(stream, options = {}) {
-  const { timeout = 3000, onError } = options;
+  const { timeout = FILE_TIMEOUTS.default, onError } = options;
 
   return new Promise((resolve, reject) => {
     let output = '';

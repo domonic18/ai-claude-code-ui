@@ -37,7 +37,7 @@ export function FullToolMessage({ message, onFileOpen, onShowSettings }: FullToo
     const isError = typeof message.toolResult === 'object' && message.toolResult.isError;
     if (shouldHideToolResult(toolName, !isError)) return null;
 
-    return <ToolResultRenderer toolResult={message.toolResult} toolId={message.toolId} />;
+    return <ToolResultRenderer toolResult={message.toolResult} toolId={message.toolId} toolName={toolName} />;
   };
 
   return (

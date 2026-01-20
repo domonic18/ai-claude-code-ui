@@ -1,8 +1,8 @@
-# 多用户 Claude Code 系统 - 数据存储设计
+# Claude Code UI - 数据存储设计
 
-> **文档版本**: 3.1
+> **文档版本**: 3.2
 > **创建时间**: 2026-01-10
-> **最后更新**: 2026-01-12 (明确容器内 HOME=/workspace 方案，统一路径映射)
+> **最后更新**: 2026-01-18
 > **所属架构**: Docker + Seccomp 容器隔离
 
 ---
@@ -603,16 +603,11 @@ const storageQuotas = {
 │   │       │           ├── metadata.json
 │   │       │           └── messages.jsonl
 │   │       ├── my-workspace/          # 默认工作区（项目代码）
-│   │       │   ├── .claude/           # 项目级配置（覆盖用户级）
-│   │       │   │   ├── CLAUDE.md      # 项目上下文
-│   │       │   │   ├── settings.local.json
-│   │       │   │   ├── commands/      # 项目级命令
-│   │       │   │   └── skills/        # 项目级 Skills
 │   │       │   ├── src/
 │   │       │   ├── package.json
 │   │       │   └── README.md
 │   │       ├── project-2/             # 其他项目
-│   │       │   └── .claude/           # 项目级配置
+│   │       │   └── src/            
 │   │       └── ...
 │   ├── user_2/
 │   │   └── data/
@@ -809,3 +804,4 @@ export async function getProjectsInContainer(userId) {
 | 2.1 | 2026-01-11 | Claude | 修正数据库位置：全局数据库位于宿主机 workspace/database，容器内无数据库 |
 | 3.0 | 2026-01-12 | Claude | 基于官方文档更新 .claude 目录结构，添加配置作用域说明，添加路径映射规范 |
 | 3.1 | 2026-01-12 | Claude | 明确容器内 HOME=/workspace 方案，统一路径映射，确保 ~/.claude/ 符合 Claude Code 官方标准 |
+| 3.2 | 2026-01-18 | Claude | 更新文档标题和版本信息 |

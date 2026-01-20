@@ -12,6 +12,7 @@ import MarkdownRenderer from './MarkdownRenderer';
 export interface ToolResultRendererProps {
   toolResult: any;
   toolId?: string;
+  toolName?: string;
 }
 
 /**
@@ -19,9 +20,12 @@ export interface ToolResultRendererProps {
  *
  * Displays tool results with styled containers and error handling.
  */
-export function ToolResultRenderer({ toolResult, toolId }: ToolResultRendererProps) {
+export function ToolResultRenderer({ toolResult, toolId, toolName }: ToolResultRendererProps) {
   const { content, isError } = getToolResultData(toolResult);
   if (!content) return null;
+
+  // Check if this is a bash/command output that should use terminal styling
+  const isTerminalOutput = toolName === 'Bash' || toolName === 'Shell';
 
   return (
     <CollapsiblePanel
@@ -71,6 +75,7 @@ export function ToolResultRenderer({ toolResult, toolId }: ToolResultRendererPro
           <MarkdownRenderer
             content={content}
             className="prose prose-sm max-w-none dark:prose-invert"
+            isTerminalOutput={isTerminalOutput}
           />
         </div>
       </div>

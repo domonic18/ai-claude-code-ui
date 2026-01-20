@@ -11,6 +11,12 @@ import { BaseSessionManager } from './BaseSessionManager.js';
 import containerManager from '../../container/core/index.js';
 import { PathUtils } from '../../core/utils/path-utils.js';
 import { CONTAINER } from '../../../config/config.js';
+import { 
+  getSessionsInContainer, 
+  getSessionMessagesInContainer, 
+  deleteSessionInContainer 
+} from '../container/ContainerSessions.js';
+import { PassThrough } from 'stream';
 
 /**
  * 容器会话管理器
@@ -39,7 +45,7 @@ export class ContainerSessionManager extends BaseSessionManager {
    */
   _getSessionFilePath(projectPath, sessionId) {
     const encodedProjectName = PathUtils.encodeProjectName(projectPath);
-    return `${CONTAINER.paths.projects}/${encodedProjectName}/sessions/${sessionId}.jsonl`;
+    return `${CONTAINER.paths.projects}/${encodedProjectName}/${sessionId}.jsonl`;
   }
 
   /**
@@ -48,7 +54,7 @@ export class ContainerSessionManager extends BaseSessionManager {
    * @returns {Promise<Object>} 会话列表结果
    */
   async getSessions(options = {}) {
-    const { userId, projectPath, sort = 'lastActivity', order = 'desc', limit, offset } = options;
+    const { userId, projectPath, limit = 50, offset = 0 } = options;
 
     try {
       if (!projectPath || !userId) {
@@ -58,34 +64,14 @@ export class ContainerSessionManager extends BaseSessionManager {
       // 确保容器存在
       await containerManager.getOrCreateContainer(userId);
 
-      // 构建会话目录路径
-      const encodedProjectName = PathUtils.encodeProjectName(projectPath);
-      const sessionsDir = `${CONTAINER.paths.projects}/${encodedProjectName}/sessions`;
+      // 使用统一的容器会话读取逻辑（支持分组、分页、排序和 demuxStream）
+      const result = await getSessionsInContainer(userId, projectPath, limit, offset);
 
-      // 使用 find 命令列出所有 jsonl 文件
-      const { stream } = await containerManager.execInContainer(
-        userId,
-        `find "${sessionsDir}" -name "*.jsonl" -type f 2>/dev/null || true`
-      );
-
-      const files = await this._readCommandOutput(stream);
-      const jsonlFiles = files.trim().split('\n').filter(Boolean);
-
-      // 解析所有会话文件
-      const allSessions = [];
-      for (const file of jsonlFiles) {
-        try {
-          const { stream: readStream } = await containerManager.execInContainer(userId, `cat "${file}"`);
-          const content = await this._readCommandOutput(readStream);
-          const result = this._parseJsonlContent(content);
-          allSessions.push(...result.sessions);
-        } catch (error) {
-          console.error(`Failed to parse session file ${file}:`, error.message);
-        }
-      }
-
-      // 应用分页和排序
-      return this._applyPaginationAndSorting(allSessions, { sort, order, limit, offset });
+      return {
+        sessions: result.sessions,
+        total: result.total,
+        hasMore: result.hasMore
+      };
     } catch (error) {
       throw this._standardizeError(error, 'getSessions');
     }
@@ -110,35 +96,16 @@ export class ContainerSessionManager extends BaseSessionManager {
       // 确保容器存在
       await containerManager.getOrCreateContainer(userId);
 
-      const filePath = this._getSessionFilePath(projectPath, sessionId);
-
-      // 读取会话文件
-      const { stream } = await containerManager.execInContainer(userId, `cat "${filePath}"`);
-      const content = await this._readCommandOutput(stream);
-
-      const result = this._parseJsonlContent(content, {
-        includeSystemMessages: false,
-        includeApiErrors: false
-      });
-
-      // 应用分页
-      const entries = result.entries;
-      const total = entries.length;
-      const start = offset;
-      const end = offset + limit;
-      const paginated = entries.slice(start, end);
+      // 使用统一的容器会话读取逻辑
+      const result = await getSessionMessagesInContainer(userId, projectPath, sessionId, limit, offset);
 
       return {
         sessionId,
-        messages: paginated,
-        total,
-        hasMore: end < total
+        messages: result.messages,
+        total: result.total,
+        hasMore: result.hasMore
       };
     } catch (error) {
-      // 如果文件不存在，返回空结果
-      if (error.message && error.message.includes('No such file')) {
-        return { sessionId, messages: [], total: 0, hasMore: false };
-      }
       throw this._standardizeError(error, 'getSessionMessages');
     }
   }
@@ -162,16 +129,9 @@ export class ContainerSessionManager extends BaseSessionManager {
       // 确保容器存在
       await containerManager.getOrCreateContainer(userId);
 
-      const filePath = this._getSessionFilePath(projectPath, sessionId);
-
-      // 删除文件
-      await containerManager.execInContainer(userId, `rm -f "${filePath}"`);
-
-      return true;
+      // 使用统一的容器会话读取逻辑
+      return await deleteSessionInContainer(userId, projectPath, sessionId);
     } catch (error) {
-      if (error.message && error.message.includes('No such file')) {
-        return false;
-      }
       throw this._standardizeError(error, 'deleteSession');
     }
   }
@@ -254,12 +214,22 @@ export class ContainerSessionManager extends BaseSessionManager {
    * @param {Object} stream - 命令输出流
    * @returns {Promise<string>} 命令输出
    */
-  _readCommandOutput(stream) {
+  async _readCommandOutput(stream) {
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+
+    containerManager.docker.modem.demuxStream(stream, stdout, stderr);
+
     return new Promise((resolve, reject) => {
       let output = '';
+      let errorOutput = '';
 
-      stream.on('data', (chunk) => {
+      stdout.on('data', (chunk) => {
         output += chunk.toString();
+      });
+
+      stderr.on('data', (chunk) => {
+        errorOutput += chunk.toString();
       });
 
       stream.on('error', (err) => {
@@ -267,7 +237,11 @@ export class ContainerSessionManager extends BaseSessionManager {
       });
 
       stream.on('end', () => {
-        resolve(output);
+        if (errorOutput && (errorOutput.includes('No such file') || errorOutput.includes('cannot access'))) {
+          resolve('');
+        } else {
+          resolve(output);
+        }
       });
     });
   }

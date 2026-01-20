@@ -10,16 +10,26 @@
     "loading": "加载中...",
     "user": "用户",
     "userMenu": "用户菜单",
-    "loggedInAs": "登录为"
+    "loggedInAs": "登录为",
+    "chat": "聊天",
+    "shell": "终端",
+    "files": "文件",
+    "version": "版本",
+    "currentVersion": "当前版本",
+    "adminConsole": "管理控制台"
+  },
+  "app": {
+    "tagline": "AI驱动，一屏尽览",
+    "conversations": "会话列表"
   },
   "homepage": {
-    "title": "Claude Code UI",
-    "subtitle": "AI 编码的多用户 Web 界面",
-    "description": "一个强大的基于 Web 的 Claude Code CLI、Cursor CLI 和 OpenAI Codex 界面。与您的团队协作，利用 AI 驱动的代码辅助功能。",
+    "title": "企业大脑",
+    "subtitle": "提供 WebUI 的智能体为企业赋能",
+    "description": "一个集成 WebUI 的智能体平台，通过 AI 驱动的解决方案为企业赋能，简化工作流程并提升生产力。",
     "features": {
-      "title": "核心功能",
+      "title": "核心能力",
       "chat": {
-        "title": "实时聊天",
+        "title": "实时对话",
         "description": "交互式 AI 聊天界面，支持流式响应"
       },
       "collaboration": {
@@ -45,17 +55,17 @@
     },
     "cta": {
       "title": "准备开始了吗？",
-      "description": "加入成千上万使用 AI 编写更好代码的开发者。立即注册，体验编程的未来。",
+      "description": "通过 AI 驱动的解决方案为您的企业赋能。立即注册，改变您的工作方式。",
       "login": "开始使用",
       "getStarted": "立即开始"
     },
     "footer": {
-      "copyright": "© 2025 Claude Code UI. 保留所有权利。"
+      "copyright": "© 2025 企业大脑. 保留所有权利。"
     }
   },
   "login": {
     "welcome": "欢迎回来",
-    "subtitle": "登录您的 Claude Code UI 账户",
+    "subtitle": "登录您的 企业大脑 账户",
     "username": "用户名",
     "usernamePlaceholder": "请输入用户名",
     "password": "密码",
@@ -64,7 +74,7 @@
     "signingIn": "登录中...",
     "error": "请输入用户名和密码",
     "firstTime": "首次使用？创建账户",
-    "credentials": "输入您的凭据以访问 Claude Code UI",
+    "credentials": "输入您的凭据以访问 企业大脑",
     "setupHint": "如果是首次使用，系统可能需要初始化。请刷新页面。"
   },
   "register": {
@@ -120,6 +130,14 @@
       "appearance": "外观",
       "api": "API 和令牌",
       "tasks": "任务"
+    },
+    "agents": {
+      "title": "代理设置",
+      "description": "配置 AI 模型行为和权限",
+      "permission": "权限模式",
+      "permissionDescription": "控制 Claude 如何与您的文件和系统交互",
+      "mcpServers": "MCP 服务器",
+      "mcpServersDescription": "管理模型上下文协议服务器以扩展功能"
     },
     "appearance": {
       "darkMode": "深色模式",
@@ -181,6 +199,9 @@
     "projectName": "项目名称",
     "addToFavorites": "添加到收藏",
     "removeFromFavorites": "从收藏移除",
-    "youHave": "当前版本"
+    "youHave": "当前版本",
+    "noConversations": "暂无会话",
+    "startANewConversation": "开始与 AI 对话",
+    "refreshConversations": "刷新会话列表"
   }
 }

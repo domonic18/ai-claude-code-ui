@@ -39,10 +39,10 @@ export const ENV_CONFIG = {
    * Application info
    */
   APP: {
-    NAME: getEnvVar('VITE_APP_NAME', 'Claude Code UI'),
+    NAME: getEnvVar('VITE_APP_NAME', 'Synapse Core'),
     VERSION: getEnvVar('VITE_APP_VERSION', '1.13.6'),
-    DESCRIPTION: getEnvVar('VITE_APP_DESCRIPTION', 'Multi-user Web Interface for Claude Code CLI'),
-    HOMEPAGE: getEnvVar('VITE_APP_HOMEPAGE', 'https://github.com/anthropics/claude-code-ui'),
+    DESCRIPTION: getEnvVar('VITE_APP_DESCRIPTION', 'AI Agent Platform Empowering Enterprises with WebUI'),
+    HOMEPAGE: getEnvVar('VITE_APP_HOMEPAGE', 'https://github.com/domonic18/ai-claude-code-ui'),
   },
 
   /**
@@ -103,7 +103,6 @@ export const ENV_CONFIG = {
    * Feature flags from environment
    */
   FEATURES: {
-    ENABLE_TASKMASTER: getEnvBool('VITE_ENABLE_TASKMASTER', true),
     ENABLE_PRD_EDITOR: getEnvBool('VITE_ENABLE_PRD_EDITOR', true),
     ENABLE_FILE_EXPLORER: getEnvBool('VITE_ENABLE_FILE_EXPLORER', true),
     ENABLE_TERMINAL: getEnvBool('VITE_ENABLE_TERMINAL', true),

@@ -9,11 +9,11 @@
  * Application metadata
  */
 export const APP_CONFIG = {
-  name: 'Claude Code UI',
+  name: 'Synapse Core',
   version: import.meta.env.VITE_APP_VERSION || '1.13.6',
-  description: 'Multi-user Web Interface for Claude Code CLI, Cursor CLI and OpenAI Codex',
-  repository: 'https://github.com/anthropics/claude-code-ui',
-  author: 'Anthropic',
+  description: 'AI Agent Platform Empowering Enterprises with WebUI',
+  repository: 'https://github.com/domonic18/ai-claude-code-ui',
+  author: 'domonic18',
 } as const;
 
 /**
@@ -22,7 +22,6 @@ export const APP_CONFIG = {
  */
 export const FEATURE_FLAGS = {
   // Enable/disable features based on environment or user settings
-  enableTaskMaster: true,
   enablePRDEditor: false, // DEPRECATED: PRDEditor functionality is being removed
   enableFileExplorer: true,
   enableTerminal: true,
@@ -69,17 +68,6 @@ export const UI_DEFAULTS = {
   showThinking: false,
   autoScrollToBottom: true,
   sendByCtrlEnter: false,
-} as const;
-
-/**
- * TaskMaster defaults
- */
-export const TASKMASTER_DEFAULTS = {
-  maxTasksPerProject: 100,
-  defaultViewMode: 'kanban',
-  defaultSortBy: 'id',
-  defaultSortOrder: 'asc',
-  autoRefreshInterval: 30000, // 30 seconds
 } as const;
 
 /**
@@ -132,9 +120,6 @@ export const STORAGE_KEYS = {
 
   // User data
   USER_SETTINGS: 'claude-code-ui.userSettings',
-
-  // TaskMaster
-  TASKMASTER_VIEW_MODE: 'claude-code-ui.taskmaster.viewMode',
 } as const;
 
 /**

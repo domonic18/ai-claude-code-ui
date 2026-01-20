@@ -15,6 +15,7 @@ import path from 'path';
 import { spawn } from 'child_process';
 import { authenticateToken } from '../../middleware/auth.js';
 import containerManager from '../../services/container/core/index.js';
+import { FILE_TIMEOUTS } from '../../config/config.js';
 import { readStreamOutput } from '../../services/files/utils/file-utils.js';
 
 const router = express.Router();
@@ -107,7 +108,7 @@ router.get('/browse-filesystem', authenticateToken, async (req, res) => {
     const { stream } = await containerManager.execInContainer(userId, `ls -la "${inputPath}" 2>/dev/null || echo "DIRECTORY_NOT_FOUND"`);
 
     // 使用 readStreamOutput 辅助函数读取流输出
-    const output = await readStreamOutput(stream, { timeout: 5000 });
+    const output = await readStreamOutput(stream, { timeout: FILE_TIMEOUTS.streamRead });
 
     // 检查目录是否存在
     if (output.includes('DIRECTORY_NOT_FOUND')) {

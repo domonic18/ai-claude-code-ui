@@ -14,6 +14,7 @@
 import containerManager from './core/index.js';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
+import { PTY_TIMEOUTS } from '../../config/config.js';
 
 // PTY 会话存储：sessionId -> sessionInfo
 const ptySessions = new Map();
@@ -392,10 +393,10 @@ export function getPtySessionBuffer(sessionId) {
 
 /**
  * 清理空闲的 PTY 会话
- * @param {number} idleTime - 空闲时间（毫秒）（默认：1 小时）
+ * @param {number} idleTime - 空闲时间（毫秒）（默认：使用配置值）
  * @returns {number} 已清理会话数
  */
-export function cleanupIdlePtySessions(idleTime = 60 * 60 * 1000) {
+export function cleanupIdlePtySessions(idleTime = PTY_TIMEOUTS.idleCleanup) {
   const now = Date.now();
   let cleanedCount = 0;
 
@@ -417,4 +418,4 @@ setInterval(() => {
   if (count > 0) {
     console.log(`Cleaned up ${count} idle PTY sessions`);
   }
-}, 30 * 60 * 1000); // 每 30 分钟
+}, PTY_TIMEOUTS.cleanupInterval); // 使用配置的清理间隔

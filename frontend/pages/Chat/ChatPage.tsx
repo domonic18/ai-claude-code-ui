@@ -37,7 +37,6 @@ export function ChatPage({
   onSessionNotProcessing,
   processingSessions,
   onReplaceTemporarySession,
-  onNavigateToSession,
   onShowSettings,
   onInputFocusChange,
   autoExpandTools,
@@ -46,11 +45,6 @@ export function ChatPage({
   autoScrollToBottom,
   sendByCtrlEnter,
   externalMessageUpdate,
-  updateAvailable,
-  latestVersion,
-  currentVersion,
-  releaseInfo,
-  onShowVersionModal,
 }: ChatPageProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
@@ -78,11 +72,6 @@ export function ChatPage({
                 isLoading={isLoadingProjects}
                 onRefresh={onSidebarRefresh}
                 onShowSettings={onShowSettings}
-                updateAvailable={updateAvailable}
-                latestVersion={latestVersion}
-                currentVersion={currentVersion}
-                releaseInfo={releaseInfo}
-                onShowVersionModal={onShowVersionModal}
                 isPWA={isPWA}
                 isMobile={isMobile}
                 onToggleSidebar={() => setSidebarVisible(false)}
@@ -163,11 +152,6 @@ export function ChatPage({
               isLoading={isLoadingProjects}
               onRefresh={onSidebarRefresh}
               onShowSettings={onShowSettings}
-              updateAvailable={updateAvailable}
-              latestVersion={latestVersion}
-              currentVersion={currentVersion}
-              releaseInfo={releaseInfo}
-              onShowVersionModal={onShowVersionModal}
               isPWA={isPWA}
               isMobile={isMobile}
               onToggleSidebar={() => setSidebarVisible(false)}
@@ -200,7 +184,6 @@ export function ChatPage({
           onSessionNotProcessing={onSessionNotProcessing}
           processingSessions={processingSessions}
           onReplaceTemporarySession={onReplaceTemporarySession}
-          onNavigateToSession={onNavigateToSession}
           onShowSettings={onShowSettings}
           autoExpandTools={autoExpandTools}
           showRawParameters={showRawParameters}

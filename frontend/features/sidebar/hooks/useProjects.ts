@@ -200,7 +200,6 @@ export function useProjects(initialProjects?: Project[] | null): UseProjectsRetu
   const getSortedProjects = useCallback((starredProjects: StarredProjects): Project[] => {
     // Defensive check: ensure projects is an array
     const projectsToSort = Array.isArray(projects) ? projects : [];
-    console.log('[useProjects] getSortedProjects - projects:', projects, 'projectsToSort:', projectsToSort);
     const sorted = [...projectsToSort];
 
     // Sort based on sort order
