@@ -128,6 +128,16 @@ export const AUTH = {
 };
 
 /**
+ * CORS 配置
+ */
+export const CORS = {
+  // 允许的源（逗号分隔）
+  origins: process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
+    : ['http://localhost:5173', 'http://localhost:3001'],
+};
+
+/**
  * 容器配置
  *
  * 注意：项目现在完全基于容器化运行，所有操作都在 Docker 容器中执行。
@@ -480,6 +490,7 @@ export default {
   SERVER,
   DATABASE,
   AUTH,
+  CORS,
   CONTAINER,
   RESOURCE_LIMITS,
   CLAUDE,

@@ -4,12 +4,17 @@
  * User authentication form with internationalization support.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/shared/contexts/AuthContext';
-import { MessageSquare, UserPlus } from 'lucide-react';
+import { MessageSquare, UserPlus, LogIn } from 'lucide-react';
 import { LanguageSwitcher } from '@/shared/components/common/LanguageSwitcher';
+
+interface SamlStatus {
+  enabled: boolean;
+  configured: boolean;
+}
 
 const LoginForm: React.FC = () => {
   const { t } = useTranslation();
@@ -18,11 +23,70 @@ const LoginForm: React.FC = () => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [samlStatus, setSamlStatus] = useState<SamlStatus>({ enabled: false, configured: false });
+  const [isLoadingSaml, setIsLoadingSaml] = useState(true);
 
   const { login } = useAuth();
 
+  // 检查 SAML 状态
+  useEffect(() => {
+    const checkSamlStatus = async () => {
+      try {
+        const response = await fetch('/api/auth/saml/status');
+        if (response.ok) {
+          const data = await response.json();
+          setSamlStatus(data);
+        }
+      } finally {
+        setIsLoadingSaml(false);
+      }
+    };
+
+    checkSamlStatus();
+  }, []);
+
   const handleFirstTimeSetup = () => {
     navigate('/register');
+  };
+
+  const handleSamlLogin = async () => {
+    // 使用同事的实现模式：
+    // 1. 调用 POST /api/auth/saml/init 获取登录URL
+    // 2. 后端返回 login_url
+    // 3. 前端重定向到该 URL
+
+    try {
+      // 使用相对路径，让 Vite 代理转发到后端
+      const initUrl = '/api/auth/saml/init';
+
+      const response = await fetch(initUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          return_to: '/chat'  // 登录成功后返回到 chat 页面
+        }),
+        credentials: 'include'  // 包含 cookies
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        setError(`SSO initialization failed: ${errorData.error || response.statusText}`);
+        return;
+      }
+
+      const data = await response.json();
+
+      // 重定向到 IdP 登录 URL
+      if (data.login_url) {
+        window.location.href = data.login_url;
+      } else {
+        setError('SSO login URL not received from server');
+      }
+    } catch (err) {
+      setError('Failed to connect to SSO service');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -124,6 +188,29 @@ const LoginForm: React.FC = () => {
               {isLoading ? t('login.signingIn') : t('login.signIn')}
             </button>
           </form>
+
+          {/* SSO Login Button */}
+          {!isLoadingSaml && samlStatus.enabled && samlStatus.configured && (
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-card text-muted-foreground">{t('login.or') || 'Or'}</span>
+              </div>
+            </div>
+          )}
+
+          {!isLoadingSaml && samlStatus.enabled && samlStatus.configured && (
+            <button
+              type="button"
+              onClick={handleSamlLogin}
+              className="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white font-medium py-2 px-4 rounded-md border border-gray-300 dark:border-gray-600 transition-colors duration-200"
+            >
+              <LogIn className="w-4 h-4" />
+              {t('login.ssoSignIn') || 'SSO Sign In'}
+            </button>
+          )}
 
           <div className="text-center space-y-2">
             <p className="text-sm text-muted-foreground">
