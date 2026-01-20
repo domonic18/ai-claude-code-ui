@@ -141,3 +141,9 @@ tasks/
 
 # Deprecated backup files
 *.deprecated
+
+# SAML/SSO certificates and keys (keep local only)
+certs/
+*.pem
+*.key
+*.crt
