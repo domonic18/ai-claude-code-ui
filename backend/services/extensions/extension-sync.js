@@ -2,7 +2,8 @@
  * Extension Sync Service
  *
  * Manages synchronization of pre-configured extensions (agents, commands, skills, hooks, knowledge)
- * from the project root extensions/.claude/ directory to user .claude/ directories.
+ * and configuration files (CLAUDE.md, settings.json) from the project root extensions/.claude/
+ * directory to user .claude/ directories.
  *
  * @module services/extensions/extension-sync
  */
@@ -37,7 +38,8 @@ export async function syncExtensions(targetDir, options = {}) {
     commands: { synced: 0, errors: [] },
     skills: { synced: 0, errors: [] },
     hooks: { synced: 0, errors: [] },
-    knowledge: { synced: 0, errors: [] }
+    knowledge: { synced: 0, errors: [] },
+    config: { synced: 0, errors: [] }  // For CLAUDE.md and settings.json
   };
 
   try {
@@ -54,6 +56,9 @@ export async function syncExtensions(targetDir, options = {}) {
     await syncResourceType('skills', targetDir, results.skills, overwriteUserFiles);
     await syncResourceType('hooks', targetDir, results.hooks, overwriteUserFiles);
     await syncResourceType('knowledge', targetDir, results.knowledge, overwriteUserFiles);
+
+    // Sync configuration files (CLAUDE.md and settings.json)
+    await syncConfigFiles(targetDir, results.config, overwriteUserFiles);
 
     return results;
   } catch (error) {
@@ -86,7 +91,7 @@ async function syncResourceType(type, targetDir, results, overwrite) {
   const fileExtensions = {
     agents: ['.json'],
     commands: ['.md'],
-    hooks: ['.js', '.md'],
+    hooks: ['.js', '.md', '.sh', '.py'],  // Shell scripts and Python scripts
     knowledge: ['.md', '.txt']
   };
 
@@ -167,6 +172,46 @@ async function syncResourceType(type, targetDir, results, overwrite) {
       const errorMsg = `${entry.name}: ${error.message}`;
       results.errors.push({ resource: entry.name, error: error.message });
       console.error(`[ExtensionSync] Failed to sync ${entry.name}:`, error.message);
+    }
+  }
+}
+
+/**
+ * Synchronize configuration files (CLAUDE.md and settings.json)
+ *
+ * @private
+ * @param {string} targetDir - Target .claude directory
+ * @param {Object} results - Results object to update
+ * @param {boolean} overwrite - Whether to overwrite existing files
+ */
+async function syncConfigFiles(targetDir, results, overwrite) {
+  const configFiles = ['CLAUDE.md', 'settings.json'];
+
+  for (const filename of configFiles) {
+    const sourcePath = path.join(EXTENSIONS_DIR, filename);
+    const targetPath = path.join(targetDir, filename);
+
+    try {
+      // Check if source file exists
+      if (!(await fileExists(sourcePath))) {
+        console.log(`[ExtensionSync] Config file not found: ${filename}, skipping`);
+        continue;
+      }
+
+      // Check if target exists and skip if not overwriting
+      if (!overwrite && await fileExists(targetPath)) {
+        console.log(`[ExtensionSync] Skipping existing config file: ${filename}`);
+        continue;
+      }
+
+      // Copy the file
+      await fs.copyFile(sourcePath, targetPath);
+      results.synced++;
+      console.log(`[ExtensionSync] Synced config file: ${filename}`);
+    } catch (error) {
+      const errorMsg = `${filename}: ${error.message}`;
+      results.errors.push({ resource: filename, error: error.message });
+      console.error(`[ExtensionSync] Failed to sync ${filename}:`, error.message);
     }
   }
 }
@@ -292,14 +337,14 @@ export async function getAllExtensions() {
     }
   }
 
-  // Read Hooks (.js and .md files)
+  // Read Hooks (.js, .md, .sh, and .py files)
   const hooksDir = path.join(EXTENSIONS_DIR, 'hooks');
   if (await directoryExists(hooksDir)) {
     const entries = await fs.readdir(hooksDir, { withFileTypes: true });
     for (const entry of entries) {
       if (entry.isFile()) {
         const ext = path.extname(entry.name);
-        if (ext === '.js' || ext === '.md') {
+        if (ext === '.js' || ext === '.md' || ext === '.sh' || ext === '.py') {
           const filePath = path.join(hooksDir, entry.name);
 
           let description = '';
@@ -309,18 +354,33 @@ export async function getAllExtensions() {
             if (ext === '.js') {
               const match = content.match(/\/\*\*\s*([^*]|\*(?!\/))*\*\//);
               description = match ? match[0].substring(2, match[0].length - 2).trim().substring(0, 100) : 'JavaScript Hook';
-            } else {
+            } else if (ext === '.md') {
               // For .md files, extract first heading
               const match = content.match(/^#\s+(.+)$/m);
               description = match ? match[1] : '';
+            } else if (ext === '.sh') {
+              // For .sh files, extract description from comment or use default
+              const match = content.match(/^#\s*(.+)$/m);
+              description = match ? match[1] : 'Shell Script Hook';
+            } else {
+              // For .py files, extract description from docstring or comment
+              const docstringMatch = content.match(/"""[\s\S]*?"""/);
+              if (docstringMatch) {
+                description = docstringMatch[0].replace(/"/g, '').trim().substring(0, 100);
+              } else {
+                const commentMatch = content.match(/^#\s*(.+)$/m);
+                description = commentMatch ? commentMatch[1] : 'Python Script Hook';
+              }
             }
           } catch {
-            description = ext === '.js' ? 'JavaScript Hook' : 'Markdown Hook';
+            description = ext === '.js' ? 'JavaScript Hook' :
+                         ext === '.md' ? 'Markdown Hook' :
+                         ext === '.sh' ? 'Shell Script Hook' : 'Python Script Hook';
           }
 
           extensions.hooks.push({
             filename: entry.name,
-            name: entry.name.replace(/\.(js|md)$/, ''),
+            name: entry.name.replace(/\.(js|md|sh|py)$/, ''),
             type: ext.substring(1),
             description
           });
