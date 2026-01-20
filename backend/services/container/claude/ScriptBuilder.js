@@ -100,6 +100,23 @@ async function filterSDKOptions(options, userId) {
     delete sdkOptions.resume;
   }
 
+  // 禁用交互式规划工具（前端暂不支持）
+  // 这些工具需要用户实时交互，Web 界面暂时不支持
+  const interactivePlanningTools = [
+    'EnterPlanMode',   // 进入规划模式
+    'AskUserQuestion', // 向用户提问
+    'ExitPlanMode'     // 退出规划模式
+  ];
+
+  // 合并已有的 disallowedTools
+  if (sdkOptions.disallowedTools && sdkOptions.disallowedTools.length > 0) {
+    sdkOptions.disallowedTools = [...sdkOptions.disallowedTools, ...interactivePlanningTools];
+  } else {
+    sdkOptions.disallowedTools = interactivePlanningTools;
+  }
+
+  console.log('[ScriptBuilder] Disallowed interactive planning tools:', interactivePlanningTools);
+
   // 移除 sessionId（SDK 不需要这个参数）
   delete sdkOptions.sessionId;
 
