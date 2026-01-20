@@ -388,7 +388,8 @@ export function MarkdownRenderer({
   const rehypePlugins = useMemo(() => {
     const plugins: any[] = [];
     if (enableMath) {
-      plugins.push(rehypeKatex);
+      // Configure rehype-katex with strict mode disabled to avoid warnings for Chinese text in math mode
+      plugins.push([rehypeKatex, { strict: false }]);
     }
     return plugins;
   }, [enableMath]);
