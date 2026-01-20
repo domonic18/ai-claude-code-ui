@@ -169,6 +169,14 @@ export const CONTAINER = {
     // 项目元数据目录（注意：官方文档未明确说明，保留用于路径验证）
     // 此目录可能由 SDK 自动管理用于会话元数据
     projects: '/workspace/.claude/projects',
+  },
+
+  // 宿主机安全策略文件路径
+  security: {
+    // Seccomp 配置文件路径（系统调用过滤）
+    seccompProfile: process.env.SECCOMP_PROFILE || path.join(PROJECT_ROOT, 'workspace/containers/seccomp/claude-code.json'),
+    // AppArmor 配置文件名称（需要在系统上预加载）
+    apparmorProfile: process.env.APPARMOR_PROFILE || 'docker-claude-code',
   }
 };
 

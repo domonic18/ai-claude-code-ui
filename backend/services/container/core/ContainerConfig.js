@@ -8,6 +8,7 @@
  */
 
 import { RESOURCE_LIMITS, CONTAINER } from '../../../config/config.js';
+import fs from 'fs';
 
 /**
  * 容器配置构建器类
@@ -54,6 +55,10 @@ export class ContainerConfigBuilder {
         CpuPeriod: resourceLimits.cpuPeriod,
         NetworkMode: network,
         ReadonlyRootfs: false,
+        // Seccomp 安全策略：直接传递 JSON 对象
+        Seccomp: this._loadSeccompProfile(),
+        // AppArmor 和其他安全选项
+        SecurityOpt: this._buildSecurityOptions(),
         LogConfig: {
           Type: 'json-file',
           Config: {
@@ -64,6 +69,43 @@ export class ContainerConfigBuilder {
       },
       Labels: this._buildLabels(userId, tier)
     };
+  }
+
+  /**
+   * 加载 Seccomp 安全配置
+   * @returns {object|null} Seccomp 配置对象，如果文件不存在则返回 null
+   * @private
+   */
+  _loadSeccompProfile() {
+    try {
+      const seccompPath = CONTAINER.security.seccompProfile;
+      const content = fs.readFileSync(seccompPath, 'utf8');
+      return JSON.parse(content);
+    } catch (error) {
+      console.warn(`[ContainerConfig] Failed to load seccomp profile: ${error.message}`);
+      // 返回 undefined 将使用 Docker 默认 seccomp profile
+      return undefined;
+    }
+  }
+
+  /**
+   * 构建容器安全选项
+   * @returns {Array<string>} 安全选项数组
+   * @private
+   */
+  _buildSecurityOptions() {
+    const securityOptions = [];
+
+    // AppArmor 配置：强制访问控制
+    // 注意：AppArmor 配置需要先在系统上加载：
+    //   sudo apparmor_parser -r workspace/containers/apparmor/docker-claude-code
+    // 如果 AppArmor 未安装或未加载，Docker 会忽略此选项并使用默认配置
+    securityOptions.push(`apparmor=${CONTAINER.security.apparmorProfile}`);
+
+    // 禁止提权：防止进程通过 exec 系统调用获得新的权限
+    securityOptions.push('no-new-privileges');
+
+    return securityOptions;
   }
 
   /**
