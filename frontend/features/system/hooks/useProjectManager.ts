@@ -212,9 +212,14 @@ export function useProjectManager(
 
   /**
    * Fetch projects from API
+   * @param {boolean} isRetry - Whether this is a retry attempt
+   * @param {number} retryCount - Current retry attempt number
    */
-  const fetchProjects = useCallback(async (isRetry = false) => {
-    return requestDeduplicator.dedupe('projects:fetch', async () => {
+  const fetchProjects = useCallback(async (isRetry = false, retryCount = 0) => {
+    return requestDeduplicator.dedupe(`projects:fetch:${retryCount}`, async () => {
+      // Flag to track if we should keep loading state (still retrying)
+      let shouldKeepLoading = false;
+
       try {
         if (!isRetry) {
           setIsLoadingProjects(true);
@@ -224,12 +229,20 @@ export function useProjectManager(
         if (!response.ok) {
           console.error('Failed to fetch projects:', response.status, response.statusText);
           setProjects([]);
+          // Retry on network errors
+          if (retryCount < 10) {
+            shouldKeepLoading = true;
+            setTimeout(() => {
+              console.log(`[useProjectManager] Retry ${retryCount + 1}/10 due to network error...`);
+              fetchProjects(true, retryCount + 1);
+            }, 2000);
+          }
           return;
         }
 
         const responseData = await response.json();
         let data: Project[] = [];
-        
+
         if (responseData && typeof responseData === 'object') {
           if (Array.isArray(responseData.data)) {
             data = responseData.data;
@@ -240,14 +253,21 @@ export function useProjectManager(
           }
         }
 
-        if (!isRetry && data.length === 0 && user) {
-          console.log('[useProjectManager] No projects found, container may be initializing. Scheduling retry...');
-          setTimeout(() => {
-            console.log('[useProjectManager] Retrying project fetch...');
-            hasFetchedRef.current = false;
-            fetchProjects(true);
-          }, 2000);
-          return;
+        // If no projects found and user is logged in, keep retrying
+        if (data.length === 0 && user) {
+          if (retryCount < 6) {
+            shouldKeepLoading = true;
+            console.log(`[useProjectManager] No projects found (retry ${retryCount + 1}/6), container may be initializing...`);
+            setTimeout(() => {
+              console.log('[useProjectManager] Retrying project fetch...');
+              fetchProjects(true, retryCount + 1);
+            }, 2000);
+            return;
+          } else {
+            console.log('[useProjectManager] Max retries reached, giving up');
+            // Let finally block set loading to false
+            return;
+          }
         }
 
         // Fetch Cursor sessions for each project
@@ -280,15 +300,19 @@ export function useProjectManager(
           const restored = restoreLastSession(data);
 
           if (!restored) {
-            // No saved session, select first session of first project
+            // No saved session, select first project and prepare for new session
             const firstProject = data[0];
             const firstSession = firstProject.sessions?.[0] ||
                                 (firstProject as any).cursorSessions?.[0] ||
                                 (firstProject as any).codexSessions?.[0];
 
+            console.log('[useProjectManager] No saved session, selecting first project:', firstProject.name);
+
+            // Always select the first project
+            setSelectedProject(firstProject);
+
             if (firstSession) {
-              console.log('[useProjectManager] No saved session, auto-selecting first session');
-              setSelectedProject(firstProject);
+              // If there's an existing session, select it
               const provider = firstProject.sessions?.some(s => s.id === firstSession.id) ? 'claude' :
                               (firstProject as any).cursorSessions?.some((s: any) => s.id === firstSession.id) ? 'cursor' : 'codex';
               setSelectedSession({
@@ -296,6 +320,11 @@ export function useProjectManager(
                 __projectName: firstProject.name,
                 __provider: provider
               });
+            } else {
+              // If no sessions exist, clear selectedSession and increment counter to start fresh
+              setSelectedSession(null);
+              setNewSessionCounter(prev => prev + 1);
+              console.log('[useProjectManager] No sessions in project, ready for new session');
             }
           }
         }
@@ -303,7 +332,10 @@ export function useProjectManager(
       } catch (error) {
         console.error('Error fetching projects:', error);
       } finally {
-        setIsLoadingProjects(false);
+        // Only set loading to false if we're not still retrying
+        if (!shouldKeepLoading) {
+          setIsLoadingProjects(false);
+        }
       }
     });
   }, [user, restoreLastSession]);
@@ -556,7 +588,20 @@ export function useProjectManager(
   /**
    * Fetch projects when user logs in
    */
+  // Track previous user ID to detect user changes
+  const prevUserIdRef = useRef<string | null>(null);
+
   useEffect(() => {
+    const currentUserId = user?.id ?? null;
+
+    // Reset fetch state when user changes
+    if (prevUserIdRef.current !== currentUserId) {
+      console.log('[useProjectManager] User changed, resetting fetch state');
+      hasFetchedRef.current = false;
+      hasInitialSyncRef.current = false;
+      prevUserIdRef.current = currentUserId;
+    }
+
     if (user && !hasFetchedRef.current) {
       console.log('[useProjectManager] User logged in, fetching projects...');
       hasFetchedRef.current = true;
