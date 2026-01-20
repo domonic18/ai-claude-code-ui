@@ -15,7 +15,8 @@
     "shell": "终端",
     "files": "文件",
     "version": "版本",
-    "currentVersion": "当前版本"
+    "currentVersion": "当前版本",
+    "adminConsole": "管理控制台"
   },
   "app": {
     "tagline": "AI驱动，一屏尽览",

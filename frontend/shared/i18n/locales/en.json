@@ -15,7 +15,8 @@
     "shell": "Shell",
     "files": "Files",
     "version": "Version",
-    "currentVersion": "Current version"
+    "currentVersion": "Current version",
+    "adminConsole": "Admin Console"
   },
   "app": {
     "tagline": "AI-Driven, All on One Screen",

@@ -15,6 +15,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Settings, LogOut, Languages, ChevronUp, Shield } from 'lucide-react';
 import { LanguageSwitcher } from '@/shared/components/common/LanguageSwitcher';
 import { useAuth } from '@/shared/contexts/AuthContext';
+import { useUserRole } from '@/features/auth/hooks/useAuth';
 
 export interface UserMenuProps {
   onShowSettings?: () => void;
@@ -25,6 +26,7 @@ export const UserMenu = ({
 }: UserMenuProps) => {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
+  const { isAdmin } = useUserRole();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -120,15 +122,17 @@ export const UserMenu = ({
               </button>
             )}
 
-            {/* 管理控制台 */}
-            <Link
-              to="/admin"
-              onClick={() => setIsOpen(false)}
-              className="w-full px-4 py-2 flex items-center gap-3 hover:bg-accent/50 transition-colors"
-            >
-              <Shield className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm text-foreground">管理控制台</span>
-            </Link>
+            {/* 管理控制台 - 仅对管理员显示 */}
+            {isAdmin && (
+              <Link
+                to="/admin"
+                onClick={() => setIsOpen(false)}
+                className="w-full px-4 py-2 flex items-center gap-3 hover:bg-accent/50 transition-colors"
+              >
+                <Shield className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-foreground">{t('common.adminConsole') || '管理控制台'}</span>
+              </Link>
+            )}
 
             {/* 退出登录 */}
             <button
