@@ -13,7 +13,7 @@
 import { loadProjectConfig, saveProjectConfig } from '../config/index.js';
 import { deleteSessionInContainer, getSessionsInContainer } from '../../sessions/container/ContainerSessions.js';
 import containerManager from '../../container/core/index.js';
-import { CONTAINER } from '../../../config/config.js';
+import { CONTAINER, FILE_TIMEOUTS } from '../../../config/config.js';
 import { readStreamOutput } from '../../files/utils/file-utils.js';
 
 /**
@@ -142,7 +142,7 @@ async function addProjectManually(userId, projectName, displayName = null) {
     );
 
     // 使用 readStreamOutput 辅助函数，设置超时
-    await readStreamOutput(stream, { timeout: 5000 });
+    await readStreamOutput(stream, { timeout: FILE_TIMEOUTS.streamRead });
 
     // Add to config as manually added project
     const config = await loadProjectConfig();

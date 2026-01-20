@@ -10,7 +10,7 @@
 import { PassThrough } from 'stream';
 import containerManager from '../../container/core/index.js';
 import { getSessionsInContainer } from '../../sessions/container/ContainerSessions.js';
-import { CONTAINER } from '../../../config/config.js';
+import { CONTAINER, FILE_TIMEOUTS } from '../../../config/config.js';
 import { loadProjectConfig } from '../config/index.js';
 
 /**
@@ -28,7 +28,7 @@ export async function getProjectsInContainer(userId) {
     // 如果容器正在创建中，快速返回空列表，让前端通过轮询获取
     let container;
     try {
-      container = await containerManager.getOrCreateContainer(userId, {}, { wait: true, timeout: 5000 });
+      container = await containerManager.getOrCreateContainer(userId, {}, { wait: true, timeout: FILE_TIMEOUTS.quickRequest });
       console.log('[ContainerProjectManager] Container:', container.id, container.name);
     } catch (error) {
       // 容器未就绪，返回空列表让前端继续轮询
