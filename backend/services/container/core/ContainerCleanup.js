@@ -8,6 +8,7 @@
  */
 
 import { repositories } from '../../../database/db.js';
+import { CONTAINER_TIMEOUTS } from '../../../config/config.js';
 
 const { Container } = repositories;
 
@@ -30,10 +31,10 @@ export class ContainerCleanupManager {
 
   /**
    * 清理空闲容器
-   * @param {number} idleTime - 空闲时间（毫秒），默认 2 小时
+   * @param {number} idleTime - 空闲时间（毫秒），默认使用配置值
    * @returns {Promise<number>} 清理的容器数量
    */
-  async cleanupIdleContainers(idleTime = 2 * 60 * 60 * 1000) {
+  async cleanupIdleContainers(idleTime = CONTAINER_TIMEOUTS.idleCleanup) {
     const now = Date.now();
     let cleanedCount = 0;
 
@@ -111,9 +112,9 @@ export class ContainerCleanupManager {
 
   /**
    * 启动清理间隔
-   * @param {number} interval - 检查间隔（毫秒），默认 30 分钟
+   * @param {number} interval - 检查间隔（毫秒），默认使用配置值
    */
-  startCleanupInterval(interval = 30 * 60 * 1000) {
+  startCleanupInterval(interval = CONTAINER_TIMEOUTS.cleanupInterval) {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
     }

@@ -1,6 +1,6 @@
 /**
  * Docker 执行引擎
- * 
+ *
  * 负责在 Docker 容器内执行脚本并处理流式输出。
  */
 
@@ -8,6 +8,7 @@ import containerManager from '../core/index.js';
 import { buildSDKScript } from './ScriptBuilder.js';
 import { processOutput } from './MessageTransformer.js';
 import { setSessionStream, getSession } from './SessionManager.js';
+import { SDK } from '../../../config/config.js';
 
 /**
  * 检查 stderr 是否包含真正的错误
@@ -97,14 +98,31 @@ export async function executeInContainer(userId, command, options, writer, sessi
     docker.modem.demuxStream(stream, stdout, stderr);
 
     return new Promise((resolve, reject) => {
-      // 添加超时保护
-      const timeout = setTimeout(() => {
-        console.error('[DockerExecutor] Execution timeout after 5 minutes');
-        stdout.destroy();
-        stderr.destroy();
-        stream.destroy();
-        reject(new Error('SDK execution timeout'));
-      }, 5 * 60 * 1000);
+      // 添加超时保护（可配置，0 表示禁用）
+      const timeoutMs = SDK.executionTimeout;
+      let timeoutHandle = null;
+      let settled = false;  // 标志：Promise 是否已经 settle
+
+      const settle = (fn, value) => {
+        if (!settled) {
+          settled = true;
+          fn(value);
+        }
+      };
+
+      if (timeoutMs > 0) {
+        const timeoutMinutes = Math.round(timeoutMs / 60000);
+        console.log(`[DockerExecutor] Setting execution timeout: ${timeoutMinutes} minutes`);
+        timeoutHandle = setTimeout(() => {
+          console.error(`[DockerExecutor] Execution timeout after ${timeoutMinutes} minutes`);
+          stdout.destroy();
+          stderr.destroy();
+          stream.destroy();
+          settle(reject, new Error(`SDK execution timeout (${timeoutMinutes} minutes)`));
+        }, timeoutMs);
+      } else {
+        console.log('[DockerExecutor] Execution timeout disabled (SDK_EXECUTION_TIMEOUT=0)');
+      }
 
       // 用于追踪会话创建
       const state = { sessionCreatedSent: false };
@@ -137,20 +155,22 @@ export async function executeInContainer(userId, command, options, writer, sessi
 
       // 监听流结束
       stream.on('end', () => {
-        clearTimeout(timeout);
-        
+        if (timeoutHandle) {
+          clearTimeout(timeoutHandle);
+        }
+
         // 检查会话是否被中止
         const session = getSession(sessionId);
         if (!session && dataCount > 0) {
           // 如果会话在 Map 中找不到，且已经有数据产生，可能是被 abortSession 删除了
           console.log(`[DockerExecutor] Stream ended for session ${sessionId}, session seems to have been aborted`);
-          resolve({ output: stdoutChunks.join(''), sessionId, aborted: true });
+          settle(resolve, { output: stdoutChunks.join(''), sessionId, aborted: true });
           return;
         }
 
         const stdoutOutput = stdoutChunks.join('');
         const stderrOutput = stderrChunks.join('');
-        
+
         console.log('[DockerExecutor] Stream ended. Total chunks:', dataCount);
         console.log('[DockerExecutor] STDOUT length:', stdoutOutput.length);
         console.log('[DockerExecutor] STDERR length:', stderrOutput.length);
@@ -158,17 +178,19 @@ export async function executeInContainer(userId, command, options, writer, sessi
         // 检查是否有真正的错误
         if (hasRealError(stderrOutput)) {
           console.error('[DockerExecutor] Execution failed:', stderrOutput);
-          reject(new Error(`SDK execution error: ${stderrOutput}`));
+          settle(reject, new Error(`SDK execution error: ${stderrOutput}`));
         } else {
           console.log('[DockerExecutor] Execution completed successfully');
-          resolve({ output: stdoutOutput, sessionId });
+          settle(resolve, { output: stdoutOutput, sessionId });
         }
       });
 
       stream.on('error', (err) => {
-        clearTimeout(timeout);
+        if (timeoutHandle) {
+          clearTimeout(timeoutHandle);
+        }
         console.error('[DockerExecutor] Stream error:', err);
-        reject(err);
+        settle(reject, err);
       });
     });
 

@@ -6,6 +6,8 @@
  * @module container/core/ContainerHealth
  */
 
+import { CONTAINER_TIMEOUTS } from '../../../config/config.js';
+
 /**
  * 容器健康监控器类
  */
@@ -36,11 +38,11 @@ export class ContainerHealthMonitor {
   /**
    * 等待容器准备就绪
    * @param {string} containerId - 容器 ID
-   * @param {number} timeout - 超时时间（毫秒），默认 60000ms
+   * @param {number} timeout - 超时时间（毫秒），默认使用配置值
    * @returns {Promise<boolean>} 容器是否准备就绪
    * @throws {Error} 如果容器未在超时时间内准备就绪
    */
-  async waitForContainerReady(containerId, timeout = 60000) {
+  async waitForContainerReady(containerId, timeout = CONTAINER_TIMEOUTS.healthCheck) {
     const startTime = Date.now();
     const container = this.docker.getContainer(containerId);
 

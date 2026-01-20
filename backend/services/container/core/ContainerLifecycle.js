@@ -12,7 +12,7 @@
 import path from 'path';
 import fs from 'fs';
 import { repositories } from '../../../database/db.js';
-import { getWorkspaceDir, CONTAINER } from '../../../config/config.js';
+import { getWorkspaceDir, CONTAINER, CONTAINER_TIMEOUTS } from '../../../config/config.js';
 import { ContainerConfigBuilder } from './ContainerConfig.js';
 import { ContainerHealthMonitor } from './ContainerHealth.js';
 import { ContainerStateMachine, ContainerState } from './ContainerStateMachine.js';
@@ -87,7 +87,7 @@ export class ContainerLifecycleManager {
    * @param {number} timeout - 超时时间（毫秒）
    * @returns {Promise<ContainerStateMachine>}
    */
-  async _waitForReady(userId, timeout = 120000) {
+  async _waitForReady(userId, timeout = CONTAINER_TIMEOUTS.ready) {
     const stateMachine = await this._getStateMachine(userId);
 
     // 如果已经就绪，直接返回
@@ -385,7 +385,7 @@ Happy coding!
    * @param {number} timeout - 超时时间（毫秒）
    * @returns {Promise<void>}
    */
-  async _waitForContainerRemoved(containerName, timeout = 10000) {
+  async _waitForContainerRemoved(containerName, timeout = CONTAINER_TIMEOUTS.remove) {
     const start = Date.now();
 
     while (Date.now() - start < timeout) {
@@ -410,7 +410,7 @@ Happy coding!
    * @param {number} timeout - 超时时间（秒）
    * @returns {Promise<void>}
    */
-  async stopContainer(userId, timeout = 10) {
+  async stopContainer(userId, timeout = CONTAINER_TIMEOUTS.stop) {
     const containerInfo = this.containers.get(userId);
     if (!containerInfo) {
       return;
