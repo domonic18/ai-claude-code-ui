@@ -77,10 +77,18 @@ async function filterSDKOptions(options, userId) {
       'TodoWrite',
       'TodoRead',
       'WebFetch',
-      'WebSearch'
+      'WebSearch',
+      'Skill'           // 关键修复：启用 Skill 工具，否则 SDK 不会加载 Skills
     ];
     console.log('[ScriptBuilder] Setting default allowedTools');
   }
+
+  // 关键修复：设置 settingSources 以从文件系统加载 Skills 和 Agents
+  // 根据 Claude Agent SDK 文档，必须显式设置此选项才能加载扩展
+  // - "user": 从 ~/.claude/ 加载（HOME 环境变量指向的目录）
+  // - "project": 从当前工作目录的 .claude/ 加载
+  sdkOptions.settingSources = ['user', 'project'];
+  console.log('[ScriptBuilder] Setting settingSources: user, project');
 
   // 处理权限模式
   // 如果前端指定了 skipPermissions，或者在容器模式下且没有明确指定 permissionMode

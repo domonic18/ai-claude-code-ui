@@ -70,6 +70,8 @@ export async function executeInContainer(userId, command, options, writer, sessi
         tty: false,  // 不使用 TTY，以便可以分离 stdout 和 stderr
         env: {
           NODE_PATH: '/app/node_modules',
+          HOME: '/workspace',
+          CLAUDE_CONFIG_DIR: '/workspace/.claude',
           ANTHROPIC_AUTH_TOKEN: authToken,
           ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL,
           ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL
