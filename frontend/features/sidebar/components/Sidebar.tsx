@@ -86,7 +86,7 @@ export const Sidebar = memo(function Sidebar({
     return () => clearInterval(timer);
   }, []);
 
-  // Auto-expand project when a session is selected
+  // Auto-expand project when a project is selected or a session is selected
   // Use ref to track previous session/project to avoid unnecessary updates
   const prevSelectionRef = useRef<{ sessionId?: string; projectName?: string } | null>(null);
 
@@ -101,7 +101,8 @@ export const Sidebar = memo(function Sidebar({
                        prevSelectionRef.current.sessionId !== currentSelection.sessionId ||
                        prevSelectionRef.current.projectName !== currentSelection.projectName;
 
-    if (hasChanged && selectedSession && selectedProject) {
+    // Auto-expand when project is selected (even without session) or when session is selected
+    if (hasChanged && selectedProject) {
       setExpandedProjects(prev => {
         // Only update if project is not already expanded
         if (prev.has(selectedProject.name)) {
