@@ -69,8 +69,12 @@ export class AuthController extends BaseController {
       const saltRounds = 12;
       const passwordHash = await bcrypt.hash(password, saltRounds);
 
+      // 第一个注册的用户自动成为管理员
+      const hasUsers = User.hasUsers();
+      const role = hasUsers ? 'user' : 'admin';
+
       // 创建用户
-      const user = User.create(username, passwordHash);
+      const user = User.create(username, passwordHash, role);
 
       // 生成令牌
       const token = generateToken(user);
@@ -99,6 +103,7 @@ export class AuthController extends BaseController {
       this._success(res, {
         id: user.id,
         username: user.username,
+        role: user.role,
         createdAt: user.createdAt,
         lastLoginAt: user.lastLoginAt
       }, 'Registration successful', 201);
@@ -169,6 +174,7 @@ export class AuthController extends BaseController {
       this._success(res, {
         id: user.id,
         username: user.username,
+        role: user.role,
         createdAt: user.createdAt,
         lastLoginAt: user.lastLoginAt
       }, 'Login successful');
@@ -195,6 +201,7 @@ export class AuthController extends BaseController {
       this._success(res, {
         id: user.id,
         username: user.username,
+        role: user.role,
         createdAt: user.createdAt,
         lastLoginAt: user.lastLoginAt
       });

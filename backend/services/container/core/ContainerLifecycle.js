@@ -267,6 +267,24 @@ export class ContainerLifecycleManager {
       await fs.promises.mkdir(claudeDir, { recursive: true });
       console.log(`[Lifecycle] Created .claude directory: ${claudeDir}`);
 
+      // 2.1. 创建默认工作区 my-workspace
+      const myWorkspaceDir = path.join(userDataDir, 'my-workspace');
+      await fs.promises.mkdir(myWorkspaceDir, { recursive: true });
+      const readmePath = path.join(myWorkspaceDir, 'README.md');
+      await fs.promises.writeFile(readmePath, `# My Workspace
+
+Welcome to your Claude Code workspace! This is your default project where you can start coding.
+
+## Getting Started
+
+- Use the chat interface to ask Claude to help you with coding tasks
+- Use the file explorer to browse and edit files
+- Use the terminal to run commands
+
+Happy coding!
+`, 'utf8');
+      console.log(`[Lifecycle] Created default workspace: ${myWorkspaceDir}`);
+
       // 同步预置扩展（agents, commands, skills）
       try {
         await syncExtensions(claudeDir, { overwriteUserFiles: true });
