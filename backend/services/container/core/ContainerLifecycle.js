@@ -68,6 +68,17 @@ export class ContainerLifecycleManager {
     const containerName = `claude-user-${userId}`;
     const stateMachine = await containerStateStore.getOrCreate(userId, containerName);
 
+    // 验证状态一致性：如果状态是中间状态但容器不存在，重置为 NON_EXISTENT
+    const intermediateStates = [ContainerState.CREATING, ContainerState.STARTING, ContainerState.HEALTH_CHECKING];
+    if (intermediateStates.includes(stateMachine.getState())) {
+      const containerExists = await this._verifyContainerExists(containerName);
+      if (!containerExists) {
+        console.log(`[Lifecycle] Container ${containerName} not found but state is ${stateMachine.getState()}, resetting to NON_EXISTENT`);
+        stateMachine.transitionTo(ContainerState.NON_EXISTENT);
+        await containerStateStore.save(stateMachine);
+      }
+    }
+
     // 缓存状态机
     this.stateMachines.set(userId, stateMachine);
 
@@ -78,6 +89,27 @@ export class ContainerLifecycleManager {
     });
 
     return stateMachine;
+  }
+
+  /**
+   * 验证容器是否真实存在
+   * @private
+   * @param {string} containerName - 容器名称
+   * @returns {Promise<boolean>}
+   */
+  async _verifyContainerExists(containerName) {
+    try {
+      const container = this.docker.getContainer(containerName);
+      await container.inspect();
+      return true;
+    } catch (error) {
+      if (error.statusCode === 404) {
+        return false;
+      }
+      // 其他错误（网络问题等）保守地认为容器可能存在
+      console.warn(`[Lifecycle] Error verifying container ${containerName}: ${error.message}`);
+      return true;
+    }
   }
 
   /**
