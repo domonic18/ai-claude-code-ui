@@ -116,7 +116,7 @@
     "attachFile": "附加文件",
     "typeMessage": "输入您的消息...",
     "thinking": "思考中...",
-    "messageAbout": "关于 {{project}} 的消息...",
+    "messageAbout": "发送消息或输入 \"/\" 选择技能",
     "selectProject": "选择一个项目以开始聊天...",
     "pressCtrlEnter": "按",
     "toSend": "发送",
@@ -128,6 +128,10 @@
     "forFiles": "引用文件",
     "stop": "停止",
     "tokenUsage": "令牌使用: {{percentage}}%",
+    "emptyState": {
+      "title": "开始对话",
+      "description": "发送消息以开始使用 AI 助手。"
+    },
     "context": "上下文: {{tokens}} 令牌",
     "tool": "工具",
     "error": "错误"
