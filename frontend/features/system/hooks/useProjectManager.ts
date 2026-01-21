@@ -397,61 +397,37 @@ export function useProjectManager(
 
   /**
    * Handle session deletion
+   * @param projectName - The project name containing the session
+   * @param sessionId - The session ID to delete
+   * @param provider - The session provider (claude/cursor/codex)
    */
-  const handleSessionDelete = useCallback((deletedSessionId: string) => {
-    let nextSessionToSelect: Session | null = null;
-    let targetProject: Project | null = null;
+  const handleSessionDelete = useCallback(async (projectName: string, sessionId: string, provider?: 'claude' | 'cursor' | 'codex') => {
+    console.log('[useProjectManager] Deleting session:', sessionId, 'from project:', projectName, 'provider:', provider);
 
-    setProjects(prevProjects => {
-      const updatedProjects = prevProjects.map(project => {
-        const remainingSessions = project.sessions?.filter(session => session.id !== deletedSessionId) || [];
-        const remainingCursorSessions = (project as any).cursorSessions?.filter((session: any) => session.id !== deletedSessionId) || [];
-        const remainingCodexSessions = (project as any).codexSessions?.filter((session: any) => session.id !== deletedSessionId) || [];
-        
-        const isSelectedProject = selectedProjectRef.current?.name === project.name;
-        const currentSession = selectedSessionRef.current;
-        
-        if (isSelectedProject && currentSession?.id === deletedSessionId) {
-          targetProject = project;
-          nextSessionToSelect = remainingSessions[0] || remainingCursorSessions[0] || remainingCodexSessions[0] || null;
-        }
-
-        return {
-          ...project,
-          sessions: remainingSessions,
-          cursorSessions: remainingCursorSessions,
-          codexSessions: remainingCodexSessions,
-          sessionMeta: {
-            ...project.sessionMeta,
-            total: Math.max(0, (project.sessionMeta?.total || 0) - 1)
-          }
-        };
-      });
-
-      const currentSession = selectedSessionRef.current;
-      if (currentSession?.id === deletedSessionId) {
-        if (nextSessionToSelect && targetProject) {
-          const sessionToSelect = nextSessionToSelect as any;
-          const provider = (targetProject as any).sessions?.some((s: any) => s.id === sessionToSelect.id) ? 'claude' :
-                          (targetProject as any).cursorSessions?.some((s: any) => s.id === sessionToSelect.id) ? 'cursor' : 'codex';
-          setTimeout(() => {
-            handleSessionSelect({
-              ...sessionToSelect,
-              __projectName: (targetProject as any).name,
-              __provider: provider
-            }, (targetProject as any).name);
-          }, 0);
-        } else {
-          setSelectedSession(null);
-          // Clear localStorage since no session is selected
-          localStorage.removeItem('lastSessionId');
-          localStorage.removeItem('lastProjectName');
-        }
+    // Delete from server API first
+    try {
+      let response;
+      if (provider === 'codex') {
+        response = await api.deleteCodexSession(sessionId);
+      } else {
+        response = await api.deleteSession(projectName, sessionId);
       }
 
-      return updatedProjects;
-    });
-  }, [handleSessionSelect]);
+      if (!response.ok) {
+        console.error('[useProjectManager] Failed to delete session:', response.status, response.statusText);
+        // Don't update local state if server deletion failed
+        return;
+      }
+
+      console.log('[useProjectManager] Session deleted successfully from server, refreshing projects...');
+
+      // Refresh projects from server to get updated session list
+      await fetchProjects(true);
+
+    } catch (error) {
+      console.error('[useProjectManager] Error deleting session:', error);
+    }
+  }, [fetchProjects]);
 
   /**
    * Handle project deletion

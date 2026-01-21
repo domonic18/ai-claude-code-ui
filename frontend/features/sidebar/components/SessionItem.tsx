@@ -198,7 +198,10 @@ export const SessionItem = memo(function SessionItem({
               className="w-6 h-6 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded flex items-center justify-center"
               onClick={(e) => {
                 e.stopPropagation();
-                onDelete();
+                // Fire and forget - let onDelete handle the async operation
+                onDelete().catch((error) => {
+                  console.error('[SessionItem] Failed to delete session:', error);
+                });
               }}
               title="Delete this session permanently"
             >
@@ -217,7 +220,10 @@ export const SessionItem = memo(function SessionItem({
             className="w-5 h-5 rounded-md bg-red-50 dark:bg-red-900/20 flex items-center justify-center active:scale-95 transition-transform opacity-70"
             onClick={(e) => {
               e.stopPropagation();
-              onDelete();
+              // Fire and forget - let onDelete handle the async operation
+              onDelete().catch((error) => {
+                console.error('[SessionItem] Failed to delete session:', error);
+              });
             }}
             title="Delete this session"
           >

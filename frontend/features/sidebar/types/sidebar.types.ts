@@ -249,7 +249,7 @@ export interface SessionItemProps {
   /** Click callback */
   onClick: () => void;
   /** Delete callback */
-  onDelete: () => void;
+  onDelete: () => Promise<void>;
   /** Start rename callback */
   onStartRename: () => void;
   /** Whether is renaming */
