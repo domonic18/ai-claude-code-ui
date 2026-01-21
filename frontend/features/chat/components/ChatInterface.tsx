@@ -144,7 +144,7 @@ export function ChatInterface({
   const [currentSessionId, setCurrentSessionId] = useState(selectedSession?.id || null);
   const [tasks, setTasks] = useState<any[]>([]);
   const [tokenBudget, setTokenBudget] = useState<any>(null);
-  const [permissionMode, setPermissionMode] = useState<'default' | 'acceptEdits' | 'plan'>('default');
+  const [permissionMode, setPermissionMode] = useState<'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'>('default');
 
   // Use model selection hook
   const { selectedModel, handleModelSelect } = useModelSelection();
@@ -438,6 +438,7 @@ export function ChatInterface({
           sessionId,
           model: backendModel,
           resume: !!currentSessionId,
+          permissionMode, // Include permission mode
         },
       });
 
@@ -456,6 +457,7 @@ export function ChatInterface({
     startStream,
     onSessionActive,
     onSessionProcessing,
+    permissionMode,
   ]);
 
   /**

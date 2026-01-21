@@ -91,11 +91,30 @@ async function filterSDKOptions(options, userId) {
   console.log('[ScriptBuilder] Setting settingSources: user, project');
 
   // 处理权限模式
-  // 如果前端指定了 skipPermissions，或者在容器模式下且没有明确指定 permissionMode
-  if (settings.skipPermissions || !sdkOptions.permissionMode || sdkOptions.permissionMode === 'default') {
+  // 优先级：前端传入的 permissionMode > 用户设置的 skipPermissions > 默认值
+  // 注意：当存在 disallowedTools 时，不能使用 bypassPermissions（会导致权限检查失效）
+
+  const hasDisallowedTools = sdkOptions.disallowedTools && sdkOptions.disallowedTools.length > 0;
+
+  // 如果前端明确传入了 permissionMode，使用前端传入的值
+  if (sdkOptions.permissionMode) {
+    // 如果前端要求 bypassPermissions 但存在 disallowedTools，发出警告
+    if (sdkOptions.permissionMode === 'bypassPermissions' && hasDisallowedTools) {
+      console.warn('[ScriptBuilder] WARNING: bypassPermissions mode will disable disallowedTools');
+    }
+    console.log('[ScriptBuilder] Using frontend permissionMode:', sdkOptions.permissionMode);
+  }
+  // 如果用户设置 skipPermissions 为 true，且没有 disallowedTools，则使用 bypassPermissions
+  else if (settings.skipPermissions && !hasDisallowedTools) {
     sdkOptions.permissionMode = 'bypassPermissions';
-    console.log('[ScriptBuilder] Setting permissionMode: bypassPermissions (reason:',
-      settings.skipPermissions ? 'skipPermissions' : (sdkOptions.permissionMode || 'default'), ')');
+    console.log('[ScriptBuilder] Setting permissionMode: bypassPermissions (reason: skipPermissions=true, no disallowedTools)');
+  }
+  // 其他情况（包括有 disallowedTools 的情况），使用 default 模式
+  else {
+    sdkOptions.permissionMode = 'default';
+    console.log('[ScriptBuilder] Setting permissionMode: default (reason: ',
+      hasDisallowedTools ? 'has disallowedTools' : 'default fallback',
+      ')');
   }
 
   // 处理 resume 参数：
