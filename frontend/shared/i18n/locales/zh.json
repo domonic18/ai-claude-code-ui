@@ -16,7 +16,24 @@
     "files": "文件",
     "version": "版本",
     "currentVersion": "当前版本",
-    "adminConsole": "管理控制台"
+    "adminConsole": "管理控制台",
+    "newSession": "新会话",
+    "untitledSession": "未命名会话",
+    "project": "项目",
+    "projectFiles": "项目文件"
+  },
+  "mainContent": {
+    "tip": "提示",
+    "tapMenuToAccessProjects": "点击上方菜单按钮访问项目",
+    "createNewProjectTip": "点击侧边栏的文件夹图标创建新项目",
+    "dragToResize": "拖动调整大小",
+    "loadingApp": "正在加载 {{appName}}",
+    "settingUpWorkspace": "正在设置您的工作空间...",
+    "chooseYourProject": "选择您的项目",
+    "projectDescription": "从侧边栏选择一个项目以开始使用 Claude 编程。每个项目包含您的聊天会话和文件历史。",
+    "projectTip": "提示",
+    "mobileTip": "点击上方菜单按钮访问项目",
+    "desktopTip": "点击侧边栏的文件夹图标创建新项目"
   },
   "app": {
     "tagline": "AI驱动，一屏尽览",
@@ -111,7 +128,9 @@
     "forFiles": "引用文件",
     "stop": "停止",
     "tokenUsage": "令牌使用: {{percentage}}%",
-    "context": "上下文: {{tokens}} 令牌"
+    "context": "上下文: {{tokens}} 令牌",
+    "tool": "工具",
+    "error": "错误"
   },
   "permissionMode": {
     "default": "默认模式",
@@ -206,5 +225,168 @@
     "noConversations": "暂无会话",
     "startANewConversation": "开始与 AI 对话",
     "refreshConversations": "刷新会话列表"
+  },
+  "auth": {
+    "error": {
+      "loginFailed": "登录失败",
+      "registrationFailed": "注册失败",
+      "networkError": "网络错误",
+      "ssoInitFailed": "SSO 初始化失败",
+      "ssoUrlNotReceived": "未收到服务器返回的 SSO 登录 URL",
+      "ssoConnectionFailed": "连接 SSO 服务失败"
+    },
+    "or": "或",
+    "ssoSignIn": "SSO 登录"
+  },
+  "tokenDisplay": {
+    "title": "令牌使用",
+    "notAvailable": "不可用",
+    "used": "已使用",
+    "remaining": "剩余",
+    "total": "总计"
+  },
+  "fileExplorer": {
+    "title": "文件",
+    "searchPlaceholder": "搜索文件和文件夹...",
+    "clearSearch": "清除搜索",
+    "simpleView": "简单视图",
+    "compactView": "紧凑视图",
+    "detailedView": "详细视图",
+    "column": {
+      "name": "名称",
+      "size": "大小",
+      "modified": "修改时间",
+      "permissions": "权限"
+    },
+    "empty": {
+      "title": "未找到文件",
+      "description": "请检查项目路径是否可访问"
+    },
+    "noMatches": {
+      "title": "未找到匹配项",
+      "description": "请尝试其他搜索词或清除搜索"
+    },
+    "size": {
+      "b": "B",
+      "kb": "KB",
+      "mb": "MB",
+      "gb": "GB"
+    },
+    "time": {
+      "justNow": "刚刚",
+      "minutesAgo": "{{count}} 分钟前",
+      "hoursAgo": "{{count}} 小时前",
+      "daysAgo": "{{count}} 天前"
+    },
+    "error": {
+      "fetchFailed": "文件获取失败",
+      "errorFetching": "获取文件时出错"
+    },
+    "loading": "正在加载文件..."
+  },
+  "websocket": {
+    "log": {
+      "skippingMessage": "跳过不同会话的消息",
+      "sessionStarted": "会话已开始"
+    },
+    "error": {
+      "localStorageSetFailed": "设置 localStorage 项失败",
+      "localStorageRemoveFailed": "删除 localStorage 项失败"
+    }
+  },
+  "apiKeys": {
+    "title": "API 密钥",
+    "description": "管理外部服务的 API 密钥",
+    "active": "已启用",
+    "inactive": "已禁用",
+    "addKey": "添加密钥",
+    "newApiKey": "新建 API 密钥",
+    "addToken": "添加令牌",
+    "githubTokens": "GitHub 令牌",
+    "githubTokensDescription": "添加 GitHub 个人访问令牌以克隆私有仓库",
+    "tokenNamePlaceholder": "令牌名称（例如：个人仓库）",
+    "githubTokenPlaceholder": "GitHub 个人访问令牌 (ghp_...)",
+    "created": "创建于",
+    "lastUsed": "上次使用",
+    "copied": "已复制！",
+    "copy": "复制",
+    "confirmDeleteKey": "确定要删除此 API 密钥吗？",
+    "confirmDeleteToken": "确定要删除此 GitHub 令牌吗？",
+    "noApiKeys": "尚未创建 API 密钥",
+    "noGithubTokens": "尚未添加 GitHub 令牌",
+    "externalApiDocumentation": "外部 API 文档",
+    "externalApiDescription": "了解如何使用外部 API 从您的应用程序触发 Claude/Cursor 会话。"
+  },
+  "projectCreation": {
+    "title": "创建新项目",
+    "projectName": "项目名称",
+    "projectNamePlaceholder": "请输入项目名称",
+    "projectNameHint": "仅使用字母、数字、连字符和下划线",
+    "defaultName": "我的工作区",
+    "infoCard": "将在您的工作区中创建一个以此命名的新文件夹。您可以立即开始使用 Claude 编程！",
+    "pathPreview": "项目将创建于：",
+    "status": {
+      "checking": "检查中...",
+      "available": "可用",
+      "unavailable": "已存在",
+      "error": "无法检查"
+    },
+    "error": {
+      "emptyName": "请输入项目名称",
+      "nameExists": "该项目名称已存在，请选择其他名称。"
+    },
+    "createButton": "创建项目",
+    "creating": "创建中..."
+  },
+  "agentPermissions": {
+    "title": "权限设置",
+    "skipPrompts": "跳过权限提示（请谨慎使用）",
+    "skipPromptsDescription": "等同于 --dangerously-skip-permissions 标志",
+    "allowedTools": "允许的工具",
+    "allowedToolsDescription": "自动允许而无需提示权限的工具",
+    "blockedTools": "阻止的工具",
+    "blockedToolsDescription": "自动阻止而无需提示权限的工具",
+    "quickAdd": "快速添加常用工具：",
+    "add": "添加",
+    "noAllowedTools": "未配置允许的工具",
+    "noBlockedTools": "未配置阻止的工具",
+    "placeholder": "例如：\"Bash(git log:*)\" 或 \"Write\"",
+    "blockedPlaceholder": "例如：\"Bash(rm:*)\"",
+    "examples": {
+      "title": "工具模式示例：",
+      "gitLog": "允许所有 git log 命令",
+      "gitDiff": "允许所有 git diff 命令",
+      "write": "允许所有 Write 工具使用",
+      "rm": "阻止所有 rm 命令（危险）"
+    }
+  },
+  "credentials": {
+    "title": "API 密钥",
+    "description": "生成 API 密钥以从其他应用程序访问外部 API",
+    "documentation": "API 文档",
+    "newKey": "新建 API 密钥",
+    "keyNamePlaceholder": "API 密钥名称（例如：生产服务器）",
+    "create": "创建",
+    "saveKeyAlert": {
+      "title": "⚠️ 保存您的 API 密钥",
+      "message": "这是您唯一看到此密钥的机会，请安全保存。",
+      "saved": "我已保存"
+    },
+    "noKeys": "尚未创建 API 密钥",
+    "updateAvailable": "有可用更新",
+    "added": "添加于"
+  },
+  "mcp": {
+    "title": "MCP 服务器",
+    "description": "模型上下文协议服务器为 Claude 提供额外的工具和数据源",
+    "addServer": "添加 MCP 服务器",
+    "noServers": "未配置 MCP 服务器"
+  },
+  "agent": {
+    "claude": "Claude",
+    "claudeChinese": "AI 助手",
+    "opencode": "OpenCode",
+    "comingSoon": "即将推出",
+    "opencodeDescription": "OpenCode 集成即将推出。此功能目前正在开发中，将在未来更新中提供。"
   }
 }

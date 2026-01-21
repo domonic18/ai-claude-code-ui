@@ -16,7 +16,24 @@
     "files": "Files",
     "version": "Version",
     "currentVersion": "Current version",
-    "adminConsole": "Admin Console"
+    "adminConsole": "Admin Console",
+    "newSession": "New Session",
+    "untitledSession": "Untitled Session",
+    "project": "Project",
+    "projectFiles": "Project Files"
+  },
+  "mainContent": {
+    "tip": "Tip",
+    "tapMenuToAccessProjects": "Tap the menu button above to access projects",
+    "createNewProjectTip": "Create a new project by clicking the folder icon in the sidebar",
+    "dragToResize": "Drag to resize",
+    "loadingApp": "Loading {{appName}}",
+    "settingUpWorkspace": "Setting up your workspace...",
+    "chooseYourProject": "Choose Your Project",
+    "projectDescription": "Select a project from the sidebar to start coding with Claude. Each project contains your chat sessions and file history.",
+    "projectTip": "Tip",
+    "mobileTip": "Tap the menu button above to access projects",
+    "desktopTip": "Create a new project by clicking the folder icon in the sidebar"
   },
   "app": {
     "tagline": "AI-Driven, All on One Screen",
@@ -111,7 +128,9 @@
     "forFiles": "for files",
     "stop": "Stop",
     "tokenUsage": "Token usage: {{percentage}}%",
-    "context": "Context: {{tokens}} tokens"
+    "context": "Context: {{tokens}} tokens",
+    "tool": "Tool",
+    "error": "Error"
   },
   "permissionMode": {
     "default": "Standard",
@@ -131,7 +150,7 @@
     "tabs": {
       "agents": "Agents",
       "appearance": "Appearance",
-      "api": "API & Tokens",
+      "api": "API Keys",
       "tasks": "Tasks"
     },
     "agents": {
@@ -206,5 +225,168 @@
     "noConversations": "No conversations yet",
     "startANewConversation": "Start chatting with AI",
     "refreshConversations": "Refresh conversations"
+  },
+  "auth": {
+    "error": {
+      "loginFailed": "Login failed",
+      "registrationFailed": "Registration failed",
+      "networkError": "Network error",
+      "ssoInitFailed": "SSO initialization failed",
+      "ssoUrlNotReceived": "SSO login URL not received from server",
+      "ssoConnectionFailed": "Failed to connect to SSO service"
+    },
+    "or": "Or",
+    "ssoSignIn": "SSO Sign In"
+  },
+  "tokenDisplay": {
+    "title": "Token Usage",
+    "notAvailable": "N/A",
+    "used": "used",
+    "remaining": "remaining",
+    "total": "total"
+  },
+  "fileExplorer": {
+    "title": "Files",
+    "searchPlaceholder": "Search files and folders...",
+    "clearSearch": "Clear search",
+    "simpleView": "Simple view",
+    "compactView": "Compact view",
+    "detailedView": "Detailed view",
+    "column": {
+      "name": "Name",
+      "size": "Size",
+      "modified": "Modified",
+      "permissions": "Permissions"
+    },
+    "empty": {
+      "title": "No files found",
+      "description": "Check if the project path is accessible"
+    },
+    "noMatches": {
+      "title": "No matches found",
+      "description": "Try a different search term or clear the search"
+    },
+    "size": {
+      "b": "B",
+      "kb": "KB",
+      "mb": "MB",
+      "gb": "GB"
+    },
+    "time": {
+      "justNow": "just now",
+      "minutesAgo": "{{count}} min ago",
+      "hoursAgo": "{{count}} hours ago",
+      "daysAgo": "{{count}} days ago"
+    },
+    "error": {
+      "fetchFailed": "File fetch failed",
+      "errorFetching": "Error fetching files"
+    },
+    "loading": "Loading files..."
+  },
+  "websocket": {
+    "log": {
+      "skippingMessage": "Skipping message for different session",
+      "sessionStarted": "Session started"
+    },
+    "error": {
+      "localStorageSetFailed": "Failed to set localStorage item",
+      "localStorageRemoveFailed": "Failed to remove localStorage item"
+    }
+  },
+  "apiKeys": {
+    "title": "API Keys",
+    "description": "Manage your API keys for external services",
+    "active": "Active",
+    "inactive": "Inactive",
+    "addKey": "Add Key",
+    "newApiKey": "New API Key",
+    "addToken": "Add Token",
+    "githubTokens": "GitHub Tokens",
+    "githubTokensDescription": "Add GitHub Personal Access Tokens to clone private repositories",
+    "tokenNamePlaceholder": "Token Name (e.g., Personal Repos)",
+    "githubTokenPlaceholder": "GitHub Personal Access Token (ghp_...)",
+    "created": "Created",
+    "lastUsed": "Last used",
+    "copied": "Copied!",
+    "copy": "Copy",
+    "confirmDeleteKey": "Are you sure you want to delete this API key?",
+    "confirmDeleteToken": "Are you sure you want to delete this GitHub token?",
+    "noApiKeys": "No API keys created yet",
+    "noGithubTokens": "No GitHub tokens added yet",
+    "externalApiDocumentation": "External API Documentation",
+    "externalApiDescription": "Learn how to use the external API to trigger Claude/Cursor sessions from your applications."
+  },
+  "projectCreation": {
+    "title": "Create New Project",
+    "projectName": "Project Name",
+    "projectNamePlaceholder": "Enter project name",
+    "projectNameHint": "Use letters, numbers, hyphens, and underscores only",
+    "defaultName": "my-workspace",
+    "infoCard": "A new folder will be created in your workspace with this name. You can start coding with Claude right away!",
+    "pathPreview": "Project will be created at:",
+    "status": {
+      "checking": "Checking...",
+      "available": "Available",
+      "unavailable": "Already exists",
+      "error": "Unable to check"
+    },
+    "error": {
+      "emptyName": "Please enter a project name",
+      "nameExists": "A project with this name already exists. Please choose a different name."
+    },
+    "createButton": "Create Project",
+    "creating": "Creating..."
+  },
+  "agentPermissions": {
+    "title": "Permission Settings",
+    "skipPrompts": "Skip permission prompts (use with caution)",
+    "skipPromptsDescription": "Equivalent to --dangerously-skip-permissions flag",
+    "allowedTools": "Allowed Tools",
+    "allowedToolsDescription": "Tools that are automatically allowed without prompting for permission",
+    "blockedTools": "Blocked Tools",
+    "blockedToolsDescription": "Tools that are automatically blocked without prompting for permission",
+    "quickAdd": "Quick add common tools:",
+    "add": "Add",
+    "noAllowedTools": "No allowed tools configured",
+    "noBlockedTools": "No blocked tools configured",
+    "placeholder": "e.g., \"Bash(git log:*)\" or \"Write\"",
+    "blockedPlaceholder": "e.g., \"Bash(rm:*)\"",
+    "examples": {
+      "title": "Tool Pattern Examples:",
+      "gitLog": "Allow all git log commands",
+      "gitDiff": "Allow all git diff commands",
+      "write": "Allow all Write tool usage",
+      "rm": "Block all rm commands (dangerous)"
+    }
+  },
+  "credentials": {
+    "title": "API Keys",
+    "description": "Generate API keys to access the external API from other applications",
+    "documentation": "API Documentation",
+    "newKey": "New API Key",
+    "keyNamePlaceholder": "API Key Name (e.g., Production Server)",
+    "create": "Create",
+    "saveKeyAlert": {
+      "title": "⚠️ Save Your API Key",
+      "message": "This is the only time you'll see this key. Store it securely.",
+      "saved": "I've saved it"
+    },
+    "noKeys": "No API keys created yet",
+    "updateAvailable": "Update available",
+    "added": "Added"
+  },
+  "mcp": {
+    "title": "MCP Servers",
+    "description": "Model Context Protocol servers provide additional tools and data sources to Claude",
+    "addServer": "Add MCP Server",
+    "noServers": "No MCP servers configured"
+  },
+  "agent": {
+    "claude": "Claude",
+    "claudeChinese": "AI Assistant",
+    "opencode": "OpenCode",
+    "comingSoon": "Coming Soon",
+    "opencodeDescription": "OpenCode integration is coming soon. This feature is currently under development and will be available in a future update."
   }
 }

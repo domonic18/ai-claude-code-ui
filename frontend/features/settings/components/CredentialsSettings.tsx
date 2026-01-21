@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
 import { Key, Plus, Trash2, Copy, Check, ExternalLink } from 'lucide-react';
@@ -9,6 +10,7 @@ import { authenticatedFetch } from '@/shared/services';
 const APP_VERSION = '1.13.6';
 
 function CredentialsSettings() {
+  const { t } = useTranslation();
   const [apiKeys, setApiKeys] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showNewKeyForm, setShowNewKeyForm] = useState(false);
@@ -76,7 +78,7 @@ function CredentialsSettings() {
   };
 
   const deleteApiKey = async (keyId) => {
-    if (!confirm('Are you sure you want to delete this API key?')) return;
+    if (!confirm(t('apiKeys.confirmDeleteKey'))) return;
 
     try {
       const res = await authenticatedFetch(`/api/settings/api-keys/${keyId}`, {
@@ -115,7 +117,7 @@ function CredentialsSettings() {
   };
 
   if (loading) {
-    return <div className="text-muted-foreground">Loading...</div>;
+    return <div className="text-muted-foreground">{t('common.loading')}</div>;
   }
 
   return (
@@ -123,9 +125,9 @@ function CredentialsSettings() {
       {/* New API Key Alert */}
       {newlyCreatedKey && (
         <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-          <h4 className="font-semibold text-yellow-500 mb-2">⚠️ Save Your API Key</h4>
+          <h4 className="font-semibold text-yellow-500 mb-2">{t('credentials.saveKeyAlert.title')}</h4>
           <p className="text-sm text-muted-foreground mb-3">
-            This is the only time you'll see this key. Store it securely.
+            {t('credentials.saveKeyAlert.message')}
           </p>
           <div className="flex items-center gap-2">
             <code className="flex-1 px-3 py-2 bg-background/50 rounded font-mono text-sm break-all">
@@ -145,7 +147,7 @@ function CredentialsSettings() {
             className="mt-3"
             onClick={() => setNewlyCreatedKey(null)}
           >
-            I've saved it
+            {t('credentials.saveKeyAlert.saved')}
           </Button>
         </div>
       )}
@@ -155,20 +157,20 @@ function CredentialsSettings() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Key className="h-5 w-5" />
-            <h3 className="text-lg font-semibold">API Keys</h3>
+            <h3 className="text-lg font-semibold">{t('credentials.title')}</h3>
           </div>
           <Button
             size="sm"
             onClick={() => setShowNewKeyForm(!showNewKeyForm)}
           >
             <Plus className="h-4 w-4 mr-1" />
-            New API Key
+            {t('credentials.newKey')}
           </Button>
         </div>
 
         <div className="mb-4">
           <p className="text-sm text-muted-foreground mb-2">
-            Generate API keys to access the external API from other applications.
+            {t('credentials.description')}
           </p>
           <a
             href="/api-docs.html"
@@ -176,7 +178,7 @@ function CredentialsSettings() {
             rel="noopener noreferrer"
             className="text-sm text-primary hover:underline inline-flex items-center gap-1"
           >
-            API Documentation
+            {t('credentials.documentation')}
             <ExternalLink className="h-3 w-3" />
           </a>
         </div>
@@ -184,15 +186,15 @@ function CredentialsSettings() {
         {showNewKeyForm && (
           <div className="mb-4 p-4 border rounded-lg bg-card">
             <Input
-              placeholder="API Key Name (e.g., Production Server)"
+              placeholder={t('credentials.keyNamePlaceholder')}
               value={newKeyName}
               onChange={(e) => setNewKeyName(e.target.value)}
               className="mb-2"
             />
             <div className="flex gap-2">
-              <Button onClick={createApiKey}>Create</Button>
+              <Button onClick={createApiKey}>{t('credentials.create')}</Button>
               <Button variant="outline" onClick={() => setShowNewKeyForm(false)}>
-                Cancel
+                {t('common.cancel')}
               </Button>
             </div>
           </div>
@@ -200,7 +202,7 @@ function CredentialsSettings() {
 
         <div className="space-y-2">
           {apiKeys.length === 0 ? (
-            <p className="text-sm text-muted-foreground italic">No API keys created yet.</p>
+            <p className="text-sm text-muted-foreground italic">{t('credentials.noKeys')}</p>
           ) : (
             apiKeys.map((key) => (
               <div
@@ -211,8 +213,8 @@ function CredentialsSettings() {
                   <div className="font-medium">{key.key_name}</div>
                   <code className="text-xs text-muted-foreground">{key.api_key}</code>
                   <div className="text-xs text-muted-foreground mt-1">
-                    Created: {new Date(key.created_at).toLocaleDateString()}
-                    {key.last_used && ` • Last used: ${new Date(key.last_used).toLocaleDateString()}`}
+                    {t('apiKeys.created')}: {new Date(key.created_at).toLocaleDateString()}
+                    {key.last_used && ` • ${t('apiKeys.lastUsed')}: ${new Date(key.last_used).toLocaleDateString()}`}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -221,7 +223,7 @@ function CredentialsSettings() {
                     variant={key.is_active ? 'outline' : 'secondary'}
                     onClick={() => toggleApiKey(key.id, key.is_active)}
                   >
-                    {key.is_active ? 'Active' : 'Inactive'}
+                    {key.is_active ? t('apiKeys.active') : t('apiKeys.inactive')}
                   </Button>
                   <Button
                     size="sm"
@@ -255,7 +257,7 @@ function CredentialsSettings() {
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 px-2 py-0.5 bg-green-500/10 text-green-600 dark:text-green-400 rounded-full hover:bg-green-500/20 transition-colors not-italic font-medium"
             >
-              <span className="text-[10px]">Update available: v{latestVersion}</span>
+              <span className="text-[10px]">{t('credentials.updateAvailable')}: v{latestVersion}</span>
               <ExternalLink className="h-2.5 w-2.5" />
             </a>
           )}

@@ -4,6 +4,7 @@
  * Service for authentication API calls and operations.
  */
 
+import { t as translate } from '@/shared/i18n';
 import type {
   User,
   LoginCredentials,
@@ -37,10 +38,10 @@ export class AuthService {
       });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Login failed' }));
+        const error = await response.json().catch(() => ({ message: translate('auth.error.loginFailed') }));
         return {
           success: false,
-          error: error.message || 'Login failed',
+          error: error.message || translate('auth.error.loginFailed'),
         };
       }
 
@@ -66,7 +67,7 @@ export class AuthService {
       console.error('Login error:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Network error',
+        error: error instanceof Error ? error.message : translate('auth.error.networkError'),
       };
     }
   }
@@ -85,10 +86,10 @@ export class AuthService {
       });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Registration failed' }));
+        const error = await response.json().catch(() => ({ message: translate('auth.error.registrationFailed') }));
         return {
           success: false,
-          error: error.message || 'Registration failed',
+          error: error.message || translate('auth.error.registrationFailed'),
         };
       }
 
@@ -114,7 +115,7 @@ export class AuthService {
       console.error('Registration error:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Network error',
+        error: error instanceof Error ? error.message : translate('auth.error.networkError'),
       };
     }
   }

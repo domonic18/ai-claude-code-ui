@@ -28,7 +28,7 @@ const LoginForm: React.FC = () => {
 
   const { login } = useAuth();
 
-  // 检查 SAML 状态
+  // Check SAML status
   useEffect(() => {
     const checkSamlStatus = async () => {
       try {
@@ -72,7 +72,7 @@ const LoginForm: React.FC = () => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        setError(`SSO initialization failed: ${errorData.error || response.statusText}`);
+        setError(`${t('auth.error.ssoInitFailed')}: ${errorData.error || response.statusText}`);
         return;
       }
 
@@ -82,10 +82,10 @@ const LoginForm: React.FC = () => {
       if (data.login_url) {
         window.location.href = data.login_url;
       } else {
-        setError('SSO login URL not received from server');
+        setError(t('auth.error.ssoUrlNotReceived'));
       }
     } catch (err) {
-      setError('Failed to connect to SSO service');
+      setError(t('auth.error.ssoConnectionFailed'));
     }
   };
 
@@ -196,7 +196,7 @@ const LoginForm: React.FC = () => {
                 <div className="w-full border-t border-border"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-card text-muted-foreground">{t('login.or') || 'Or'}</span>
+                <span className="px-2 bg-card text-muted-foreground">{t('auth.or')}</span>
               </div>
             </div>
           )}
@@ -208,7 +208,7 @@ const LoginForm: React.FC = () => {
               className="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white font-medium py-2 px-4 rounded-md border border-gray-300 dark:border-gray-600 transition-colors duration-200"
             >
               <LogIn className="w-4 h-4" />
-              {t('login.ssoSignIn') || 'SSO Sign In'}
+              {t('auth.ssoSignIn')}
             </button>
           )}
 

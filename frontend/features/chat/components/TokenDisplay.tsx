@@ -12,6 +12,7 @@
  */
 
 import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export interface TokenBudget {
   /** Total tokens available */
@@ -35,6 +36,8 @@ interface TokenDisplayProps {
  * TokenDisplay Component
  */
 export function TokenDisplay({ budget, compact = false }: TokenDisplayProps) {
+  const { t } = useTranslation();
+
   // Calculate percentage if not provided
   const percentage = useMemo(() => {
     if (budget?.percentage !== undefined) {
@@ -61,7 +64,7 @@ export function TokenDisplay({ budget, compact = false }: TokenDisplayProps) {
     return (
       <div className="flex items-center gap-2 text-xs">
         <span className="text-gray-600 dark:text-gray-400">
-          {percentage !== null ? `${percentage}%` : 'N/A'}
+          {percentage !== null ? `${percentage}%` : t('tokenDisplay.notAvailable')}
         </span>
         <div className="w-16 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
           {percentage !== null && (
@@ -80,7 +83,7 @@ export function TokenDisplay({ budget, compact = false }: TokenDisplayProps) {
     <div className="px-4 py-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-          Token Usage
+          {t('tokenDisplay.title')}
         </span>
         {percentage !== null && (
           <span className={`text-sm font-semibold text-${color}-600 dark:text-${color}-400`}>
@@ -102,13 +105,15 @@ export function TokenDisplay({ budget, compact = false }: TokenDisplayProps) {
       {/* Details */}
       <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
         <span>
-          {budget?.used !== undefined ? `${budget.used.toLocaleString()} used` : 'N/A'}
+          {budget?.used !== undefined
+            ? `${budget.used.toLocaleString()} ${t('tokenDisplay.used')}`
+            : t('tokenDisplay.notAvailable')}
         </span>
         <span>
           {budget?.remaining !== undefined
-            ? `${budget.remaining.toLocaleString()} remaining`
+            ? `${budget.remaining.toLocaleString()} ${t('tokenDisplay.remaining')}`
             : budget?.total
-            ? `${budget.total.toLocaleString()} total`
+            ? `${budget.total.toLocaleString()} ${t('tokenDisplay.total')}`
             : ''}
         </span>
       </div>
