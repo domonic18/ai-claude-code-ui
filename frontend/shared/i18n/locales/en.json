@@ -114,12 +114,15 @@
     "context": "Context: {{tokens}} tokens"
   },
   "permissionMode": {
-    "default": "Bypass Permissions",
-    "acceptEdits": "Accept Edits",
-    "plan": "Plan Mode",
-    "description": "Click to change permission mode (or press Tab in input)",
+    "default": "Standard",
+    "defaultDescription": "Dangerous operations need confirmation for safety",
+    "acceptEdits": "Auto Edits",
     "acceptEditsDescription": "Auto-accept file edits suggested by AI",
-    "planDescription": "Planning mode - review before executing"
+    "bypassPermissions": "Unrestricted",
+    "bypassPermissionsDescription": "No permission checks, all operations allowed (use caution)",
+    "plan": "Plan Only",
+    "planDescription": "Plan without executing, review before running",
+    "description": "Click to change permission mode"
   },
   "settings": {
     "title": "Settings",

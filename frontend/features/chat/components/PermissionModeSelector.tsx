@@ -26,24 +26,24 @@ export interface PermissionModeSelectorProps {
 
 const MODE_CONFIG = {
   default: {
-    label: 'Standard',
     color: 'blue',
-    description: 'Standard mode - tools may require confirmation',
+    labelKey: 'permissionMode.default',
+    descriptionKey: 'permissionMode.defaultDescription',
   },
   acceptEdits: {
-    label: 'Auto Edits',
     color: 'green',
-    description: 'Auto-accept file edits suggested by AI',
+    labelKey: 'permissionMode.acceptEdits',
+    descriptionKey: 'permissionMode.acceptEditsDescription',
   },
   bypassPermissions: {
-    label: 'Bypass',
     color: 'orange',
-    description: 'Bypass all permission checks (use with caution)',
+    labelKey: 'permissionMode.bypassPermissions',
+    descriptionKey: 'permissionMode.bypassPermissionsDescription',
   },
   plan: {
-    label: 'Plan Only',
     color: 'purple',
-    description: 'Planning mode - review before executing',
+    labelKey: 'permissionMode.plan',
+    descriptionKey: 'permissionMode.planDescription',
   },
 } as const;
 
@@ -93,11 +93,11 @@ export function PermissionModeSelector({
       className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all duration-200 ${colorClass} ${
         disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
       }`}
-      title={config.description}
+      title={t(config.descriptionKey)}
     >
       <div className="flex items-center gap-2">
         <div className={`w-2 h-2 rounded-full ${dotColorClass}`} />
-        <span>{config.label}</span>
+        <span>{t(config.labelKey)}</span>
       </div>
     </button>
   );
