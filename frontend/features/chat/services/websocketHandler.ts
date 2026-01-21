@@ -12,6 +12,7 @@
  * - Other: session-aborted, token-budget
  */
 
+import { t as translate } from '@/shared/i18n';
 import type { ChatMessage } from '../types';
 
 // Message ID counter to ensure unique IDs
@@ -94,14 +95,14 @@ const safeLocalStorage = {
     try {
       localStorage.setItem(key, value);
     } catch (e) {
-      console.warn('Failed to set localStorage item:', e);
+      console.warn(`${translate('websocket.error.localStorageSetFailed')}:`, e);
     }
   },
   removeItem: (key: string): void => {
     try {
       localStorage.removeItem(key);
     } catch (e) {
-      console.warn('Failed to remove localStorage item:', e);
+      console.warn(`${translate('websocket.error.localStorageRemoveFailed')}:`, e);
     }
   }
 };
@@ -130,14 +131,14 @@ export function handleWebSocketMessage(
 
   // For new sessions (currentSessionId is null), allow messages through
   if (!isGlobalMessage && message.sessionId && currentSessionId && message.sessionId !== currentSessionId) {
-    console.log('⏭️ Skipping message for different session:', message.sessionId, 'current:', currentSessionId);
+    console.log(`⏭️ ${translate('websocket.log.skippingMessage')}:`, message.sessionId, 'current:', currentSessionId);
     return false;
   }
 
   switch (message.type) {
     case 'session-start':
       // Session initialization message - just acknowledge it
-      console.log('📝 Session started:', message.sessionId);
+      console.log(`📝 ${translate('websocket.log.sessionStarted')}:`, message.sessionId);
       return true;
 
     case 'session-created':

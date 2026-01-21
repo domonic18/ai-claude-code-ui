@@ -218,8 +218,8 @@ function MainContent({
                 }}
               />
             </div>
-            <h2 className="text-xl font-semibold mb-2">Loading {APP_NAME}</h2>
-            <p>Setting up your workspace...</p>
+            <h2 className="text-xl font-semibold mb-2">{t('mainContent.loadingApp', { appName: APP_NAME })}</h2>
+            <p>{t('mainContent.settingUpWorkspace')}</p>
           </div>
         </div>
       </div>
@@ -248,13 +248,13 @@ function MainContent({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-5l-2-2H5a2 2 0 00-2 2z" />
               </svg>
             </div>
-            <h2 className="text-2xl font-semibold mb-3 text-gray-900 dark:text-white">Choose Your Project</h2>
+            <h2 className="text-2xl font-semibold mb-3 text-gray-900 dark:text-white">{t('mainContent.chooseYourProject')}</h2>
             <p className="text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
-              Select a project from the sidebar to start coding with Claude. Each project contains your chat sessions and file history.
+              {t('mainContent.projectDescription')}
             </p>
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
               <p className="text-sm text-blue-700 dark:text-blue-300">
-                💡 <strong>Tip:</strong> {isMobile ? 'Tap the menu button above to access projects' : 'Create a new project by clicking the folder icon in the sidebar'}
+                💡 <strong>{t('mainContent.tip')}:</strong> {isMobile ? t('mainContent.tapMenuToAccessProjects') : t('mainContent.createNewProjectTip')}
               </p>
             </div>
           </div>
@@ -297,7 +297,7 @@ function MainContent({
                 {activeTab === 'chat' && selectedSession ? (
                   <div className="min-w-0">
                     <h2 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white whitespace-nowrap overflow-x-auto scrollbar-hide">
-                      {selectedSession.summary || selectedSession.name || (selectedSession as any).title || (selectedSession.__provider === 'cursor' ? 'Untitled Session' : 'New Session')}
+                      {selectedSession.summary || selectedSession.name || (selectedSession as any).title || (selectedSession.__provider === 'cursor' ? t('common.untitledSession') : t('common.newSession'))}
                     </h2>
                     <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                       {selectedProject.displayName}
@@ -306,7 +306,7 @@ function MainContent({
                 ) : activeTab === 'chat' && !selectedSession ? (
                   <div className="min-w-0">
                     <h2 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">
-                      New Session
+                      {t('common.newSession')}
                     </h2>
                     <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                       {selectedProject.displayName}
@@ -315,7 +315,7 @@ function MainContent({
                 ) : (
                   <div className="min-w-0">
                     <h2 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">
-                      {activeTab === 'files' ? 'Project Files' : 'Project'}
+                      {activeTab === 'files' ? t('common.projectFiles') : t('common.project')}
                     </h2>
                     <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                       {selectedProject.displayName}
@@ -442,7 +442,7 @@ function MainContent({
                 ref={resizeRef}
                 onMouseDown={handleMouseDown}
                 className="flex-shrink-0 w-1 bg-gray-200 dark:bg-gray-700 hover:bg-blue-500 dark:hover:bg-blue-600 cursor-col-resize transition-colors relative group"
-                title="Drag to resize"
+                title={t('mainContent.dragToResize')}
               >
                 <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-1 bg-blue-500 dark:bg-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>

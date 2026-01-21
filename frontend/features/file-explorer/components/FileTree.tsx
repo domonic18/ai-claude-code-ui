@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ScrollArea } from '@/shared/components/ui/ScrollArea';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
@@ -17,6 +18,7 @@ import type {
 } from '../types/file-explorer.types';
 
 function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
+  const { t } = useTranslation();
   const [files, setFiles] = useState<FileNode[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
@@ -92,17 +94,17 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ File fetch failed:', response.status, errorText);
+        console.error(`❌ ${t('fileExplorer.error.fetchFailed')}:`, response.status, errorText);
         setFiles([]);
         return;
       }
 
       const responseData = await response.json();
-      // 处理 responseFormatter 包装格式: {success: true, data: [...]}
+      // Handle responseFormatter wrapped format: {success: true, data: [...]}
       const data = responseData.data ?? responseData;
       setFiles(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('❌ Error fetching files:', error);
+      console.error(`❌ ${t('fileExplorer.error.errorFetching')}:`, error);
       setFiles([]);
     } finally {
       setLoading(false);
@@ -127,9 +129,14 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
 
   // Format file size
   const formatFileSize = (bytes) => {
-    if (!bytes || bytes === 0) return '0 B';
+    if (!bytes || bytes === 0) return `0 ${t('fileExplorer.size.b')}`;
     const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const sizes = [
+      t('fileExplorer.size.b'),
+      t('fileExplorer.size.kb'),
+      t('fileExplorer.size.mb'),
+      t('fileExplorer.size.gb')
+    ];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
@@ -140,11 +147,11 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
     const now = new Date();
     const past = new Date(date);
     const diffInSeconds = Math.floor((now.getTime() - past.getTime()) / 1000);
-    
-    if (diffInSeconds < 60) return 'just now';
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} min ago`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
-    if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+
+    if (diffInSeconds < 60) return t('fileExplorer.time.justNow');
+    if (diffInSeconds < 3600) return t('fileExplorer.time.minutesAgo', { count: Math.floor(diffInSeconds / 60) });
+    if (diffInSeconds < 86400) return t('fileExplorer.time.hoursAgo', { count: Math.floor(diffInSeconds / 3600) });
+    if (diffInSeconds < 2592000) return t('fileExplorer.time.daysAgo', { count: Math.floor(diffInSeconds / 86400) });
     return past.toLocaleDateString();
   };
 
@@ -358,7 +365,7 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-gray-500 dark:text-gray-400">
-          Loading files...
+          {t('fileExplorer.loading')}
         </div>
       </div>
     );
@@ -369,14 +376,14 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
       {/* Header with Search and View Mode Toggle */}
       <div className="p-4 border-b border-border space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-foreground">Files</h3>
+          <h3 className="text-sm font-medium text-foreground">{t('fileExplorer.title')}</h3>
           <div className="flex gap-1">
             <Button
               variant={viewMode === 'simple' ? 'default' : 'ghost'}
               size="sm"
               className="h-8 w-8 p-0"
               onClick={() => changeViewMode('simple')}
-              title="Simple view"
+              title={t('fileExplorer.simpleView')}
             >
               <List className="w-4 h-4" />
             </Button>
@@ -385,7 +392,7 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
               size="sm"
               className="h-8 w-8 p-0"
               onClick={() => changeViewMode('compact')}
-              title="Compact view"
+              title={t('fileExplorer.compactView')}
             >
               <Eye className="w-4 h-4" />
             </Button>
@@ -394,7 +401,7 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
               size="sm"
               className="h-8 w-8 p-0"
               onClick={() => changeViewMode('detailed')}
-              title="Detailed view"
+              title={t('fileExplorer.detailedView')}
             >
               <TableProperties className="w-4 h-4" />
             </Button>
@@ -406,7 +413,7 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
           <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Search files and folders..."
+            placeholder={t('fileExplorer.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-8 pr-8 h-8 text-sm"
@@ -417,7 +424,7 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
               size="sm"
               className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-accent"
               onClick={() => setSearchQuery('')}
-              title="Clear search"
+              title={t('fileExplorer.clearSearch')}
             >
               <X className="w-3 h-3" />
             </Button>
@@ -429,10 +436,10 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
       {viewMode === 'detailed' && filteredFiles.length > 0 && (
         <div className="px-4 pt-2 pb-1 border-b border-border">
           <div className="grid grid-cols-12 gap-2 px-2 text-xs font-medium text-muted-foreground">
-            <div className="col-span-5">Name</div>
-            <div className="col-span-2">Size</div>
-            <div className="col-span-3">Modified</div>
-            <div className="col-span-2">Permissions</div>
+            <div className="col-span-5">{t('fileExplorer.column.name')}</div>
+            <div className="col-span-2">{t('fileExplorer.column.size')}</div>
+            <div className="col-span-3">{t('fileExplorer.column.modified')}</div>
+            <div className="col-span-2">{t('fileExplorer.column.permissions')}</div>
           </div>
         </div>
       )}
@@ -443,9 +450,9 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
             <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center mx-auto mb-3">
               <Folder className="w-6 h-6 text-muted-foreground" />
             </div>
-            <h4 className="font-medium text-foreground mb-1">No files found</h4>
+            <h4 className="font-medium text-foreground mb-1">{t('fileExplorer.empty.title')}</h4>
             <p className="text-sm text-muted-foreground">
-              Check if the project path is accessible
+              {t('fileExplorer.empty.description')}
             </p>
           </div>
         ) : filteredFiles.length === 0 && searchQuery ? (
@@ -453,9 +460,9 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
             <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center mx-auto mb-3">
               <Search className="w-6 h-6 text-muted-foreground" />
             </div>
-            <h4 className="font-medium text-foreground mb-1">No matches found</h4>
+            <h4 className="font-medium text-foreground mb-1">{t('fileExplorer.noMatches.title')}</h4>
             <p className="text-sm text-muted-foreground">
-              Try a different search term or clear the search
+              {t('fileExplorer.noMatches.description')}
             </p>
           </div>
         ) : (

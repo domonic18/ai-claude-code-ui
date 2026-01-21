@@ -9,6 +9,7 @@
  */
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/shared/components/ui/Button';
 import { Server, Plus } from 'lucide-react';
 import { McpServer } from '../../types/settings.types';
@@ -41,16 +42,18 @@ export const McpServerList: React.FC<McpServerListProps> = ({
   serverTools,
   toolsLoading
 }) => {
+  const { t } = useTranslation();
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <Server className="w-5 h-5 text-purple-500" />
         <h3 className="text-lg font-medium text-foreground">
-          MCP Servers
+          {t('mcp.title')}
         </h3>
       </div>
       <p className="text-sm text-muted-foreground">
-        Model Context Protocol servers provide additional tools and data sources to Claude
+        {t('mcp.description')}
       </p>
 
       <div className="flex justify-between items-center">
@@ -60,7 +63,7 @@ export const McpServerList: React.FC<McpServerListProps> = ({
           size="sm"
         >
           <Plus className="w-4 h-4 mr-2" />
-          Add MCP Server
+          {t('mcp.addServer')}
         </Button>
       </div>
 
@@ -77,7 +80,7 @@ export const McpServerList: React.FC<McpServerListProps> = ({
         ))}
         {servers.length === 0 && (
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            No MCP servers configured
+            {t('mcp.noServers')}
           </div>
         )}
       </div>

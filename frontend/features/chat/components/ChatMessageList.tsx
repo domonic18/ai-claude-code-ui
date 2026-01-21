@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useMemo, memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChatMessage } from './ChatMessage';
 import { useChatScroll } from '../hooks';
 import type { ChatMessage as ChatMessageType } from '../types';
@@ -56,6 +57,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   autoScrollToBottom = true,
   visibleMessageCount = 100,
 }: ChatMessageListProps) {
+  const { t } = useTranslation();
   const {
     scrollContainerRef,
     messagesEndRef,
@@ -103,10 +105,10 @@ export const ChatMessageList = memo(function ChatMessageList({
             </svg>
           </div>
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-            Start a conversation
+            {t('chat.emptyState.title')}
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Send a message to begin working with AI assistance.
+            {t('chat.emptyState.description')}
           </p>
         </div>
       </div>

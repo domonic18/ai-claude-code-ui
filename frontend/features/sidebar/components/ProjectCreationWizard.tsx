@@ -10,14 +10,14 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, FolderPlus, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
 import { api } from '@/shared/services';
 import type { ProjectCreationWizardProps } from '../types/sidebar.types';
 
-// Default project name
-const DEFAULT_PROJECT_NAME = 'my-project';
+// Default project name - will be set from translation in component
 
 // Debounce delay for name checking (ms)
 const CHECK_DEBOUNCE_MS = 300;
@@ -98,8 +98,11 @@ const ProjectCreationWizard = ({
   onClose,
   onProjectCreated
 }: ProjectCreationWizardProps) => {
+  const { t } = useTranslation();
+  const defaultProjectName = t('projectCreation.defaultName');
+
   // Form state
-  const [projectName, setProjectName] = useState<string>(DEFAULT_PROJECT_NAME);
+  const [projectName, setProjectName] = useState<string>(defaultProjectName);
 
   // UI state
   const [isCreating, setIsCreating] = useState<boolean>(false);
@@ -131,14 +134,14 @@ const ProjectCreationWizard = ({
    */
   useEffect(() => {
     const initializeName = async () => {
-      const availableName = await generateAvailableName(DEFAULT_PROJECT_NAME);
+      const availableName = await generateAvailableName(defaultProjectName);
       setProjectName(availableName);
       // Mark initial load as complete after setting the name
       isInitialLoad.current = false;
     };
 
     initializeName();
-  }, []);
+  }, [defaultProjectName]);
 
   /**
    * Check availability when project name changes
@@ -155,8 +158,8 @@ const ProjectCreationWizard = ({
    * Handle project name input change
    */
   const handleNameChange = (value: string) => {
-    // Allow only alphanumeric, hyphens, and underscores
-    const sanitizedName = value.replace(/[^a-zA-Z0-9-_]/g, '');
+    // Allow alphanumeric, hyphens, underscores, and Chinese characters
+    const sanitizedName = value.replace(/[^\u4e00-\u9fa5a-zA-Z0-9-_]/g, '');
     setProjectName(sanitizedName);
     setError(null);
   };
@@ -166,12 +169,12 @@ const ProjectCreationWizard = ({
    */
   const handleCreate = async () => {
     if (!projectName || projectName.trim().length === 0) {
-      setError('Please enter a project name');
+      setError(t('projectCreation.error.emptyName'));
       return;
     }
 
     if (availabilityStatus === 'unavailable') {
-      setError('A project with this name already exists. Please choose a different name.');
+      setError(t('projectCreation.error.nameExists'));
       return;
     }
 
@@ -224,28 +227,28 @@ const ProjectCreationWizard = ({
         return (
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <Loader2 className="w-4 h-4 animate-spin" />
-            <span>Checking...</span>
+            <span>{t('projectCreation.status.checking')}</span>
           </div>
         );
       case 'available':
         return (
           <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
             <Check className="w-4 h-4" />
-            <span>Available</span>
+            <span>{t('projectCreation.status.available')}</span>
           </div>
         );
       case 'unavailable':
         return (
           <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
             <AlertCircle className="w-4 h-4" />
-            <span>Already exists</span>
+            <span>{t('projectCreation.status.unavailable')}</span>
           </div>
         );
       case 'error':
         return (
           <div className="flex items-center gap-2 text-sm text-yellow-600 dark:text-yellow-400">
             <AlertCircle className="w-4 h-4" />
-            <span>Unable to check</span>
+            <span>{t('projectCreation.status.error')}</span>
           </div>
         );
       default:
@@ -276,7 +279,7 @@ const ProjectCreationWizard = ({
               <FolderPlus className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Create New Project
+              {t('projectCreation.title')}
             </h3>
           </div>
           <button
@@ -304,7 +307,7 @@ const ProjectCreationWizard = ({
           {/* Project Name Input */}
           <div className="space-y-3">
             <label htmlFor="project-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Project Name
+              {t('projectCreation.projectName')}
             </label>
             <div className="relative">
               <Input
@@ -312,7 +315,7 @@ const ProjectCreationWizard = ({
                 type="text"
                 value={projectName}
                 onChange={(e) => handleNameChange(e.target.value)}
-                placeholder="Enter project name"
+                placeholder={t('projectCreation.projectNamePlaceholder')}
                 className="w-full pr-24"
                 disabled={isCreating}
                 autoFocus
@@ -324,22 +327,21 @@ const ProjectCreationWizard = ({
               </div>
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Use letters, numbers, hyphens, and underscores only
+              {t('projectCreation.projectNameHint')}
             </p>
           </div>
 
           {/* Info Card */}
           <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
             <p className="text-sm text-blue-800 dark:text-blue-200">
-              A new folder will be created in your workspace with this name.
-              You can start coding with Claude right away!
+              {t('projectCreation.infoCard')}
             </p>
           </div>
 
           {/* Project Path Preview */}
           {projectName && (
             <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Project will be created at:</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('projectCreation.pathPreview')}</p>
               <p className="text-sm font-mono text-gray-900 dark:text-white">
                 /workspace/{projectName}
               </p>
@@ -354,7 +356,7 @@ const ProjectCreationWizard = ({
             onClick={onClose}
             disabled={isCreating}
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             onClick={handleCreate}
@@ -363,12 +365,12 @@ const ProjectCreationWizard = ({
             {isCreating ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Creating...
+                {t('projectCreation.creating')}
               </>
             ) : (
               <>
                 <Check className="w-4 h-4 mr-2" />
-                Create Project
+                {t('projectCreation.createButton')}
               </>
             )}
           </Button>
