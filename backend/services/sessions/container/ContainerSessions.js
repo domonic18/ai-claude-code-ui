@@ -238,8 +238,6 @@ async function listSessionFiles(userId, projectName) {
   const encodedProjectName = encodeProjectName(projectName);
   const projectDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
 
-  console.log(`[ContainerSessions] Listing files in: ${projectDir}`);
-
   // 使用 for 循环查找所有 .jsonl 文件（更可靠）
   const { stream } = await containerManager.execInContainer(
     userId,
@@ -258,16 +256,14 @@ async function listSessionFiles(userId, projectName) {
 
     stdout.on('data', (chunk) => {
       output += chunk.toString();
-      console.log(`[ContainerSessions] STDOUT chunk:`, JSON.stringify(chunk.toString()));
     });
 
     stderr.on('data', (chunk) => {
-      console.log(`[ContainerSessions] STDERR while listing files:`, chunk.toString());
+      // 静默处理 stderr 错误（目录可能不存在）
     });
 
     stream.on('error', (err) => {
       // Directory might not exist, return empty array
-      console.log(`[ContainerSessions] Error listing files:`, err.message);
       resolve([]);
     });
 
@@ -278,10 +274,8 @@ async function listSessionFiles(userId, projectName) {
         const sessionFiles = files.filter(f =>
           f.endsWith('.jsonl') && !f.startsWith('agent-')
         );
-        console.log(`[ContainerSessions] Found session files:`, sessionFiles);
         resolve(sessionFiles);
       } catch (e) {
-        console.log(`[ContainerSessions] Error parsing file list:`, e.message);
         resolve([]);
       }
     });
@@ -297,18 +291,13 @@ async function listSessionFiles(userId, projectName) {
  * @returns {Promise<Object>} 会话列表和分页信息
  */
 async function getSessionsInContainer(userId, projectName, limit = 5, offset = 0) {
-  console.log(`[ContainerSessions] Getting sessions for project: ${projectName}`);
-
   try {
     // 获取会话文件列表
     const sessionFiles = await listSessionFiles(userId, projectName);
 
     if (sessionFiles.length === 0) {
-      console.log(`[ContainerSessions] No session files found for project: ${projectName}`);
       return { sessions: [], hasMore: false, total: 0 };
     }
-
-    console.log(`[ContainerSessions] Found ${sessionFiles.length} session files`);
 
     // 读取所有会话文件
     const allSessions = new Map();
@@ -392,8 +381,6 @@ async function getSessionsInContainer(userId, projectName, limit = 5, offset = 0
     const paginatedSessions = visibleSessions.slice(offset, offset + limit);
     const hasMore = offset + limit < total;
 
-    console.log(`[ContainerSessions] Returning ${paginatedSessions.length} sessions (total: ${total})`);
-
     return {
       sessions: paginatedSessions,
       hasMore,
@@ -468,8 +455,6 @@ async function getSessionFilesInfo(userId, projectName) {
  * @returns {Promise<Object|Array>} 消息列表和分页信息，或全部消息
  */
 async function getSessionMessagesInContainer(userId, projectName, sessionId, limit = null, offset = 0) {
-  console.log(`[ContainerSessions] Getting messages for session: ${sessionId} in project: ${projectName}`);
-
   try {
     const encodedProjectName = encodeProjectName(projectName);
     const projectDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
@@ -548,8 +533,6 @@ async function getSessionMessagesInContainer(userId, projectName, sessionId, lim
  * @returns {Promise<boolean>} 是否成功
  */
 async function updateSessionSummaryInContainer(userId, projectName, sessionId, newSummary) {
-  console.log(`[ContainerSessions] Updating summary for session: ${sessionId} in project: ${projectName}`);
-
   try {
     const encodedProjectName = encodeProjectName(projectName);
     const projectDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
@@ -558,7 +541,6 @@ async function updateSessionSummaryInContainer(userId, projectName, sessionId, n
     const sessionFiles = await listSessionFiles(userId, projectName);
 
     if (sessionFiles.length === 0) {
-      console.error(`[ContainerSessions] No session files found for project: ${projectName}`);
       return false;
     }
 
@@ -642,7 +624,6 @@ async function updateSessionSummaryInContainer(userId, projectName, sessionId, n
             });
           });
 
-          console.log(`[ContainerSessions] Summary updated successfully for session: ${sessionId}`);
           return true;
         }
       } catch (error) {
@@ -650,7 +631,7 @@ async function updateSessionSummaryInContainer(userId, projectName, sessionId, n
       }
     }
 
-    console.error(`[ContainerSessions] Session ${sessionId} not found in any file`);
+    console.warn(`[ContainerSessions] Session ${sessionId} not found`);
     return false;
   } catch (error) {
     console.error(`[ContainerSessions] Error updating session summary:`, error);
@@ -666,8 +647,6 @@ async function updateSessionSummaryInContainer(userId, projectName, sessionId, n
  * @returns {Promise<boolean>} 是否成功
  */
 async function deleteSessionInContainer(userId, projectName, sessionId) {
-  console.log(`[ContainerSessions] Deleting session: ${sessionId} in project: ${projectName}`);
-
   try {
     const encodedProjectName = encodeProjectName(projectName);
     const projectDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
@@ -676,7 +655,6 @@ async function deleteSessionInContainer(userId, projectName, sessionId) {
     const sessionFiles = await listSessionFiles(userId, projectName);
 
     if (sessionFiles.length === 0) {
-      console.error(`[ContainerSessions] No session files found for project: ${projectName}`);
       return false;
     }
 
@@ -741,7 +719,6 @@ async function deleteSessionInContainer(userId, projectName, sessionId) {
             });
           });
 
-          console.log(`[ContainerSessions] Session deleted successfully: ${sessionId}`);
           return true;
         }
       } catch (error) {
@@ -749,7 +726,7 @@ async function deleteSessionInContainer(userId, projectName, sessionId) {
       }
     }
 
-    console.error(`[ContainerSessions] Session ${sessionId} not found in any file`);
+    console.warn(`[ContainerSessions] Session ${sessionId} not found`);
     return false;
   } catch (error) {
     console.error(`[ContainerSessions] Error deleting session:`, error);

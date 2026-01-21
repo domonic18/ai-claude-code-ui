@@ -21,18 +21,14 @@ import { loadProjectConfig } from '../config/index.js';
  * @returns {Promise<Array>} 项目列表
  */
 export async function getProjectsInContainer(userId) {
-  console.log('[ContainerProjectManager] getProjectsInContainer - userId:', userId);
-
   try {
     // 获取容器（设置短超时，避免长时间阻塞前端请求）
     // 如果容器正在创建中，快速返回空列表，让前端通过轮询获取
     let container;
     try {
       container = await containerManager.getOrCreateContainer(userId, {}, { wait: true, timeout: FILE_TIMEOUTS.quickRequest });
-      console.log('[ContainerProjectManager] Container:', container.id, container.name);
     } catch (error) {
       // 容器未就绪，返回空列表让前端继续轮询
-      console.log('[ContainerProjectManager] Container not ready yet, returning empty list:', error.message);
       return [];
     }
 
@@ -61,11 +57,10 @@ export async function getProjectsInContainer(userId) {
       });
 
       stderr.on('data', (chunk) => {
-        console.error('[ContainerProjectManager] STDERR:', chunk.toString());
+        // 静默处理 stderr
       });
 
       stream.on('error', (err) => {
-        console.error('[ContainerProjectManager] Error listing projects:', err);
         resolve([]);
       });
 
@@ -79,11 +74,8 @@ export async function getProjectsInContainer(userId) {
           try {
             projectConfig = await loadProjectConfig();
           } catch (configError) {
-            console.warn('[ContainerProjectManager] Failed to load project config:', configError.message);
+            // 静默失败
           }
-
-          console.log('[ContainerProjectManager] Raw ls output:', JSON.stringify(output));
-          console.log('[ContainerProjectManager] Split lines:', lines.length);
 
           for (const line of lines) {
             let projectName = line.trim();
@@ -95,7 +87,6 @@ export async function getProjectsInContainer(userId) {
 
             // 跳过空行和隐藏目录（以 . 开头）
             if (!projectName || projectName === '' || projectName.startsWith('.')) {
-              console.log('[ContainerProjectManager] Skipping hidden/empty:', projectName);
               continue;
             }
 
@@ -118,22 +109,16 @@ export async function getProjectsInContainer(userId) {
             });
           }
 
-          console.log('[ContainerProjectManager] Found projects in container:', projectList.length);
-          console.log('[ContainerProjectManager] Project data:', JSON.stringify(projectList, null, 2));
-
           // 加载每个项目的会话信息
           for (const project of projectList) {
             try {
-              console.log(`[ContainerProjectManager] Loading sessions for project: ${project.name}`);
               const sessionResult = await getSessionsInContainer(userId, project.name, 5, 0);
               project.sessions = sessionResult.sessions || [];
               project.sessionMeta = {
                 hasMore: sessionResult.hasMore,
                 total: sessionResult.total
               };
-              console.log(`[ContainerProjectManager] Loaded ${project.sessions.length} sessions for ${project.name} (total: ${sessionResult.total})`);
             } catch (error) {
-              console.warn(`[ContainerProjectManager] Could not load sessions for project ${project.name}:`, error.message);
               // 保持空会话列表
               project.sessions = [];
               project.sessionMeta = { hasMore: false, total: 0 };
@@ -142,7 +127,6 @@ export async function getProjectsInContainer(userId) {
 
           resolve(projectList);
         } catch (parseError) {
-          console.error('[ContainerProjectManager] Error parsing projects:', parseError);
           reject(new Error(`Failed to parse projects: ${parseError.message}`));
         }
       });
@@ -150,7 +134,6 @@ export async function getProjectsInContainer(userId) {
 
     return projects;
   } catch (error) {
-    console.error('[ContainerProjectManager] Failed to get projects in container:', error);
     throw new Error(`Failed to get projects in container: ${error.message}`);
   }
 }

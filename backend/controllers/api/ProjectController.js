@@ -129,8 +129,6 @@ export class ProjectController extends BaseController {
       const { projectName, sessionId } = req.params; // 修复：使用 projectName 而不是 projectId
       const { limit = 100, offset = 0 } = this._getPagination(req, { page: 1, limit: 100 });
 
-      console.log(`[ProjectController] Getting session messages for project: ${projectName}, session: ${sessionId}`);
-
       // 动态导入容器会话服务
       const { getSessionMessagesInContainer } = await import('../../services/sessions/container/ContainerSessions.js');
 
@@ -190,22 +188,15 @@ export class ProjectController extends BaseController {
       const userId = this._getUserId(req);
       const { projectName } = req.params;
 
-      console.log('[ProjectController] deleteProject called:', { userId, projectName });
-
       // 检查项目是否为空
       const isEmpty = await this.claudeDiscovery.isProjectEmpty(projectName, { userId });
-
-      console.log('[ProjectController] Project empty check result:', isEmpty);
 
       if (!isEmpty) {
         throw new Error('Cannot delete project with existing sessions');
       }
 
-      console.log('[ProjectController] Deleting project directory in container...');
-
       // 删除容器中的项目目录
       const projectPath = `${CONTAINER.paths.workspace}/${projectName}`;
-      console.log('[ProjectController] Project path to delete:', projectPath);
 
       const { stream } = await containerManager.execInContainer(userId, `rm -rf "${projectPath}"`);
 
@@ -216,14 +207,12 @@ export class ProjectController extends BaseController {
         const cleanup = () => {
           if (!resolved) {
             resolved = true;
-            console.log('[ProjectController] Delete command completed');
             resolve();
           }
         };
 
         stream.on('end', cleanup);
         stream.on('error', (err) => {
-          console.error('[ProjectController] Delete command error:', err);
           if (!resolved) {
             resolved = true;
             reject(err);
@@ -233,17 +222,13 @@ export class ProjectController extends BaseController {
         // 添加超时保护，3秒后自动完成
         setTimeout(() => {
           if (!resolved) {
-            console.log('[ProjectController] Delete command timeout (this is normal for rm -rf)');
             cleanup();
           }
         }, 3000);
       });
 
-      console.log('[ProjectController] Project deleted successfully');
-
       this._success(res, null, 'Project deleted successfully');
     } catch (error) {
-      console.error('[ProjectController] Error deleting project:', error);
       this._handleError(error, req, res, next);
     }
   }

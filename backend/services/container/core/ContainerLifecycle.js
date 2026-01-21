@@ -82,9 +82,12 @@ export class ContainerLifecycleManager {
     // 缓存状态机
     this.stateMachines.set(userId, stateMachine);
 
-    // 监听状态变化，自动保存
+    // 监听状态变化，自动保存（仅记录重要状态变化）
     stateMachine.on('stateChanged', async (event) => {
-      console.log(`[Lifecycle] State changed for user ${userId}: ${event.from} -> ${event.to}`);
+      const importantTransitions = ['ready', 'failed'];
+      if (importantTransitions.includes(event.to)) {
+        console.log(`[Lifecycle] State changed for user ${userId}: ${event.from} -> ${event.to}`);
+      }
       await containerStateStore.save(stateMachine);
     });
 
@@ -187,7 +190,6 @@ export class ContainerLifecycleManager {
       }
 
       // 状态为 READY 但容器不在缓存中或未运行，重置状态
-      console.log(`[Lifecycle] Container state is READY but container not available, resetting to NON_EXISTENT`);
       stateMachine.transitionTo(ContainerState.NON_EXISTENT);
       await containerStateStore.save(stateMachine);
     }
@@ -196,11 +198,8 @@ export class ContainerLifecycleManager {
     if ([ContainerState.CREATING, ContainerState.STARTING, ContainerState.HEALTH_CHECKING].includes(stateMachine.getState())) {
       // 如果设置了不等待，立即抛出错误让调用方处理
       if (options.wait === false) {
-        console.log(`[Lifecycle] Container ${stateMachine.getState()} in progress for user ${userId}, not waiting (wait=false)`);
         throw new Error(`Container is ${stateMachine.getState()}, not ready yet`);
       }
-
-      console.log(`[Lifecycle] Container ${stateMachine.getState()} in progress for user ${userId}, waiting...`);
 
       try {
         await this._waitForReady(userId, options.timeout);
@@ -209,7 +208,6 @@ export class ContainerLifecycleManager {
         // 等待失败，检查是否需要重试
         if (stateMachine.is(ContainerState.FAILED)) {
           // 清理失败状态并重试
-          console.log(`[Lifecycle] Previous creation failed for user ${userId}, resetting...`);
           stateMachine.transitionTo(ContainerState.NON_EXISTENT);
           await containerStateStore.save(stateMachine);
           return this.getOrCreateContainer(userId, userConfig, options);
@@ -220,7 +218,6 @@ export class ContainerLifecycleManager {
 
     // 情况 3: 容器处于失败状态，重置并重试
     if (stateMachine.is(ContainerState.FAILED)) {
-      console.log(`[Lifecycle] Container in failed state for user ${userId}, resetting...`);
       stateMachine.transitionTo(ContainerState.NON_EXISTENT);
       await containerStateStore.save(stateMachine);
     }

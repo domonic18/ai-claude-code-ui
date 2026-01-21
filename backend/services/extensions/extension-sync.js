@@ -60,6 +60,13 @@ export async function syncExtensions(targetDir, options = {}) {
     // Sync configuration files (CLAUDE.md and settings.json)
     await syncConfigFiles(targetDir, results.config, overwriteUserFiles);
 
+    // 打印汇总日志
+    const totalSynced = results.agents.synced + results.commands.synced + results.skills.synced +
+                       results.hooks.synced + results.knowledge.synced + results.config.synced;
+    if (totalSynced > 0) {
+      console.log(`[ExtensionSync] Synced ${totalSynced} extensions (${results.agents.synced} agents, ${results.commands.synced} commands, ${results.skills.synced} skills, ${results.hooks.synced} hooks, ${results.knowledge.synced} knowledge, ${results.config.synced} config)`);
+    }
+
     return results;
   } catch (error) {
     console.error('[ExtensionSync] Failed to sync extensions:', error);
@@ -116,7 +123,6 @@ async function syncResourceType(type, targetDir, results, overwrite) {
 
           await copyDirectory(sourcePath, targetPath);
           results.synced++;
-          console.log(`[ExtensionSync] Synced skill: ${entry.name}`);
         }
       } else if (type === 'hooks' || type === 'knowledge') {
         // Hooks and Knowledge support both files and directories
@@ -135,7 +141,6 @@ async function syncResourceType(type, targetDir, results, overwrite) {
 
             await fs.copyFile(sourcePath, targetPath);
             results.synced++;
-            console.log(`[ExtensionSync] Synced ${type.slice(0, -1)}: ${entry.name}`);
           }
         } else if (entry.isDirectory()) {
           // Support subdirectories (useful for knowledge categorization)
@@ -149,7 +154,6 @@ async function syncResourceType(type, targetDir, results, overwrite) {
 
           await copyDirectory(sourcePath, targetPath);
           results.synced++;
-          console.log(`[ExtensionSync] Synced ${type.slice(0, -1)} directory: ${entry.name}`);
         }
       } else {
         // Agents and Commands are files
@@ -165,7 +169,6 @@ async function syncResourceType(type, targetDir, results, overwrite) {
 
           await fs.copyFile(sourcePath, targetPath);
           results.synced++;
-          console.log(`[ExtensionSync] Synced ${type.slice(0, -1)}: ${entry.name}`);
         }
       }
     } catch (error) {
@@ -207,7 +210,6 @@ async function syncConfigFiles(targetDir, results, overwrite) {
       // Copy the file
       await fs.copyFile(sourcePath, targetPath);
       results.synced++;
-      console.log(`[ExtensionSync] Synced config file: ${filename}`);
     } catch (error) {
       const errorMsg = `${filename}: ${error.message}`;
       results.errors.push({ resource: filename, error: error.message });
