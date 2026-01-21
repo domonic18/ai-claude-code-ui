@@ -18,8 +18,9 @@ import SidebarHeader from './SidebarHeader';
 import ProjectList from './ProjectList';
 import ProjectCreationWizard from './ProjectCreationWizard';
 import UserMenu from './UserMenu';
+import { ConfirmDialog } from '@/shared/components/ui';
 import { TIMESTAMP_UPDATE_INTERVAL } from '../constants/sidebar.constants';
-import type { SidebarProps, ExpandedProjects } from '../types/sidebar.types';
+import type { SidebarProps, ExpandedProjects, SessionProvider } from '../types/sidebar.types';
 import { useProjects } from '../hooks';
 import { useSessions } from '../hooks';
 import { useStarredProjects } from '../hooks';
@@ -76,6 +77,20 @@ export const Sidebar = memo(function Sidebar({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [editingSession, setEditingSession] = useState(null);
   const [editingSessionName, setEditingSessionName] = useState('');
+
+  // Delete confirmation dialog state
+  const [deleteConfirmState, setDeleteConfirmState] = useState<{
+    isOpen: boolean;
+    projectName: string;
+    sessionId: string;
+    provider?: SessionProvider;
+  }>({
+    isOpen: false,
+    projectName: '',
+    sessionId: '',
+    provider: undefined,
+  });
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Auto-update timestamps every minute
   useEffect(() => {
@@ -187,7 +202,7 @@ export const Sidebar = memo(function Sidebar({
   const handleDeleteProject = useCallback(async (projectName: string) => {
     await deleteProject(projectName);
     if (onProjectDelete) {
-      await onProjectDelete(projectName);
+      onProjectDelete(projectName);
     }
   }, [deleteProject, onProjectDelete]);
 
@@ -203,29 +218,68 @@ export const Sidebar = memo(function Sidebar({
     }
   }, [onSessionSelect]);
 
-  const handleSessionDelete = useCallback(async (projectName: string, sessionId: string, provider?: any) => {
-    // 再次确认以确保用户看到对话框
-    if (!window.confirm(t('sidebar.confirmDeleteSession') || 'Are you sure you want to delete this session?')) {
-      return;
-    }
+  const handleSessionDelete = useCallback(async (projectName: string, sessionId: string, provider?: SessionProvider) => {
+    // Open confirmation dialog instead of blocking with window.confirm
+    setDeleteConfirmState({
+      isOpen: true,
+      projectName,
+      sessionId,
+      provider,
+    });
+  }, []);
 
+  /**
+   * Handle the actual session deletion after confirmation
+   */
+  const handleConfirmSessionDelete = useCallback(async () => {
+    const { projectName, sessionId, provider } = deleteConfirmState;
+
+    setIsDeleting(true);
     try {
       await deleteSession(projectName, sessionId, provider);
-      // Only call parent callback if deletion was successful (not cancelled)
+
+      // Only call parent callback if deletion was successful
       if (onSessionDelete) {
-        await onSessionDelete(projectName, sessionId, provider);
+        onSessionDelete(projectName, sessionId, provider);
       }
-    } catch (error: any) {
-      // Ignore user cancellation (already handled by confirm above, but for robust error handling)
-      if (error?.code === 'CANCELLED') {
-        return;
+
+      // Refresh projects to update the UI with latest session list
+      // This ensures the deleted session is removed from propProjects
+      if (onRefresh) {
+        await onRefresh();
       }
+
+      // Close dialog on success
+      setDeleteConfirmState({
+        isOpen: false,
+        projectName: '',
+        sessionId: '',
+        provider: undefined,
+      });
+    } catch (error: unknown) {
       console.error('[Sidebar] Error deleting session:', error);
-      // Show error message to user
+
+      // Keep dialog open on error to allow user to see what happened
+      // You could add error state to the dialog here if needed
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete session. Please try again.';
-      window.alert(errorMessage);
+      // For now, log the error - in a real app you might want to show this in the dialog
+      console.error(errorMessage);
+    } finally {
+      setIsDeleting(false);
     }
-  }, [deleteSession, onSessionDelete, t]);
+  }, [deleteConfirmState, deleteSession, onSessionDelete, onRefresh]);
+
+  /**
+   * Handle canceling the session deletion
+   */
+  const handleCancelSessionDelete = useCallback(() => {
+    setDeleteConfirmState({
+      isOpen: false,
+      projectName: '',
+      sessionId: '',
+      provider: undefined,
+    });
+  }, []);
 
   const handleUpdateSessionSummary = useCallback(async (projectName: string, sessionId: string, summary: string) => {
     try {
@@ -299,6 +353,19 @@ export const Sidebar = memo(function Sidebar({
         />,
         document.body
       )}
+
+      {/* Delete Session Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirmState.isOpen}
+        title={t('sidebar.confirmDeleteSession') || 'Delete Session'}
+        message={t('sidebar.confirmDeleteSessionMessage') || 'Are you sure you want to delete this session? This action cannot be undone.'}
+        confirmLabel={t('sidebar.delete') || 'Delete'}
+        cancelLabel={t('sidebar.cancel') || 'Cancel'}
+        type="danger"
+        isLoading={isDeleting}
+        onConfirm={handleConfirmSessionDelete}
+        onCancel={handleCancelSessionDelete}
+      />
 
       <div
         className="h-full flex flex-col bg-card md:select-none"
