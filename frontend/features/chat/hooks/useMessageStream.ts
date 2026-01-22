@@ -145,6 +145,11 @@ export function useMessageStream(options: UseMessageStreamOptions = {}): UseMess
 
     setIsStreaming(false);
 
+    // Clear streaming content to hide StreamingIndicator
+    // Content is already persisted in the messages array
+    setStreamingContent('');
+    setStreamingThinking('');
+
     // Call completion callback with final content
     if (hasContentRef.current) {
       onStreamComplete?.(streamingContent + streamBufferRef.current, streamingThinking + thinkingBufferRef.current);

@@ -8,6 +8,7 @@
  */
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { StreamingIndicatorProps } from '../types';
 import MarkdownRenderer from './MarkdownRenderer';
 
@@ -21,22 +22,25 @@ export function StreamingIndicator({
   content = '',
   thinking,
 }: StreamingIndicatorProps) {
+  const { t } = useTranslation();
   if (!isStreaming && !content) {
     return null;
   }
 
   return (
     <div className="flex items-center gap-3 px-3 py-2 bg-gray-50 dark:bg-gray-800/30 rounded-lg">
-      {/* Animated dots */}
-      <div className="flex gap-1 flex-shrink-0">
-        <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
-        <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
-        <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" />
-      </div>
+      {/* Animated dots - only show while actively streaming */}
+      {isStreaming && (
+        <div className="flex gap-1 flex-shrink-0">
+          <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+          <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
+          <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" />
+        </div>
+      )}
 
       {/* Status text */}
       <span className="text-sm text-gray-600 dark:text-gray-400 flex-shrink-0">
-        {isStreaming ? 'AI is responding' : 'Response complete'}
+        {isStreaming ? t('chat.streaming.responding') : t('chat.streaming.complete')}
       </span>
 
       {/* Preview of streaming content */}
