@@ -245,6 +245,13 @@ function AppContent() {
     setShowSettings(true);
   }, []);
 
+  // Reset activeTab to 'chat' when session changes
+  useEffect(() => {
+    if (selectedSession) {
+      setActiveTab('chat');
+    }
+  }, [selectedSession?.id]);
+
   // URL-based session loading is now handled in useProjectManager
   // This ensures a single source of truth for session selection
 
