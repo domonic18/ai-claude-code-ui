@@ -309,9 +309,10 @@ export class FileAdapter extends BaseFileAdapter {
         { projectPath, isContainerProject }
       );
 
-      // 使用 find 命令获取文件树
+      // 使用 find 命令获取文件树，输出格式：路径\0类型 (d=目录, f=文件, l=符号链接)
+      // 使用 \0 (null 字符) 作为分隔符，因为文件名不允许包含 \0
       const excludeArgs = excludedDirs.map(d => `-name "${d}" -prune -o`).join(' ');
-      const command = `find ${containerPath} ${excludeArgs} -type f -o -type d | head -1000`;
+      const command = `find ${containerPath} ${excludeArgs} \\( -type d -o -type f -o -type l \\) -printf "%p\\0%y\\0" 2>/dev/null | head -c 100000`;
 
       const { stream } = await containerManager.execInContainer(userId, command);
 
@@ -332,8 +333,8 @@ export class FileAdapter extends BaseFileAdapter {
         });
 
         stream.on('end', () => {
-          const lines = output.trim().split('\n').filter(Boolean);
-          const tree = this._parseFileTreeOutput(lines, containerPath);
+          // output 是使用 \0 分隔的字符串：路径\0类型\0路径\0类型\0...
+          const tree = this._parseFileTreeOutput(output, containerPath);
           resolve(tree);
         });
       });
@@ -593,25 +594,60 @@ export class FileAdapter extends BaseFileAdapter {
   /**
    * 解析文件树输出
    * @private
-   * @param {Array<string>} lines - 输出行
+   * @param {string} output - 输出字符串，格式：路径\0类型\0路径\0类型\0...
    * @param {string} basePath - 基础路径
    * @returns {Array} 文件树
    */
-  _parseFileTreeOutput(lines, basePath) {
+  _parseFileTreeOutput(output, basePath) {
     const tree = [];
     const processedPaths = new Set();
 
-    // 预先收集所有路径，用于判断是文件还是目录
-    const allPaths = new Set(lines);
+    // 处理空输出
+    if (!output || output.trim() === '') {
+      return tree;
+    }
 
+    // 解析输出：路径\0类型\0路径\0类型\0...
+    // 使用 \0 分隔，因为文件名不允许包含 \0
+    const parts = output.split('\0');
+    const pathTypeMap = new Map();
+    const validPaths = [];
 
-    for (const line of lines) {
-      // 跳过空行
-      if (!line || line.trim() === '') {
+    // 每两个元素为一对：(path, type)
+    // 注意：parts.length 可能是奇数（数据被截断），所以用 < 而不是 <=
+    for (let i = 0; i < parts.length - 1; i += 2) {
+      const fullPath = parts[i];
+      const typeFlag = parts[i + 1];
+
+      // 跳过空路径或类型
+      if (!fullPath || !typeFlag) {
         continue;
       }
 
-      const relativePath = line.replace(basePath + '/', '').replace(basePath, '');
+      // 验证路径是否在 basePath 下
+      if (!fullPath.startsWith(basePath)) {
+        continue;
+      }
+
+      // 转换 find 的类型标识到我们的类型
+      // f=file, d=directory, l=symlink (视为目录)
+      let type;
+      if (typeFlag === 'f') {
+        type = 'file';
+      } else if (typeFlag === 'd' || typeFlag === 'l') {
+        type = 'directory';
+      } else {
+        // 其他类型（socket, FIFO 等）视为文件
+        type = 'file';
+      }
+
+      pathTypeMap.set(fullPath, type);
+      validPaths.push(fullPath);
+    }
+
+    // 构建文件树
+    for (const fullPath of validPaths) {
+      const relativePath = fullPath.replace(basePath + '/', '').replace(basePath, '');
 
       // 跳过隐藏文件/目录（路径的任何部分以点开头）
       const pathParts = relativePath.split('/');
@@ -629,40 +665,37 @@ export class FileAdapter extends BaseFileAdapter {
       // 验证每个部分是否有效
       if (parts.length === 0 || parts.some(part => part === '' || !this._isValidFileName(part))) {
         console.log('[FileAdapter] Skipping invalid path:', relativePath, '->', parts);
-        continue; // 跳过无效路径
+        continue;
       }
 
       let currentLevel = tree;
 
       for (let i = 0; i < parts.length; i++) {
         const part = parts[i];
-        // 构建到当前部分的完整路径
         const pathSoFar = `${basePath}/${parts.slice(0, i + 1).join('/')}`;
-        // 判断是否为目录
-        const isDir = this._isDirectory(pathSoFar, allPaths);
+        const type = pathTypeMap.get(pathSoFar) || 'file'; // 默认为文件
 
         let existing = currentLevel.find(item => item.name === part);
 
         if (!existing) {
           existing = {
             name: part,
-            type: isDir ? 'directory' : 'file',
+            type: type,
             path: pathSoFar
           };
 
-          if (isDir) {
+          if (type === 'directory') {
             existing.children = [];
           }
 
           currentLevel.push(existing);
-        } else if (isDir && !existing.children) {
+        } else if (type === 'directory' && !existing.children) {
           // 如果已存在的节点是文件，但我们需要它作为目录，更新它
           existing.type = 'directory';
           existing.children = [];
         }
 
-        if (isDir) {
-          // 确保 currentLevel 始终是一个数组
+        if (type === 'directory') {
           currentLevel = existing.children || tree;
         }
       }
