@@ -1,0 +1,74 @@
+# Claude Code Web UI - Complete Image
+# Multi-stage build for proper native module compilation
+
+FROM node:20-slim AS builder
+
+# Configure apt to use Aliyun mirrors
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
+    sed -i 's|security.debian.org/debian-security|mirrors.aliyun.com/debian-security|g' /etc/apt/sources.list.d/debian.sources
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    python3 \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy package files and install dependencies
+COPY package*.json ./
+RUN npm config set registry https://registry.npmmirror.com
+RUN npm ci && npm cache clean --force
+
+# Runtime image
+FROM node:20-slim
+
+# Configure apt to use Aliyun mirrors
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
+    sed -i 's|security.debian.org/debian-security|mirrors.aliyun.com/debian-security|g' /etc/apt/sources.list.d/debian.sources
+
+# Install runtime dependencies (no build tools)
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    wget \
+    bash \
+    jq \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy node_modules from builder
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package*.json ./
+
+# Copy application files
+COPY backend ./backend
+COPY shared ./shared
+COPY dist ./dist
+
+# Create workspace directory
+RUN mkdir -p /workspace && \
+    chown -R node:node /app /workspace
+
+# Switch to non-root user
+USER node
+
+WORKDIR /app
+
+# Environment variables
+ENV NODE_ENV=production \
+    PORT=3001
+
+# Expose port
+EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD node -e "require('http').get('http://localhost:3001/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
+
+# Start the server
+CMD ["node", "backend/index.js"]
