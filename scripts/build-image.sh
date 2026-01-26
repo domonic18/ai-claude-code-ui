@@ -1,6 +1,7 @@
 #!/bin/bash
 # 构建 Docker 镜像脚本
-# 镜像标签格式: git_<commit-hash>_<YYYYMMDDHHMMSS>
+# 构建两个镜像：主应用镜像和运行时镜像
+# 镜像标签: latest
 
 set -e
 
@@ -17,48 +18,67 @@ cd "$PROJECT_ROOT"
 # ==================== 腾讯云配置 ====================
 REGISTRY="ccr.ccs.tencentyun.com"
 NAMESPACE="patent"
-PROJECT="claude-code-ui"
 
-# ==================== 生成版本号 ====================
-GIT_HASH=$(git rev-parse --short HEAD)
-BUILD_DATE=$(date +"%Y%m%d%H%M%S")
-VERSION="git_${GIT_HASH}_${BUILD_DATE}"
-
-# 远程镜像名称
-VERSIONED_IMAGE="${REGISTRY}/${NAMESPACE}/${PROJECT}:${VERSION}"
+# 镜像名称（只有 latest 标签）
+MAIN_IMAGE="${REGISTRY}/${NAMESPACE}/claude-code-ui:latest"
+RUNTIME_IMAGE="${REGISTRY}/${NAMESPACE}/claude-code-runtime:latest"
 
 # 检查 Dockerfile
-DOCKERFILE="docker/Dockerfile.production"
-if [ ! -f "$DOCKERFILE" ]; then
-  error "找不到 Dockerfile: $DOCKERFILE"
+MAIN_DOCKERFILE="docker/Dockerfile.deploy"
+RUNTIME_DOCKERFILE="docker/Dockerfile.runtime"
+
+if [ ! -f "$MAIN_DOCKERFILE" ]; then
+  error "找不到主应用 Dockerfile: $MAIN_DOCKERFILE"
+  exit 1
+fi
+
+if [ ! -f "$RUNTIME_DOCKERFILE" ]; then
+  error "找不到运行时 Dockerfile: $RUNTIME_DOCKERFILE"
   exit 1
 fi
 
 echo ""
 echo "=========================================="
-info "  Building Docker Image"
+info "  Building Docker Images"
 echo "=========================================="
 echo "Project Root: $PROJECT_ROOT"
-echo "Git Hash: $GIT_HASH"
-echo "Build Date: $BUILD_DATE"
-echo "Version: $VERSION"
+echo "Registry: $REGISTRY"
 echo "=========================================="
 
-# 构建镜像
-info "开始构建镜像..."
+# 构建主应用镜像
+echo ""
+info "1/2 构建主应用镜像 (claude-code-ui)..."
 docker build \
-  -f "$DOCKERFILE" \
-  -t "$VERSIONED_IMAGE" \
+  -f "$MAIN_DOCKERFILE" \
+  -t "$MAIN_IMAGE" \
   .
+
+info "主应用镜像构建完成！"
+echo "  - $MAIN_IMAGE"
+
+# 构建运行时镜像
+echo ""
+info "2/2 构建运行时镜像 (claude-code-runtime)..."
+docker build \
+  -f "$RUNTIME_DOCKERFILE" \
+  -t "$RUNTIME_IMAGE" \
+  .
+
+info "运行时镜像构建完成！"
+echo "  - $RUNTIME_IMAGE"
 
 # 完成
 echo ""
 echo "======================================"
-info "镜像构建完成！版本号: $VERSION"
+info "所有镜像构建完成！"
 echo "======================================"
 echo ""
 info_msg "已构建的镜像："
-echo "  $VERSIONED_IMAGE"
+echo "  主应用："
+echo "    $MAIN_IMAGE"
+echo ""
+echo "  运行时："
+echo "    $RUNTIME_IMAGE"
 echo ""
 info_msg "下一步："
 echo "  推送镜像: ./scripts/push-image.sh"
