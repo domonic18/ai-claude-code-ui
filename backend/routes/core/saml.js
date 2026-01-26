@@ -257,10 +257,12 @@ router.post('/callback', async (req, res) => {
     const token = generateToken({ id: user.id, username: user.username });
 
     // 设置 httpOnly cookie
+    // 注意：SAML 跨域重定向需要使用 'lax' 而不是 'strict'
+    // 注意：secure 只在 HTTPS 时设为 true，HTTP 部署需要 false
     const cookieOptions = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+      secure: process.env.COOKIE_SECURE === 'true',
+      sameSite: 'lax',
       maxAge: 365 * 24 * 60 * 60 * 1000,
       path: '/'
     };
@@ -321,8 +323,8 @@ router.get('/logout', (req, res) => {
 
   res.clearCookie('auth_token', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    secure: process.env.COOKIE_SECURE === 'true',
+    sameSite: 'lax',
     path: '/'
   });
 
