@@ -3,18 +3,15 @@
 
 services:
   app:
-    image: ccr.ccs.tencentyun.com/patent/claude-code-ui:git_7af1dfc_20260123
+    image: ccr.ccs.tencentyun.com/patent/claude-code-ui:latest
     container_name: claude-code-app
     ports:
-      - "${PORT:-3001}:3001"
+      - "3001:3001"
     volumes:
       - ./workspace:/app/workspace:rw
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    environment:
-      - NODE_ENV=production
-      - PORT=3001
-      - WORKSPACE_DIR=/app/workspace
-      - DATABASE_PATH=/app/workspace/database/claude-code.db
+    env_file:
+      - .env.production
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
