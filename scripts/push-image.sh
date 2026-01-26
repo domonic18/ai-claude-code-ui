@@ -21,8 +21,8 @@ PROJECT="claude-code-ui"
 # ==================== 获取版本号 ====================
 GIT_HASH=$(git rev-parse --short HEAD)
 
-# 查找已有的版本镜像标签
-EXISTING_TAG=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "${REGISTRY}/${NAMESPACE}/${PROJECT}:git_${GIT_HASH}_[0-9]\{14\}$" | head -1)
+# 查找已有的版本镜像标签（按时间戳排序，取最新的）
+EXISTING_TAG=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "${REGISTRY}/${NAMESPACE}/${PROJECT}:git_${GIT_HASH}_[0-9]\{14\}$" | sort -r | head -1)
 
 if [ -n "$EXISTING_TAG" ]; then
   VERSIONED_IMAGE="$EXISTING_TAG"
