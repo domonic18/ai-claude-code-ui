@@ -31,11 +31,11 @@ import { spawn } from 'child_process';
  */
 export async function getGithubTokenById(tokenId, userId) {
   const { getDatabase } = await import('../database/db.js');
-  const db = await getDatabase();
+  const db = getDatabase();
 
-  const credential = await db.get(
+  const credential = db.get(
     'SELECT * FROM user_credentials WHERE id = ? AND user_id = ? AND credential_type = ? AND is_active = 1',
-    [tokenId, userId, 'github_token']
+    tokenId, userId, 'github_token'
   );
 
   if (credential) {
