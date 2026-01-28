@@ -20,6 +20,7 @@ export default defineConfig(({ command, mode }) => {
     },
     server: {
       port: parseInt(env.VITE_PORT) || 5173,
+      allowedHosts: ['brain.bj33smarter.com'],
       proxy: {
         '/api': {
           target: `http://localhost:${env.PORT || 3001}`,

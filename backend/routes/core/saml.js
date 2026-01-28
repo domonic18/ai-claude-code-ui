@@ -97,9 +97,19 @@ router.post('/init', (req, res) => {
     });
   }
 
-  const protocol = req.protocol;
-  const host = req.get('host');
-  const ssoLoginUrl = `${protocol}://${host}/api/auth/saml/sso-login`;
+  // 优先使用环境变量配置的 SAML_ISSUER 来构建 sso-login URL
+  // SAML_ISSUER 格式: http://brain.bj33smarter.com:20080/api/auth/saml
+  // 我们需要将其转换为: http://brain.bj33smarter.com:20080/api/auth/saml/sso-login
+  let baseUrl = samlConfig.issuer;
+
+  // 如果 SAML_ISSUER 未配置或为空，回退到请求的协议和主机
+  if (!baseUrl || baseUrl === 'http://localhost:5173') {
+    const protocol = req.protocol;
+    const host = req.get('host');
+    baseUrl = `${protocol}://${host}/api/auth/saml`;
+  }
+
+  const ssoLoginUrl = `${baseUrl}/sso-login`;
 
   return res.json({
     login_url: ssoLoginUrl,
