@@ -31,14 +31,23 @@ export function handleChatConnection(ws, connectedClients) {
             const data = JSON.parse(message);
 
             if (data.type === 'claude-command') {
-                console.log('[DEBUG] User message:', data.command || '[Continue/Resume]');
-                console.log('📁 Project:', data.options?.projectPath || 'Unknown');
-                console.log('🔄 Session:', data.options?.sessionId ? 'Resume' : 'New');
-                console.log('[DEBUG] Using container mode for Claude SDK');
-
                 // 容器模式：使用 queryClaudeSDKInContainer
                 // 将 projectPath（例如 "my/workspace"）转换回项目名（例如 "my-workspace"）
                 const originalProjectName = data.options?.projectPath?.replace(/\//g, '-') || '';
+
+                // 处理附件：将文件路径追加到命令文本中
+                let command = data.command || '';
+                if (data.attachments && Array.isArray(data.attachments) && data.attachments.length > 0) {
+                    const filePaths = data.attachments
+                        .filter(f => f.path) // 只包含有 path 的附件
+                        .map(f => f.path)
+                        .join('\n- ');
+
+                    if (filePaths) {
+                        command = `Please analyze the following files:\n- ${filePaths}\n\n${command}`;
+                    }
+                }
+
                 const containerOptions = {
                     ...data.options,
                     userId: ws.user.userId,  // JWT payload 中是 userId，不是 id
@@ -46,36 +55,25 @@ export function handleChatConnection(ws, connectedClients) {
                     projectPath: originalProjectName,
                     // 不要在这里设置 cwd - 让 SDK 函数根据 isContainerProject 确定
                 };
-                console.log('[DEBUG] Calling queryClaudeSDKInContainer with options:', JSON.stringify(containerOptions));
+
                 try {
-                    await queryClaudeSDKInContainer(data.command, containerOptions, writer);
-                    console.log('[DEBUG] queryClaudeSDKInContainer completed');
+                    await queryClaudeSDKInContainer(command, containerOptions, writer);
                 } catch (sdkError) {
                     console.error('[ERROR] queryClaudeSDKInContainer failed:', sdkError);
                     throw sdkError;
                 }
             } else if (data.type === 'cursor-command') {
-                console.log('[DEBUG] Cursor message:', data.command || '[Continue/Resume]');
-                console.log('📁 Project:', data.options?.cwd || 'Unknown');
-                console.log('🔄 Session:', data.options?.sessionId ? 'Resume' : 'New');
-                console.log('🤖 Model:', data.options?.model || 'default');
                 await spawnCursor(data.command, data.options, writer);
             } else if (data.type === 'codex-command') {
-                console.log('[DEBUG] Codex message:', data.command || '[Continue/Resume]');
-                console.log('📁 Project:', data.options?.projectPath || data.options?.cwd || 'Unknown');
-                console.log('🔄 Session:', data.options?.sessionId ? 'Resume' : 'New');
-                console.log('🤖 Model:', data.options?.model || 'default');
                 await queryCodex(data.command, data.options, writer);
             } else if (data.type === 'cursor-resume') {
                 // 向后兼容：作为带恢复标志且无提示的 cursor-command 处理
-                console.log('[DEBUG] Cursor resume session (compat):', data.sessionId);
                 await spawnCursor('', {
                     sessionId: data.sessionId,
                     resume: true,
                     cwd: data.options?.cwd
                 }, writer);
             } else if (data.type === 'abort-session') {
-                console.log('[DEBUG] Abort session request:', data.sessionId);
                 const provider = data.provider || 'claude';
                 let success;
 
@@ -95,7 +93,6 @@ export function handleChatConnection(ws, connectedClients) {
                     success
                 });
             } else if (data.type === 'cursor-abort') {
-                console.log('[DEBUG] Abort Cursor session:', data.sessionId);
                 const success = abortCursorSession(data.sessionId);
                 writer.send({
                     type: 'session-aborted',
