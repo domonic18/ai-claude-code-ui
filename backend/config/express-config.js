@@ -100,9 +100,10 @@ export function configureExpress(app, wss) {
     app.use('/api/extensions', authenticateToken, extensions);
 
     // ===== 资源路由 =====
-    // 注意：files 路由必须在 projects 之前注册，以避免路由冲突
-    // 因为 files 有 /:projectName/files，projects 有 /:projectName
-    // 如果 projects 先注册，/:projectName 会匹配所有请求
+    // /api/files: 文件上传（无需项目名前缀）
+    // /api/projects/:projectName/*: 项目相关的文件操作
+    // files 路由必须在 projects 之前注册，避免 /:projectName 被错误匹配
+    app.use('/api/files', authenticateToken, files);
     app.use('/api/projects', authenticateToken, files);
     app.use('/api/projects', authenticateToken, projects);
     app.use('/api/sessions', authenticateToken, sessions);

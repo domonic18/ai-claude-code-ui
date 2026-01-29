@@ -8,11 +8,33 @@
  */
 
 import express from 'express';
+import multer from 'multer';
 import { FileController } from '../../controllers/api/index.js';
 import { authenticate, validate } from '../../middleware/index.js';
 
 const router = express.Router();
 const fileController = new FileController();
+
+// 配置 multer 用于内存存储文件上传
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB
+    files: 10
+  },
+  fileFilter: (req, file, cb) => {
+    // 允许的文件类型
+    const allowedExtensions = ['.docx', '.pdf', '.md', '.txt', '.js', '.ts', '.jsx', '.tsx', '.json', '.csv'];
+    const originalName = file.originalname.toLowerCase();
+    const hasValidExtension = allowedExtensions.some(ext => originalName.endsWith(ext));
+
+    if (hasValidExtension) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Invalid file type. Allowed: ${allowedExtensions.join(', ')}`));
+    }
+  }
+});
 
 /**
  * GET /api/projects/:projectName/file
@@ -90,5 +112,19 @@ router.get('/:projectName/files/exists', authenticate(), validate({
     path: { required: true, type: 'string' }
   }
 }), fileController._asyncHandler(fileController.fileExists));
+
+/**
+ * POST /api/files/upload
+ * 上传文件附件
+ */
+router.post('/upload', authenticate(), (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) {
+      console.error('[UPLOAD] Multer error:', err);
+      return next(err);
+    }
+    next();
+  });
+}, fileController._asyncHandler(fileController.uploadFile));
 
 export default router;

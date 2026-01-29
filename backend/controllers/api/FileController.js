@@ -10,6 +10,8 @@
 import { BaseController } from '../core/BaseController.js';
 import { FileOperationsService } from '../../services/files/operations/FileOperationsService.js';
 import { NotFoundError, ValidationError } from '../../middleware/error-handler.middleware.js';
+import fs from 'fs/promises';
+import path from 'path';
 
 /**
  * 文件控制器
@@ -244,6 +246,87 @@ export class FileController extends BaseController {
       res.setHeader('Content-Type', contentType);
       res.send(result.content);
     } catch (error) {
+      this._handleError(error, req, res, next);
+    }
+  }
+
+  /**
+   * 上传文件附件
+   * 支持的文件类型：.docx, .pdf, .md, .txt
+   * @param {Object} req - Express 请求对象
+   * @param {Object} res - Express 响应对象
+   * @param {Function} next - 下一个中间件
+   */
+  async uploadFile(req, res, next) {
+    try {
+      const userId = this._getUserId(req);
+
+      if (!req.file) {
+        throw new ValidationError('No file uploaded');
+      }
+
+      const { project } = req.body;
+      const projectName = project || 'default';
+
+      // 允许的文件扩展名
+      const allowedExtensions = ['.docx', '.pdf', '.md', '.txt', '.js', '.ts', '.jsx', '.tsx', '.json', '.csv'];
+      const originalName = req.file.originalname;
+      const ext = originalName.toLowerCase().includes('.')
+        ? '.' + originalName.split('.').pop().toLowerCase()
+        : '';
+
+      if (!allowedExtensions.includes(ext)) {
+        throw new ValidationError(`Unsupported file type: ${ext}. Allowed types: ${allowedExtensions.join(', ')}`);
+      }
+
+      // 按日期分组存储，保留原始文件名
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+      // 生成安全的文件名（只防止路径遍历，保留中文等字符）
+      // 只移除危险的路径字符：.. / \
+      let safeBaseName = originalName
+        .replace(/\.\./g, '')   // 移除 ..
+        .replace(/[\/\\]/g, '_'); // 替换路径分隔符
+
+      // 如果同名文件存在，添加序号后缀
+      const userDataDir = path.join(process.cwd(), 'workspace', 'users', `user_${userId}`, 'data');
+      const uploadsDir = path.join(userDataDir, projectName, 'uploads', today);
+
+      // 构建完整文件路径
+      let finalFilename = safeBaseName;
+      let filePath = path.join(uploadsDir, finalFilename);
+
+      // 检查文件是否已存在，如果存在则添加序号
+      let counter = 1;
+      const nameWithoutExt = safeBaseName.replace(/\.[^.]+$/, '');
+      const extension = ext || '';
+
+      // 检查文件是否存在
+      try {
+        while (await fs.access(filePath)) {
+          finalFilename = `${nameWithoutExt}_${counter}${extension}`;
+          filePath = path.join(uploadsDir, finalFilename);
+          counter++;
+        }
+      } catch {
+        // 文件不存在，可以使用原始文件名
+      }
+
+      // 容器内路径：/workspace/{projectName}/uploads/{date}/{filename}
+      const containerPath = `/workspace/${projectName}/uploads/${today}/${finalFilename}`;
+
+      await fs.mkdir(uploadsDir, { recursive: true });
+      await fs.writeFile(filePath, req.file.buffer);
+
+      this._success(res, {
+        name: originalName,
+        path: containerPath,
+        size: req.file.size,
+        type: req.file.mimetype,
+        date: today,
+      }, 'File uploaded successfully');
+    } catch (error) {
+      console.error('[FileController.uploadFile] Error:', error);
       this._handleError(error, req, res, next);
     }
   }
