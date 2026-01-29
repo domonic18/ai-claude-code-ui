@@ -135,6 +135,7 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
       sendMessage({
         type: 'claude-command',
         command: content,
+        attachments: files.length > 0 ? files : undefined, // Include attached files
         options: {
           projectPath: selectedProject?.name,
           sessionId,
