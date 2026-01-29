@@ -45,6 +45,8 @@ interface ChatInterfaceProps {
     name: string;
     path: string;
   };
+  /** Authenticated fetch function */
+  authenticatedFetch?: (url: string, options?: RequestInit) => Promise<Response>;
   /** Selected session */
   selectedSession?: {
     id: string;
@@ -236,7 +238,7 @@ export function ChatInterface({
     selectedProject: selectedProject?.name,
     authenticatedFetch,
     onFileReference: (file) => {
-      console.log('File referenced:', file);
+      // File referenced callback
     },
   });
 
@@ -297,7 +299,6 @@ export function ChatInterface({
     } else if (prevId !== undefined && newId === undefined) {
       // Only clear when selectedSession actually changes FROM a session TO null
       // (e.g., clicking "New Session" button), not when WebSocket updates currentSessionId
-      console.log('[ChatInterface] Session cleared, resetting messages');
       setCurrentSessionId(null);
       setMessages([]);
       // Clear draft when clearing session
@@ -320,7 +321,6 @@ export function ChatInterface({
   // Force state reset when new session counter changes (user clicked "New Session")
   useEffect(() => {
     if (newSessionCounter > prevNewSessionCounterRef.current) {
-      console.log('[ChatInterface] New session counter changed, forcing state reset');
       prevNewSessionCounterRef.current = newSessionCounter;
       setCurrentSessionId(null);
       setMessages([]);
@@ -340,8 +340,6 @@ export function ChatInterface({
     // Process all new messages since last render
     const newMessages = wsMessages.slice(processedCountRef.current);
     if (newMessages.length === 0) return;
-
-    console.log('[ChatInterface] Processing', newMessages.length, 'new messages (total:', wsMessages.length, ')');
 
     for (const message of newMessages) {
       // Handle the message using our WebSocket handler service
@@ -433,6 +431,7 @@ export function ChatInterface({
       sendMessage({
         type: 'claude-command',
         command: content,
+        attachments: files.length > 0 ? files : undefined, // Include attached files
         options: {
           projectPath: selectedProject?.name,
           sessionId,
@@ -471,14 +470,24 @@ export function ChatInterface({
    * Handle file add
    */
   const handleAddFile = useCallback((file: FileAttachment) => {
-    setAttachedFiles(prev => [...prev, file]);
+    setAttachedFiles(prev => {
+      // Check if file with same ID already exists, update it
+      const existingIndex = prev.findIndex(f => f.id === file.id);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = file;
+        return updated;
+      }
+      // Otherwise add as new
+      return [...prev, file];
+    });
   }, []);
 
   /**
    * Handle file remove
    */
-  const handleRemoveFile = useCallback((fileName: string) => {
-    setAttachedFiles(prev => prev.filter(f => f.name !== fileName));
+  const handleRemoveFile = useCallback((fileId: string) => {
+    setAttachedFiles(prev => prev.filter(f => f.id !== fileId));
   }, []);
 
   /**
