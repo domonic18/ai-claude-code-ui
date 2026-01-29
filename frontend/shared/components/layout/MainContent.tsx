@@ -56,6 +56,7 @@ export interface MainContentProps {
   isPWA: boolean;
   onMenuClick: () => void;
   isLoading: boolean;
+  authenticatedFetch?: (url: string, options?: RequestInit) => Promise<Response>;
   onInputFocusChange?: (focused: boolean) => void;
   // Session Protection Props
   onSessionActive?: (sessionId: string) => void;
@@ -86,6 +87,7 @@ function MainContent({
   isPWA: _isPWA,
   onMenuClick,
   isLoading,
+  authenticatedFetch,
   onInputFocusChange,
   onSessionActive,
   onSessionInactive,
@@ -415,6 +417,7 @@ function MainContent({
                 autoScrollToBottom={autoScrollToBottom}
                 sendByCtrlEnter={sendByCtrlEnter}
                 externalMessageUpdate={externalMessageUpdate}
+                authenticatedFetch={authenticatedFetch}
               />
             </ErrorBoundary>
           </div>
