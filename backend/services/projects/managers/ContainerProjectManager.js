@@ -38,29 +38,22 @@ export async function getProjectsInContainer(userId) {
 
     // 列出容器中的项目目录（排除 .claude 等系统目录）
     // 使用单个命令完成：列出目录 + 过滤 + 验证
-    const { stream } = await containerManager.execInContainer(
+    const { stream, exec } = await containerManager.execInContainer(
       userId,
-      `for item in "${workspacePath}"/*; do [ -d "$item" ] && basename "$item"; done 2>/dev/null | grep -v "^\\.claude$" || echo ""`
+      `ls -1 "${workspacePath}" 2>/dev/null | grep -v "^\\.claude$" || echo ""`
     );
 
     // 收集输出
     const projects = await new Promise((resolve, reject) => {
-      const stdout = new PassThrough();
-      const stderr = new PassThrough();
       let output = '';
 
-      // 使用 Docker 的 demuxStream 分离 stdout/stderr，这会移除 8 字节协议头
-      containerManager.docker.modem.demuxStream(stream, stdout, stderr);
-
-      stdout.on('data', (chunk) => {
+      // 收集流数据
+      stream.on('data', (chunk) => {
         output += chunk.toString();
       });
 
-      stderr.on('data', (chunk) => {
-        // 静默处理 stderr
-      });
-
       stream.on('error', (err) => {
+        console.warn(`[ContainerProjectManager] Stream error: ${err.message}`);
         resolve([]);
       });
 
@@ -107,6 +100,43 @@ export async function getProjectsInContainer(userId) {
               cursorSessions: [],
               codexSessions: []
             });
+          }
+
+          // 如果没有项目，自动创建默认工作区
+          if (projectList.length === 0) {
+            console.log(`[ContainerProjectManager] No projects found in container, creating default workspace`);
+            try {
+              // 在容器内创建 my-workspace 目录
+              const { stream: createStream } = await containerManager.execInContainer(
+                userId,
+                `mkdir -p "${workspacePath}/my-workspace" && echo "created"`
+              );
+
+              // 等待命令完成
+              await new Promise((resolveCreate) => {
+                let createOutput = '';
+                createStream.on('data', (c) => createOutput += c.toString());
+                createStream.on('end', () => resolveCreate(createOutput));
+                createStream.on('error', () => resolveCreate(createOutput));
+              });
+
+              // 添加默认工作区到列表
+              projectList.push({
+                name: 'my-workspace',
+                path: 'my-workspace',
+                displayName: 'my-workspace',
+                fullPath: 'my-workspace',
+                isContainerProject: true,
+                sessions: [],
+                sessionMeta: { hasMore: false, total: 0 },
+                cursorSessions: [],
+                codexSessions: []
+              });
+
+              console.log(`[ContainerProjectManager] Default workspace created successfully: my-workspace`);
+            } catch (createError) {
+              console.warn(`[ContainerProjectManager] Failed to create default workspace: ${createError.message}`);
+            }
           }
 
           // 加载每个项目的会话信息

@@ -19,6 +19,8 @@ import { ContainerHealthMonitor } from './ContainerHealth.js';
 import { ContainerResourceMonitor } from './ContainerStats.js';
 import { ContainerCleanupManager } from './ContainerCleanup.js';
 import { ContainerLifecycleManager } from './ContainerLifecycle.js';
+import { ContainerVolumeInitializer } from './ContainerVolume.js';
+import { CONTAINER } from '../../../config/config.js';
 
 // 导出所有模块
 export { DockerConnectionManager } from './DockerConnection.js';
@@ -27,6 +29,7 @@ export { ContainerHealthMonitor } from './ContainerHealth.js';
 export { ContainerResourceMonitor } from './ContainerStats.js';
 export { ContainerCleanupManager } from './ContainerCleanup.js';
 export { ContainerLifecycleManager } from './ContainerLifecycle.js';
+export { ContainerVolumeInitializer } from './ContainerVolume.js';
 
 /**
  * 统一的容器管理器类（向后兼容）
@@ -177,7 +180,11 @@ let _singletonInstance = null;
  */
 function getContainerManager() {
   if (!_singletonInstance) {
-    _singletonInstance = new ContainerManager();
+    _singletonInstance = new ContainerManager({
+      dataDir: CONTAINER.dataDir,
+      image: CONTAINER.image,
+      network: CONTAINER.network
+    });
   }
   return _singletonInstance;
 }

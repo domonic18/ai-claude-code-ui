@@ -1,0 +1,60 @@
+# Claude Code UI - Production Image
+# Main application image containing backend service and frontend build artifacts
+# Purpose: Production deployment providing complete Web UI service
+#
+# Build: docker build -f docker/Dockerfile.deploy -t ccr.ccs.tencentyun.com/patent/claude-code-ui:latest .
+
+FROM ccr.ccs.tencentyun.com/patent/claude-code-ui:base
+
+# Switch back to root user to copy files and install additional tools
+USER root
+
+# Install gosu (for user switching)
+RUN apt-get update && apt-get install -y gosu && rm -rf /var/lib/apt/lists/*
+
+# Set working directory to application directory
+WORKDIR /app
+
+# Copy application code
+COPY --chown=node:node backend ./backend
+COPY --chown=node:node shared ./shared
+COPY --chown=node:node dist ./dist
+
+# Copy container configuration files to two locations:
+# 1. /app/containers/ - for seccomp profile reading
+# 2. /workspace/containers/ - for mounting into user containers
+COPY --chown=node:node workspace/containers ./containers-tmp
+RUN mkdir -p /app/containers /workspace /workspace/.claude /workspace/database /workspace/containers && \
+    cp -r containers-tmp/* /app/containers/ && \
+    cp -r containers-tmp/* /workspace/containers/ && \
+    rm -rf containers-tmp && \
+    chown -R node:node /workspace /app
+
+# Copy entrypoint script for handling Docker socket and data directory permissions
+# This script runs as root to set up permissions, then switches to node user
+COPY --chown=root:root docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Note: Do not switch user here, let the entrypoint script run as root first, then switch to node user
+
+# Environment variables
+ENV NODE_ENV=production \
+    PORT=3001 \
+    # Working data directory (consistent with mount point)
+    WORKSPACE_DIR=/workspace \
+    # Claude configuration directory
+    CLAUDE_CONFIG_DIR=/workspace/.claude \
+    # Database path
+    DATABASE_PATH=/workspace/database/claude-code.db \
+    # PATH includes node binaries
+    PATH="/app/node_modules/.bin:${PATH}"
+
+# Expose port
+EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD node -e "require('http').get('http://localhost:3001/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))" || exit 1
+
+# Use entrypoint script for permission setup and application startup
+ENTRYPOINT ["/entrypoint.sh"]

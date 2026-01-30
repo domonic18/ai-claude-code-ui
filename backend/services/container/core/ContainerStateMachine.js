@@ -250,6 +250,35 @@ export class ContainerStateMachine extends EventEmitter {
   }
 
   /**
+   * 强制重置状态到 NON_EXISTENT
+   * 用于处理卡住的状态（如服务器重启后遗留的 creating 状态）
+   * 此方法绕过正常的转换规则
+   */
+  forceReset() {
+    const previousState = this.currentState;
+    this.previousState = previousState;
+    this.currentState = ContainerState.NON_EXISTENT;
+    this.stateHistory.push(ContainerState.NON_EXISTENT);
+    this.lastTransitionTime = new Date();
+    this.error = null;
+
+    console.log(`[StateMachine] Force reset state from ${previousState} to NON_EXISTENT for user ${this.userId}`);
+
+    // 触发状态变化事件
+    this.emit('stateChanged', {
+      from: previousState,
+      to: ContainerState.NON_EXISTENT,
+      userId: this.userId,
+      containerName: this.containerName,
+      timestamp: this.lastTransitionTime,
+      metadata: { forced: true }
+    });
+
+    // 通知等待者
+    this._notifyStateWaiters(ContainerState.NON_EXISTENT);
+  }
+
+  /**
    * 获取错误信息
    * @returns {Error|null}
    */
@@ -424,10 +453,16 @@ export class ContainerStateMachine extends EventEmitter {
    * @returns {ContainerStateMachine}
    */
   static fromJSON(data) {
+    // 如果状态是中间状态，服务器重启后这些状态肯定无效，重置为 NON_EXISTENT
+    const intermediateStates = ['creating', 'starting', 'health_checking'];
+    const initialState = intermediateStates.includes(data.currentState)
+      ? ContainerState.NON_EXISTENT
+      : data.currentState;
+
     const machine = new ContainerStateMachine({
       userId: data.userId,
       containerName: data.containerName,
-      initialState: data.currentState
+      initialState
     });
 
     machine.stateHistory = data.stateHistory || [data.currentState];
@@ -435,6 +470,10 @@ export class ContainerStateMachine extends EventEmitter {
 
     if (data.error) {
       machine.error = new Error(data.error);
+    }
+
+    if (initialState !== data.currentState) {
+      console.log(`[StateMachine] Reset stale state from ${data.currentState} to ${initialState} for user ${data.userId}`);
     }
 
     return machine;

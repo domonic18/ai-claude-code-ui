@@ -46,10 +46,17 @@ export class ContainerConfigBuilder {
       Cmd: ['/bin/sh', '-c', 'exec /bin/sh -i 2>&1'],
       Env: this._buildEnvironment(userId, tier),
       HostConfig: {
-        // 单一挂载点：所有数据统一在 /workspace 下
+        // Docker socket 挂载
         Binds: [
-          `${userDataDir}:${CONTAINER.paths.workspace}:rw`    // 统一工作目录
+          '/var/run/docker.sock:/var/run/docker.sock:rw'        // Docker socket
         ],
+        // 为每个用户创建独立命名卷
+        // 删除镜像后数据依然保留（命名卷独立于镜像）
+        Volumes: {
+          [CONTAINER.paths.workspace]: {
+            Name: `claude-user-data-${userId}`
+          }
+        },
         Memory: resourceLimits.memory,
         CpuQuota: resourceLimits.cpuQuota,
         CpuPeriod: resourceLimits.cpuPeriod,

@@ -1,0 +1,77 @@
+# Claude Code UI - Base Image
+# Base image containing system dependencies and Node.js modules, without application code
+# Purpose: Accelerate subsequent image builds by avoiding repeated dependency installation
+#
+# Build: docker build -f docker/Dockerfile.base -t ccr.ccs.tencentyun.com/patent/claude-code-ui:base .
+
+# Use full node:20 image (not slim) which includes Node.js headers
+# This is required for building native modules like better-sqlite3
+FROM node:20
+
+# Configure Aliyun mirrors for faster builds in China
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
+    sed -i 's|security.debian.org/debian-security|mirrors.aliyun.com/debian-security|g' /etc/apt/sources.list.d/debian.sources
+
+# Install system runtime dependencies and build tools
+RUN apt-get update && apt-get install -y \
+    # Build tools (for compiling native modules: sqlite3, bcrypt, etc.)
+    build-essential \
+    python3 \
+    g++ \
+    make \
+    # Version control
+    git \
+    # Network tools
+    curl \
+    wget \
+    # Terminal tools
+    bash \
+    jq \
+    # Python and pip (Claude Code dependency)
+    python3-pip \
+    # Lightweight editor
+    vim-tiny \
+    # Clean up cache
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Configure npm to use domestic mirror
+RUN npm config set registry https://registry.npmmirror.com
+
+# Copy package files
+COPY package*.json ./
+
+# Create node-gyp cache directory with proper permissions
+RUN mkdir -p /root/.cache/node-gyp /root/.npm && \
+    chown -R root:root /root/.cache /root/.npm
+
+# Install production dependencies with all native modules built from source
+# The node:20 full image includes Node.js headers, so no network download is needed
+# --build-from-source flag ensures all native modules (better-sqlite3, sqlite3, etc.) compile locally
+RUN npm ci --only=production --build-from-source && \
+    npm cache clean --force
+
+# Create application directory structure (node user already exists in node:20-slim)
+RUN mkdir -p /workspace /app/workspace && \
+    chown -R node:node /app /workspace
+
+# Switch to non-root user
+USER node
+
+# Set working directory
+WORKDIR /workspace
+
+# Environment variables
+ENV NODE_ENV=production \
+    PATH="/app/node_modules/.bin:${PATH}"
+
+# Image metadata
+LABEL maintainer="Claude Code UI" \
+      description="Base image with system dependencies and Node.js modules" \
+      version="1.0"
+
+# This image does not provide a runtime entry point, it is only used as a base image
+# Actual images should FROM this image and add application code
+CMD ["/bin/bash"]

@@ -17,6 +17,7 @@ import { ContainerConfigBuilder } from './ContainerConfig.js';
 import { ContainerHealthMonitor } from './ContainerHealth.js';
 import { ContainerStateMachine, ContainerState } from './ContainerStateMachine.js';
 import containerStateStore from './ContainerStateStore.js';
+import { ContainerVolumeInitializer } from './ContainerVolume.js';
 import { syncExtensions } from '../../extensions/extension-sync.js';
 
 const { Container } = repositories;
@@ -50,6 +51,7 @@ export class ContainerLifecycleManager {
     // 子模块
     this.configBuilder = new ContainerConfigBuilder();
     this.healthMonitor = new ContainerHealthMonitor(this.docker);
+    this.volumeInitializer = new ContainerVolumeInitializer({ docker: this.docker });
   }
 
   /**
@@ -68,13 +70,13 @@ export class ContainerLifecycleManager {
     const containerName = `claude-user-${userId}`;
     const stateMachine = await containerStateStore.getOrCreate(userId, containerName);
 
-    // 验证状态一致性：如果状态是中间状态但容器不存在，重置为 NON_EXISTENT
+    // 验证状态一致性：如果状态是中间状态但容器不存在，强制重置为 NON_EXISTENT
     const intermediateStates = [ContainerState.CREATING, ContainerState.STARTING, ContainerState.HEALTH_CHECKING];
     if (intermediateStates.includes(stateMachine.getState())) {
       const containerExists = await this._verifyContainerExists(containerName);
       if (!containerExists) {
-        console.log(`[Lifecycle] Container ${containerName} not found but state is ${stateMachine.getState()}, resetting to NON_EXISTENT`);
-        stateMachine.transitionTo(ContainerState.NON_EXISTENT);
+        console.log(`[Lifecycle] Container ${containerName} not found but state is ${stateMachine.getState()}, force resetting to NON_EXISTENT`);
+        stateMachine.forceReset();
         await containerStateStore.save(stateMachine);
       }
     }
@@ -336,6 +338,9 @@ Happy coding!
       // 3. 清理可能存在的孤立容器
       await this._removeOrphanedContainerSync(containerName);
 
+      // 3.5. 初始化用户命名卷
+      await this._initializeUserVolume(userId, userDataDir);
+
       // 4. 创建容器
       const container = await new Promise((resolve, reject) => {
         this.docker.createContainer(containerConfig, (err, container) => {
@@ -346,6 +351,26 @@ Happy coding!
 
       // 5. 启动容器
       await container.start();
+
+      // 5.5. 等待容器完全启动，然后在容器内创建默认工作区
+      // 使用重试机制确保命令执行成功
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      let workspaceEnsured = false;
+      for (let i = 0; i < 3; i++) {
+        try {
+          await this._ensureDefaultWorkspaceInContainer(container, containerName);
+          workspaceEnsured = true;
+          break;
+        } catch (wsErr) {
+          console.warn(`[Lifecycle] Workspace ensure attempt ${i + 1} failed: ${wsErr.message}`);
+          if (i < 2) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+      }
+      if (!workspaceEnsured) {
+        console.warn(`[Lifecycle] Failed to ensure workspace after 3 attempts, will be created on-demand`);
+      }
 
       // 6. 构建容器信息
       const containerInfo = {
@@ -431,6 +456,18 @@ Happy coding!
     }
 
     throw new Error(`Timeout waiting for container ${containerName} to be removed`);
+  }
+
+  /**
+   * 初始化用户命名卷
+   * 创建一个临时容器来将数据复制到命名卷中
+   * @private
+   * @param {number} userId - 用户 ID
+   * @param {string} userDataDir - 用户数据目录（源）
+   * @returns {Promise<void>}
+   */
+  async _initializeUserVolume(userId, userDataDir) {
+    return this.volumeInitializer.initializeUserVolume(userId, userDataDir);
   }
 
   /**
@@ -617,10 +654,10 @@ Happy coding!
             // 容器未运行，更新数据库状态并清理状态机
             Container.updateStatus(container_id, 'stopped');
             console.log(`[Lifecycle] Container ${container_name} is stopped, status updated in database`);
-            // 清理状态机状态
+            // 清理状态机状态 - 使用 forceReset 绕过转换规则
             const stateMachine = this.stateMachines.get(user_id);
             if (stateMachine) {
-              stateMachine.transitionTo(ContainerState.NON_EXISTENT);
+              stateMachine.forceReset();
               await containerStateStore.save(stateMachine);
             }
           }
@@ -629,10 +666,19 @@ Happy coding!
           if (dockerErr.statusCode === 404) {
             console.log(`[Lifecycle] Container ${container_name} not found in Docker, removing from database`);
             Container.delete(container_id);
-            // 清理状态机状态
-            const stateMachine = this.stateMachines.get(user_id);
+            // 清理状态机状态 - 使用 forceReset 绕过转换规则
+            let stateMachine = this.stateMachines.get(user_id);
+            if (!stateMachine) {
+              // 如果不在缓存中，从存储加载
+              try {
+                stateMachine = await containerStateStore.load(user_id);
+              } catch (loadErr) {
+                console.warn(`[Lifecycle] Could not load state machine for user ${user_id}: ${loadErr.message}`);
+              }
+            }
             if (stateMachine) {
-              stateMachine.transitionTo(ContainerState.NON_EXISTENT);
+              // 使用 forceReset 而不是 transitionTo，因为状态可能不允许转换
+              stateMachine.forceReset();
               await containerStateStore.save(stateMachine);
             }
           } else {
@@ -667,6 +713,46 @@ Happy coding!
    */
   getContainerByUserId(userId) {
     return this.containers.get(userId);
+  }
+
+  /**
+   * 确保容器内有默认工作区
+   * 在容器启动后执行，确保命名卷中的 /workspace 目录结构正确
+   * @private
+   * @param {object} container - Docker 容器实例
+   * @param {string} containerName - 容器名称
+   * @returns {Promise<void>}
+   */
+  async _ensureDefaultWorkspaceInContainer(container, containerName) {
+    console.log(`[Lifecycle] Ensuring default workspace in container ${containerName}...`);
+
+    // 使用 exec 在容器内创建工作区
+    const exec = await container.exec({
+      Cmd: ['/bin/sh', '-c', 'mkdir -p /workspace/my-workspace && ls -la /workspace/'],
+      AttachStdout: true,
+      AttachStderr: true
+    });
+
+    const stream = await exec.start({ Detach: false });
+
+    // 使用 Promise.race 设置超时
+    const result = await Promise.race([
+      new Promise((resolve) => {
+        let output = '';
+        stream.on('data', (chunk) => { output += chunk.toString(); });
+        stream.on('end', () => resolve({ success: true, output }));
+        stream.on('error', (err) => resolve({ success: false, error: err.message }));
+      }),
+      new Promise((resolve) => {
+        setTimeout(() => resolve({ success: false, error: 'timeout' }), 15000);
+      })
+    ]);
+
+    if (result.success) {
+      console.log(`[Lifecycle] Default workspace ensured in container ${containerName}`);
+    } else {
+      throw new Error(result.error || 'Unknown error');
+    }
   }
 
 }
