@@ -17,7 +17,6 @@ import { ContainerConfigBuilder } from './ContainerConfig.js';
 import { ContainerHealthMonitor } from './ContainerHealth.js';
 import { ContainerStateMachine, ContainerState } from './ContainerStateMachine.js';
 import containerStateStore from './ContainerStateStore.js';
-import { ContainerVolumeInitializer } from './ContainerVolume.js';
 import { syncExtensions } from '../../extensions/extension-sync.js';
 
 const { Container } = repositories;
@@ -51,7 +50,6 @@ export class ContainerLifecycleManager {
     // 子模块
     this.configBuilder = new ContainerConfigBuilder();
     this.healthMonitor = new ContainerHealthMonitor(this.docker);
-    this.volumeInitializer = new ContainerVolumeInitializer({ docker: this.docker });
   }
 
   /**
@@ -338,9 +336,6 @@ Happy coding!
       // 3. 清理可能存在的孤立容器
       await this._removeOrphanedContainerSync(containerName);
 
-      // 3.5. 初始化用户命名卷
-      await this._initializeUserVolume(userId, userDataDir);
-
       // 4. 创建容器
       const container = await new Promise((resolve, reject) => {
         this.docker.createContainer(containerConfig, (err, container) => {
@@ -456,18 +451,6 @@ Happy coding!
     }
 
     throw new Error(`Timeout waiting for container ${containerName} to be removed`);
-  }
-
-  /**
-   * 初始化用户命名卷
-   * 创建一个临时容器来将数据复制到命名卷中
-   * @private
-   * @param {number} userId - 用户 ID
-   * @param {string} userDataDir - 用户数据目录（源）
-   * @returns {Promise<void>}
-   */
-  async _initializeUserVolume(userId, userDataDir) {
-    return this.volumeInitializer.initializeUserVolume(userId, userDataDir);
   }
 
   /**

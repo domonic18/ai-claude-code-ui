@@ -156,10 +156,6 @@ export const CONTAINER = {
   // Docker 网络
   network: process.env.CONTAINER_NETWORK || 'claude-network',
 
-  // 数据目录（用于存储用户数据，兼容 Docker Desktop for Mac）
-  // 生产环境应使用宿主机路径如 /var/lib/claude-code
-  dataDir: process.env.DATA_DIR || path.join(PROJECT_ROOT, 'workspace'),
-
   // 容器内路径规范（符合 docs/arch/data-storage-design.md v3.1）
   paths: {
     // 统一工作目录（通过 HOME=/workspace，~ 也指向此目录）

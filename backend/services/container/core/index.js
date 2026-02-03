@@ -19,7 +19,6 @@ import { ContainerHealthMonitor } from './ContainerHealth.js';
 import { ContainerResourceMonitor } from './ContainerStats.js';
 import { ContainerCleanupManager } from './ContainerCleanup.js';
 import { ContainerLifecycleManager } from './ContainerLifecycle.js';
-import { ContainerVolumeInitializer } from './ContainerVolume.js';
 import { CONTAINER } from '../../../config/config.js';
 
 // 导出所有模块
@@ -29,7 +28,6 @@ export { ContainerHealthMonitor } from './ContainerHealth.js';
 export { ContainerResourceMonitor } from './ContainerStats.js';
 export { ContainerCleanupManager } from './ContainerCleanup.js';
 export { ContainerLifecycleManager } from './ContainerLifecycle.js';
-export { ContainerVolumeInitializer } from './ContainerVolume.js';
 
 /**
  * 统一的容器管理器类（向后兼容）
