@@ -181,19 +181,25 @@ export class ContainerVolumeInitializer {
   async _runCheckContainer(container) {
     await container.start();
 
-    // 获取容器输出以确认检查结果
-    const stream = await container.attach({ stream: true, stdout: true, stderr: true });
-    const output = await new Promise((resolve) => {
-      let data = '';
-      stream.on('data', (chunk) => { data += chunk.toString(); });
-      stream.on('end', () => resolve(data));
-      stream.on('error', () => resolve(''));
-    });
-
     // 等待容器退出
     await new Promise((resolve) => {
       container.wait((err, data) => {
         resolve(data ? data.StatusCode : -1);
+      });
+    });
+
+    // 获取容器输出以确认检查结果
+    // 使用 logs() 而不是 attach()，因为 attach() 在 Docker-in-Docker 环境下
+    // 可能不会触发 end 事件，导致 Promise 永远不 resolve
+    const output = await new Promise((resolve, reject) => {
+      container.logs({ stdout: true, stderr: true }, (err, logs) => {
+        if (err) {
+          // 如果 logs 失败，返回空字符串
+          resolve('');
+        } else {
+          // logs 是 Buffer，转换为字符串
+          resolve(logs ? logs.toString('utf-8') : '');
+        }
       });
     });
 
