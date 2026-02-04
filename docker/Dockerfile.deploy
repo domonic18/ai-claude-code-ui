@@ -19,6 +19,7 @@ WORKDIR /app
 COPY --chown=node:node backend ./backend
 COPY --chown=node:node shared ./shared
 COPY --chown=node:node dist ./dist
+COPY --chown=node:node extensions/.claude /app/extensions/.claude
 
 # Copy container configuration files to two locations:
 # 1. /app/containers/ - for seccomp profile reading

@@ -36,6 +36,7 @@ RUN mkdir -p /workspace /app /workspace/.claude/projects && \
 # Copy application files
 COPY --chown=node:node backend ./backend
 COPY --chown=node:node shared ./shared
+COPY --chown=node:node extensions/.claude /app/extensions/.claude
 
 # Switch to non-root user
 USER node
