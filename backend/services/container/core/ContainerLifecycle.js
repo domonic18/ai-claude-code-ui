@@ -18,6 +18,7 @@ import { ContainerHealthMonitor } from './ContainerHealth.js';
 import { ContainerStateMachine, ContainerState } from './ContainerStateMachine.js';
 import containerStateStore from './ContainerStateStore.js';
 import { syncExtensions } from '../../extensions/extension-sync.js';
+import { createExtensionTar } from '../../extensions/extension-tar.js';
 
 const { Container } = repositories;
 
@@ -268,6 +269,7 @@ export class ContainerLifecycleManager {
 
     } catch (error) {
       // 设置失败状态
+      console.error(`[Lifecycle] Container creation failed for user ${userId}:`, error);
       stateMachine.setFailed(error);
       await containerStateStore.save(stateMachine);
 
@@ -287,43 +289,29 @@ export class ContainerLifecycleManager {
     const userDataDir = path.join(this.config.dataDir, 'users', `user_${userId}`, 'data');
 
     try {
-      // 1. 创建用户数据目录
+      // 1. 创建用户数据目录（用于备份和本地开发环境）
       await fs.promises.mkdir(userDataDir, { recursive: true });
       console.log(`[Lifecycle] Created user data directory: ${userDataDir}`);
 
-      // 2. 创建 .claude 目录并同步预置扩展
+      // 2. 创建 .claude 目录并同步预置扩展（用于备份）
       const claudeDir = path.join(userDataDir, '.claude');
       await fs.promises.mkdir(claudeDir, { recursive: true });
       console.log(`[Lifecycle] Created .claude directory: ${claudeDir}`);
 
-      // 2.1. 创建默认工作区 my-workspace
-      const myWorkspaceDir = path.join(userDataDir, 'my-workspace');
-      await fs.promises.mkdir(myWorkspaceDir, { recursive: true });
-      const readmePath = path.join(myWorkspaceDir, 'README.md');
-      await fs.promises.writeFile(readmePath, `# My Workspace
-
-Welcome to your Claude Code workspace! This is your default project where you can start coding.
-
-## Getting Started
-
-- Use the chat interface to ask Claude to help you with coding tasks
-- Use the file explorer to browse and edit files
-- Use the terminal to run commands
-
-Happy coding!
-`, 'utf8');
-      console.log(`[Lifecycle] Created default workspace: ${myWorkspaceDir}`);
-
-      // 同步预置扩展（agents, commands, skills）
+      // 同步预置扩展到本地备份目录
       try {
         await syncExtensions(claudeDir, { overwriteUserFiles: true });
-        console.log(`[Lifecycle] Synced extensions for user ${userId}`);
+        console.log(`[Lifecycle] Synced extensions to local backup for user ${userId}`);
       } catch (syncError) {
         // 扩展同步失败不应阻止容器创建，只记录错误
-        console.warn(`[Lifecycle] Failed to sync extensions for user ${userId}:`, syncError.message);
+        console.warn(`[Lifecycle] Failed to sync extensions to local backup:`, syncError.message);
       }
 
-      // 3. 构建容器配置
+      // 3. 创建命名卷（如果不存在）
+      const volumeName = `claude-user-${userId}-workspace`;
+      await this._ensureVolumeExists(volumeName);
+
+      // 4. 构建容器配置
       const containerConfig = this.configBuilder.buildConfig({
         name: containerName,
         userDataDir,
@@ -333,23 +321,50 @@ Happy coding!
         network: this.config.network
       });
 
-      // 3. 清理可能存在的孤立容器
+      // 5. 清理可能存在的孤立容器
       await this._removeOrphanedContainerSync(containerName);
 
-      // 4. 创建容器
-      const container = await new Promise((resolve, reject) => {
-        this.docker.createContainer(containerConfig, (err, container) => {
-          if (err) reject(err);
-          else resolve(container);
+      // 6. 创建容器（使用命名卷）
+      console.log(`[Lifecycle] Creating container ${containerName}...`);
+      let container;
+      try {
+        container = await new Promise((resolve, reject) => {
+          this.docker.createContainer(containerConfig, (err, container) => {
+            if (err) {
+              console.error(`[Lifecycle] Failed to create container:`, err);
+              reject(err);
+            } else {
+              console.log(`[Lifecycle] Container ${containerName} created with ID: ${container.id}`);
+              resolve(container);
+            }
+          });
         });
-      });
+      } catch (createError) {
+        throw new Error(`Failed to create container: ${createError.message}`);
+      }
 
-      // 5. 启动容器
-      await container.start();
+      // 7. 启动容器
+      console.log(`[Lifecycle] Starting container ${containerName}...`);
+      try {
+        await container.start();
+        console.log(`[Lifecycle] Container ${containerName} started`);
+      } catch (startError) {
+        throw new Error(`Failed to start container: ${startError.message}`);
+      }
 
-      // 5.5. 等待容器完全启动，然后在容器内创建默认工作区
-      // 使用重试机制确保命令执行成功
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // 8. 等待容器完全启动
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // 9. 同步扩展文件到容器内（命名卷方式）
+      try {
+        await this._syncExtensionsToContainer(container, userId);
+        console.log(`[Lifecycle] Extensions synced to container ${containerName}`);
+      } catch (syncError) {
+        // 扩展同步失败不应阻止容器创建，只记录错误
+        console.warn(`[Lifecycle] Failed to sync extensions to container:`, syncError.message);
+      }
+
+      // 10. 在容器内创建默认工作区目录结构
       let workspaceEnsured = false;
       for (let i = 0; i < 3; i++) {
         try {
@@ -367,7 +382,15 @@ Happy coding!
         console.warn(`[Lifecycle] Failed to ensure workspace after 3 attempts, will be created on-demand`);
       }
 
-      // 6. 构建容器信息
+      // 11. 在容器内创建 README.md 文件
+      try {
+        await this._createReadmeInContainer(container);
+        console.log(`[Lifecycle] README.md created in container ${containerName}`);
+      } catch (readmeErr) {
+        console.warn(`[Lifecycle] Failed to create README.md:`, readmeErr.message);
+      }
+
+      // 12. 构建容器信息
       const containerInfo = {
         id: container.id,
         name: containerName,
@@ -377,7 +400,7 @@ Happy coding!
         lastActive: new Date()
       };
 
-      // 7. 写入数据库
+      // 13. 写入数据库
       try {
         Container.create(userId, container.id, containerName);
         console.log(`[Lifecycle] Container record saved to database: ${containerName}`);
@@ -389,6 +412,37 @@ Happy coding!
 
     } catch (error) {
       throw new Error(`Container creation failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * 确保命名卷存在，如果不存在则创建
+   * @private
+   * @param {string} volumeName - 卷名称
+   * @returns {Promise<void>}
+   */
+  async _ensureVolumeExists(volumeName) {
+    try {
+      // 检查卷是否已存在
+      const volume = this.docker.getVolume(volumeName);
+      await volume.inspect();
+      console.log(`[Lifecycle] Volume ${volumeName} already exists`);
+    } catch (err) {
+      // 卷不存在，创建新卷
+      if (err.statusCode === 404) {
+        await new Promise((resolve, reject) => {
+          this.docker.createVolume({
+            Name: volumeName,
+            Driver: 'local'
+          }, (err, volume) => {
+            if (err) reject(err);
+            else resolve(volume);
+          });
+        });
+        console.log(`[Lifecycle] Created volume: ${volumeName}`);
+      } else {
+        throw err;
+      }
     }
   }
 
@@ -736,6 +790,172 @@ Happy coding!
     } else {
       throw new Error(result.error || 'Unknown error');
     }
+  }
+
+  /**
+   * 同步扩展文件到容器内
+   * 在容器启动后执行，通过 docker.putArchive 将扩展文件上传到命名卷
+   * @private
+   * @param {object} container - Docker 容器实例
+   * @param {number} userId - 用户 ID
+   * @returns {Promise<void>}
+   */
+  async _syncExtensionsToContainer(container, userId) {
+    console.log(`[Lifecycle] Syncing extensions to container for user ${userId}...`);
+
+    try {
+      // 创建扩展文件的 tar 流
+      const tarStream = await createExtensionTar({
+        includeSkills: true,
+        includeAgents: true,
+        includeCommands: true,
+        includeHooks: true,
+        includeKnowledge: true,
+        includeConfig: true
+      });
+
+      console.log(`[Lifecycle] Extension tar stream created`);
+
+      // 使用 Docker Modem 的 putArchive 方法上传 tar 包到容器
+      await new Promise((resolve, reject) => {
+        container.putArchive(tarStream, { path: '/workspace' }, (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      console.log(`[Lifecycle] Extensions uploaded to container successfully`);
+
+      // 设置 hooks 脚本的执行权限
+      await this._setHooksPermissions(container);
+
+    } catch (error) {
+      throw new Error(`Failed to sync extensions: ${error.message}`);
+    }
+  }
+
+  /**
+   * 设置容器内 hooks 脚本的执行权限
+   * @private
+   * @param {object} container - Docker 容器实例
+   * @returns {Promise<void>}
+   */
+  async _setHooksPermissions(container) {
+    console.log(`[Lifecycle] Setting hooks permissions...`);
+
+    const exec = await container.exec({
+      Cmd: ['/bin/sh', '-c', 'chmod +x /workspace/.claude/hooks/*.sh 2>/dev/null || true'],
+      AttachStdout: true,
+      AttachStderr: true
+    });
+
+    const stream = await exec.start({ Detach: false });
+
+    // 使用 Promise.race 设置超时，避免永久挂起
+    await new Promise((resolve, reject) => {
+      let ended = false;
+
+      stream.on('data', (chunk) => {
+        // 消费数据，避免缓冲区填满
+      });
+
+      stream.on('end', () => {
+        if (!ended) {
+          ended = true;
+          resolve();
+        }
+      });
+
+      stream.on('error', (err) => {
+        if (!ended) {
+          ended = true;
+          // 权限设置失败不应该阻塞流程，只记录警告
+          console.warn(`[Lifecycle] Hooks permission warning: ${err.message}`);
+          resolve();
+        }
+      });
+
+      // 设置超时
+      setTimeout(() => {
+        if (!ended) {
+          ended = true;
+          console.warn(`[Lifecycle] Hooks permission setting timed out`);
+          resolve();
+        }
+      }, 5000);
+    });
+
+    console.log(`[Lifecycle] Hooks permissions set`);
+  }
+
+  /**
+   * 在容器内创建 README.md 文件
+   * @private
+   * @param {object} container - Docker 容器实例
+   * @returns {Promise<void>}
+   */
+  async _createReadmeInContainer(container) {
+    console.log(`[Lifecycle] Creating README.md in container...`);
+
+    const readmeContent = `# My Workspace
+
+Welcome to your Claude Code workspace! This is your default project where you can start coding.
+
+## Getting Started
+
+- Use the chat interface to ask Claude to help you with coding tasks
+- Use the file explorer to browse and edit files
+- Use the terminal to run commands
+
+Happy coding!
+`;
+
+    const exec = await container.exec({
+      Cmd: ['/bin/sh', '-c', `cat > /workspace/my-workspace/README.md << 'EOF'
+${readmeContent}
+EOF`],
+      AttachStdout: true,
+      AttachStderr: true
+    });
+
+    const stream = await exec.start({ Detach: false });
+
+    // 使用超时机制，避免永久挂起
+    await new Promise((resolve) => {
+      let ended = false;
+
+      stream.on('data', (chunk) => {
+        // 消费数据，避免缓冲区填满
+      });
+
+      stream.on('end', () => {
+        if (!ended) {
+          ended = true;
+          console.log(`[Lifecycle] README.md created successfully`);
+          resolve();
+        }
+      });
+
+      stream.on('error', (err) => {
+        if (!ended) {
+          ended = true;
+          console.warn(`[Lifecycle] README creation warning: ${err.message}`);
+          resolve(); // 即使出错也继续
+        }
+      });
+
+      // 设置超时
+      setTimeout(() => {
+        if (!ended) {
+          ended = true;
+          console.warn(`[Lifecycle] README creation timed out`);
+          resolve(); // 超时后继续
+        }
+      }, 5000);
+    });
   }
 
 }
