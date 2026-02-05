@@ -18,9 +18,12 @@ cd "$PROJECT_ROOT"
 REGISTRY="ccr.ccs.tencentyun.com"
 NAMESPACE="patent"
 
-# 镜像名称（只有 latest 标签）
-MAIN_IMAGE="${REGISTRY}/${NAMESPACE}/claude-code-ui:latest"
-RUNTIME_IMAGE="${REGISTRY}/${NAMESPACE}/claude-code-runtime:latest"
+# 获取版本号
+VERSION="$(git describe --tags --always 2>/dev/null || git rev-parse --short HEAD)"
+
+# 镜像名称
+MAIN_IMAGE="${REGISTRY}/${NAMESPACE}/claude-code-ui:${VERSION}"
+SANDBOX_IMAGE="${REGISTRY}/${NAMESPACE}/claude-code-sandbox:${VERSION}"
 
 # 检查镜像是否存在
 if ! docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "^${MAIN_IMAGE}$"; then
@@ -29,8 +32,8 @@ if ! docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "^${MAIN_IMAGE}
   exit 1
 fi
 
-if ! docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "^${RUNTIME_IMAGE}$"; then
-  error "未找到运行时镜像: $RUNTIME_IMAGE"
+if ! docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "^${SANDBOX_IMAGE}$"; then
+  error "未找到沙箱镜像: $SANDBOX_IMAGE"
   error "请先运行: ./scripts/build-image.sh"
   exit 1
 fi
@@ -55,10 +58,10 @@ echo ""
 info "1/2 推送主应用镜像: $MAIN_IMAGE"
 docker push "$MAIN_IMAGE"
 
-# 推送运行时镜像
+# 推送沙箱镜像
 echo ""
-info "2/2 推送运行时镜像: $RUNTIME_IMAGE"
-docker push "$RUNTIME_IMAGE"
+info "2/2 推送沙箱镜像: $SANDBOX_IMAGE"
+docker push "$SANDBOX_IMAGE"
 
 # 完成
 echo ""
@@ -70,22 +73,26 @@ info_msg "已推送的镜像："
 echo "  主应用："
 echo "    $MAIN_IMAGE"
 echo ""
-echo "  运行时："
-echo "    $RUNTIME_IMAGE"
+echo "  沙箱："
+echo "    $SANDBOX_IMAGE"
 echo ""
 info_msg "部署流程："
 echo ""
-echo "  1. 新机器上创建 .env，配置运行时镜像："
-echo "     CONTAINER_IMAGE=${RUNTIME_IMAGE}"
+echo "  1. 新机器上拉取镜像："
+echo "     docker pull ${MAIN_IMAGE}"
+echo "     docker pull ${SANDBOX_IMAGE}"
 echo ""
-echo "  2. 新机器上创建 docker-compose.yml："
+echo "  2. 新机器上创建 .env 文件，配置沙箱镜像："
+echo "     CONTAINER_IMAGE=${SANDBOX_IMAGE}"
+echo ""
+echo "  3. 新机器上创建 docker-compose.yml："
 echo "     services:"
 echo "       app:"
 echo "         image: ${MAIN_IMAGE}"
 echo "         ..."
 echo ""
-echo "  3. 新机器上启动（自动拉取 latest）："
+echo "  4. 新机器上启动："
 echo "     docker-compose up -d"
 echo ""
-info_msg "每次推送会覆盖 latest，部署时自动获取最新版本 ✅"
+info_msg "当前版本: ${VERSION}"
 echo ""

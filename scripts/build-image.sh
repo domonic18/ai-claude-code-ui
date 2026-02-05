@@ -23,15 +23,18 @@ cd "$PROJECT_ROOT"
 REGISTRY="ccr.ccs.tencentyun.com"
 NAMESPACE="patent"
 
+# 获取版本号
+VERSION="$(git describe --tags --always 2>/dev/null || git rev-parse --short HEAD)"
+
 # 镜像名称
 BASE_IMAGE="${REGISTRY}/${NAMESPACE}/claude-code-ui:base"
-MAIN_IMAGE="${REGISTRY}/${NAMESPACE}/claude-code-ui:latest"
-RUNTIME_IMAGE="${REGISTRY}/${NAMESPACE}/claude-code-runtime:latest"
+MAIN_IMAGE="${REGISTRY}/${NAMESPACE}/claude-code-ui:${VERSION}"
+SANDBOX_IMAGE="${REGISTRY}/${NAMESPACE}/claude-code-sandbox:${VERSION}"
 
 # Dockerfile 路径
 BASE_DOCKERFILE="docker/Dockerfile.base"
-MAIN_DOCKERFILE="docker/Dockerfile.deploy"
-RUNTIME_DOCKERFILE="docker/Dockerfile.runtime"
+MAIN_DOCKERFILE="docker/Dockerfile.main"
+SANDBOX_DOCKERFILE="docker/Dockerfile.sandbox"
 
 # 解析命令行参数
 REBUILD_BASE=false
@@ -56,7 +59,7 @@ while [[ $# -gt 0 ]]; do
       echo "镜像构建顺序："
       echo "  1. $BASE_IMAGE"
       echo "  2. $MAIN_IMAGE (基于 base)"
-      echo "  3. $RUNTIME_IMAGE"
+      echo "  3. $SANDBOX_IMAGE"
       exit 0
       ;;
     *)
@@ -130,20 +133,20 @@ info "主应用镜像构建完成！"
 echo "  - $MAIN_IMAGE"
 
 # ==================== 阶段 3: 运行时镜像 ====================
-if [ ! -f "$RUNTIME_DOCKERFILE" ]; then
-  error "找不到运行时 Dockerfile: $RUNTIME_DOCKERFILE"
+if [ ! -f "$SANDBOX_DOCKERFILE" ]; then
+  error "找不到沙箱 Dockerfile: $SANDBOX_DOCKERFILE"
   exit 1
 fi
 
 echo ""
-info "3/3 构建运行时镜像 (claude-code-runtime)..."
+info "3/3 构建沙箱镜像 (claude-code-sandbox)..."
 docker build \
-  -f "$RUNTIME_DOCKERFILE" \
-  -t "$RUNTIME_IMAGE" \
+  -f "$SANDBOX_DOCKERFILE" \
+  -t "$SANDBOX_IMAGE" \
   .
 
-info "运行时镜像构建完成！"
-echo "  - $RUNTIME_IMAGE"
+info "沙箱镜像构建完成！"
+echo "  - $SANDBOX_IMAGE"
 
 # ==================== 完成 ====================
 echo ""
@@ -151,17 +154,13 @@ echo "======================================"
 info "所有镜像构建完成！"
 echo "======================================"
 echo ""
+info_msg "版本号: ${VERSION}"
+echo ""
 info_msg "已构建的镜像："
-echo "  基础镜像："
-echo "    $BASE_IMAGE"
-echo ""
-echo "  主应用："
-echo "    $MAIN_IMAGE"
-echo ""
-echo "  运行时："
-echo "    $RUNTIME_IMAGE"
+echo "  - $BASE_IMAGE"
+echo "  - $MAIN_IMAGE"
+echo "  - $SANDBOX_IMAGE"
 echo ""
 info_msg "下一步："
-echo "  本地测试: ./scripts/deploy-test-image.sh"
 echo "  推送镜像: ./scripts/push-image.sh"
 echo ""
