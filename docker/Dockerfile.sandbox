@@ -1,13 +1,13 @@
-# Claude Code Runtime Container Image
-# This image provides the runtime environment for Claude Code in containerized deployments
+# Claude Code Sandbox Container Image
+# This image provides the sandbox runtime environment for Claude Code in containerized deployments
 #
-# Build: docker build -f docker/Dockerfile.runtime -t ccr.ccs.tencentyun.com/patent/claude-code-runtime:latest .
-# Run:   docker run -d --name claude-runtime claude-code-runtime:latest
-# Build with custom base: docker build --build-arg BASE_IMAGE=myregistry/base:latest -f docker/Dockerfile.runtime ...
+# Build: docker build -f docker/Dockerfile.sandbox -t ccr.ccs.tencentyun.com/patent/claude-code-sandbox:latest .
+# Run:   docker run -d --name claude-sandbox claude-code-sandbox:latest
+# Build with custom base: docker build --build-arg BASE_IMAGE=myregistry/base:latest -f docker/Dockerfile.sandbox ...
 
 # Base image which contains all Node.js dependencies
 # Use --build-arg to override the default
-ARG BASE_IMAGE=ccr.ccs.tencentyun.com/patent/claude-code-ui:base
+ARG BASE_IMAGE=claude-code-ui:base
 FROM ${BASE_IMAGE}
 
 # Switch to root user for setup
@@ -26,19 +26,22 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Claude Code CLI globally
-# Note: This will install from npm registry.
-# For production, consider using a specific version or private registry.
+# Tries multiple package names in order:
+# 1. @anthropic-ai/claude-code (official npm package)
+# 2. claude-code (alternative package name)
+# 3. Skip installation if both fail (will be handled by application)
+# For production, consider pinning a specific version: npm install -g @anthropic-ai/claude-code@1.x.x
 RUN npm install -g @anthropic-ai/claude-code 2>/dev/null || \
     npm install -g claude-code 2>/dev/null || \
-    echo "Claude Code CLI installation skipped - will be installed from source"
+    echo "Claude Code CLI installation skipped - will be handled by application"
 
 # Create workspace and config directories
 RUN mkdir -p /workspace /app /workspace/.claude/projects && \
     chown -R node:node /workspace /app
 
-# Copy application files
-COPY --chown=node:node backend ./backend
-COPY --chown=node:node shared ./shared
+# Copy application files to /app directory (not /workspace)
+COPY --chown=node:node backend /app/backend
+COPY --chown=node:node shared /app/shared
 COPY --chown=node:node extensions/.claude /app/extensions/.claude
 
 # Switch to non-root user
@@ -51,13 +54,9 @@ WORKDIR /workspace
 ENV NODE_ENV=production \
     CLAUDE_CONFIG_DIR=/workspace/.claude
 
-# Health check
+# Health check - check if the entrypoint process is running
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:3001/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || \
-    command -v claude >/dev/null 2>&1 || exit 1
-
-# Expose health check port
-EXPOSE 3001
+    CMD pgrep -f "node.*container-entrypoint.js" >/dev/null || exit 1
 
 # Container entrypoint - keeps container running and provides health check
 CMD ["node", "/app/backend/container-entrypoint.js"]

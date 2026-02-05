@@ -23,7 +23,7 @@ docker build -f docker/Dockerfile.production -t claude-code-ui:production .
 
 ---
 
-### Dockerfile.runtime
+### Dockerfile.sandbox
 **用途**：容器运行时镜像（多用户隔离模式）
 
 **包含内容**：
@@ -37,7 +37,7 @@ docker build -f docker/Dockerfile.production -t claude-code-ui:production .
 
 **构建命令**：
 ```bash
-docker build -f docker/Dockerfile.runtime -t claude-code-runtime:latest .
+docker build -f docker/Dockerfile.sandbox -t claude-code-sandbox:latest .
 ```
 
 ---

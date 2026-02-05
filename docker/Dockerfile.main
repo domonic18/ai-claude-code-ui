@@ -2,12 +2,12 @@
 # Main application image containing backend service and frontend build artifacts
 # Purpose: Production deployment providing complete Web UI service
 #
-# Build: docker build -f docker/Dockerfile.deploy -t ccr.ccs.tencentyun.com/patent/claude-code-ui:latest .
-# Build with custom base: docker build --build-arg BASE_IMAGE=myregistry/base:latest -f docker/Dockerfile.deploy ...
+# Build: docker build -f docker/Dockerfile.main -t ccr.ccs.tencentyun.com/patent/claude-code-ui:latest .
+# Build with custom base: docker build --build-arg BASE_IMAGE=myregistry/base:latest -f docker/Dockerfile.main ...
 
 # Base image with build dependencies and Node.js modules
 # Use --build-arg to override the default
-ARG BASE_IMAGE=ccr.ccs.tencentyun.com/patent/claude-code-ui:base
+ARG BASE_IMAGE=claude-code-ui:base
 FROM ${BASE_IMAGE}
 
 # Switch back to root user to copy files and install additional tools
@@ -25,14 +25,12 @@ COPY --chown=node:node shared ./shared
 COPY --chown=node:node dist ./dist
 COPY --chown=node:node extensions/.claude /app/extensions/.claude
 
-# Copy container configuration files to two locations:
-# 1. /app/containers/ - for seccomp profile reading
-# 2. /workspace/containers/ - for mounting into user containers
-COPY --chown=node:node workspace/containers ./containers-tmp
-RUN mkdir -p /app/containers /workspace /workspace/.claude /workspace/database /workspace/containers && \
-    cp -r containers-tmp/* /app/containers/ && \
-    cp -r containers-tmp/* /workspace/containers/ && \
-    rm -rf containers-tmp && \
+# Copy container configuration files (seccomp/apparmor profiles)
+# Only needed in /app/containers/ for reading by main application
+# The config is passed to Docker API, not mounted into user containers
+COPY --chown=node:node workspace/containers /app/containers
+
+RUN mkdir -p /workspace /workspace/.claude /workspace/database && \
     chown -R node:node /workspace /app
 
 # Copy entrypoint script for handling Docker socket and data directory permissions
