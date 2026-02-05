@@ -266,7 +266,7 @@ class ContainerManager {
     // 配置
     this.config = {
       dataDir: options.dataDir,
-      image: options.image || 'claude-code-runtime:latest',
+      image: options.image || 'claude-code-sandbox:latest',
       network: options.network || 'bridge',
       ...options
     };
@@ -549,7 +549,7 @@ import ContainerManager from './backend/services/container/ContainerManager.js';
 // 创建容器管理器实例
 const containerManager = new ContainerManager({
   dataDir: './workspace',
-  image: 'claude-code-runtime:latest'
+  image: 'claude-code-sandbox:latest'
 });
 
 // 获取或创建用户容器

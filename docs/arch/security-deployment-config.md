@@ -546,7 +546,7 @@ const containerConfig = {
 
 ```javascript
 async createUserNetwork(userId) {
-  const networkName = `claude-network-${userId}`;
+  const networkName = `claude-code-network-${userId}`;
 
   try {
     await this.docker.createNetwork({
@@ -765,7 +765,7 @@ services:
     depends_on:
       - db
     networks:
-      - claude-network
+      - claude-code-network
 
   db:
     image: postgres:15-alpine
@@ -777,7 +777,7 @@ services:
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     restart: unless-stopped
     networks:
-      - claude-network
+      - claude-code-network
 
   nginx:
     image: nginx:alpine
@@ -792,7 +792,7 @@ services:
       - app
     restart: unless-stopped
     networks:
-      - claude-network
+      - claude-code-network
 
   prometheus:
     image: prom/prometheus:latest
@@ -803,7 +803,7 @@ services:
       - "9090:9090"
     restart: unless-stopped
     networks:
-      - claude-network
+      - claude-code-network
 
   grafana:
     image: grafana/grafana:latest
@@ -815,10 +815,10 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
     restart: unless-stopped
     networks:
-      - claude-network
+      - claude-code-network
 
 networks:
-  claude-network:
+  claude-code-network:
     driver: bridge
 ```
 
@@ -848,7 +848,7 @@ docker:
 
 # 容器配置
 containers:
-  image: claude-code-runtime:latest
+  image: claude-code-sandbox:latest
   dataDir: ./workspace                       # 使用项目根目录下的 ./workspace 目录
   logLevel: info
 
@@ -927,7 +927,7 @@ cp .env.example .env
 nano .env
 
 # 3. 构建镜像
-docker build -t claude-code-runtime:latest -f Dockerfile.runtime .
+docker build -t claude-code-sandbox:latest -f docker/Dockerfile.sandbox .
 
 # 4. 启动服务
 docker-compose up -d
