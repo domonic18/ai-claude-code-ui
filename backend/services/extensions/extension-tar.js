@@ -12,6 +12,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { Readable } from 'stream';
+import { finished } from 'stream';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -46,6 +47,11 @@ export async function createExtensionTar(options = {}) {
 
   // Create a temporary directory for the tar content
   const tempDir = path.join(PROJECT_ROOT, 'workspace', 'temp', `extensions-${Date.now()}`);
+
+  // Cleanup function to remove temp directory
+  const cleanup = () => {
+    fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+  };
 
   try {
     // Ensure temp directory exists
@@ -84,19 +90,29 @@ export async function createExtensionTar(options = {}) {
     // Create a readable stream from the tar file
     const stream = fs.createReadStream(tarPath);
 
-    // Clean up temp directory after stream is consumed
-    stream.on('end', () => {
-      fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    // Use stream.finished() to ensure cleanup happens when stream is finalized
+    // This is more reliable than just 'end' and 'error' events
+    finished(stream, (err) => {
+      // Ignore errors, just cleanup
+      cleanup();
     });
-    stream.on('error', () => {
-      fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
-    });
+
+    // Also set up timeout-based cleanup as a safety net
+    // If stream is not consumed within 5 minutes, cleanup anyway
+    const timeoutId = setTimeout(cleanup, 5 * 60 * 1000);
+
+    // Clear timeout when stream is consumed
+    stream.on('end', () => clearTimeout(timeoutId));
+    stream.on('error', () => clearTimeout(timeoutId));
+
+    // Expose cleanup function for manual cleanup if needed
+    stream.cleanup = cleanup;
 
     return stream;
 
   } catch (error) {
     // Clean up on error
-    await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    cleanup();
     throw error;
   }
 }

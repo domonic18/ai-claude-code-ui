@@ -753,6 +753,36 @@ export class ContainerLifecycleManager {
   }
 
   /**
+   * 在容器内执行命令并设置超时
+   * @private
+   * @param {object} container - Docker 容器实例
+   * @param {string} command - 要执行的命令
+   * @param {number} timeout - 超时时间（毫秒）
+   * @returns {Promise<{success: boolean, output?: string, error?: string}>}
+   */
+  async _execWithTimeout(container, command, timeout = 15000) {
+    const exec = await container.exec({
+      Cmd: ['/bin/sh', '-c', command],
+      AttachStdout: true,
+      AttachStderr: true
+    });
+
+    const stream = await exec.start({ Detach: false });
+
+    return Promise.race([
+      new Promise((resolve) => {
+        let output = '';
+        stream.on('data', (chunk) => { output += chunk.toString(); });
+        stream.on('end', () => resolve({ success: true, output }));
+        stream.on('error', (err) => resolve({ success: false, error: err.message }));
+      }),
+      new Promise((resolve) =>
+        setTimeout(() => resolve({ success: false, error: 'timeout' }), timeout)
+      )
+    ]);
+  }
+
+  /**
    * 确保容器内有默认工作区
    * 在容器启动后执行，确保命名卷中的 /workspace 目录结构正确
    * @private
@@ -763,27 +793,11 @@ export class ContainerLifecycleManager {
   async _ensureDefaultWorkspaceInContainer(container, containerName) {
     console.log(`[Lifecycle] Ensuring default workspace in container ${containerName}...`);
 
-    // 使用 exec 在容器内创建工作区
-    const exec = await container.exec({
-      Cmd: ['/bin/sh', '-c', 'mkdir -p /workspace/my-workspace && ls -la /workspace/'],
-      AttachStdout: true,
-      AttachStderr: true
-    });
-
-    const stream = await exec.start({ Detach: false });
-
-    // 使用 Promise.race 设置超时
-    const result = await Promise.race([
-      new Promise((resolve) => {
-        let output = '';
-        stream.on('data', (chunk) => { output += chunk.toString(); });
-        stream.on('end', () => resolve({ success: true, output }));
-        stream.on('error', (err) => resolve({ success: false, error: err.message }));
-      }),
-      new Promise((resolve) => {
-        setTimeout(() => resolve({ success: false, error: 'timeout' }), 15000);
-      })
-    ]);
+    const result = await this._execWithTimeout(
+      container,
+      'mkdir -p /workspace/my-workspace && ls -la /workspace/',
+      15000
+    );
 
     if (result.success) {
       console.log(`[Lifecycle] Default workspace ensured in container ${containerName}`);
@@ -846,47 +860,15 @@ export class ContainerLifecycleManager {
   async _setHooksPermissions(container) {
     console.log(`[Lifecycle] Setting hooks permissions...`);
 
-    const exec = await container.exec({
-      Cmd: ['/bin/sh', '-c', 'chmod +x /workspace/.claude/hooks/*.sh 2>/dev/null || true'],
-      AttachStdout: true,
-      AttachStderr: true
-    });
+    const result = await this._execWithTimeout(
+      container,
+      'chmod +x /workspace/.claude/hooks/*.sh 2>/dev/null || true',
+      5000
+    );
 
-    const stream = await exec.start({ Detach: false });
-
-    // 使用 Promise.race 设置超时，避免永久挂起
-    await new Promise((resolve, reject) => {
-      let ended = false;
-
-      stream.on('data', (chunk) => {
-        // 消费数据，避免缓冲区填满
-      });
-
-      stream.on('end', () => {
-        if (!ended) {
-          ended = true;
-          resolve();
-        }
-      });
-
-      stream.on('error', (err) => {
-        if (!ended) {
-          ended = true;
-          // 权限设置失败不应该阻塞流程，只记录警告
-          console.warn(`[Lifecycle] Hooks permission warning: ${err.message}`);
-          resolve();
-        }
-      });
-
-      // 设置超时
-      setTimeout(() => {
-        if (!ended) {
-          ended = true;
-          console.warn(`[Lifecycle] Hooks permission setting timed out`);
-          resolve();
-        }
-      }, 5000);
-    });
+    if (!result.success) {
+      console.warn(`[Lifecycle] Hooks permission warning: ${result.error}`);
+    }
 
     console.log(`[Lifecycle] Hooks permissions set`);
   }
@@ -913,49 +895,18 @@ Welcome to your Claude Code workspace! This is your default project where you ca
 Happy coding!
 `;
 
-    const exec = await container.exec({
-      Cmd: ['/bin/sh', '-c', `cat > /workspace/my-workspace/README.md << 'EOF'
+    // 使用 heredoc 语法创建文件
+    const command = `cat > /workspace/my-workspace/README.md << 'EOF'
 ${readmeContent}
-EOF`],
-      AttachStdout: true,
-      AttachStderr: true
-    });
+EOF`;
 
-    const stream = await exec.start({ Detach: false });
+    const result = await this._execWithTimeout(container, command, 5000);
 
-    // 使用超时机制，避免永久挂起
-    await new Promise((resolve) => {
-      let ended = false;
-
-      stream.on('data', (chunk) => {
-        // 消费数据，避免缓冲区填满
-      });
-
-      stream.on('end', () => {
-        if (!ended) {
-          ended = true;
-          console.log(`[Lifecycle] README.md created successfully`);
-          resolve();
-        }
-      });
-
-      stream.on('error', (err) => {
-        if (!ended) {
-          ended = true;
-          console.warn(`[Lifecycle] README creation warning: ${err.message}`);
-          resolve(); // 即使出错也继续
-        }
-      });
-
-      // 设置超时
-      setTimeout(() => {
-        if (!ended) {
-          ended = true;
-          console.warn(`[Lifecycle] README creation timed out`);
-          resolve(); // 超时后继续
-        }
-      }, 5000);
-    });
+    if (result.success) {
+      console.log(`[Lifecycle] README.md created successfully`);
+    } else {
+      console.warn(`[Lifecycle] README creation warning: ${result.error}`);
+    }
   }
 
 }

@@ -92,21 +92,7 @@ export class AuthController extends BaseController {
       });
 
       // 设置 httpOnly cookie（行业最佳实践）
-      // Cookie 配置使用环境变量
-      const cookieOptions = {
-        httpOnly: true,
-        secure: process.env.COOKIE_SECURE === 'true',
-        sameSite: process.env.COOKIE_SAMESITE || 'lax',
-        maxAge: SESSION_TIMEOUTS.cookieMaxAge,
-        path: '/'
-      };
-
-      // 只在生产环境且配置了 domain 时才设置
-      if (process.env.NODE_ENV === 'production' && process.env.COOKIE_DOMAIN) {
-        cookieOptions.domain = process.env.COOKIE_DOMAIN;
-      }
-
-      res.cookie('auth_token', token, cookieOptions);
+      res.cookie('auth_token', token, this._getCookieOptions());
 
       this._success(res, {
         id: user.id,
@@ -170,21 +156,7 @@ export class AuthController extends BaseController {
       });
 
       // 设置 httpOnly cookie（行业最佳实践）
-      // Cookie 配置使用环境变量
-      const cookieOptions = {
-        httpOnly: true,
-        secure: process.env.COOKIE_SECURE === 'true',
-        sameSite: process.env.COOKIE_SAMESITE || 'lax',
-        maxAge: SESSION_TIMEOUTS.cookieMaxAge,
-        path: '/'
-      };
-
-      // 只在生产环境且配置了 domain 时才设置
-      if (process.env.NODE_ENV === 'production' && process.env.COOKIE_DOMAIN) {
-        cookieOptions.domain = process.env.COOKIE_DOMAIN;
-      }
-
-      res.cookie('auth_token', token, cookieOptions);
+      res.cookie('auth_token', token, this._getCookieOptions());
 
       this._success(res, {
         id: user.id,
@@ -296,6 +268,29 @@ export class AuthController extends BaseController {
   }
 
   /**
+   * 获取 Cookie 配置选项
+   * 确保设置和清除 Cookie 时使用相同的配置
+   * @private
+   * @returns {Object} Cookie 配置选项
+   */
+  _getCookieOptions() {
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.COOKIE_SECURE === 'true',
+      sameSite: process.env.COOKIE_SAMESITE || 'lax',
+      maxAge: SESSION_TIMEOUTS.cookieMaxAge,
+      path: '/'
+    };
+
+    // 只在生产环境且配置了 domain 时才设置
+    if (process.env.NODE_ENV === 'production' && process.env.COOKIE_DOMAIN) {
+      cookieOptions.domain = process.env.COOKIE_DOMAIN;
+    }
+
+    return cookieOptions;
+  }
+
+  /**
    * 注销
    * @param {Object} req - Express 请求对象
    * @param {Object} res - Express 响应对象
@@ -303,19 +298,9 @@ export class AuthController extends BaseController {
    */
   async logout(req, res, next) {
     try {
-      // 清除 httpOnly cookie（配置需与设置时一致）
-      const cookieOptions = {
-        httpOnly: true,
-        secure: process.env.COOKIE_SECURE === 'true',
-        sameSite: process.env.COOKIE_SAMESITE || 'lax',
-        path: '/'
-      };
-
-      if (process.env.NODE_ENV === 'production' && process.env.COOKIE_DOMAIN) {
-        cookieOptions.domain = process.env.COOKIE_DOMAIN;
-      }
-
-      res.clearCookie('auth_token', cookieOptions);
+      // 清除 httpOnly cookie（配置需与设置时完全一致）
+      // clearCookie 会忽略 maxAge 等选项，只使用 path/domain/sameSite/secure 来匹配
+      res.clearCookie('auth_token', this._getCookieOptions());
 
       this._success(res, null, 'Logged out successfully');
     } catch (error) {

@@ -392,14 +392,14 @@ export class ContainerStateMachine extends EventEmitter {
       const matchingWaiters = waiters.filter(w => w.targetStates.includes(newState));
 
       if (matchingWaiters.length > 0) {
-        console.log(`[ContainerStateMachine] Notifying ${matchingWaiters.length} waiters from state ${state} for new state ${newState}`);
+        console.log(`[StateMachine] Notifying ${matchingWaiters.length} waiters from state ${state} for new state ${newState}`);
 
         // 通知匹配的等待者
         matchingWaiters.forEach(waiter => {
           try {
             waiter.callback(newState);
           } catch (error) {
-            console.error('[ContainerStateMachine] Error in state waiter callback:', error);
+            console.error('[StateMachine] Error in state waiter callback:', error);
           }
         });
       }
@@ -454,7 +454,11 @@ export class ContainerStateMachine extends EventEmitter {
    */
   static fromJSON(data) {
     // 如果状态是中间状态，服务器重启后这些状态肯定无效，重置为 NON_EXISTENT
-    const intermediateStates = ['creating', 'starting', 'health_checking'];
+    const intermediateStates = [
+      ContainerState.CREATING,
+      ContainerState.STARTING,
+      ContainerState.HEALTH_CHECKING
+    ];
     const initialState = intermediateStates.includes(data.currentState)
       ? ContainerState.NON_EXISTENT
       : data.currentState;

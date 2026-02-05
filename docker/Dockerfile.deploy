@@ -3,8 +3,12 @@
 # Purpose: Production deployment providing complete Web UI service
 #
 # Build: docker build -f docker/Dockerfile.deploy -t ccr.ccs.tencentyun.com/patent/claude-code-ui:latest .
+# Build with custom base: docker build --build-arg BASE_IMAGE=myregistry/base:latest -f docker/Dockerfile.deploy ...
 
-FROM ccr.ccs.tencentyun.com/patent/claude-code-ui:base
+# Base image with build dependencies and Node.js modules
+# Use --build-arg to override the default
+ARG BASE_IMAGE=ccr.ccs.tencentyun.com/patent/claude-code-ui:base
+FROM ${BASE_IMAGE}
 
 # Switch back to root user to copy files and install additional tools
 USER root

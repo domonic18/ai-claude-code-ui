@@ -3,9 +3,12 @@
 #
 # Build: docker build -f docker/Dockerfile.runtime -t ccr.ccs.tencentyun.com/patent/claude-code-runtime:latest .
 # Run:   docker run -d --name claude-runtime claude-code-runtime:latest
+# Build with custom base: docker build --build-arg BASE_IMAGE=myregistry/base:latest -f docker/Dockerfile.runtime ...
 
-# Build from base image which contains all Node.js dependencies
-FROM ccr.ccs.tencentyun.com/patent/claude-code-ui:base
+# Base image which contains all Node.js dependencies
+# Use --build-arg to override the default
+ARG BASE_IMAGE=ccr.ccs.tencentyun.com/patent/claude-code-ui:base
+FROM ${BASE_IMAGE}
 
 # Switch to root user for setup
 USER root

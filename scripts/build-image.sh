@@ -78,8 +78,8 @@ echo "=========================================="
 # ==================== 阶段 1: 基础镜像 ====================
 BUILD_BASE=false
 
-# 检查 base 镜像是否已存在
-if docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "^${BASE_IMAGE}$"; then
+# 检查 base 镜像是否已存在（使用 docker image inspect 更可靠）
+if docker image inspect "$BASE_IMAGE" &>/dev/null; then
   if [ "$REBUILD_BASE" = true ]; then
     info_msg "强制重建 base 镜像"
     BUILD_BASE=true
