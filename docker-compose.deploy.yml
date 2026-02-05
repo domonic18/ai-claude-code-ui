@@ -1,25 +1,80 @@
 # Docker Compose 部署配置 (用于目标机器)
 # 使用远程镜像，无需构建
+#
+# 使用方式：
+#   docker-compose -f docker-compose.deploy.yml up -d
+#   docker-compose -f docker-compose.deploy.yml logs -f
+#   docker-compose -f docker-compose.deploy.yml down
 
 services:
+  # 主应用服务
   app:
     image: ccr.ccs.tencentyun.com/patent/claude-code-ui:latest
     container_name: claude-code-app
     ports:
       - "3001:3001"
     volumes:
-      - ./workspace:/app/workspace:rw
+      # 使用命名卷持久化数据（不产生本地文件）
+      - claude-code-data:/workspace:rw
+      # Docker socket（用于创建用户容器）
       - /var/run/docker.sock:/var/run/docker.sock
+      # 用户数据目录（宿主机路径，兼容 Docker Desktop for Mac）
+      - /var/lib/claude-code:/var/lib/claude-code:rw
     env_file:
       - .env.deploy
+    environment:
+      # 生产环境
+      - NODE_ENV=production
+      # 工作目录
+      - WORKSPACE_DIR=/workspace
+      # 数据目录（使用宿主机路径，兼容 Docker Desktop for Mac）
+      - DATA_DIR=/var/lib/claude-code
+      # Seccomp 配置文件路径（容器配置文件在应用代码目录）
+      - SECCOMP_PROFILE=/app/containers/seccomp/claude-code.json
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    # 日志配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # 重启策略
     restart: unless-stopped
+    # 健康检查
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    # 网络配置
+    networks:
+      - claude-network
+    # 依赖服务（如需添加数据库，可在此添加）
+    depends_on: []
+    # 安全选项
+    security_opt:
+      - no-new-privileges:true
 
+# 网络配置
 networks:
-  default:
+  claude-network:
+    driver: bridge
     name: claude-code-network
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+# 卷配置（数据持久化）
+volumes:
+  claude-code-data:
+    name: claude-code-data
+    driver: local

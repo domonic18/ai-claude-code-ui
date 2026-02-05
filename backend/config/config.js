@@ -372,8 +372,14 @@ export function getProjectRoot() {
 
 /**
  * 获取 workspace 目录的绝对路径
+ * 优先使用 WORKSPACE_DIR 环境变量（用于 Docker 部署）
  */
 export function getWorkspaceDir() {
+  // 在 Docker 部署环境中，使用 WORKSPACE_DIR 环境变量
+  // 这样可以与命名卷挂载点保持一致
+  if (process.env.WORKSPACE_DIR) {
+    return process.env.WORKSPACE_DIR;
+  }
   return path.join(PROJECT_ROOT, 'workspace');
 }
 

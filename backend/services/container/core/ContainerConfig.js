@@ -30,6 +30,10 @@ export class ContainerConfigBuilder {
     const tier = userConfig.tier || 'free';
     const resourceLimits = RESOURCE_LIMITS[tier] || RESOURCE_LIMITS.free;
 
+    // 使用命名卷支持 Docker-in-Docker 环境
+    // 命名卷在 Docker 层级，所有容器都能访问
+    const volumeName = `claude-user-${userId}-workspace`;
+
     return {
       name: name,
       Image: image,
@@ -46,9 +50,11 @@ export class ContainerConfigBuilder {
       Cmd: ['/bin/sh', '-c', 'exec /bin/sh -i 2>&1'],
       Env: this._buildEnvironment(userId, tier),
       HostConfig: {
-        // 单一挂载点：所有数据统一在 /workspace 下
+        // 使用命名卷而不是 bind mount，支持 Docker-in-Docker 环境
+        // 格式：卷名:容器路径:选项
         Binds: [
-          `${userDataDir}:${CONTAINER.paths.workspace}:rw`    // 统一工作目录
+          `${volumeName}:${CONTAINER.paths.workspace}:rw`,      // 用户工作区命名卷
+          '/var/run/docker.sock:/var/run/docker.sock:rw'        // Docker socket
         ],
         Memory: resourceLimits.memory,
         CpuQuota: resourceLimits.cpuQuota,
@@ -67,7 +73,11 @@ export class ContainerConfigBuilder {
           }
         }
       },
-      Labels: this._buildLabels(userId, tier)
+      // 定义容器内的挂载点（Docker API 要求）
+      Volumes: {
+        [CONTAINER.paths.workspace]: {}
+      },
+      Labels: this._buildLabels(userId, tier, volumeName)
     };
   }
 
@@ -149,10 +159,11 @@ export class ContainerConfigBuilder {
    * 构建容器标签
    * @param {number} userId - 用户 ID
    * @param {string} tier - 用户层级
+   * @param {string} volumeName - 命名卷名称
    * @returns {object} 标签对象
    * @private
    */
-  _buildLabels(userId, tier) {
+  _buildLabels(userId, tier, volumeName) {
     return {
       // Docker Compose 风格标签 - 用于在 Docker 客户端中分组显示
       'com.docker.compose.project': 'claude-code-ui',
@@ -163,6 +174,7 @@ export class ContainerConfigBuilder {
       'com.claude-code.user': String(userId),
       'com.claude-code.managed': 'true',
       'com.claude-code.tier': tier,
+      'com.claude-code.volume': volumeName,
       'com.claude-code.created': new Date().toISOString()
     };
   }

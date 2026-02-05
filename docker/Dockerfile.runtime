@@ -1,39 +1,19 @@
 # Claude Code Runtime Container Image
 # This image provides the runtime environment for Claude Code in containerized deployments
 #
-# Build: docker build -f Dockerfile.runtime -t claude-code-runtime:latest .
+# Build: docker build -f docker/Dockerfile.runtime -t ccr.ccs.tencentyun.com/patent/claude-code-runtime:latest .
 # Run:   docker run -d --name claude-runtime claude-code-runtime:latest
+# Build with custom base: docker build --build-arg BASE_IMAGE=myregistry/base:latest -f docker/Dockerfile.runtime ...
 
-# Multi-stage build for optimized image size
-FROM node:20-slim AS builder
+# Base image which contains all Node.js dependencies
+# Use --build-arg to override the default
+ARG BASE_IMAGE=ccr.ccs.tencentyun.com/patent/claude-code-ui:base
+FROM ${BASE_IMAGE}
 
-# Configure apt to use Aliyun mirrors (replace default Debian mirrors)
-RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
-    sed -i 's|security.debian.org/debian-security|mirrors.aliyun.com/debian-security|g' /etc/apt/sources.list.d/debian.sources
+# Switch to root user for setup
+USER root
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    python3 \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install dependencies
-RUN npm ci --only=production && \
-    npm cache clean --force
-
-# Final runtime image
-FROM node:20-slim
-
-# Configure apt to use Aliyun mirrors (replace default Debian mirrors)
-RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
-    sed -i 's|security.debian.org/debian-security|mirrors.aliyun.com/debian-security|g' /etc/apt/sources.list.d/debian.sources
-
-# Install runtime dependencies
+# Install runtime dependencies (build tools already in base image)
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -52,22 +32,14 @@ RUN npm install -g @anthropic-ai/claude-code 2>/dev/null || \
     npm install -g claude-code 2>/dev/null || \
     echo "Claude Code CLI installation skipped - will be installed from source"
 
-# Set working directory for application files
-WORKDIR /app
-
-# Copy installed node_modules from builder stage
-COPY --from=builder --chown=node:node /app/node_modules ./node_modules
-COPY --from=builder --chown=node:node /app/package*.json ./
+# Create workspace and config directories
+RUN mkdir -p /workspace /app /workspace/.claude/projects && \
+    chown -R node:node /workspace /app
 
 # Copy application files
 COPY --chown=node:node backend ./backend
 COPY --chown=node:node shared ./shared
-
-# Create workspace and config directories
-# Note: /workspace/my-workspace is created at runtime on host filesystem
-# to ensure it persists with the bind mount
-RUN mkdir -p /workspace /app /workspace/.claude/projects && \
-    chown -R node:node /workspace /app
+COPY --chown=node:node extensions/.claude /app/extensions/.claude
 
 # Switch to non-root user
 USER node

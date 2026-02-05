@@ -92,14 +92,7 @@ export class AuthController extends BaseController {
       });
 
       // 设置 httpOnly cookie（行业最佳实践）
-      // sameSite: 'lax' 允许跨端口 cookie（开发环境需要）
-      res.cookie('auth_token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax', // 使用 lax 以支持开发环境的跨端口请求
-        maxAge: SESSION_TIMEOUTS.cookieMaxAge, // 使用配置的 Cookie 过期时间
-        path: '/'
-      });
+      res.cookie('auth_token', token, this._getCookieOptions());
 
       this._success(res, {
         id: user.id,
@@ -163,14 +156,7 @@ export class AuthController extends BaseController {
       });
 
       // 设置 httpOnly cookie（行业最佳实践）
-      // sameSite: 'lax' 允许跨端口 cookie（开发环境需要）
-      res.cookie('auth_token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax', // 使用 lax 以支持开发环境的跨端口请求
-        maxAge: SESSION_TIMEOUTS.cookieMaxAge, // 使用配置的 Cookie 过期时间
-        path: '/'
-      });
+      res.cookie('auth_token', token, this._getCookieOptions());
 
       this._success(res, {
         id: user.id,
@@ -282,6 +268,29 @@ export class AuthController extends BaseController {
   }
 
   /**
+   * 获取 Cookie 配置选项
+   * 确保设置和清除 Cookie 时使用相同的配置
+   * @private
+   * @returns {Object} Cookie 配置选项
+   */
+  _getCookieOptions() {
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.COOKIE_SECURE === 'true',
+      sameSite: process.env.COOKIE_SAMESITE || 'lax',
+      maxAge: SESSION_TIMEOUTS.cookieMaxAge,
+      path: '/'
+    };
+
+    // 只在生产环境且配置了 domain 时才设置
+    if (process.env.NODE_ENV === 'production' && process.env.COOKIE_DOMAIN) {
+      cookieOptions.domain = process.env.COOKIE_DOMAIN;
+    }
+
+    return cookieOptions;
+  }
+
+  /**
    * 注销
    * @param {Object} req - Express 请求对象
    * @param {Object} res - Express 响应对象
@@ -289,13 +298,9 @@ export class AuthController extends BaseController {
    */
   async logout(req, res, next) {
     try {
-      // 清除 httpOnly cookie
-      res.clearCookie('auth_token', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        path: '/'
-      });
+      // 清除 httpOnly cookie（配置需与设置时完全一致）
+      // clearCookie 会忽略 maxAge 等选项，只使用 path/domain/sameSite/secure 来匹配
+      res.clearCookie('auth_token', this._getCookieOptions());
 
       this._success(res, null, 'Logged out successfully');
     } catch (error) {
