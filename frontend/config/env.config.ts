@@ -93,8 +93,8 @@ export const ENV_CONFIG = {
    * Container configuration
    */
   CONTAINER: {
-    IMAGE: getEnvVar('CONTAINER_IMAGE', 'claude-code-runtime:latest'),
-    NETWORK: getEnvVar('CONTAINER_NETWORK', 'claude-network'),
+    IMAGE: getEnvVar('CONTAINER_IMAGE', 'claude-code-sandbox:latest'),
+    NETWORK: getEnvVar('CONTAINER_NETWORK', 'claude-code-network'),
     SOCKET_PATH: getEnvVar('DOCKER_HOST', '/var/run/docker.sock'),
     CERT_PATH: getEnvVar('DOCKER_CERT_PATH'),
   },

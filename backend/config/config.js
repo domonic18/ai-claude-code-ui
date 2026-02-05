@@ -151,10 +151,10 @@ export const CONTAINER = {
   },
 
   // Docker 镜像
-  image: process.env.CONTAINER_IMAGE || 'claude-code-runtime:latest',
+  image: process.env.CONTAINER_IMAGE || 'claude-code-sandbox:latest',
 
   // Docker 网络
-  network: process.env.CONTAINER_NETWORK || 'claude-network',
+  network: process.env.CONTAINER_NETWORK || 'claude-code-network',
 
   // 容器内路径规范（符合 docs/arch/data-storage-design.md v3.1）
   paths: {
