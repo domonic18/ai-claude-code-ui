@@ -10,8 +10,10 @@
 import { BaseController } from '../core/BaseController.js';
 import { FileOperationsService } from '../../services/files/operations/FileOperationsService.js';
 import { NotFoundError, ValidationError } from '../../middleware/error-handler.middleware.js';
+import containerManager from '../../services/container/core/index.js';
 import fs from 'fs/promises';
 import path from 'path';
+import { execSync } from 'child_process';
 
 /**
  * 文件控制器
@@ -253,6 +255,7 @@ export class FileController extends BaseController {
   /**
    * 上传文件附件
    * 支持的文件类型：.docx, .pdf, .md, .txt
+   * 使用 Docker putArchive API 将文件直接写入用户命名卷
    * @param {Object} req - Express 请求对象
    * @param {Object} res - Express 响应对象
    * @param {Function} next - 下一个中间件
@@ -269,7 +272,7 @@ export class FileController extends BaseController {
       const projectName = project || 'default';
 
       // 允许的文件扩展名
-      const allowedExtensions = ['.docx', '.pdf', '.md', '.txt', '.js', '.ts', '.jsx', '.tsx', '.json', '.csv'];
+      const allowedExtensions = ['.doc', '.docx', '.pdf', '.md', '.txt', '.js', '.ts', '.jsx', '.tsx', '.json', '.csv'];
       const originalName = req.file.originalname;
       const ext = originalName.toLowerCase().includes('.')
         ? '.' + originalName.split('.').pop().toLowerCase()
@@ -279,48 +282,60 @@ export class FileController extends BaseController {
         throw new ValidationError(`Unsupported file type: ${ext}. Allowed types: ${allowedExtensions.join(', ')}`);
       }
 
-      // 按日期分组存储，保留原始文件名
+      // 按日期分组存储
       const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
-      // 生成安全的文件名（只防止路径遍历，保留中文等字符）
-      // 只移除危险的路径字符：.. / \
-      let safeBaseName = originalName
-        .replace(/\.\./g, '')   // 移除 ..
-        .replace(/[\/\\]/g, '_'); // 替换路径分隔符
-
-      // 如果同名文件存在，添加序号后缀
-      const userDataDir = path.join(process.cwd(), 'workspace', 'users', `user_${userId}`, 'data');
-      const uploadsDir = path.join(userDataDir, projectName, 'uploads', today);
-
-      // 构建完整文件路径
-      let finalFilename = safeBaseName;
-      let filePath = path.join(uploadsDir, finalFilename);
-
-      // 检查文件是否已存在，如果存在则添加序号
-      let counter = 1;
-      const nameWithoutExt = safeBaseName.replace(/\.[^.]+$/, '');
-      const extension = ext || '';
-
-      // 检查文件是否存在
-      try {
-        while (await fs.access(filePath)) {
-          finalFilename = `${nameWithoutExt}_${counter}${extension}`;
-          filePath = path.join(uploadsDir, finalFilename);
-          counter++;
-        }
-      } catch {
-        // 文件不存在，可以使用原始文件名
-      }
+      // 生成 ASCII 安全的文件名（避免中文文件名编码问题）
+      const uniqueId = Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+      const safeFilename = `${uniqueId}${ext}`;
 
       // 容器内路径：/workspace/{projectName}/uploads/{date}/{filename}
-      const containerPath = `/workspace/${projectName}/uploads/${today}/${finalFilename}`;
+      const containerPath = `/workspace/${projectName}/uploads/${today}/${safeFilename}`;
+      const containerDir = `/workspace/${projectName}/uploads/${today}`;
 
-      await fs.mkdir(uploadsDir, { recursive: true });
-      await fs.writeFile(filePath, req.file.buffer);
+      // 获取用户命名卷名称
+      const volumeName = `claude-user-${userId}-workspace`;
+
+      // 使用 putArchive API 将文件写入用户命名卷
+      const container = await containerManager.getOrCreateContainer(userId);
+      const dockerContainer = containerManager.docker.getContainer(container.id);
+
+      // 创建本地临时文件和 tar（保持完整目录结构）
+      const tempDir = `/tmp/upload_${Date.now()}`;
+      const localDirPath = `${tempDir}/${projectName}/uploads/${today}`;
+      const localFilePath = `${localDirPath}/${safeFilename}`;
+
+      await fs.mkdir(localDirPath, { recursive: true });
+      await fs.writeFile(localFilePath, req.file.buffer);
+
+      // 创建 tar 归档（保持目录结构，使用 ustar 格式避免扩展属性）
+      const tarPath = `${tempDir}/archive.tar`;
+      execSync(
+        `tar --format=ustar -cf "${tarPath}" -C "${tempDir}" "${projectName}/uploads/${today}/${safeFilename}"`,
+        { cwd: tempDir }
+      );
+
+      // 读取 tar 文件
+      const tarBuffer = await fs.readFile(tarPath);
+
+      // 使用 putArchive 上传到容器（上传到 /workspace 下，会自动解压）
+      await new Promise((resolve, reject) => {
+        dockerContainer.putArchive(tarBuffer, { path: '/workspace' }, (err) => {
+          if (err) {
+            reject(new Error(`putArchive failed: ${err.message}`));
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      // 清理临时文件
+      await fs.rm(tempDir, { recursive: true, force: true });
 
       this._success(res, {
-        name: originalName,
-        path: containerPath,
+        displayName: originalName,     // 原始文件名，用于显示
+        filename: safeFilename,        // 实际文件名（ASCII 安全）
+        path: containerPath,           // 容器内完整路径
         size: req.file.size,
         type: req.file.mimetype,
         date: today,
