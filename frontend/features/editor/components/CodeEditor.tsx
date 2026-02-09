@@ -348,41 +348,27 @@ function CodeEditor({
 
   const handleSave = async () => {
     setSaving(true);
+    setSaveSuccess(false);
+
     try {
-      console.log('Saving file:', {
-        projectName: file.projectName,
-        path: file.path,
-        contentLength: content?.length
-      });
-
       const response = await api.saveFile(file.projectName, file.path, content);
-
-      console.log('Save response:', {
-        status: response.status,
-        ok: response.ok,
-        contentType: response.headers.get('content-type')
-      });
 
       if (!response.ok) {
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `Save failed: ${response.status}`);
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || errorData.message || `Save failed: ${response.status}`);
         } else {
-          const textError = await response.text();
-          console.error('Non-JSON error response:', textError);
           throw new Error(`Save failed: ${response.status} ${response.statusText}`);
         }
       }
 
-      const result = await response.json();
-      console.log('Save successful:', result);
+      await response.json().catch(() => ({}));
 
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
 
     } catch (error) {
-      console.error('Error saving file:', error);
       alert(`Error saving file: ${error.message}`);
     } finally {
       setSaving(false);
