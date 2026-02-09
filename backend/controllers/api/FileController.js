@@ -110,7 +110,6 @@ export class FileController extends BaseController {
         depth: parseInt(depth, 10),
         includeHidden: showHidden === 'true' || showHidden === true
       });
-
       this._success(res, tree);
     } catch (error) {
       this._handleError(error, req, res, next);
@@ -148,15 +147,14 @@ export class FileController extends BaseController {
   async deleteFile(req, res, next) {
     try {
       const userId = this._getUserId(req);
-      const { filePath } = req.params;
-      const { recursive = false } = req.body;
+      const { path } = req.body;
+      const { recursive = true } = req.body;
 
-      const result = await this.fileOpsService.deleteFile(filePath, {
+      const result = await this.fileOpsService.deleteFile(path, {
         userId,
         containerMode: req.containerMode,
         recursive
       });
-
       this._success(res, result, 'File deleted successfully');
     } catch (error) {
       this._handleError(error, req, res, next);
@@ -322,7 +320,6 @@ export class FileController extends BaseController {
       await new Promise((resolve, reject) => {
         dockerContainer.putArchive(tarBuffer, { path: '/workspace' }, (err) => {
           if (err) {
-            console.error('[FileController.uploadFile] putArchive failed:', err);
             reject(new Error(`putArchive failed: ${err.message}`));
           } else {
             resolve();
@@ -344,7 +341,6 @@ export class FileController extends BaseController {
 
       this._success(res, responseData, 'File uploaded successfully');
     } catch (error) {
-      console.error('[FileController.uploadFile] Error:', error);
       this._handleError(error, req, res, next);
     }
   }

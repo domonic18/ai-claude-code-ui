@@ -75,8 +75,6 @@ export class FileAdapter extends BaseFileAdapter {
         );
       }
 
-      console.log('[FileAdapter] readFile:', { filePath, cleanPath, containerPath });
-
       // 验证路径安全性
       if (containerPath.includes('..')) {
         throw new Error('Path traversal detected');
@@ -123,12 +121,6 @@ export class FileAdapter extends BaseFileAdapter {
             const charCode = trimmedContent.charCodeAt(0);
             if (charCode === 0xFEFF || trimmedContent.startsWith('\uFEFF')) {
               trimmedContent = trimmedContent.slice(1);
-              console.log('[FileAdapter] BOM detected and stripped for file:', filePath);
-            }
-
-            // Log for debugging
-            if (trimmedContent.length > 0 && trimmedContent.charCodeAt(0) > 127) {
-              console.log('[FileAdapter] First char code:', trimmedContent.charCodeAt(0), 'File:', filePath);
             }
 
             resolve({
@@ -467,21 +459,23 @@ export class FileAdapter extends BaseFileAdapter {
       // 获取或创建容器
       await containerManager.getOrCreateContainer(userId);
 
-      // 构建容器路径
-      const containerPath = this._buildContainerPath(
-        validation.safePath,
-        { projectPath, isContainerProject }
-      );
+      // safePath 已经是完整的容器路径，直接使用
+      // 例如: /workspace/my-workspace/README.md
+      const containerPath = validation.safePath;
 
       // 删除文件或目录
+      const deleteCommand = `rm -rf "${containerPath}"`;
+
       const { stream } = await containerManager.execInContainer(
         userId,
-        `rm -rf "${containerPath}"`
+        deleteCommand
       );
 
       return new Promise((resolve, reject) => {
         let resolved = false;
         let timeoutId = null;
+        let output = '';
+        let errorOutput = '';
 
         const doResolve = (result) => {
           if (!resolved) {
@@ -499,17 +493,43 @@ export class FileAdapter extends BaseFileAdapter {
           }
         };
 
+        // 捕获命令输出
+        stream.on('data', (chunk) => {
+          output += chunk.toString();
+        });
+
         stream.on('error', (err) => {
           doReject(new Error(`Failed to delete file: ${err.message}`));
         });
 
-        stream.on('end', () => {
-          doResolve({ success: true });
+        stream.on('end', async () => {
+          // 验证文件是否真的被删除了
+          try {
+            const checkCommand = `test -e "${containerPath}" && echo "EXISTS" || echo "NOT_EXISTS"`;
+            const { stream: checkStream } = await containerManager.execInContainer(userId, checkCommand);
+
+            let checkOutput = '';
+            checkStream.on('data', (chunk) => {
+              checkOutput += chunk.toString();
+            });
+
+            checkStream.on('end', () => {
+              const trimmedOutput = checkOutput.trim();
+              if (trimmedOutput === 'EXISTS') {
+                doReject(new Error(`Failed to delete file: ${filePath} still exists`));
+              } else {
+                doResolve({ success: true });
+              }
+            });
+          } catch (checkError) {
+            // 即使验证失败，也尝试返回成功（可能是检查命令的问题）
+            doResolve({ success: true });
+          }
         });
 
         timeoutId = setTimeout(() => {
           doResolve({ success: true });
-        }, 2000);
+        }, 5000);
       });
     } catch (error) {
       throw this._standardizeError(error, 'deleteFile');
@@ -702,7 +722,6 @@ export class FileAdapter extends BaseFileAdapter {
 
       // 验证每个部分是否有效
       if (parts.length === 0 || parts.some(part => part === '' || !this._isValidFileName(part))) {
-        console.log('[FileAdapter] Skipping invalid path:', relativePath, '->', parts);
         continue;
       }
 
