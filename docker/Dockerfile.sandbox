@@ -41,13 +41,17 @@ RUN npm install -g @anthropic-ai/claude-code 2>/dev/null || \
 RUN mkdir -p /workspace /app /workspace/.claude/projects && \
     chown -R node:node /workspace /app
 
-# Copy application files to /app directory (not /workspace)
+# Copy application files to /app directory
 COPY --chown=node:node backend /app/backend
 COPY --chown=node:node shared /app/shared
 COPY --chown=node:node extensions/.claude /app/extensions/.claude
 
-# Switch to non-root user
-USER node
+# Install gosu for user switching
+RUN apt-get update && apt-get install -y gosu && rm -rf /var/lib/apt/lists/*
+
+# Copy entrypoint script
+COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Set working directory
 WORKDIR /workspace
@@ -56,9 +60,12 @@ WORKDIR /workspace
 ENV NODE_ENV=production \
     CLAUDE_CONFIG_DIR=/workspace/.claude
 
-# Health check - check if the entrypoint process is running
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD pgrep -f "node.*container-entrypoint.js" >/dev/null || exit 1
 
-# Container entrypoint - keeps container running and provides health check
+# Use entrypoint to fix permissions before switching to node user
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+
+# Container entrypoint - keeps container running
 CMD ["node", "/app/backend/container-entrypoint.js"]
