@@ -32,7 +32,7 @@ function initializeContainer() {
   // 确保必要的目录存在
   [CLAUDE_DIR, PROJECTS_DIR].forEach(dir => {
     if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+      fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
       console.log(`[INIT] Created directory: ${dir}`);
     }
   });
