@@ -526,9 +526,108 @@ sudo apparmor_parser -r /etc/apparmor.d/claude-code
 sudo aa-status
 ```
 
-### 1.3 网络隔离配置
+### 1.3 容器用户权限管理
 
-#### 1.3.1 默认网络模式
+#### 1.3.1 权限管理策略
+
+为了平衡安全性和功能性，系统采用**两级权限管理**策略：
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    容器权限管理架构                          │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  容器启动阶段              应用运行阶段                       │
+│  ┌─────────────┐          ┌─────────────┐                  │
+│  │  root 用户   │  ──────→ │  node 用户  │                  │
+│  │  (临时)      │          │  (实际运行) │                  │
+│  └─────────────┘          └─────────────┘                  │
+│         │                         │                         │
+│         ▼                         ▼                         │
+│  修复 /workspace 权限      应用程序安全运行                 │
+│  chown node:node           文件读写操作                     │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### 1.3.2 工作流程
+
+**启动阶段 (root 用户)：**
+
+1. 容器以 root 用户启动
+2. Entrypoint 脚本检查 `/workspace` 目录所有者
+3. 如果所有者不是 node 用户，执行 `chown -R node:node /workspace`
+4. 设置正确的目录权限 (`chmod 755`)
+
+**运行阶段 (node 用户)：**
+
+5. 使用 `gosu` 切换到 node 用户
+6. 应用程序以 node 用户身份运行
+7. 所有文件操作都受 node 用户权限限制
+
+#### 1.3.3 安全保障
+
+**关键点：**
+- ✅ 应用程序**始终以 node 用户运行**（非特权）
+- ✅ root 权限**仅用于启动时修复权限**
+- ✅ 每次启动都会**检查并修复权限**
+- ✅ 使用 `gosu` 而非 `su`（更安全，不创建新会话）
+
+**安全优势：**
+```bash
+# 应用程序运行时
+root@host:~$ docker exec claude-user-5 whoami
+node
+root@host:~$ docker exec claude-user-5 id
+uid=1000(node) gid=1000(node) groups=1000(node)
+```
+
+#### 1.3.4 实现细节
+
+**Dockerfile 配置：**
+```dockerfile
+# 安装 gosu 用于安全的用户切换
+RUN apt-get update && apt-get install -y gosu && rm -rf /var/lib/apt/lists/*
+
+# 复制 entrypoint 脚本
+COPY docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# 使用 entrypoint（不设置 USER 指令）
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+```
+
+**Entrypoint 脚本：**
+```bash
+#!/bin/sh
+set -e
+
+# 仅在 root 用户时修复权限
+if [ "$(id -u)" = '0' ]; then
+    # 检查并修复 /workspace 所有权
+    if [ "$(stat -c '%u' /workspace)" != "$(id -u node)" ]; then
+        chown -R node:node /workspace
+    fi
+
+    # 切换到 node 用户运行应用
+    exec gosu node "$@"
+fi
+
+# 非 root 用户直接运行
+exec "$@"
+```
+
+#### 1.3.5 为什么不使用 `su` 或 `sudo`
+
+| 方法 | 问题 |
+|------|------|
+| `su` | 创建新的 TTY 会话，信号处理复杂 |
+| `sudo` | 需要在容器内配置 sudoers，增加攻击面 |
+| `gosu` | ✅ 直接切换用户，保留 PID 1，信号处理正确 |
+
+### 1.4 网络隔离配置
+
+#### 1.4.1 默认网络模式
 
 使用 Docker 默认的 `bridge` 网络：
 
@@ -540,7 +639,7 @@ const containerConfig = {
 };
 ```
 
-#### 1.3.2 用户隔离网络（可选）
+#### 1.4.2 用户隔离网络（可选）
 
 为需要额外隔离的用户创建独立网络：
 
@@ -570,7 +669,7 @@ async createUserNetwork(userId) {
 }
 ```
 
-#### 1.3.3 容器间通信控制
+#### 1.4.3 容器间通信控制
 
 ```javascript
 // 禁止容器间通信
@@ -582,9 +681,9 @@ const networkConfig = {
 };
 ```
 
-### 1.4 资源限制配置
+### 1.5 资源限制配置
 
-#### 1.4.1 CPU 限制
+#### 1.5.1 CPU 限制
 
 ```javascript
 const cpuLimits = {
@@ -606,7 +705,7 @@ const cpuLimits = {
 };
 ```
 
-#### 1.4.2 内存限制
+#### 1.5.2 内存限制
 
 ```javascript
 const memoryLimits = {
@@ -628,7 +727,7 @@ const memoryLimits = {
 };
 ```
 
-#### 1.4.3 磁盘限制
+#### 1.5.3 磁盘限制
 
 ```javascript
 const diskLimits = {
@@ -644,7 +743,7 @@ const diskLimits = {
 };
 ```
 
-#### 1.4.4 进程数限制
+#### 1.5.4 进程数限制
 
 ```javascript
 const processLimits = {
@@ -660,7 +759,7 @@ const processLimits = {
 };
 ```
 
-### 1.5 安全检查清单
+### 1.6 安全检查清单
 
 部署前必须完成的安全检查：
 
