@@ -289,7 +289,14 @@
     },
     "error": {
       "fetchFailed": "File fetch failed",
-      "errorFetching": "Error fetching files"
+      "errorFetching": "Error fetching files",
+      "cannotDeleteSystemFolder": "Cannot delete system folders (uploads, generated_docs)"
+    },
+    "delete": {
+      "title": "Delete",
+      "confirmFile": "Are you sure you want to delete {{name}}?",
+      "confirmDirectory": "Are you sure you want to delete {{name}} and all its contents?",
+      "error": "Failed to delete: {{message}}"
     },
     "loading": "Loading files..."
   },

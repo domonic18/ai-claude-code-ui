@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ScrollArea } from '@/shared/components/ui/ScrollArea';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
-import { Folder, FolderOpen, File, FileText, FileCode, List, TableProperties, Eye, Search, X } from 'lucide-react';
+import { Folder, FolderOpen, File, FileText, FileCode, List, TableProperties, Eye, Search, X, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CodeEditor } from '@/features/editor';
 import ImageViewer from '@/shared/components/common/ImageViewer';
@@ -27,6 +27,59 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
   const [viewMode, setViewMode] = useState<FileViewMode>('detailed');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filteredFiles, setFilteredFiles] = useState<FileNode[]>([]);
+  const [deletingFile, setDeletingFile] = useState<string | null>(null);
+
+  /**
+   * System folders that should not be deleted
+   */
+  const SYSTEM_FOLDERS = ['uploads', 'generated_docs'];
+
+  /**
+   * Check if a file/folder is a system folder
+   */
+  const isSystemFolder = (item: FileNode): boolean => {
+    if (item.type !== 'directory') return false;
+    return SYSTEM_FOLDERS.includes(item.name);
+  };
+
+  /**
+   * Handle file/folder deletion with confirmation
+   */
+  const handleDeleteFile = async (item: FileNode, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (isSystemFolder(item)) {
+      alert(t('fileExplorer.error.cannotDeleteSystemFolder'));
+      return;
+    }
+
+    const isDirectory = item.type === 'directory';
+    const message = isDirectory
+      ? t('fileExplorer.delete.confirmDirectory', { name: item.name })
+      : t('fileExplorer.delete.confirmFile', { name: item.name });
+
+    if (!confirm(message)) {
+      return;
+    }
+
+    setDeletingFile(item.path);
+
+    try {
+      const response = await api.deleteFile(selectedProject.name, item.path);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.message || 'Deletion failed');
+      }
+
+      // Refresh file list after successful deletion
+      await fetchFiles();
+    } catch (error) {
+      alert(t('fileExplorer.delete.error', { message: error.message }));
+    } finally {
+      setDeletingFile(null);
+    }
+  };
 
   useEffect(() => {
     if (selectedProject) {
@@ -93,8 +146,6 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
       const response = await api.getFiles(selectedProject.name);
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`❌ ${t('fileExplorer.error.fetchFailed')}:`, response.status, errorText);
         setFiles([]);
         return;
       }
@@ -104,7 +155,6 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
       const data = responseData.data ?? responseData;
       setFiles(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error(`❌ ${t('fileExplorer.error.errorFetching')}:`, error);
       setFiles([]);
     } finally {
       setLoading(false);
@@ -157,7 +207,7 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
 
   const renderFileTree = (items: FileNode[], level = 0) => {
     return items.map((item) => (
-      <div key={item.path} className="select-none">
+      <div key={item.path} className="select-none group">
         <Button
           variant="ghost"
           className={cn(
@@ -186,25 +236,39 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
             }
           }}
         >
-          <div className="flex items-center gap-2 min-w-0 w-full">
-            {item.type === 'directory' ? (
-              expandedDirs.has(item.path) ? (
-                <FolderOpen className="w-4 h-4 text-blue-500 flex-shrink-0" />
+          <div className="flex items-center justify-between gap-2 min-w-0 w-full">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              {item.type === 'directory' ? (
+                expandedDirs.has(item.path) ? (
+                  <FolderOpen className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                ) : (
+                  <Folder className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                )
               ) : (
-                <Folder className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              )
-            ) : (
-              getFileIcon(item.name)
+                getFileIcon(item.name)
+              )}
+              <span className="text-sm truncate text-foreground">
+                {item.name}
+              </span>
+            </div>
+            {!isSystemFolder(item) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                onClick={(e) => handleDeleteFile(item, e)}
+                disabled={deletingFile === item.path}
+                title={t('fileExplorer.delete.title')}
+              >
+                <Trash2 className="w-3 h-3" />
+              </Button>
             )}
-            <span className="text-sm truncate text-foreground">
-              {item.name}
-            </span>
           </div>
         </Button>
-        
-        {item.type === 'directory' && 
-         expandedDirs.has(item.path) && 
-         item.children && 
+
+        {item.type === 'directory' &&
+         expandedDirs.has(item.path) &&
+         item.children &&
          item.children.length > 0 && (
           <div>
             {renderFileTree(item.children, level + 1)}
@@ -241,7 +305,7 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
   // Render detailed view with table-like layout
   const renderDetailedView = (items, level = 0) => {
     return items.map((item) => (
-      <div key={item.path} className="select-none">
+      <div key={item.path} className="select-none group">
         <div
           className={cn(
             "grid grid-cols-12 gap-2 p-2 hover:bg-accent cursor-pointer items-center",
@@ -267,7 +331,7 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
             }
           }}
         >
-          <div className="col-span-5 flex items-center gap-2 min-w-0">
+          <div className="col-span-4 flex items-center gap-2 min-w-0">
             {item.type === 'directory' ? (
               expandedDirs.has(item.path) ? (
                 <FolderOpen className="w-4 h-4 text-blue-500 flex-shrink-0" />
@@ -290,11 +354,25 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
           <div className="col-span-2 text-sm text-muted-foreground font-mono">
             {item.permissionsRwx || '-'}
           </div>
+          <div className="col-span-1 flex justify-end">
+            {!isSystemFolder(item) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                onClick={(e) => handleDeleteFile(item, e)}
+                disabled={deletingFile === item.path}
+                title={t('fileExplorer.delete.title')}
+              >
+                <Trash2 className="w-3 h-3" />
+              </Button>
+            )}
+          </div>
         </div>
-        
-        {item.type === 'directory' && 
-         expandedDirs.has(item.path) && 
-         item.children && 
+
+        {item.type === 'directory' &&
+         expandedDirs.has(item.path) &&
+         item.children &&
          renderDetailedView(item.children, level + 1)}
       </div>
     ));
@@ -303,7 +381,7 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
   // Render compact view with inline details
   const renderCompactView = (items, level = 0) => {
     return items.map((item) => (
-      <div key={item.path} className="select-none">
+      <div key={item.path} className="select-none group">
         <div
           className={cn(
             "flex items-center justify-between p-2 hover:bg-accent cursor-pointer",
@@ -329,7 +407,7 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
             }
           }}
         >
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             {item.type === 'directory' ? (
               expandedDirs.has(item.path) ? (
                 <FolderOpen className="w-4 h-4 text-blue-500 flex-shrink-0" />
@@ -350,12 +428,24 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
                 <span className="font-mono">{item.permissionsRwx}</span>
               </>
             )}
+            {!isSystemFolder(item) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                onClick={(e) => handleDeleteFile(item, e)}
+                disabled={deletingFile === item.path}
+                title={t('fileExplorer.delete.title')}
+              >
+                <Trash2 className="w-3 h-3" />
+              </Button>
+            )}
           </div>
         </div>
-        
-        {item.type === 'directory' && 
-         expandedDirs.has(item.path) && 
-         item.children && 
+
+        {item.type === 'directory' &&
+         expandedDirs.has(item.path) &&
+         item.children &&
          renderCompactView(item.children, level + 1)}
       </div>
     ));
@@ -436,10 +526,11 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
       {viewMode === 'detailed' && filteredFiles.length > 0 && (
         <div className="px-4 pt-2 pb-1 border-b border-border">
           <div className="grid grid-cols-12 gap-2 px-2 text-xs font-medium text-muted-foreground">
-            <div className="col-span-5">{t('fileExplorer.column.name')}</div>
+            <div className="col-span-4">{t('fileExplorer.column.name')}</div>
             <div className="col-span-2">{t('fileExplorer.column.size')}</div>
             <div className="col-span-3">{t('fileExplorer.column.modified')}</div>
             <div className="col-span-2">{t('fileExplorer.column.permissions')}</div>
+            <div className="col-span-1"></div>
           </div>
         </div>
       )}
