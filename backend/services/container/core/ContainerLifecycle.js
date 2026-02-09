@@ -791,17 +791,14 @@ export class ContainerLifecycleManager {
    * @returns {Promise<void>}
    */
   async _ensureDefaultWorkspaceInContainer(container, containerName) {
-    console.log(`[Lifecycle] Ensuring default workspace in container ${containerName}...`);
-
+    // 创建默认项目目录结构（my-workspace 是系统的默认项目名称）
     const result = await this._execWithTimeout(
       container,
-      'mkdir -p /workspace/my-workspace && ls -la /workspace/',
+      'mkdir -p /workspace/my-workspace/uploads && chmod 755 /workspace && ls -la /workspace/',
       15000
     );
 
-    if (result.success) {
-      console.log(`[Lifecycle] Default workspace ensured in container ${containerName}`);
-    } else {
+    if (!result.success) {
       throw new Error(result.error || 'Unknown error');
     }
   }
@@ -815,8 +812,6 @@ export class ContainerLifecycleManager {
    * @returns {Promise<void>}
    */
   async _syncExtensionsToContainer(container, userId) {
-    console.log(`[Lifecycle] Syncing extensions to container for user ${userId}...`);
-
     try {
       // 创建扩展文件的 tar 流
       const tarStream = await createExtensionTar({
@@ -828,8 +823,6 @@ export class ContainerLifecycleManager {
         includeConfig: true
       });
 
-      console.log(`[Lifecycle] Extension tar stream created`);
-
       // 使用 Docker Modem 的 putArchive 方法上传 tar 包到容器
       await new Promise((resolve, reject) => {
         container.putArchive(tarStream, { path: '/workspace' }, (err) => {
@@ -840,8 +833,6 @@ export class ContainerLifecycleManager {
           }
         });
       });
-
-      console.log(`[Lifecycle] Extensions uploaded to container successfully`);
 
       // 设置 hooks 脚本的执行权限
       await this._setHooksPermissions(container);
@@ -858,8 +849,6 @@ export class ContainerLifecycleManager {
    * @returns {Promise<void>}
    */
   async _setHooksPermissions(container) {
-    console.log(`[Lifecycle] Setting hooks permissions...`);
-
     const result = await this._execWithTimeout(
       container,
       'chmod +x /workspace/.claude/hooks/*.sh 2>/dev/null || true',
@@ -867,10 +856,8 @@ export class ContainerLifecycleManager {
     );
 
     if (!result.success) {
-      console.warn(`[Lifecycle] Hooks permission warning: ${result.error}`);
+      // 静默处理 hooks 权限设置失败
     }
-
-    console.log(`[Lifecycle] Hooks permissions set`);
   }
 
   /**
@@ -880,8 +867,6 @@ export class ContainerLifecycleManager {
    * @returns {Promise<void>}
    */
   async _createReadmeInContainer(container) {
-    console.log(`[Lifecycle] Creating README.md in container...`);
-
     const readmeContent = `# My Workspace
 
 Welcome to your Claude Code workspace! This is your default project where you can start coding.
@@ -895,18 +880,12 @@ Welcome to your Claude Code workspace! This is your default project where you ca
 Happy coding!
 `;
 
-    // 使用 heredoc 语法创建文件
+    // 使用 heredoc 语法创建文件（my-workspace 是系统的默认项目名称）
     const command = `cat > /workspace/my-workspace/README.md << 'EOF'
 ${readmeContent}
 EOF`;
 
-    const result = await this._execWithTimeout(container, command, 5000);
-
-    if (result.success) {
-      console.log(`[Lifecycle] README.md created successfully`);
-    } else {
-      console.warn(`[Lifecycle] README creation warning: ${result.error}`);
-    }
+    await this._execWithTimeout(container, command, 5000);
   }
 
 }
