@@ -322,6 +322,7 @@ export class FileController extends BaseController {
       await new Promise((resolve, reject) => {
         dockerContainer.putArchive(tarBuffer, { path: '/workspace' }, (err) => {
           if (err) {
+            console.error('[FileController.uploadFile] putArchive failed:', err);
             reject(new Error(`putArchive failed: ${err.message}`));
           } else {
             resolve();
@@ -332,14 +333,16 @@ export class FileController extends BaseController {
       // 清理临时文件
       await fs.rm(tempDir, { recursive: true, force: true });
 
-      this._success(res, {
+      const responseData = {
         displayName: originalName,     // 原始文件名，用于显示
         filename: safeFilename,        // 实际文件名（ASCII 安全）
         path: containerPath,           // 容器内完整路径
         size: req.file.size,
         type: req.file.mimetype,
         date: today,
-      }, 'File uploaded successfully');
+      };
+
+      this._success(res, responseData, 'File uploaded successfully');
     } catch (error) {
       console.error('[FileController.uploadFile] Error:', error);
       this._handleError(error, req, res, next);

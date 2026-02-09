@@ -151,7 +151,10 @@ export async function executeInContainer(userId, command, options, writer, sessi
       // 监听 stderr（错误和调试信息）
       stderr.on('data', (chunk) => {
         const errorMsg = chunk.toString();
-        console.error('[DockerExecutor] STDERR:', errorMsg);
+        // 只输出可打印的调试日志，避免输出二进制数据污染日志
+        if (errorMsg.startsWith('[SDK]') || errorMsg.includes('Error') || errorMsg.includes('Exception')) {
+          console.error('[DockerExecutor] STDERR:', errorMsg.substring(0, 500));
+        }
         stderrChunks.push(errorMsg);
       });
 
