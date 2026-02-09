@@ -11,6 +11,7 @@ import { queryClaudeSDKInContainer, abortClaudeSDKSessionInContainer, isClaudeSD
 import { spawnCursor, abortCursorSession, isCursorSessionActive, getActiveCursorSessions } from '../../services/execution/cursor/index.js';
 import { queryCodex, abortCodexSession, isCodexSessionActive, getActiveCodexSessions } from '../../services/execution/codex/index.js';
 import { WebSocketWriter } from '../writer.js';
+import { formatReadInstructions } from '../../services/files/FileDocumentReader.js';
 
 /**
  * 处理聊天 WebSocket 连接
@@ -37,15 +38,19 @@ export function handleChatConnection(ws, connectedClients) {
 
                 // 处理附件：将文件路径追加到命令文本中
                 let command = data.command || '';
-                if (data.attachments && Array.isArray(data.attachments) && data.attachments.length > 0) {
+
+                // 检查是否有新附件（使用 path 字段判断，因为图片可能没有 path）
+                const hasNewAttachments = data.attachments && Array.isArray(data.attachments) && data.attachments.some(f => f.path);
+
+                if (hasNewAttachments) {
                     const filePaths = data.attachments
                         .filter(f => f.path) // 只包含有 path 的附件
-                        .map(f => f.path)
-                        .join('\n- ');
+                        .map(f => ({ path: f.path, name: f.name, type: f.type }));
 
-                    if (filePaths) {
-                        command = `Please analyze the following files:\n- ${filePaths}\n\n${command}`;
-                    }
+                    // 使用 FileDocumentReader 生成读取指令
+                    const readInstructions = formatReadInstructions(filePaths);
+
+                    command = `I have uploaded the following files:\n\n${readInstructions}\n\nPlease read each file content using the specified method, then answer: ${command}`;
                 }
 
                 const containerOptions = {

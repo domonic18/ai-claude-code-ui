@@ -64,9 +64,15 @@ async function filterSDKOptions(options, userId) {
   // 设置默认工具，如果最终没有配置任何工具
   if (!sdkOptions.allowedTools || sdkOptions.allowedTools.length === 0) {
     sdkOptions.allowedTools = [
+      // Git 相关命令
       'Bash(git log:*)',
       'Bash(git diff:*)',
       'Bash(git status:*)',
+      // 文档处理命令（PDF、Word 等）
+      'Bash(pdftotext:*)',
+      'Bash(pandoc:*)',
+      'Bash(file:*)',
+      // 其他工具
       'Write',
       'Read',
       'Edit',
