@@ -208,25 +208,56 @@ export class FileAdapter extends BaseFileAdapter {
       const workspacePath = CONTAINER.paths.workspace;
 
       if (dirPath && dirPath !== workspacePath && dirPath !== projectsBasePath) {
-        await new Promise(async (resolve, reject) => {
-          const result = await containerManager.execInContainer(
-            userId,
-            `mkdir -p "${dirPath}"`
-          );
-          const mkdirStream = result.stream;
-          mkdirStream.on('end', resolve);
-          mkdirStream.on('error', reject);
+        const { stream: mkdirStream } = await containerManager.execInContainer(
+          userId,
+          `mkdir -p "${dirPath}"`
+        );
+
+        // 使用 Promise 包装目录创建
+        await new Promise((resolve, reject) => {
+          let resolved = false;
+          const timeoutId = setTimeout(() => {
+            if (!resolved) {
+              resolved = true;
+              resolve();
+            }
+          }, 5000);
+
+          mkdirStream.on('data', () => {}); // 消费数据
+          mkdirStream.on('error', (err) => {
+            if (!resolved) {
+              resolved = true;
+              clearTimeout(timeoutId);
+              reject(err);
+            }
+          });
+          mkdirStream.on('end', () => {
+            if (!resolved) {
+              resolved = true;
+              clearTimeout(timeoutId);
+              resolve();
+            }
+          });
         });
       }
 
+      // 删除旧文件（如果存在）
+      const { stream: rmStream } = await containerManager.execInContainer(userId, `rm -f "${containerPath}"`);
+      await new Promise((resolve) => {
+        let resolved = false;
+        rmStream.on('data', () => {});
+        rmStream.on('error', () => { if (!resolved) { resolved = true; resolve(); }});
+        rmStream.on('end', () => { if (!resolved) { resolved = true; resolve(); }});
+        setTimeout(() => { if (!resolved) { resolved = true; resolve(); }}, 5000);
+      });
+
       // 使用 base64 安全处理特殊字符
       const base64Content = Buffer.from(content, encoding).toString('base64');
+      const writeCommand = `echo '${base64Content}' | base64 -d > "${containerPath}"`;
 
-      const { stream } = await containerManager.execInContainer(
-        userId,
-        `printf '%s' "$(echo '${base64Content}' | base64 -d)" > "${containerPath}"`
-      );
+      const { stream } = await containerManager.execInContainer(userId, writeCommand);
 
+      // 直接监听 stream 事件（不使用 demuxStream，因为 exec 可能不需要）
       return new Promise((resolve, reject) => {
         let errorOutput = '';
         let resolved = false;
@@ -248,12 +279,18 @@ export class FileAdapter extends BaseFileAdapter {
           }
         };
 
+        // 监听 stream 事件
         stream.on('data', (chunk) => {
           const output = chunk.toString();
-          if (output.toLowerCase().includes('error') ||
-              output.toLowerCase().includes('cannot') ||
-              output.toLowerCase().includes('permission denied')) {
-            errorOutput += output;
+          // 检测任何错误信息（不区分大小写）
+          const lowerOutput = output.toLowerCase();
+          if (lowerOutput.includes('error') ||
+              lowerOutput.includes('cannot') ||
+              lowerOutput.includes('permission denied') ||
+              lowerOutput.includes('denied') ||
+              lowerOutput.includes('no such file') ||
+              lowerOutput.includes('not found')) {
+            errorOutput = output; // 保存原始错误信息
           }
         });
 
@@ -269,9 +306,10 @@ export class FileAdapter extends BaseFileAdapter {
           }
         });
 
+        // 设置 10 秒超时
         timeoutId = setTimeout(() => {
           doResolve({ success: true, path: containerPath });
-        }, 3000);
+        }, 10000);
       });
     } catch (error) {
       throw this._standardizeError(error, 'writeFile');
