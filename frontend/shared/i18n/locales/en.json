@@ -290,13 +290,23 @@
     "error": {
       "fetchFailed": "File fetch failed",
       "errorFetching": "Error fetching files",
-      "cannotDeleteSystemFolder": "Cannot delete system folders (uploads, generated_docs)"
+      "cannotDeleteSystemFolder": "Cannot delete system folders (uploads, generated_docs)",
+      "cannotRenameSystemFolder": "Cannot rename system folders (uploads, generated_docs)"
     },
     "delete": {
       "title": "Delete",
       "confirmFile": "Are you sure you want to delete {{name}}?",
       "confirmDirectory": "Are you sure you want to delete {{name}} and all its contents?",
       "error": "Failed to delete: {{message}}"
+    },
+    "rename": {
+      "title": "Rename",
+      "confirmFile": "Are you sure you want to rename \"{{oldName}}\" to \"{{newName}}\"?",
+      "confirmDirectory": "Are you sure you want to rename \"{{oldName}}\" to \"{{newName}}\"?",
+      "nameCannotBeEmpty": "File name cannot be empty",
+      "confirm": "Confirm",
+      "cancel": "Cancel",
+      "error": "Failed to rename: {{message}}"
     },
     "loading": "Loading files..."
   },

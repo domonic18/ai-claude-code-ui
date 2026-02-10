@@ -220,3 +220,8 @@ export const FILE_ERROR_TYPES = {
   QUOTA_EXCEEDED: 'QUOTA_EXCEEDED',
   UNKNOWN: 'UNKNOWN',
 } as const;
+
+/**
+ * System folders that cannot be deleted or renamed
+ */
+export const SYSTEM_FOLDERS = ['uploads', 'generated_docs'];

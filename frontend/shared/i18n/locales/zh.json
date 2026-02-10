@@ -290,13 +290,23 @@
     "error": {
       "fetchFailed": "文件获取失败",
       "errorFetching": "获取文件时出错",
-      "cannotDeleteSystemFolder": "无法删除系统文件夹（uploads、generated_docs）"
+      "cannotDeleteSystemFolder": "无法删除系统文件夹（uploads、generated_docs）",
+      "cannotRenameSystemFolder": "无法重命名系统文件夹（uploads、generated_docs）"
     },
     "delete": {
       "title": "删除",
       "confirmFile": "确定要删除 {{name}} 吗？",
       "confirmDirectory": "确定要删除 {{name}} 及其所有内容吗？",
       "error": "删除失败：{{message}}"
+    },
+    "rename": {
+      "title": "重命名",
+      "confirmFile": "确定要将 \"{{oldName}}\" 重命名为 \"{{newName}}\" 吗？",
+      "confirmDirectory": "确定要将 \"{{oldName}}\" 重命名为 \"{{newName}}\" 吗？",
+      "nameCannotBeEmpty": "文件名不能为空",
+      "confirm": "确认",
+      "cancel": "取消",
+      "error": "重命名失败：{{message}}"
     },
     "loading": "正在加载文件..."
   },
