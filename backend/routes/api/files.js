@@ -11,6 +11,7 @@ import express from 'express';
 import multer from 'multer';
 import { FileController } from '../../controllers/api/index.js';
 import { authenticate, validate } from '../../middleware/index.js';
+import { MAX_FILE_SIZE, MAX_FILES_COUNT, ALLOWED_UPLOAD_EXTENSIONS } from '../../services/files/constants.js';
 
 const router = express.Router();
 const fileController = new FileController();
@@ -19,19 +20,18 @@ const fileController = new FileController();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
-    files: 10
+    fileSize: MAX_FILE_SIZE,
+    files: MAX_FILES_COUNT
   },
   fileFilter: (req, file, cb) => {
     // 允许的文件类型
-    const allowedExtensions = ['.docx', '.pdf', '.md', '.txt', '.js', '.ts', '.jsx', '.tsx', '.json', '.csv'];
     const originalName = file.originalname.toLowerCase();
-    const hasValidExtension = allowedExtensions.some(ext => originalName.endsWith(ext));
+    const hasValidExtension = ALLOWED_UPLOAD_EXTENSIONS.some(ext => originalName.endsWith(ext));
 
     if (hasValidExtension) {
       cb(null, true);
     } else {
-      cb(new Error(`Invalid file type. Allowed: ${allowedExtensions.join(', ')}`));
+      cb(new Error(`Invalid file type. Allowed: ${ALLOWED_UPLOAD_EXTENSIONS.join(', ')}`));
     }
   }
 });
@@ -92,6 +92,17 @@ router.delete('/:projectName/files', authenticate(), validate({
     path: { required: true, type: 'string' }
   }
 }), fileController._asyncHandler(fileController.deleteFile));
+
+/**
+ * PUT /api/projects/:projectName/rename
+ * 重命名文件或目录
+ */
+router.put('/:projectName/rename', authenticate(), validate({
+  body: {
+    oldPath: { required: true, type: 'string' },
+    newName: { required: true, type: 'string' }
+  }
+}), fileController._asyncHandler(fileController.renameFile));
 
 /**
  * POST /api/projects/:projectName/directory

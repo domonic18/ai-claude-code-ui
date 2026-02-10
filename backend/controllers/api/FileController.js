@@ -11,6 +11,7 @@ import { BaseController } from '../core/BaseController.js';
 import { FileOperationsService } from '../../services/files/operations/FileOperationsService.js';
 import { NotFoundError, ValidationError } from '../../middleware/error-handler.middleware.js';
 import containerManager from '../../services/container/core/index.js';
+import { ALLOWED_UPLOAD_EXTENSIONS } from '../../services/files/constants.js';
 import fs from 'fs/promises';
 import path from 'path';
 import { execSync } from 'child_process';
@@ -155,8 +156,35 @@ export class FileController extends BaseController {
         containerMode: req.containerMode,
         recursive
       });
+
+      console.log('[FileController.deleteFile] User', userId, 'deleted:', path);
       this._success(res, result, 'File deleted successfully');
     } catch (error) {
+      console.error('[FileController.deleteFile] Error:', error);
+      this._handleError(error, req, res, next);
+    }
+  }
+
+  /**
+   * 重命名文件或目录
+   * @param {Object} req - Express 请求对象
+   * @param {Object} res - Express 响应对象
+   * @param {Function} next - 下一个中间件
+   */
+  async renameFile(req, res, next) {
+    try {
+      const userId = this._getUserId(req);
+      const { oldPath, newName } = req.body;
+
+      const result = await this.fileOpsService.renameFile(oldPath, newName, {
+        userId,
+        containerMode: req.containerMode
+      });
+
+      console.log('[FileController.renameFile] User', userId, 'renamed:', oldPath, '->', result.newPath);
+      this._success(res, result, 'File renamed successfully');
+    } catch (error) {
+      console.error('[FileController.renameFile] Error:', error);
       this._handleError(error, req, res, next);
     }
   }
@@ -269,15 +297,13 @@ export class FileController extends BaseController {
       const { project } = req.body;
       const projectName = project || 'default';
 
-      // 允许的文件扩展名
-      const allowedExtensions = ['.doc', '.docx', '.pdf', '.md', '.txt', '.js', '.ts', '.jsx', '.tsx', '.json', '.csv'];
       const originalName = req.file.originalname;
       const ext = originalName.toLowerCase().includes('.')
         ? '.' + originalName.split('.').pop().toLowerCase()
         : '';
 
-      if (!allowedExtensions.includes(ext)) {
-        throw new ValidationError(`Unsupported file type: ${ext}. Allowed types: ${allowedExtensions.join(', ')}`);
+      if (!ALLOWED_UPLOAD_EXTENSIONS.includes(ext)) {
+        throw new ValidationError(`Unsupported file type: ${ext}. Allowed types: ${ALLOWED_UPLOAD_EXTENSIONS.join(', ')}`);
       }
 
       // 按日期分组存储
@@ -339,8 +365,10 @@ export class FileController extends BaseController {
         date: today,
       };
 
+      console.log('[FileController.uploadFile] User', userId, 'uploaded:', originalName, '->', containerPath);
       this._success(res, responseData, 'File uploaded successfully');
     } catch (error) {
+      console.error('[FileController.uploadFile] Error:', error);
       this._handleError(error, req, res, next);
     }
   }

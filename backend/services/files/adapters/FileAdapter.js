@@ -11,6 +11,7 @@ import { BaseFileAdapter } from './BaseFileAdapter.js';
 import containerManager from '../../container/core/index.js';
 import { CONTAINER } from '../../../config/config.js';
 import { PathUtils } from '../../core/utils/path-utils.js';
+import { SYSTEM_FOLDERS } from '../constants.js';
 import { PassThrough } from 'stream';
 
 /**
@@ -553,22 +554,177 @@ export class FileAdapter extends BaseFileAdapter {
 
       await containerManager.getOrCreateContainer(userId);
 
-      const containerPath = this._buildContainerPath(
-        validation.safePath,
-        { projectPath, isContainerProject }
-      );
+      // 使用 safePath 而不是通过 _buildContainerPath 构建路径
+      // 因为 safePath 已经是完整的容器路径
+      const containerPath = validation.safePath;
 
       const { stream } = await containerManager.execInContainer(
         userId,
-        `test -f "${containerPath}" || test -d "${containerPath}"`
+        `test -e "${containerPath}" && echo "EXISTS" || echo "NOT_EXISTS"`
       );
 
       return new Promise((resolve) => {
-        stream.on('error', () => resolve(false));
-        stream.on('end', () => resolve(true));
+        let output = '';
+        let resolved = false;
+        const doResolve = (result) => {
+          if (!resolved) {
+            resolved = true;
+            resolve(result);
+          }
+        };
+
+        // Capture output
+        stream.on('data', (chunk) => {
+          output += chunk.toString();
+        });
+
+        stream.on('error', () => {
+          doResolve(false);
+        });
+
+        stream.on('end', () => {
+          const trimmedOutput = output.trim();
+          doResolve(trimmedOutput === 'EXISTS');
+        });
+
+        // 2 second timeout
+        setTimeout(() => {
+          doResolve(false);
+        }, 2000);
       });
-    } catch {
+    } catch (error) {
+      console.error('[FileAdapter.fileExists] Error:', error);
       return false;
+    }
+  }
+
+  /**
+   * 重命名文件或目录
+   * @param {string} oldPath - 旧路径（完整路径）
+   * @param {string} newName - 新名称（仅文件名，不包含路径）
+   * @param {Object} options - 选项
+   * @returns {Promise<{success: boolean, newPath: string}>}
+   */
+  async renameFile(oldPath, newName, options = {}) {
+    const { userId, projectPath = '', isContainerProject = false } = options;
+
+    try {
+      // 验证新名称
+      if (!newName || newName.trim() === '') {
+        throw new Error('New name cannot be empty');
+      }
+
+      // 清理新名称
+      const cleanName = this._cleanFileName(newName.trim());
+
+      // 检查新名称是否有效
+      if (!this._isValidFileName(cleanName)) {
+        throw new Error('Invalid file name');
+      }
+
+      // 检查是否是系统文件夹
+      const oldName = oldPath.split('/').filter(Boolean).pop() || '';
+      if (SYSTEM_FOLDERS.includes(oldName)) {
+        throw new Error(`Cannot rename system folders (${SYSTEM_FOLDERS.join(', ')})`);
+      }
+
+      // 获取或创建容器
+      await containerManager.getOrCreateContainer(userId);
+
+      // 清理路径中的 ./ 和 //
+      let cleanPath = oldPath.replace(/\/\.\//g, '/').replace(/\/+/g, '/');
+
+      let oldContainerPath;
+
+      // 检查是否是绝对路径（以 /workspace 开头）
+      if (cleanPath.startsWith('/workspace')) {
+        // 已经是绝对路径，直接使用
+        oldContainerPath = cleanPath;
+      } else {
+        // 相对路径，需要构建完整路径
+        // 移除开头的斜杠（如果有）
+        if (cleanPath.startsWith('/')) {
+          cleanPath = cleanPath.substring(1);
+        }
+
+        // 验证路径
+        const validation = this._validatePath(cleanPath, options);
+        if (!validation.valid) {
+          throw new Error(validation.error);
+        }
+
+        // 构建容器路径
+        oldContainerPath = this._buildContainerPath(
+          validation.safePath,
+          { projectPath, isContainerProject }
+        );
+      }
+
+      // 验证路径安全性
+      if (oldContainerPath.includes('..')) {
+        throw new Error('Path traversal detected');
+      }
+
+      // 构建新路径
+      const pathParts = oldContainerPath.split('/');
+      pathParts[pathParts.length - 1] = cleanName;
+      const newContainerPath = pathParts.join('/');
+
+      // 使用 mv 命令重命名（mv 会自动检查目标是否存在，如果存在则报错）
+      const renameCommand = `mv "${oldContainerPath}" "${newContainerPath}" 2>&1`;
+
+      const { stream } = await containerManager.execInContainer(userId, renameCommand);
+
+      return new Promise((resolve, reject) => {
+        let resolved = false;
+        let output = '';
+        let errorOutput = '';
+
+        const doResolve = (result) => {
+          if (!resolved) {
+            resolved = true;
+            resolve(result);
+          }
+        };
+
+        const doReject = (err) => {
+          if (!resolved) {
+            resolved = true;
+            reject(err);
+          }
+        };
+
+        // 捕获命令输出
+        stream.on('data', (chunk) => {
+          output += chunk.toString();
+        });
+
+        stream.on('error', (err) => {
+          console.error('[FileAdapter.renameFile] Stream error:', err);
+          doReject(new Error(`Failed to rename: ${err.message}`));
+        });
+
+        stream.on('end', async () => {
+          // 检查命令是否有错误输出
+          // 如果有错误输出，说明 mv 命令失败了（如目标文件已存在）
+          if (output.trim() && output.toLowerCase().includes('cannot')) {
+            console.error('[FileAdapter.renameFile] mv command failed:', output);
+            doReject(new Error(`Rename failed: ${output}`));
+            return;
+          }
+
+          // 如果没有错误，认为重命名成功
+          doResolve({ success: true, newPath: newContainerPath });
+        });
+
+        // 5秒超时
+        setTimeout(() => {
+          doResolve({ success: true, newPath: newContainerPath });
+        }, 5000);
+      });
+    } catch (error) {
+      console.error('[FileAdapter.renameFile] Error:', error);
+      throw this._standardizeError(error, 'renameFile');
     }
   }
 

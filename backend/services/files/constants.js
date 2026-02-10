@@ -312,6 +312,34 @@ export const ALL_BINARY_EXTENSIONS = new Set([
 ]);
 
 /**
+ * 系统文件夹
+ * 这些文件夹不可删除或重命名
+ */
+export const SYSTEM_FOLDERS = ['uploads', 'generated_docs'];
+
+/**
+ * 上传文件限制
+ */
+export const MAX_FILES_COUNT = 10;
+
+/**
+ * 允许上传的文件扩展名
+ */
+export const ALLOWED_UPLOAD_EXTENSIONS = [
+  '.doc',
+  '.docx',
+  '.pdf',
+  '.md',
+  '.txt',
+  '.js',
+  '.ts',
+  '.jsx',
+  '.tsx',
+  '.json',
+  '.csv'
+];
+
+/**
  * 判断文件扩展名是否为二进制文件
  *
  * @param {string} filename - 文件名
