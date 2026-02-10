@@ -340,10 +340,10 @@ export class FileAdapter extends BaseFileAdapter {
         { projectPath, isContainerProject }
       );
 
-      // 使用 find 命令获取文件树，输出格式：路径\0类型 (d=目录, f=文件, l=符号链接)
+      // 使用 find 命令获取文件树，输出格式：路径\0类型\0大小\0修改时间\0...
       // 使用 \0 (null 字符) 作为分隔符，因为文件名不允许包含 \0
       const excludeArgs = excludedDirs.map(d => `-name "${d}" -prune -o`).join(' ');
-      const command = `find ${containerPath} ${excludeArgs} \\( -type d -o -type f -o -type l \\) -printf "%p\\0%y\\0" 2>/dev/null | head -c 100000`;
+      const command = `find ${containerPath} ${excludeArgs} \\( -type d -o -type f -o -type l \\) -printf "%p\\0%y\\0%s\\0%T@\\0" 2>/dev/null | head -c 200000`;
 
       const { stream } = await containerManager.execInContainer(userId, command);
 
@@ -855,7 +855,7 @@ export class FileAdapter extends BaseFileAdapter {
   /**
    * 解析文件树输出
    * @private
-   * @param {string} output - 输出字符串，格式：路径\0类型\0路径\0类型\0...
+   * @param {string} output - 输出字符串，格式：路径\0类型\0大小\0修改时间\0...
    * @param {string} basePath - 基础路径
    * @returns {Array} 文件树
    */
@@ -868,17 +868,21 @@ export class FileAdapter extends BaseFileAdapter {
       return tree;
     }
 
-    // 解析输出：路径\0类型\0路径\0类型\0...
+    // 解析输出：路径\0类型\0大小\0修改时间\0...
     // 使用 \0 分隔，因为文件名不允许包含 \0
     const parts = output.split('\0');
     const pathTypeMap = new Map();
+    const pathSizeMap = new Map();
+    const pathMtimeMap = new Map();
     const validPaths = [];
 
-    // 每两个元素为一对：(path, type)
-    // 注意：parts.length 可能是奇数（数据被截断），所以用 < 而不是 <=
-    for (let i = 0; i < parts.length - 1; i += 2) {
+    // 每4个元素为一组：(path, type, size, mtime)
+    // 注意：parts.length 可能不是4的倍数（数据被截断），所以用 < 而不是 <=
+    for (let i = 0; i < parts.length - 3; i += 4) {
       const fullPath = parts[i];
       const typeFlag = parts[i + 1];
+      const sizeStr = parts[i + 2];
+      const mtimeStr = parts[i + 3];
 
       // 跳过空路径或类型
       if (!fullPath || !typeFlag) {
@@ -902,7 +906,13 @@ export class FileAdapter extends BaseFileAdapter {
         type = 'file';
       }
 
+      // 解析大小和修改时间
+      const size = parseInt(sizeStr, 10) || 0;
+      const mtime = parseFloat(mtimeStr) || 0;
+
       pathTypeMap.set(fullPath, type);
+      pathSizeMap.set(fullPath, size);
+      pathMtimeMap.set(fullPath, mtime);
       validPaths.push(fullPath);
     }
 
@@ -934,6 +944,8 @@ export class FileAdapter extends BaseFileAdapter {
         const part = parts[i];
         const pathSoFar = `${basePath}/${parts.slice(0, i + 1).join('/')}`;
         const type = pathTypeMap.get(pathSoFar) || 'file'; // 默认为文件
+        const size = pathSizeMap.get(pathSoFar) || 0;
+        const mtime = pathMtimeMap.get(pathSoFar) || 0;
 
         let existing = currentLevel.find(item => item.name === part);
 
@@ -941,7 +953,9 @@ export class FileAdapter extends BaseFileAdapter {
           existing = {
             name: part,
             type: type,
-            path: pathSoFar
+            path: pathSoFar,
+            size: type === 'file' ? size : 0,
+            modified: mtime ? new Date(mtime * 1000).toISOString() : null
           };
 
           if (type === 'directory') {
