@@ -308,6 +308,19 @@
       "cancel": "取消",
       "error": "重命名失败：{{message}}"
     },
+    "new": {
+      "title": "新建",
+      "folder": "新建文件夹",
+      "file": "新建文件",
+      "folderPlaceholder": "文件夹名称",
+      "filePlaceholder": "文件名称",
+      "folderHint": "在 {{location}} 创建文件夹",
+      "fileHint": "在 {{location}} 创建文件",
+      "creating": "创建中...",
+      "error": "创建失败：{{message}}",
+      "nameRequired": "请输入名称",
+      "root": "根目录"
+    },
     "loading": "正在加载文件..."
   },
   "websocket": {

@@ -308,6 +308,19 @@
       "cancel": "Cancel",
       "error": "Failed to rename: {{message}}"
     },
+    "new": {
+      "title": "New",
+      "folder": "New Folder",
+      "file": "New File",
+      "folderPlaceholder": "Folder name",
+      "filePlaceholder": "File name",
+      "folderHint": "Create folder in {{location}}",
+      "fileHint": "Create file in {{location}}",
+      "creating": "Creating...",
+      "error": "Failed to create: {{message}}",
+      "nameRequired": "Please enter a name",
+      "root": "root"
+    },
     "loading": "Loading files..."
   },
   "websocket": {
