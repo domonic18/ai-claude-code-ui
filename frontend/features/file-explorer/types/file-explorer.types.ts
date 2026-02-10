@@ -51,6 +51,8 @@ export interface FileNode {
   type: FileType;
   size?: number;
   modifiedTime?: Date;
+  modified?: string; // ISO date string from backend
+  permissionsRwx?: string; // e.g., "rwxr-xr-x"
   children?: FileNode[];
   isExpanded?: boolean;
   isSelected?: boolean;
@@ -118,7 +120,7 @@ export interface SelectedFile {
 export interface SelectedImage {
   name: string;
   path: string;
-  projectPath?: string;
+  projectPath: string;
   projectName: string;
 }
 

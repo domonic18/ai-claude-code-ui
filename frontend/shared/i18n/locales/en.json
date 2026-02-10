@@ -328,6 +328,7 @@
       "creating": "Creating...",
       "error": "Failed to create: {{message}}",
       "nameRequired": "Please enter a name",
+      "invalidName": "Invalid file name. Characters \\ / : * ? \" < > | are not allowed",
       "root": "root"
     },
     "loading": "Loading files..."

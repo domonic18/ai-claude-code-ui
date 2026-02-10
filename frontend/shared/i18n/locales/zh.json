@@ -328,6 +328,7 @@
       "creating": "创建中...",
       "error": "创建失败：{{message}}",
       "nameRequired": "请输入名称",
+      "invalidName": "文件名无效。不能包含以下字符：\\ / : * ? \" < > |",
       "root": "根目录"
     },
     "loading": "正在加载文件..."
