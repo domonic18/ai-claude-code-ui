@@ -115,6 +115,17 @@ router.post('/:projectName/directory', authenticate(), validate({
 }), fileController._asyncHandler(fileController.createDirectory));
 
 /**
+ * POST /api/projects/:projectName/move
+ * 移动文件或目录
+ */
+router.post('/:projectName/move', authenticate(), validate({
+  body: {
+    sourcePath: { required: true, type: 'string' },
+    targetPath: { type: 'string' }
+  }
+}), fileController._asyncHandler(fileController.moveFile));
+
+/**
  * GET /api/projects/:projectName/files/exists
  * 检查文件是否存在
  */

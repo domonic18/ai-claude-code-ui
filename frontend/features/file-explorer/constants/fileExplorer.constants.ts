@@ -224,4 +224,4 @@ export const FILE_ERROR_TYPES = {
 /**
  * System folders that cannot be deleted or renamed
  */
-export const SYSTEM_FOLDERS = ['uploads', 'generated_docs'];
+export const SYSTEM_FOLDERS: string[] = [];

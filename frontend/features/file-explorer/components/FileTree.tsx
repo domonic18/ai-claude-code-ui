@@ -89,6 +89,12 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
   const [newItemName, setNewItemName] = useState<string>('');
   const [isCreating, setIsCreating] = useState(false);
 
+  // Drag and drop states
+  const [draggingItem, setDraggingItem] = useState<FileNode | null>(null);
+  const [dragOverItem, setDragOverItem] = useState<FileNode | null>(null);
+  const [isDragOverRoot, setIsDragOverRoot] = useState(false);
+  const [isMoving, setIsMoving] = useState(false);
+
   /**
    * Recursively find a file node by path
    */
@@ -107,10 +113,11 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
 
   /**
    * Check if a file/folder is a system folder
+   * Note: Currently no system folders are defined, all folders can be modified
    */
   const isSystemFolder = (item: FileNode): boolean => {
     if (item.type !== 'directory') return false;
-    return SYSTEM_FOLDERS.includes(item.name);
+    return SYSTEM_FOLDERS.length > 0 && SYSTEM_FOLDERS.includes(item.name);
   };
 
   /**
@@ -118,11 +125,6 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
    */
   const handleDeleteFile = async (item: FileNode, e: React.MouseEvent) => {
     e.stopPropagation();
-
-    if (isSystemFolder(item)) {
-      alert(t('fileExplorer.error.cannotDeleteSystemFolder'));
-      return;
-    }
 
     const isDirectory = item.type === 'directory';
     const message = isDirectory
@@ -157,10 +159,6 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
    */
   const handleRenameStart = (item: FileNode, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isSystemFolder(item)) {
-      alert(t('fileExplorer.error.cannotRenameSystemFolder'));
-      return;
-    }
     setRenamingFile(item.path);
     setEditingName(item.name);
   };
@@ -363,6 +361,149 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
     }
   };
 
+  /**
+   * Check if source can be dropped into target
+   */
+  const canDrop = (source: FileNode, target: FileNode | null): boolean => {
+    // Target is null means root directory, always allow
+    if (!target) return true;
+
+    // Cannot drop into non-directory
+    if (target.type !== 'directory') return false;
+
+    // Cannot drop into itself
+    if (source.path === target.path) return false;
+
+    // Cannot drop into system folder
+    if (isSystemFolder(target)) return false;
+
+    // Cannot drop into its own subfolder
+    if (target.path.startsWith(source.path + '/')) return false;
+
+    return true;
+  };
+
+  /**
+   * Handle drag start
+   */
+  const handleDragStart = (item: FileNode, e: React.DragEvent) => {
+    // Don't drag if renaming or system folder
+    if (renamingFile === item.path || isSystemFolder(item)) {
+      e.preventDefault();
+      return;
+    }
+
+    setDraggingItem(item);
+    e.dataTransfer.effectAllowed = 'move';
+    // Set custom drag image or data if needed
+    e.dataTransfer.setData('text/plain', item.path);
+  };
+
+  /**
+   * Handle drag over
+   */
+  const handleDragOver = (item: FileNode | null, e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    if (!draggingItem) return;
+
+    if (item === null) {
+      // Dragging over root area
+      setIsDragOverRoot(true);
+      setDragOverItem(null);
+    } else {
+      // Always highlight when dragging over a directory
+      // Only allow drop if canDrop returns true
+      setDragOverItem(item);
+      setIsDragOverRoot(false);
+    }
+  };
+
+  /**
+   * Handle drag leave for the scroll area - clear all drag states when leaving the file tree
+   */
+  const handleScrollAreaDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    // Check if we're actually leaving the scroll area
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      setIsDragOverRoot(false);
+      setDragOverItem(null);
+    }
+  };
+
+  /**
+   * Handle drop
+   */
+  const handleDrop = async (targetItem: FileNode | null, e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    setDragOverItem(null);
+    setIsDragOverRoot(false);
+
+    if (!draggingItem) return;
+
+    // Validate drop
+    if (!canDrop(draggingItem, targetItem)) {
+      if (targetItem?.path === draggingItem.path) {
+        alert(t('fileExplorer.move.error.cannotMoveToSelf'));
+      } else if (targetItem && targetItem.path.startsWith(draggingItem.path + '/')) {
+        alert(t('fileExplorer.move.error.cannotMoveToChild'));
+      } else if (targetItem && isSystemFolder(targetItem)) {
+        alert(t('fileExplorer.move.error.cannotMoveToSystem'));
+      }
+      setDraggingItem(null);
+      return;
+    }
+
+    // Calculate target path
+    let targetPath = '';
+    if (targetItem) {
+      targetPath = extractRelativePath(targetItem.path, selectedProject.name);
+    }
+
+    // Confirm move
+    const confirmMessage = targetItem
+      ? t('fileExplorer.move.confirm', { sourceName: draggingItem.name, targetName: targetItem.name })
+      : t('fileExplorer.move.confirmToRoot', { sourceName: draggingItem.name });
+
+    if (!confirm(confirmMessage)) {
+      setDraggingItem(null);
+      return;
+    }
+
+    // Execute move
+    setIsMoving(true);
+
+    try {
+      const sourcePath = extractRelativePath(draggingItem.path, selectedProject.name);
+
+      const response = await api.moveFile(selectedProject.name, sourcePath, targetPath);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        if (errorData.message?.includes('already exists')) {
+          throw new Error(t('fileExplorer.move.error.targetExists'));
+        }
+        throw new Error(errorData.error || errorData.message || 'Move failed');
+      }
+
+      // Refresh file list
+      await fetchFiles();
+    } catch (error) {
+      console.error('[FileExplorer] Move error:', error);
+      alert(t('fileExplorer.move.error.generic', { message: error.message }));
+    } finally {
+      setIsMoving(false);
+      setDraggingItem(null);
+    }
+  };
+
   useEffect(() => {
     if (selectedProject) {
       fetchFiles();
@@ -507,14 +648,28 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
 
   const renderFileTree = (items: FileNode[], level = 0) => {
     return items.map((item) => (
-      <div key={item.path} className="select-none group">
+      <div
+        key={item.path}
+        className={cn(
+          "select-none group rounded-md",
+          dragOverItem?.path === item.path && item.type === 'directory' && "ring-2 ring-blue-400 bg-blue-50/50"
+        )}
+      >
         <Button
           variant="ghost"
           className={cn(
             "w-full justify-start p-2 h-auto font-normal text-left hover:bg-accent",
-            selectedFolder?.path === item.path && "bg-accent/50"
+            selectedFolder?.path === item.path && "bg-accent/50",
+            draggingItem?.path === item.path && "opacity-50"
           )}
           style={{ paddingLeft: `${level * 16 + 12}px` }}
+          draggable={!isSystemFolder(item) && renamingFile !== item.path}
+          onDragStart={(e) => handleDragStart(item, e)}
+          onDragOver={(e) => {
+            e.stopPropagation();
+            handleDragOver(item, e);
+          }}
+          onDrop={(e) => handleDrop(item, e)}
           onClick={(e) => {
             // Don't toggle if renaming
             if (renamingFile === item.path) return;
@@ -662,13 +817,27 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
   // Render detailed view with table-like layout
   const renderDetailedView = (items, level = 0) => {
     return items.map((item) => (
-      <div key={item.path} className="select-none group">
+      <div
+        key={item.path}
+        className={cn(
+          "select-none group rounded-md",
+          dragOverItem?.path === item.path && item.type === 'directory' && "ring-2 ring-blue-400 bg-blue-50/50"
+        )}
+      >
         <div
           className={cn(
             "grid grid-cols-12 gap-2 p-2 hover:bg-accent cursor-pointer items-center",
-            selectedFolder?.path === item.path && "bg-accent/50"
+            selectedFolder?.path === item.path && "bg-accent/50",
+            draggingItem?.path === item.path && "opacity-50"
           )}
           style={{ paddingLeft: `${level * 16 + 12}px` }}
+          draggable={!isSystemFolder(item) && renamingFile !== item.path}
+          onDragStart={(e) => handleDragStart(item, e)}
+          onDragOver={(e) => {
+            e.stopPropagation();
+            handleDragOver(item, e);
+          }}
+          onDrop={(e) => handleDrop(item, e)}
           onClick={(e) => {
             // Don't toggle if renaming
             if (renamingFile === item.path) return;
@@ -795,13 +964,27 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
   // Render compact view with inline details
   const renderCompactView = (items, level = 0) => {
     return items.map((item) => (
-      <div key={item.path} className="select-none group">
+      <div
+        key={item.path}
+        className={cn(
+          "select-none group rounded-md",
+          dragOverItem?.path === item.path && item.type === 'directory' && "ring-2 ring-blue-400 bg-blue-50/50"
+        )}
+      >
         <div
           className={cn(
             "flex items-center justify-between p-2 hover:bg-accent cursor-pointer",
-            selectedFolder?.path === item.path && "bg-accent/50"
+            selectedFolder?.path === item.path && "bg-accent/50",
+            draggingItem?.path === item.path && "opacity-50"
           )}
           style={{ paddingLeft: `${level * 16 + 12}px` }}
+          draggable={!isSystemFolder(item) && renamingFile !== item.path}
+          onDragStart={(e) => handleDragStart(item, e)}
+          onDragOver={(e) => {
+            e.stopPropagation();
+            handleDragOver(item, e);
+          }}
+          onDrop={(e) => handleDrop(item, e)}
           onClick={(e) => {
             // Don't toggle if renaming
             if (renamingFile === item.path) return;
@@ -1098,7 +1281,15 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
         </div>
       )}
       
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea
+        className={cn(
+          "flex-1 p-4",
+          isDragOverRoot && "bg-blue-50/50"
+        )}
+        onDragOver={(e) => handleDragOver(null, e)}
+        onDragLeave={handleScrollAreaDragLeave}
+        onDrop={(e) => handleDrop(null, e)}
+      >
         {files.length === 0 ? (
           <div className="text-center py-8">
             <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center mx-auto mb-3">

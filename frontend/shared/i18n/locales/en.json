@@ -289,9 +289,7 @@
     },
     "error": {
       "fetchFailed": "File fetch failed",
-      "errorFetching": "Error fetching files",
-      "cannotDeleteSystemFolder": "Cannot delete system folders (uploads, generated_docs)",
-      "cannotRenameSystemFolder": "Cannot rename system folders (uploads, generated_docs)"
+      "errorFetching": "Error fetching files"
     },
     "delete": {
       "title": "Delete",
@@ -307,6 +305,17 @@
       "confirm": "Confirm",
       "cancel": "Cancel",
       "error": "Failed to rename: {{message}}"
+    },
+    "move": {
+      "confirm": "Move \"{{sourceName}}\" to \"{{targetName}}\"?",
+      "confirmToRoot": "Move \"{{sourceName}}\" to root directory?",
+      "error": {
+        "cannotMoveToSelf": "Cannot move to itself",
+        "cannotMoveToChild": "Cannot move to its own subfolder",
+        "cannotMoveToSystem": "Cannot move to system folder",
+        "targetExists": "Target location already has a file with the same name",
+        "generic": "Failed to move: {{message}}"
+      }
     },
     "new": {
       "title": "New",

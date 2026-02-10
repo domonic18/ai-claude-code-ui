@@ -289,9 +289,7 @@
     },
     "error": {
       "fetchFailed": "文件获取失败",
-      "errorFetching": "获取文件时出错",
-      "cannotDeleteSystemFolder": "无法删除系统文件夹（uploads、generated_docs）",
-      "cannotRenameSystemFolder": "无法重命名系统文件夹（uploads、generated_docs）"
+      "errorFetching": "获取文件时出错"
     },
     "delete": {
       "title": "删除",
@@ -307,6 +305,17 @@
       "confirm": "确认",
       "cancel": "取消",
       "error": "重命名失败：{{message}}"
+    },
+    "move": {
+      "confirm": "确定将 \"{{sourceName}}\" 移动到 \"{{targetName}}\" 吗？",
+      "confirmToRoot": "确定将 \"{{sourceName}}\" 移动到根目录吗？",
+      "error": {
+        "cannotMoveToSelf": "不能移动到自身",
+        "cannotMoveToChild": "不能移动到自己的子文件夹中",
+        "cannotMoveToSystem": "不能移动到系统文件夹",
+        "targetExists": "目标位置已存在同名文件",
+        "generic": "移动失败：{{message}}"
+      }
     },
     "new": {
       "title": "新建",

@@ -108,6 +108,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ path: dirPath }),
     }),
+  moveFile: (projectName: string, sourcePath: string, targetPath: string) =>
+    authenticatedFetch(`/api/projects/${projectName}/move`, {
+      method: 'POST',
+      body: JSON.stringify({ sourcePath, targetPath }),
+    }),
   getFiles: (projectName: string) =>
     authenticatedFetch(`/api/projects/${projectName}/files`),
   transcribe: (formData: FormData) =>

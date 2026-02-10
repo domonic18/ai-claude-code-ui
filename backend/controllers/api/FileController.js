@@ -201,15 +201,15 @@ export class FileController extends BaseController {
   async createDirectory(req, res, next) {
     try {
       const userId = this._getUserId(req);
-      const { path } = req.body;
+      const { path: dirPath } = req.body;
       const { recursive = true } = req.body;
       const { projectName } = req.params;
 
-      if (!path) {
+      if (!dirPath) {
         throw new ValidationError('path is required');
       }
 
-      const result = await this.fileOpsService.createDirectory(path, {
+      const result = await this.fileOpsService.createDirectory(dirPath, {
         userId,
         projectPath: projectName,
         isContainerProject: true,
@@ -220,6 +220,44 @@ export class FileController extends BaseController {
       this._success(res, result, 'Directory created successfully');
     } catch (error) {
       console.error('[FileController.createDirectory] Error:', error);
+      this._handleError(error, req, res, next);
+    }
+  }
+
+  /**
+   * 移动文件或目录
+   * @param {Object} req - Express 请求对象
+   * @param {string} req.body.sourcePath - 源路径
+   * @param {string} req.body.targetPath - 目标目录路径（空字符串表示根目录）
+   * @param {string} req.params.projectName - 项目名称
+   * @param {Object} res - Express 响应对象
+   * @param {Function} next - 下一个中间件
+   */
+  async moveFile(req, res, next) {
+    try {
+      const userId = this._getUserId(req);
+      const { sourcePath, targetPath } = req.body;
+      const { projectName } = req.params;
+
+      if (!sourcePath) {
+        throw new ValidationError('sourcePath is required');
+      }
+
+      if (targetPath === undefined || targetPath === null) {
+        throw new ValidationError('targetPath is required');
+      }
+
+      const result = await this.fileOpsService.moveFile(sourcePath, targetPath, {
+        userId,
+        projectPath: projectName,
+        isContainerProject: true,
+        containerMode: req.containerMode
+      });
+
+      console.log('[FileController.moveFile] User', userId, 'moved:', sourcePath, '->', result.newPath);
+      this._success(res, result, 'File moved successfully');
+    } catch (error) {
+      console.error('[FileController.moveFile] Error:', error);
       this._handleError(error, req, res, next);
     }
   }
@@ -321,7 +359,7 @@ export class FileController extends BaseController {
       const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
       // 生成 ASCII 安全的文件名（避免中文文件名编码问题）
-      const uniqueId = Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+      const uniqueId = Date.now().toString(36) + Math.random().toString(36).slice(2, 11);
       const safeFilename = `${uniqueId}${ext}`;
 
       // 容器内路径：/workspace/{projectName}/uploads/{date}/{filename}

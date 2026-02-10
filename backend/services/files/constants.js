@@ -314,8 +314,9 @@ export const ALL_BINARY_EXTENSIONS = new Set([
 /**
  * 系统文件夹
  * 这些文件夹不可删除或重命名
+ * 注意：当前没有定义系统文件夹，所有文件夹都可以操作
  */
-export const SYSTEM_FOLDERS = ['uploads', 'generated_docs'];
+export const SYSTEM_FOLDERS = [];
 
 /**
  * 上传文件限制

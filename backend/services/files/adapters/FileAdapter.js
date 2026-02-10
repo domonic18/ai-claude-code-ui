@@ -11,7 +11,6 @@ import { BaseFileAdapter } from './BaseFileAdapter.js';
 import containerManager from '../../container/core/index.js';
 import { CONTAINER } from '../../../config/config.js';
 import { PathUtils } from '../../core/utils/path-utils.js';
-import { SYSTEM_FOLDERS } from '../constants.js';
 import { PassThrough } from 'stream';
 
 /**
@@ -622,12 +621,6 @@ export class FileAdapter extends BaseFileAdapter {
         throw new Error('Invalid file name');
       }
 
-      // 检查是否是系统文件夹
-      const oldName = oldPath.split('/').filter(Boolean).pop() || '';
-      if (SYSTEM_FOLDERS.includes(oldName)) {
-        throw new Error(`Cannot rename system folders (${SYSTEM_FOLDERS.join(', ')})`);
-      }
-
       // 获取或创建容器
       await containerManager.getOrCreateContainer(userId);
 
@@ -815,6 +808,169 @@ export class FileAdapter extends BaseFileAdapter {
     } catch (error) {
       console.error('[FileAdapter.createDirectory] Error:', error);
       throw this._standardizeError(error, 'createDirectory');
+    }
+  }
+
+  /**
+   * 移动文件或目录
+   * @param {string} sourcePath - 源路径（完整路径）
+   * @param {string} targetDir - 目标目录路径（空字符串表示根目录）
+   * @param {Object} options - 选项
+   * @param {string} options.userId - 用户 ID
+   * @param {string} [options.projectPath=''] - 项目路径
+   * @param {boolean} [options.isContainerProject=false] - 是否为容器项目
+   * @returns {Promise<{success: boolean, newPath: string}>}
+   */
+  async moveFile(sourcePath, targetDir, options = {}) {
+    const { userId, projectPath = '', isContainerProject = false } = options;
+
+    try {
+      // 验证源路径
+      if (!sourcePath || sourcePath.trim() === '') {
+        throw new Error('Source path is required');
+      }
+
+      // 获取或创建容器
+      await containerManager.getOrCreateContainer(userId);
+
+      // 清理源路径
+      let cleanSourcePath = sourcePath.replace(/\/\.\//g, '/').replace(/\/+/g, '/');
+      let sourceContainerPath;
+
+      if (cleanSourcePath.startsWith('/workspace')) {
+        sourceContainerPath = cleanSourcePath;
+      } else {
+        if (cleanSourcePath.startsWith('/')) {
+          cleanSourcePath = cleanSourcePath.substring(1);
+        }
+        const validation = this._validatePath(cleanSourcePath, options);
+        if (!validation.valid) {
+          throw new Error(validation.error);
+        }
+        sourceContainerPath = this._buildContainerPath(
+          validation.safePath,
+          { projectPath, isContainerProject }
+        );
+      }
+
+      // 验证路径安全性
+      if (sourceContainerPath.includes('..')) {
+        throw new Error('Path traversal detected in source path');
+      }
+
+      // 构建目标路径
+      let targetContainerPath;
+      if (targetDir === '' || targetDir === null || targetDir === undefined) {
+        // 移动到根目录
+        const pathParts = sourceContainerPath.split('/');
+        const fileName = pathParts[pathParts.length - 1];
+        // 根目录是 /workspace/{projectPath} 或 /workspace
+        if (isContainerProject && projectPath) {
+          targetContainerPath = `${CONTAINER.paths.workspace}/${projectPath}/${fileName}`;
+        } else if (projectPath) {
+          targetContainerPath = `${CONTAINER.paths.projects}/${PathUtils.encodeProjectName(projectPath)}/${fileName}`;
+        } else {
+          targetContainerPath = `${CONTAINER.paths.workspace}/${fileName}`;
+        }
+      } else {
+        // 移动到指定目录
+        let cleanTargetDir = targetDir.replace(/\/\.\//g, '/').replace(/\/+/g, '/');
+        let targetDirContainerPath;
+
+        if (cleanTargetDir.startsWith('/workspace')) {
+          targetDirContainerPath = cleanTargetDir;
+        } else {
+          if (cleanTargetDir.startsWith('/')) {
+            cleanTargetDir = cleanTargetDir.substring(1);
+          }
+          const targetValidation = this._validatePath(cleanTargetDir, options);
+          if (!targetValidation.valid) {
+            throw new Error(targetValidation.error);
+          }
+          targetDirContainerPath = this._buildContainerPath(
+            targetValidation.safePath,
+            { projectPath, isContainerProject }
+          );
+        }
+
+        const pathParts = sourceContainerPath.split('/');
+        const fileName = pathParts[pathParts.length - 1];
+        targetContainerPath = `${targetDirContainerPath}/${fileName}`;
+      }
+
+      targetContainerPath = targetContainerPath.replace(/\/+/g, '/');
+
+      // 检查源和目标是否相同
+      if (sourceContainerPath === targetContainerPath) {
+        throw new Error('Cannot move to the same location');
+      }
+
+      // 检查目标是否已存在
+      const checkCommand = `test -e "${targetContainerPath}" && echo "EXISTS" || echo "NOT_EXISTS"`;
+      const { stream: checkStream } = await containerManager.execInContainer(userId, checkCommand);
+
+      const targetExists = await new Promise((resolve) => {
+        let output = '';
+        checkStream.on('data', (chunk) => {
+          output += chunk.toString();
+        });
+        checkStream.on('end', () => {
+          resolve(output.trim() === 'EXISTS');
+        });
+        checkStream.on('error', () => {
+          resolve(false);
+        });
+      });
+
+      if (targetExists) {
+        throw new Error('Target location already exists with the same name');
+      }
+
+      // 使用 mv 命令移动
+      const moveCommand = `mv "${sourceContainerPath}" "${targetContainerPath}" 2>&1`;
+      const { stream } = await containerManager.execInContainer(userId, moveCommand);
+
+      return new Promise((resolve, reject) => {
+        let resolved = false;
+        let output = '';
+
+        const doResolve = (result) => {
+          if (!resolved) {
+            resolved = true;
+            resolve(result);
+          }
+        };
+
+        const doReject = (err) => {
+          if (!resolved) {
+            resolved = true;
+            reject(err);
+          }
+        };
+
+        stream.on('data', (chunk) => {
+          output += chunk.toString();
+        });
+
+        stream.on('error', (err) => {
+          doReject(new Error(`Failed to move: ${err.message}`));
+        });
+
+        stream.on('end', () => {
+          if (output.trim() && output.toLowerCase().includes('cannot')) {
+            doReject(new Error(`Move failed: ${output}`));
+            return;
+          }
+          doResolve({ success: true, newPath: targetContainerPath });
+        });
+
+        setTimeout(() => {
+          doResolve({ success: true, newPath: targetContainerPath });
+        }, 5000);
+      });
+    } catch (error) {
+      console.error('[FileAdapter.moveFile] Error:', error);
+      throw this._standardizeError(error, 'moveFile');
     }
   }
 

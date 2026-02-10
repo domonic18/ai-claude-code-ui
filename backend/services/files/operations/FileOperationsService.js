@@ -106,6 +106,17 @@ export class FileOperationsService {
   }
 
   /**
+   * 移动文件或目录
+   * @param {string} sourcePath - 源路径
+   * @param {string} targetDir - 目标目录路径（空字符串表示根目录）
+   * @param {Object} options - 选项
+   * @returns {Promise<{success: boolean, newPath: string}>}
+   */
+  async moveFile(sourcePath, targetDir, options = {}) {
+    return await this.adapter.moveFile(sourcePath, targetDir, options);
+  }
+
+  /**
    * 获取服务信息
    * @returns {Object} 服务信息
    */
