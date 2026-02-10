@@ -3,11 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { ScrollArea } from '@/shared/components/ui/ScrollArea';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
-import { Folder, FolderOpen, File, FileText, FileCode, List, TableProperties, Eye, Search, X, Trash2 } from 'lucide-react';
+import { Folder, FolderOpen, File, FileText, FileCode, List, TableProperties, Eye, Search, X, Trash2, Edit2, Check, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CodeEditor } from '@/features/editor';
 import ImageViewer from '@/shared/components/common/ImageViewer';
 import { api } from '@/shared/services';
+import { SYSTEM_FOLDERS } from '../constants/fileExplorer.constants';
 import type {
   FileTreeComponentProps,
   FileNode,
@@ -28,11 +29,25 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filteredFiles, setFilteredFiles] = useState<FileNode[]>([]);
   const [deletingFile, setDeletingFile] = useState<string | null>(null);
+  const [renamingFile, setRenamingFile] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState<string>('');
+  const [isRenaming, setIsRenaming] = useState(false);
 
   /**
-   * System folders that should not be deleted
+   * Recursively find a file node by path
    */
-  const SYSTEM_FOLDERS = ['uploads', 'generated_docs'];
+  const findFileByPath = (items: FileNode[], targetPath: string): FileNode | null => {
+    for (const item of items) {
+      if (item.path === targetPath) {
+        return item;
+      }
+      if (item.children && item.children.length > 0) {
+        const found = findFileByPath(item.children, targetPath);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
 
   /**
    * Check if a file/folder is a system folder
@@ -78,6 +93,109 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
       alert(t('fileExplorer.delete.error', { message: error.message }));
     } finally {
       setDeletingFile(null);
+    }
+  };
+
+  /**
+   * Start renaming a file/folder
+   */
+  const handleRenameStart = (item: FileNode, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isSystemFolder(item)) {
+      alert(t('fileExplorer.error.cannotRenameSystemFolder'));
+      return;
+    }
+    setRenamingFile(item.path);
+    setEditingName(item.name);
+  };
+
+  /**
+   * Cancel renaming
+   */
+  const handleRenameCancel = () => {
+    setRenamingFile(null);
+    setEditingName('');
+  };
+
+  /**
+   * Complete renaming with confirmation
+   */
+  const handleRenameComplete = async () => {
+    // Prevent duplicate calls
+    if (!renamingFile || isRenaming) {
+      return;
+    }
+
+    const trimmedName = editingName.trim();
+    if (!trimmedName) {
+      alert(t('fileExplorer.rename.nameCannotBeEmpty'));
+      return;
+    }
+
+    // Find and store the item info before starting (search recursively in the tree)
+    const item = findFileByPath(filteredFiles.length > 0 ? filteredFiles : files, renamingFile);
+    if (!item) {
+      setRenamingFile(null);
+      setEditingName('');
+      return;
+    }
+
+    const isDirectory = item.type === 'directory';
+    const message = isDirectory
+      ? t('fileExplorer.rename.confirmDirectory', { oldName: item.name, newName: trimmedName })
+      : t('fileExplorer.rename.confirmFile', { oldName: item.name, newName: trimmedName });
+
+    if (!confirm(message)) {
+      return;
+    }
+
+    // Set renaming flag to prevent duplicate calls
+    setIsRenaming(true);
+
+    // Create a timeout promise
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Request timeout after 10 seconds')), 10000);
+    });
+
+    try {
+      // Race between API call and timeout
+      const response = await Promise.race([
+        api.renameFile(selectedProject.name, item.path, trimmedName),
+        timeoutPromise
+      ]) as Response;
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.message || 'Rename failed');
+      }
+
+      // Clear renaming state BEFORE fetching files
+      setRenamingFile(null);
+      setEditingName('');
+
+      // Refresh file list after successful rename
+      await fetchFiles();
+    } catch (error) {
+      console.error('[FileExplorer] Rename error:', error);
+      alert(t('fileExplorer.rename.error', { message: error.message }));
+      // Reset state on error
+      setRenamingFile(null);
+      setEditingName('');
+    } finally {
+      setIsRenaming(false);
+    }
+  };
+
+  /**
+   * Handle key press in rename input
+   */
+  const handleRenameKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleRenameComplete();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleRenameCancel();
     }
   };
 
@@ -215,6 +333,9 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
           )}
           style={{ paddingLeft: `${level * 16 + 12}px` }}
           onClick={() => {
+            // Don't toggle if renaming
+            if (renamingFile === item.path) return;
+
             if (item.type === 'directory') {
               toggleDirectory(item.path);
             } else if (isImageFile(item.name)) {
@@ -247,21 +368,68 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
               ) : (
                 getFileIcon(item.name)
               )}
-              <span className="text-sm truncate text-foreground">
-                {item.name}
-              </span>
+              {renamingFile === item.path ? (
+                <Input
+                  type="text"
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  onKeyDown={handleRenameKeyPress}
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-6 px-1 py-0 text-sm w-40"
+                  autoFocus
+                />
+              ) : (
+                <span className="text-sm truncate text-foreground">
+                  {item.name}
+                </span>
+              )}
             </div>
-            {!isSystemFolder(item) && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                onClick={(e) => handleDeleteFile(item, e)}
-                disabled={deletingFile === item.path}
-                title={t('fileExplorer.delete.title')}
-              >
-                <Trash2 className="w-3 h-3" />
-              </Button>
+            {!isSystemFolder(item) && renamingFile !== item.path && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-primary hover:text-primary-foreground"
+                  onClick={(e) => handleRenameStart(item, e)}
+                  title={t('fileExplorer.rename.title')}
+                >
+                  <Edit2 className="w-3 h-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                  onClick={(e) => handleDeleteFile(item, e)}
+                  disabled={deletingFile === item.path}
+                  title={t('fileExplorer.delete.title')}
+                >
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </>
+            )}
+            {renamingFile === item.path && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-green-600 hover:text-white"
+                  onClick={(e) => { e.stopPropagation(); handleRenameComplete(); }}
+                  disabled={isRenaming}
+                  title={t('fileExplorer.rename.confirm')}
+                >
+                  <Check className="w-3 h-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-gray-600 hover:text-white"
+                  onClick={(e) => { e.stopPropagation(); handleRenameCancel(); }}
+                  disabled={isRenaming}
+                  title={t('fileExplorer.rename.cancel')}
+                >
+                  <XCircle className="w-3 h-3" />
+                </Button>
+              </>
             )}
           </div>
         </Button>
@@ -312,6 +480,9 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
           )}
           style={{ paddingLeft: `${level * 16 + 12}px` }}
           onClick={() => {
+            // Don't toggle if renaming
+            if (renamingFile === item.path) return;
+
             if (item.type === 'directory') {
               toggleDirectory(item.path);
             } else if (isImageFile(item.name)) {
@@ -341,9 +512,21 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
             ) : (
               getFileIcon(item.name)
             )}
-            <span className="text-sm truncate text-foreground">
-              {item.name}
-            </span>
+            {renamingFile === item.path ? (
+              <Input
+                type="text"
+                value={editingName}
+                onChange={(e) => setEditingName(e.target.value)}
+                onKeyDown={handleRenameKeyPress}
+                onClick={(e) => e.stopPropagation()}
+                className="h-6 px-1 py-0 text-sm w-32"
+                autoFocus
+              />
+            ) : (
+              <span className="text-sm truncate text-foreground">
+                {item.name}
+              </span>
+            )}
           </div>
           <div className="col-span-2 text-sm text-muted-foreground">
             {item.type === 'file' ? formatFileSize(item.size) : '-'}
@@ -354,18 +537,53 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
           <div className="col-span-2 text-sm text-muted-foreground font-mono">
             {item.permissionsRwx || '-'}
           </div>
-          <div className="col-span-1 flex justify-end">
-            {!isSystemFolder(item) && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                onClick={(e) => handleDeleteFile(item, e)}
-                disabled={deletingFile === item.path}
-                title={t('fileExplorer.delete.title')}
-              >
-                <Trash2 className="w-3 h-3" />
-              </Button>
+          <div className="col-span-1 flex justify-end gap-1">
+            {!isSystemFolder(item) && renamingFile !== item.path && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-primary hover:text-primary-foreground"
+                  onClick={(e) => handleRenameStart(item, e)}
+                  title={t('fileExplorer.rename.title')}
+                >
+                  <Edit2 className="w-3 h-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                  onClick={(e) => handleDeleteFile(item, e)}
+                  disabled={deletingFile === item.path}
+                  title={t('fileExplorer.delete.title')}
+                >
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </>
+            )}
+            {renamingFile === item.path && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-green-600 hover:text-white"
+                  onClick={(e) => { e.stopPropagation(); handleRenameComplete(); }}
+                  disabled={isRenaming}
+                  title={t('fileExplorer.rename.confirm')}
+                >
+                  <Check className="w-3 h-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-gray-600 hover:text-white"
+                  onClick={(e) => { e.stopPropagation(); handleRenameCancel(); }}
+                  disabled={isRenaming}
+                  title={t('fileExplorer.rename.cancel')}
+                >
+                  <XCircle className="w-3 h-3" />
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -388,6 +606,9 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
           )}
           style={{ paddingLeft: `${level * 16 + 12}px` }}
           onClick={() => {
+            // Don't toggle if renaming
+            if (renamingFile === item.path) return;
+
             if (item.type === 'directory') {
               toggleDirectory(item.path);
             } else if (isImageFile(item.name)) {
@@ -417,28 +638,75 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
             ) : (
               getFileIcon(item.name)
             )}
-            <span className="text-sm truncate text-foreground">
-              {item.name}
-            </span>
+            {renamingFile === item.path ? (
+              <Input
+                type="text"
+                value={editingName}
+                onChange={(e) => setEditingName(e.target.value)}
+                onKeyDown={handleRenameKeyPress}
+                onClick={(e) => e.stopPropagation()}
+                className="h-6 px-1 py-0 text-sm w-32"
+                autoFocus
+              />
+            ) : (
+              <span className="text-sm truncate text-foreground">
+                {item.name}
+              </span>
+            )}
           </div>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             {item.type === 'file' && (
               <>
                 <span>{formatFileSize(item.size)}</span>
                 <span className="font-mono">{item.permissionsRwx}</span>
               </>
             )}
-            {!isSystemFolder(item) && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                onClick={(e) => handleDeleteFile(item, e)}
-                disabled={deletingFile === item.path}
-                title={t('fileExplorer.delete.title')}
-              >
-                <Trash2 className="w-3 h-3" />
-              </Button>
+            {!isSystemFolder(item) && renamingFile !== item.path && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-primary hover:text-primary-foreground"
+                  onClick={(e) => handleRenameStart(item, e)}
+                  title={t('fileExplorer.rename.title')}
+                >
+                  <Edit2 className="w-3 h-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                  onClick={(e) => handleDeleteFile(item, e)}
+                  disabled={deletingFile === item.path}
+                  title={t('fileExplorer.delete.title')}
+                >
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </>
+            )}
+            {renamingFile === item.path && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-green-600 hover:text-white"
+                  onClick={(e) => { e.stopPropagation(); handleRenameComplete(); }}
+                  disabled={isRenaming}
+                  title={t('fileExplorer.rename.confirm')}
+                >
+                  <Check className="w-3 h-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-gray-600 hover:text-white"
+                  onClick={(e) => { e.stopPropagation(); handleRenameCancel(); }}
+                  disabled={isRenaming}
+                  title={t('fileExplorer.rename.cancel')}
+                >
+                  <XCircle className="w-3 h-3" />
+                </Button>
+              </>
             )}
           </div>
         </div>

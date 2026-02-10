@@ -98,6 +98,11 @@ export const api = {
       method: 'DELETE',
       body: JSON.stringify({ path: filePath }),
     }),
+  renameFile: (projectName: string, oldPath: string, newName: string) =>
+    authenticatedFetch(`/api/projects/${projectName}/rename`, {
+      method: 'PUT',
+      body: JSON.stringify({ oldPath, newName }),
+    }),
   getFiles: (projectName: string) =>
     authenticatedFetch(`/api/projects/${projectName}/files`),
   transcribe: (formData: FormData) =>
