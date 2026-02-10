@@ -103,6 +103,11 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ oldPath, newName }),
     }),
+  createDirectory: (projectName: string, dirPath: string) =>
+    authenticatedFetch(`/api/projects/${projectName}/directory`, {
+      method: 'POST',
+      body: JSON.stringify({ path: dirPath }),
+    }),
   getFiles: (projectName: string) =>
     authenticatedFetch(`/api/projects/${projectName}/files`),
   transcribe: (formData: FormData) =>

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ScrollArea } from '@/shared/components/ui/ScrollArea';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
-import { Folder, FolderOpen, File, FileText, FileCode, List, TableProperties, Eye, Search, X, Trash2, Edit2, Check, XCircle } from 'lucide-react';
+import { Folder, FolderOpen, File, FileText, FileCode, List, TableProperties, Eye, Search, X, Trash2, Edit2, Check, XCircle, Plus, FolderPlus, FilePlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CodeEditor } from '@/features/editor';
 import ImageViewer from '@/shared/components/common/ImageViewer';
@@ -17,6 +17,57 @@ import type {
   SelectedImage,
   FileType
 } from '../types/file-explorer.types';
+
+/**
+ * Default content for newly created files
+ * Single newline ensures file isn't empty but appears blank when opened
+ */
+const DEFAULT_FILE_CONTENT = '\n';
+
+/**
+ * Invalid characters for file/folder names
+ */
+const INVALID_NAME_CHARS = /[\\/:*?"<>|]/;
+
+/**
+ * Validates if a file/folder name is valid
+ * @param {string} name - The name to validate
+ * @returns {boolean} true if valid, false otherwise
+ */
+function isValidFileName(name: string): boolean {
+  if (!name || name.trim() === '') return false;
+  if (INVALID_NAME_CHARS.test(name)) return false;
+  if (name === '.' || name === '..') return false;
+  return true;
+}
+
+/**
+ * Extracts relative path from a full container path
+ * @param {string} fullPath - Full container path (e.g., /workspace/my-workspace/test)
+ * @param {string} projectName - Project name
+ * @returns {string} Relative path (e.g., test)
+ */
+function extractRelativePath(fullPath: string, projectName: string): string {
+  if (!fullPath.startsWith('/workspace/')) {
+    return fullPath;
+  }
+
+  const parts = fullPath.split('/');
+  const projectIndex = parts.findIndex(p => p === projectName);
+
+  if (projectIndex === -1) {
+    // Project not found in path, return as is
+    return fullPath.replace('/workspace/', '');
+  }
+
+  if (projectIndex === parts.length - 1) {
+    // Path is the project root
+    return '.';
+  }
+
+  // Extract path after project name
+  return parts.slice(projectIndex + 1).join('/');
+}
 
 function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
   const { t } = useTranslation();
@@ -32,6 +83,11 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
   const [renamingFile, setRenamingFile] = useState<string | null>(null);
   const [editingName, setEditingName] = useState<string>('');
   const [isRenaming, setIsRenaming] = useState(false);
+  const [selectedFolder, setSelectedFolder] = useState<FileNode | null>(null);
+  const [showNewMenu, setShowNewMenu] = useState(false);
+  const [newItemType, setNewItemType] = useState<'folder' | 'file' | null>(null);
+  const [newItemName, setNewItemName] = useState<string>('');
+  const [isCreating, setIsCreating] = useState(false);
 
   /**
    * Recursively find a file node by path
@@ -199,6 +255,114 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
     }
   };
 
+  /**
+   * Handle folder selection
+   */
+  const handleFolderSelect = (item: FileNode, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (item.type === 'directory') {
+      if (selectedFolder?.path === item.path) {
+        setSelectedFolder(null);
+      } else {
+        setSelectedFolder(item);
+        // Auto-expand the selected folder
+        if (!expandedDirs.has(item.path)) {
+          setExpandedDirs(prev => new Set(prev.add(item.path)));
+        }
+      }
+    }
+  };
+
+  /**
+   * Start creating new folder or file
+   */
+  const handleNewItemClick = (type: 'folder' | 'file') => {
+    setNewItemType(type);
+    setNewItemName('');
+    setShowNewMenu(false);
+  };
+
+  /**
+   * Cancel new item creation
+   */
+  const handleNewItemCancel = () => {
+    setNewItemType(null);
+    setNewItemName('');
+  };
+
+  /**
+   * Complete new item creation
+   */
+  const handleNewItemComplete = async () => {
+    if (isCreating) return;
+
+    const trimmedName = newItemName.trim();
+    if (!trimmedName) {
+      alert(t('fileExplorer.new.nameRequired'));
+      return;
+    }
+
+    if (!isValidFileName(trimmedName)) {
+      alert(t('fileExplorer.new.error', { message: 'Invalid file name. Characters \\ / : * ? " < > | are not allowed, and name cannot be . or ..' }));
+      return;
+    }
+
+    setIsCreating(true);
+
+    const basePath = selectedFolder
+      ? extractRelativePath(selectedFolder.path, selectedProject.name)
+      : '.';
+    const fullPath = basePath === '.' ? trimmedName : `${basePath}/${trimmedName}`;
+    const parentDirPath = selectedFolder?.path || null;
+
+    try {
+      if (newItemType === 'folder') {
+        const response = await api.createDirectory(selectedProject.name, fullPath);
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || errorData.message || 'Failed to create folder');
+        }
+      } else {
+        const response = await api.saveFile(selectedProject.name, fullPath, DEFAULT_FILE_CONTENT);
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || errorData.message || 'Failed to create file');
+        }
+      }
+
+      // Expand parent directory before clearing state
+      if (parentDirPath && !expandedDirs.has(parentDirPath)) {
+        setExpandedDirs(prev => new Set(prev.add(parentDirPath)));
+      }
+
+      // Clear UI state
+      setNewItemType(null);
+      setNewItemName('');
+      setSelectedFolder(null);
+
+      // Force refresh with timestamp to ensure re-render
+      await fetchFiles();
+    } catch (error) {
+      console.error('[FileExplorer] New item error:', error);
+      alert(t('fileExplorer.new.error', { message: error.message }));
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  /**
+   * Handle key press in new item input
+   */
+  const handleNewItemKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleNewItemComplete();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleNewItemCancel();
+    }
+  };
+
   useEffect(() => {
     if (selectedProject) {
       fetchFiles();
@@ -234,6 +398,21 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
     }
   }, [files, searchQuery]);
 
+  // Close new menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showNewMenu) {
+        const target = event.target as HTMLElement;
+        if (!target.closest('.new-menu-container') && !target.closest('[data-new-menu-trigger]')) {
+          setShowNewMenu(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showNewMenu]);
+
   // Recursively filter files and directories based on search query
   const filterFiles = (items, query) => {
     return items.reduce((filtered, item) => {
@@ -264,6 +443,7 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
       const response = await api.getFiles(selectedProject.name);
 
       if (!response.ok) {
+        console.error('[FileExplorer] fetchFiles failed:', response.status);
         setFiles([]);
         return;
       }
@@ -271,8 +451,10 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
       const responseData = await response.json();
       // Handle responseFormatter wrapped format: {success: true, data: [...]}
       const data = responseData.data ?? responseData;
-      setFiles(Array.isArray(data) ? data : []);
+      const filesArray = Array.isArray(data) ? data : [];
+      setFiles(filesArray);
     } catch (error) {
+      console.error('[FileExplorer] fetchFiles error:', error);
       setFiles([]);
     } finally {
       setLoading(false);
@@ -330,11 +512,18 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
           variant="ghost"
           className={cn(
             "w-full justify-start p-2 h-auto font-normal text-left hover:bg-accent",
+            selectedFolder?.path === item.path && "bg-accent/50"
           )}
           style={{ paddingLeft: `${level * 16 + 12}px` }}
-          onClick={() => {
+          onClick={(e) => {
             // Don't toggle if renaming
             if (renamingFile === item.path) return;
+
+            // Check for Ctrl/Cmd + Click for folder selection
+            if ((e.ctrlKey || e.metaKey) && item.type === 'directory') {
+              handleFolderSelect(item, e);
+              return;
+            }
 
             if (item.type === 'directory') {
               toggleDirectory(item.path);
@@ -477,11 +666,18 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
         <div
           className={cn(
             "grid grid-cols-12 gap-2 p-2 hover:bg-accent cursor-pointer items-center",
+            selectedFolder?.path === item.path && "bg-accent/50"
           )}
           style={{ paddingLeft: `${level * 16 + 12}px` }}
-          onClick={() => {
+          onClick={(e) => {
             // Don't toggle if renaming
             if (renamingFile === item.path) return;
+
+            // Check for Ctrl/Cmd + Click for folder selection
+            if ((e.ctrlKey || e.metaKey) && item.type === 'directory') {
+              handleFolderSelect(item, e);
+              return;
+            }
 
             if (item.type === 'directory') {
               toggleDirectory(item.path);
@@ -603,11 +799,18 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
         <div
           className={cn(
             "flex items-center justify-between p-2 hover:bg-accent cursor-pointer",
+            selectedFolder?.path === item.path && "bg-accent/50"
           )}
           style={{ paddingLeft: `${level * 16 + 12}px` }}
-          onClick={() => {
+          onClick={(e) => {
             // Don't toggle if renaming
             if (renamingFile === item.path) return;
+
+            // Check for Ctrl/Cmd + Click for folder selection
+            if ((e.ctrlKey || e.metaKey) && item.type === 'directory') {
+              handleFolderSelect(item, e);
+              return;
+            }
 
             if (item.type === 'directory') {
               toggleDirectory(item.path);
@@ -736,6 +939,38 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-medium text-foreground">{t('fileExplorer.title')}</h3>
           <div className="flex gap-1">
+            {/* New button with dropdown */}
+            <div className="relative new-menu-container">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 gap-1"
+                onClick={() => setShowNewMenu(!showNewMenu)}
+                title={t('fileExplorer.new.title')}
+                data-new-menu-trigger="true"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="text-xs">{t('fileExplorer.new.title')}</span>
+              </Button>
+              {showNewMenu && (
+                <div className="absolute right-0 top-full mt-1 z-10 bg-popover border border-border rounded-md shadow-lg min-w-[140px]">
+                  <button
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center gap-2"
+                    onClick={() => handleNewItemClick('folder')}
+                  >
+                    <FolderPlus className="w-4 h-4" />
+                    {t('fileExplorer.new.folder')}
+                  </button>
+                  <button
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center gap-2"
+                    onClick={() => handleNewItemClick('file')}
+                  >
+                    <FilePlus className="w-4 h-4" />
+                    {t('fileExplorer.new.file')}
+                  </button>
+                </div>
+              )}
+            </div>
             <Button
               variant={viewMode === 'simple' ? 'default' : 'ghost'}
               size="sm"
@@ -788,6 +1023,66 @@ function FileTree({ selectedProject, className = '' }: FileTreeComponentProps) {
             </Button>
           )}
         </div>
+
+        {/* New folder/file input */}
+        {newItemType && (
+          <div
+            className="flex items-center gap-2 p-2 bg-accent rounded-md"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {newItemType === 'folder' ? (
+              <FolderPlus className="w-4 h-4 text-blue-500 flex-shrink-0" />
+            ) : (
+              <FilePlus className="w-4 h-4 text-green-500 flex-shrink-0" />
+            )}
+            <input
+              type="text"
+              placeholder={
+                newItemType === 'folder'
+                  ? t('fileExplorer.new.folderPlaceholder')
+                  : t('fileExplorer.new.filePlaceholder')
+              }
+              value={newItemName}
+              onChange={(e) => setNewItemName(e.target.value)}
+              onKeyDown={handleNewItemKeyPress}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              className="h-7 px-2 text-sm flex-1 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20"
+              autoFocus
+            />
+            <div className="text-xs text-muted-foreground flex-shrink-0 min-w-0 max-w-32 truncate" onClick={(e) => e.stopPropagation()}>
+              {selectedFolder
+                ? (newItemType === 'folder'
+                    ? t('fileExplorer.new.folderHint', { location: selectedFolder.name })
+                    : t('fileExplorer.new.fileHint', { location: selectedFolder.name }))
+                : (newItemType === 'folder'
+                    ? t('fileExplorer.new.folderHint', { location: t('fileExplorer.new.root') })
+                    : t('fileExplorer.new.fileHint', { location: t('fileExplorer.new.root') }))
+              }
+            </div>
+            <div className="flex gap-1 flex-shrink-0">
+              <button
+                type="button"
+                className="h-8 px-3 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                onMouseDown={(e) => { e.stopPropagation(); handleNewItemComplete(); }}
+                disabled={isCreating}
+                title={t('fileExplorer.rename.confirm')}
+              >
+                <Check className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                className="h-8 px-3 bg-gray-600 hover:bg-gray-700 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                onMouseDown={(e) => { e.stopPropagation(); handleNewItemCancel(); }}
+                disabled={isCreating}
+                title={t('fileExplorer.rename.cancel')}
+              >
+                <XCircle className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Column Headers for Detailed View */}
