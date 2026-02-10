@@ -5,3 +5,5 @@
  */
 
 export * from './useFileTree';
+export * from './useFileOperations';
+export * from './useDragAndDrop';
