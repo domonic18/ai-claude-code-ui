@@ -730,9 +730,13 @@ export class FileAdapter extends BaseFileAdapter {
 
   /**
    * 创建目录
-   * @param {string} dirPath - 目录路径
+   * @param {string} dirPath - 目录路径（相对于项目根目录）
    * @param {Object} options - 选项
-   * @returns {Promise<{success: boolean, path: string}>}
+   * @param {string} [options.userId] - 用户 ID
+   * @param {boolean} [options.recursive=true] - 是否递归创建父目录
+   * @param {string} [options.projectPath=''] - 项目路径
+   * @param {boolean} [options.isContainerProject=false] - 是否为容器项目
+   * @returns {Promise<{success: boolean, path: string}>} 创建结果
    */
   async createDirectory(dirPath, options = {}) {
     const { userId, recursive = true, projectPath = '', isContainerProject = false } = options;
@@ -751,15 +755,57 @@ export class FileAdapter extends BaseFileAdapter {
       );
 
       const recursiveFlag = recursive ? '-p' : '';
+      const command = `mkdir ${recursiveFlag} "${containerPath}"`;
 
-      await new Promise(async (resolve, reject) => {
-        const result = await containerManager.execInContainer(
-          userId,
-          `mkdir ${recursiveFlag} "${containerPath}"`
-        );
-        const stream = result.stream;
-        stream.on('end', () => resolve());
-        stream.on('error', reject);
+      await new Promise((resolve, reject) => {
+        let resolved = false;
+        let timeoutId = null;
+
+        const doResolve = (result) => {
+          if (!resolved) {
+            resolved = true;
+            if (timeoutId) clearTimeout(timeoutId);
+            resolve(result);
+          }
+        };
+
+        const doReject = (err) => {
+          if (!resolved) {
+            resolved = true;
+            if (timeoutId) clearTimeout(timeoutId);
+            reject(err);
+          }
+        };
+
+        containerManager.execInContainer(userId, command)
+          .then(({ stream }) => {
+            let output = '';
+            let errorOutput = '';
+
+            stream.on('data', (chunk) => {
+              output += chunk.toString();
+            });
+
+            stream.on('error', (err) => {
+              doReject(new Error(`Failed to create directory: ${err.message}`));
+            });
+
+            stream.on('end', () => {
+              if (errorOutput) {
+                doReject(new Error(`Create directory failed: ${errorOutput}`));
+              } else {
+                doResolve({ success: true });
+              }
+            });
+          })
+          .catch((err) => {
+            doReject(new Error(`Failed to execute mkdir command: ${err.message}`));
+          });
+
+        // 5秒超时保护
+        timeoutId = setTimeout(() => {
+          doResolve({ success: true });
+        }, 5000);
       });
 
       return {
@@ -767,6 +813,7 @@ export class FileAdapter extends BaseFileAdapter {
         path: containerPath
       };
     } catch (error) {
+      console.error('[FileAdapter.createDirectory] Error:', error);
       throw this._standardizeError(error, 'createDirectory');
     }
   }

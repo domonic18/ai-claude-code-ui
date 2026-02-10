@@ -192,23 +192,34 @@ export class FileController extends BaseController {
   /**
    * 创建目录
    * @param {Object} req - Express 请求对象
+   * @param {string} req.body.path - 目录路径
+   * @param {boolean} [req.body.recursive=true] - 是否递归创建父目录
+   * @param {string} req.params.projectName - 项目名称
    * @param {Object} res - Express 响应对象
    * @param {Function} next - 下一个中间件
    */
   async createDirectory(req, res, next) {
     try {
       const userId = this._getUserId(req);
-      const { dirPath } = req.params;
+      const { path } = req.body;
       const { recursive = true } = req.body;
+      const { projectName } = req.params;
 
-      const result = await this.fileOpsService.createDirectory(dirPath, {
+      if (!path) {
+        throw new ValidationError('path is required');
+      }
+
+      const result = await this.fileOpsService.createDirectory(path, {
         userId,
+        projectPath: projectName,
+        isContainerProject: true,
         containerMode: req.containerMode,
         recursive
       });
 
       this._success(res, result, 'Directory created successfully');
     } catch (error) {
+      console.error('[FileController.createDirectory] Error:', error);
       this._handleError(error, req, res, next);
     }
   }
