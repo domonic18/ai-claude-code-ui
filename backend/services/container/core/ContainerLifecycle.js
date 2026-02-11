@@ -70,13 +70,23 @@ export class ContainerLifecycleManager {
     const stateMachine = await containerStateStore.getOrCreate(userId, containerName);
 
     // 验证状态一致性：如果状态是中间状态但容器不存在，强制重置为 NON_EXISTENT
+    // 只有当中间状态已经持续超过一定时间时才重置（避免干扰活跃的创建过程）
     const intermediateStates = [ContainerState.CREATING, ContainerState.STARTING, ContainerState.HEALTH_CHECKING];
     if (intermediateStates.includes(stateMachine.getState())) {
       const containerExists = await this._verifyContainerExists(containerName);
       if (!containerExists) {
-        console.log(`[Lifecycle] Container ${containerName} not found but state is ${stateMachine.getState()}, force resetting to NON_EXISTENT`);
-        stateMachine.forceReset();
-        await containerStateStore.save(stateMachine);
+        // 检查状态持续时间（容器创建通常在 30 秒内完成）
+        const stateAge = Date.now() - stateMachine.lastTransitionTime.getTime();
+        const staleThreshold = 30000; // 30 秒
+
+        if (stateAge > staleThreshold) {
+          console.log(`[Lifecycle] Container ${containerName} not found, state is ${stateMachine.getState()} for ${Math.floor(stateAge / 1000)}s, force resetting to NON_EXISTENT`);
+          stateMachine.forceReset();
+          await containerStateStore.save(stateMachine);
+        } else {
+          // 状态时间短，可能是活跃的创建过程，不要重置
+          console.log(`[Lifecycle] Container ${containerName} not found but state ${stateMachine.getState()} is recent (${Math.floor(stateAge / 1000)}s), not resetting (active creation in progress)`);
+        }
       }
     }
 
@@ -238,6 +248,9 @@ export class ContainerLifecycleManager {
   async _createContainerWithStateMachine(userId, userConfig, stateMachine) {
     const containerName = `claude-user-${userId}`;
 
+    // 设置创建保护标志，防止被 forceReset 中断
+    stateMachine.beginCreation();
+
     try {
       // 转换到 CREATING 状态
       stateMachine.transitionTo(ContainerState.CREATING);
@@ -270,10 +283,20 @@ export class ContainerLifecycleManager {
     } catch (error) {
       // 设置失败状态
       console.error(`[Lifecycle] Container creation failed for user ${userId}:`, error);
+      // 清除创建保护标志，允许后续操作重置状态
+      stateMachine.endCreation();
       stateMachine.setFailed(error);
       await containerStateStore.save(stateMachine);
 
       throw new Error(`Failed to create container for user ${userId}: ${error.message}`);
+    } finally {
+      // 确保在任何情况下都清除创建保护标志
+      // 只有当状态不再是 CREATING 时才清除（正常完成的情况）
+      if (stateMachine.getState() !== ContainerState.CREATING &&
+          stateMachine.getState() !== ContainerState.STARTING &&
+          stateMachine.getState() !== ContainerState.HEALTH_CHECKING) {
+        stateMachine.endCreation();
+      }
     }
   }
 
@@ -355,16 +378,7 @@ export class ContainerLifecycleManager {
       // 8. 等待容器完全启动
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // 9. 同步扩展文件到容器内（命名卷方式）
-      try {
-        await this._syncExtensionsToContainer(container, userId);
-        console.log(`[Lifecycle] Extensions synced to container ${containerName}`);
-      } catch (syncError) {
-        // 扩展同步失败不应阻止容器创建，只记录错误
-        console.warn(`[Lifecycle] Failed to sync extensions to container:`, syncError.message);
-      }
-
-      // 10. 在容器内创建默认工作区目录结构
+      // 9. 在容器内创建默认工作区目录结构（必须先创建目录，再同步扩展）
       let workspaceEnsured = false;
       for (let i = 0; i < 3; i++) {
         try {
@@ -380,6 +394,15 @@ export class ContainerLifecycleManager {
       }
       if (!workspaceEnsured) {
         console.warn(`[Lifecycle] Failed to ensure workspace after 3 attempts, will be created on-demand`);
+      }
+
+      // 10. 同步扩展文件到容器内（必须在目录创建之后执行）
+      try {
+        await this._syncExtensionsToContainer(container, userId);
+        console.log(`[Lifecycle] Extensions synced to container ${containerName}`);
+      } catch (syncError) {
+        // 扩展同步失败不应阻止容器创建，只记录错误
+        console.warn(`[Lifecycle] Failed to sync extensions to container:`, syncError.message);
       }
 
       // 11. 在容器内创建 README.md 文件
@@ -824,8 +847,9 @@ export class ContainerLifecycleManager {
       });
 
       // 使用 Docker Modem 的 putArchive 方法上传 tar 包到容器
+      // 解压到 /workspace/my-workspace，与 SDK 的 HOME 目录一致
       await new Promise((resolve, reject) => {
-        container.putArchive(tarStream, { path: '/workspace' }, (err) => {
+        container.putArchive(tarStream, { path: '/workspace/my-workspace' }, (err) => {
           if (err) {
             reject(err);
           } else {
@@ -851,7 +875,7 @@ export class ContainerLifecycleManager {
   async _setHooksPermissions(container) {
     const result = await this._execWithTimeout(
       container,
-      'chmod +x /workspace/.claude/hooks/*.sh 2>/dev/null || true',
+      'chmod +x /workspace/my-workspace/.claude/hooks/*.sh 2>/dev/null || true',
       5000
     );
 

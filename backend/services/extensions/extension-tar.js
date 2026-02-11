@@ -201,7 +201,9 @@ async function createTarArchive(sourceDir, outputPath) {
     const { spawn } = await import('child_process');
 
     await new Promise((resolve, reject) => {
-      const tar = spawn('tar', ['-cf', outputPath, '.'], {
+      // 使用 --no-xattrs 排除 macOS 扩展属性，避免容器内解压失败
+      // macOS 的 com.apple.provenance 等属性在容器内不受支持
+      const tar = spawn('tar', ['--no-xattrs', '-cf', outputPath, '.'], {
         cwd: sourceDir,
         stdio: 'ignore'
       });

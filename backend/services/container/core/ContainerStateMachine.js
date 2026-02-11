@@ -160,6 +160,9 @@ export class ContainerStateMachine extends EventEmitter {
 
     // 用于等待状态变化的 Promise 缓存
     this._stateWaiters = new Map();
+
+    // 创建操作保护：防止在创建过程中被强制重置
+    this._isCreating = false;
   }
 
   /**
@@ -219,6 +222,14 @@ export class ContainerStateMachine extends EventEmitter {
     this.stateHistory.push(newState);
     this.lastTransitionTime = new Date();
 
+    // 管理创建操作保护标志
+    if (newState === ContainerState.CREATING) {
+      this._isCreating = true;
+    } else if (previousState === ContainerState.CREATING) {
+      // 离开 CREATING 状态，清除保护标志
+      this._isCreating = false;
+    }
+
     // 清除错误状态（如果转换到非失败状态）
     if (newState !== ContainerState.FAILED) {
       this.error = null;
@@ -253,8 +264,16 @@ export class ContainerStateMachine extends EventEmitter {
    * 强制重置状态到 NON_EXISTENT
    * 用于处理卡住的状态（如服务器重启后遗留的 creating 状态）
    * 此方法绕过正常的转换规则
+   * 如果正在创建中，则跳过重置以避免干扰活跃的创建过程
+   * @returns {boolean} 是否执行了重置
    */
   forceReset() {
+    // 如果正在创建中，不允许强制重置
+    if (this.isCreating()) {
+      console.log(`[StateMachine] Skipping force reset for user ${this.userId}: container creation is in progress`);
+      return false;
+    }
+
     const previousState = this.currentState;
     this.previousState = previousState;
     this.currentState = ContainerState.NON_EXISTENT;
@@ -276,6 +295,31 @@ export class ContainerStateMachine extends EventEmitter {
 
     // 通知等待者
     this._notifyStateWaiters(ContainerState.NON_EXISTENT);
+
+    return true;
+  }
+
+  /**
+   * 开始创建操作，设置保护标志
+   * 防止创建过程被 forceReset 中断
+   */
+  beginCreation() {
+    this._isCreating = true;
+  }
+
+  /**
+   * 结束创建操作，清除保护标志
+   */
+  endCreation() {
+    this._isCreating = false;
+  }
+
+  /**
+   * 检查是否正在创建中
+   * @returns {boolean}
+   */
+  isCreating() {
+    return this._isCreating;
   }
 
   /**

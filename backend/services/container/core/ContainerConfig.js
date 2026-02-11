@@ -127,9 +127,10 @@ export class ContainerConfigBuilder {
    */
   _buildEnvironment(userId, tier) {
     const containerEnv = [
-      // 关键配置：设置 HOME 指向 /workspace
-      // 这样 ~/.claude/ = /workspace/.claude/，符合 Claude Code 官方标准
-      `HOME=/workspace`,
+      // 关键配置：设置 HOME 指向 /workspace/my-workspace
+      // 这样 ~/.claude/ = /workspace/my-workspace/.claude/，确保 SDK 能正确加载自定义 Skills
+      // 注意：扩展文件通过 putArchive 解压到 /workspace/my-workspace/.claude/
+      `HOME=/workspace/my-workspace`,
       `USER_ID=${userId}`,
       `NODE_ENV=production`,
       `USER_TIER=${tier}`,
