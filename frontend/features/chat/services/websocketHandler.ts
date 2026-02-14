@@ -354,6 +354,30 @@ function handleClaudeResponse(message: WebSocketMessage, callbacks: MessageHandl
       return true;
     }
 
+    // Handle result messages (e.g., "Unknown skill: xxx", errors)
+    if (messageData.type === 'result' && messageData.result) {
+      const resultText = typeof messageData.result === 'string' ? messageData.result : JSON.stringify(messageData.result);
+      if (resultText.trim()) {
+        // Check if this is an error/warning message
+        const isError = /Unknown skill|Error|error|Failed|failed/.test(resultText);
+
+        callbacks.onAddMessage({
+          id: generateMessageId(isError ? 'error' : 'assistant'),
+          type: isError ? 'error' : 'assistant',
+          content: isError ? `⚠️ ${resultText}` : resultText,
+          timestamp: Date.now()
+        });
+
+        // Also complete the stream if this is an error
+        if (isError) {
+          callbacks.onSetLoading?.(false);
+          callbacks.completeStream?.();
+        }
+
+        return true;
+      }
+    }
+
     // Handle user messages (tool_result) - these are already shown so skip them
     // Note: user messages have structure {type: "user", message: {role: "user", content: [...]}}
     if (sdkType === 'user' || dataRole === 'user') {
