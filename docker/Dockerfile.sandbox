@@ -32,9 +32,9 @@ RUN apt-get update && apt-get install -y \
 # 1. @anthropic-ai/claude-code (official npm package)
 # 2. claude-code (alternative package name)
 # 3. Skip installation if both fail (will be handled by application)
-# For production, consider pinning a specific version: npm install -g @anthropic-ai/claude-code@1.x.x
-RUN npm install -g @anthropic-ai/claude-code 2>/dev/null || \
-    npm install -g claude-code 2>/dev/null || \
+# Lock version to match backend SDK version (0.2.7) for compatibility
+RUN npm install -g @anthropic-ai/claude-code@0.2.7 2>/dev/null || \
+    npm install -g @anthropic-ai/claude-code@0.2.7 2>/dev/null || \
     echo "Claude Code CLI installation skipped - will be handled by application"
 
 # Create workspace and config directories
