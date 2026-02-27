@@ -815,9 +815,10 @@ export class ContainerLifecycleManager {
    */
   async _ensureDefaultWorkspaceInContainer(container, containerName) {
     // 创建默认项目目录结构（my-workspace 是系统的默认项目名称）
+    // 同时创建 .claude/projects 目录，SDK 需要它来存储会话数据
     const result = await this._execWithTimeout(
       container,
-      'mkdir -p /workspace/my-workspace/uploads && chmod 755 /workspace && ls -la /workspace/',
+      'mkdir -p /workspace/my-workspace/uploads /workspace/my-workspace/.claude/projects && chmod 755 /workspace && ls -la /workspace/',
       15000
     );
 

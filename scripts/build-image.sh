@@ -141,6 +141,7 @@ fi
 echo ""
 info "3/3 构建沙箱镜像 (claude-code-sandbox)..."
 docker build \
+  --build-arg BASE_IMAGE="$BASE_IMAGE" \
   -f "$SANDBOX_DOCKERFILE" \
   -t "$SANDBOX_IMAGE" \
   .

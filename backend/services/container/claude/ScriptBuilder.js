@@ -5,6 +5,7 @@
  */
 
 import { UserSettingsService } from '../../settings/UserSettingsService.js';
+import { loadAgentsForSDK } from '../../../services/extensions/extension-sync.js';
 
 /**
  * 过滤 SDK 选项，移除不需要传给 SDK 的字段
@@ -89,37 +90,85 @@ async function filterSDKOptions(options, userId) {
     console.log('[ScriptBuilder] Setting default allowedTools');
   }
 
-  // 关键修复：设置 settingSources 以从文件系统加载 Skills 和 Agents
+  // 关键修复：设置 settingSources 以从文件系统加载扩展
   // 根据 Claude Agent SDK 文档，必须显式设置此选项才能加载扩展
   // - "user": 从 ~/.claude/ 加载（HOME 环境变量指向的目录）
   // - "project": 从当前工作目录的 .claude/ 加载
+  //
+  // SDK 将自动从以下位置加载：
+  // - settings.json (包含 customAgents 配置，直接注册无需前缀)
+  // - CLAUDE.md (上下文文档)
+  // - skills/ (技能目录)
+  // - agents/ (代理目录)
+  // - commands/ (命令目录)
+  // - hooks/ (钩子目录)
+  // - knowledge/ (知识目录)
   sdkOptions.settingSources = ['user', 'project'];
   console.log('[ScriptBuilder] Setting settingSources: user, project');
 
+  // 动态加载 agents 和配置 plugins（从 extensions/.claude/ 目录）
+  // 注意：skills 不能通过 sdkOptions.skills 传递给子 agents
+  // 必须使用 plugins 让 SDK 自动扫描，这样主对话和子 agents 都能使用 skills
+  if (options.enableExtensions !== false) {
+    try {
+      // 动态加载 agents（从 .md 文件读取）
+      sdkOptions.agents = await loadAgentsForSDK();
+      console.log('[ScriptBuilder] Loaded agents:', Object.keys(sdkOptions.agents));
+
+      // 配置 plugins 指向 skills 目录
+      // SDK 会自动扫描 plugins 目录下的 skills，主对话和子 agents 都能使用
+      sdkOptions.plugins = [
+        {
+          type: 'local',
+          path: '/workspace/my-workspace/.claude'
+        }
+      ];
+      console.log('[ScriptBuilder] Configured plugins for skills scanning');
+    } catch (error) {
+      console.error('[ScriptBuilder] Failed to load extensions:', error);
+      // 如果加载失败，设置为空
+      sdkOptions.agents = {};
+      sdkOptions.plugins = [];
+    }
+  }
+
+  // 定义系统级禁用的交互式规划工具（前端暂不支持）
+  // 这些工具需要用户实时交互，Web 界面暂时不支持
+  const interactivePlanningTools = [
+    'EnterPlanMode',   // 进入规划模式
+    'AskUserQuestion', // 向用户提问
+    'ExitPlanMode'     // 退出规划模式
+  ];
+
   // 处理权限模式
   // 优先级：前端传入的 permissionMode > 用户设置的 skipPermissions > 默认值
-  // 注意：当存在 disallowedTools 时，不能使用 bypassPermissions（会导致权限检查失效）
+  // 注意：只有用户设置的 disallowedTools 才会影响 bypassPermissions 模式
+  // 系统级禁用（interactivePlanningTools）不影响权限模式选择
 
-  const hasDisallowedTools = sdkOptions.disallowedTools && sdkOptions.disallowedTools.length > 0;
+  // 提取用户设置的禁止工具（不包括系统级的 interactivePlanningTools）
+  const userDisallowedTools = sdkOptions.disallowedTools
+    ? sdkOptions.disallowedTools.filter(tool => !interactivePlanningTools.includes(tool))
+    : [];
+  const hasUserDisallowedTools = userDisallowedTools.length > 0;
 
   // 如果前端明确传入了 permissionMode，使用前端传入的值
   if (sdkOptions.permissionMode) {
-    // 如果前端要求 bypassPermissions 但存在 disallowedTools，发出警告
-    if (sdkOptions.permissionMode === 'bypassPermissions' && hasDisallowedTools) {
-      console.warn('[ScriptBuilder] WARNING: bypassPermissions mode will disable disallowedTools');
+    // 如果前端要求 bypassPermissions 但存在用户设置的禁止工具，发出警告
+    if (sdkOptions.permissionMode === 'bypassPermissions' && hasUserDisallowedTools) {
+      console.warn('[ScriptBuilder] WARNING: bypassPermissions mode will disable user-set disallowedTools:', userDisallowedTools);
     }
     console.log('[ScriptBuilder] Using frontend permissionMode:', sdkOptions.permissionMode);
   }
-  // 如果用户设置 skipPermissions 为 true，且没有 disallowedTools，则使用 bypassPermissions
-  else if (settings.skipPermissions && !hasDisallowedTools) {
+  // 如果用户设置 skipPermissions 为 true，且没有用户设置的禁止工具，则使用 bypassPermissions
+  else if (settings.skipPermissions && !hasUserDisallowedTools) {
     sdkOptions.permissionMode = 'bypassPermissions';
-    console.log('[ScriptBuilder] Setting permissionMode: bypassPermissions (reason: skipPermissions=true, no disallowedTools)');
+    console.log('[ScriptBuilder] Setting permissionMode: bypassPermissions (reason: skipPermissions=true, no user disallowedTools)');
   }
-  // 其他情况（包括有 disallowedTools 的情况），使用 default 模式
+  // 其他情况（包括有用户设置禁止工具的情况），使用 default 模式
   else {
     sdkOptions.permissionMode = 'default';
     console.log('[ScriptBuilder] Setting permissionMode: default (reason: ',
-      hasDisallowedTools ? 'has disallowedTools' : 'default fallback',
+      hasUserDisallowedTools ? 'has user disallowedTools' : 'default fallback',
       ')');
   }
 
@@ -133,22 +182,13 @@ async function filterSDKOptions(options, userId) {
     delete sdkOptions.resume;
   }
 
-  // 禁用交互式规划工具（前端暂不支持）
-  // 这些工具需要用户实时交互，Web 界面暂时不支持
-  const interactivePlanningTools = [
-    'EnterPlanMode',   // 进入规划模式
-    'AskUserQuestion', // 向用户提问
-    'ExitPlanMode'     // 退出规划模式
-  ];
-
-  // 合并已有的 disallowedTools
-  if (sdkOptions.disallowedTools && sdkOptions.disallowedTools.length > 0) {
-    sdkOptions.disallowedTools = [...sdkOptions.disallowedTools, ...interactivePlanningTools];
-  } else {
-    sdkOptions.disallowedTools = interactivePlanningTools;
-  }
-
+  // 合并系统级和用户级的 disallowedTools
+  // 用户设置的禁止工具优先保留，然后添加系统级禁用工具
+  sdkOptions.disallowedTools = [...userDisallowedTools, ...interactivePlanningTools];
   console.log('[ScriptBuilder] Disallowed interactive planning tools:', interactivePlanningTools);
+  if (userDisallowedTools.length > 0) {
+    console.log('[ScriptBuilder] User disallowed tools:', userDisallowedTools);
+  }
 
   // 移除 sessionId（SDK 不需要这个参数）
   delete sdkOptions.sessionId;
@@ -157,6 +197,9 @@ async function filterSDKOptions(options, userId) {
   if (sdkOptions.model === 'custom') {
     delete sdkOptions.model;
   }
+
+  // 调试：检查返回前的 sdkOptions keys
+  console.log('[ScriptBuilder] Returning sdkOptions keys:', Object.keys(sdkOptions));
 
   return sdkOptions;
 }

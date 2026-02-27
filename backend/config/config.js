@@ -156,19 +156,19 @@ export const CONTAINER = {
   // Docker 网络
   network: process.env.CONTAINER_NETWORK || 'claude-code-network',
 
-  // 容器内路径规范（符合 docs/arch/data-storage-design.md v3.1）
+  // 容器内路径规范
   paths: {
-    // 统一工作目录（通过 HOME=/workspace，~ 也指向此目录）
+    // 统一工作目录
     workspace: '/workspace',
-    // Claude 配置根目录（用户级配置，~/.claude/）
-    claudeConfig: '/workspace/.claude',
+    // Claude 配置根目录（指向项目工作区，以便 SDK 能读取 customAgents）
+    // 注意：SDK 的 CLAUDE_CONFIG_DIR 决定了 settings.json 的读取位置
+    claudeConfig: '/workspace/my-workspace/.claude',
     // 设置文件
-    settings: '/workspace/.claude/settings.json',
+    settings: '/workspace/my-workspace/.claude/settings.json',
     // API 密钥文件（保留用于兼容性）
-    apiKeys: '/workspace/.claude/api_keys.json',
-    // 项目元数据目录（注意：官方文档未明确说明，保留用于路径验证）
-    // 此目录可能由 SDK 自动管理用于会话元数据
-    projects: '/workspace/.claude/projects',
+    apiKeys: '/workspace/my-workspace/.claude/api_keys.json',
+    // 项目元数据目录
+    projects: '/workspace/my-workspace/.claude/projects',
   },
 
   // 宿主机安全策略文件路径

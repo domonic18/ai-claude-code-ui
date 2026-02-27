@@ -50,9 +50,15 @@ export function mapCliOptionsToSDK(options = {}) {
 
   // 默认工具列表
   const defaultTools = [
+    // Git 相关命令
     'Bash(git log:*)',
     'Bash(git diff:*)',
     'Bash(git status:*)',
+    // 文档处理命令（PDF、Word 等）
+    'Bash(pdftotext:*)',
+    'Bash(pandoc:*)',
+    'Bash(file:*)',
+    // 其他工具
     'Write',
     'Read',
     'Edit',
@@ -63,7 +69,8 @@ export function mapCliOptionsToSDK(options = {}) {
     'TodoWrite',
     'TodoRead',
     'WebFetch',
-    'WebSearch'
+    'WebSearch',
+    'Skill'           // 关键：启用 Skill 工具，否则 SDK 不会加载 Skills
   ];
 
   // 处理工具权限

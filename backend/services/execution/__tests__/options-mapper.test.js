@@ -114,8 +114,11 @@ describe('OptionsMapper', () => {
 
       const sdkOptions = mapCliOptionsToSDK(cliOptions);
 
-      // allowedTools should not be set when empty (to avoid unnecessary configuration)
-      assert.equal(sdkOptions.allowedTools, undefined);
+      // allowedTools should have default values including Skill
+      assert.ok(Array.isArray(sdkOptions.allowedTools));
+      assert.ok(sdkOptions.allowedTools.includes('Skill'));
+      assert.ok(sdkOptions.allowedTools.includes('Write'));
+      assert.ok(sdkOptions.allowedTools.includes('Read'));
     });
 
     it('should handle missing toolsSettings', () => {
@@ -123,8 +126,11 @@ describe('OptionsMapper', () => {
 
       const sdkOptions = mapCliOptionsToSDK(cliOptions);
 
-      // allowedTools should not be set when empty (to avoid unnecessary configuration)
-      assert.equal(sdkOptions.allowedTools, undefined);
+      // allowedTools should have default values including Skill
+      assert.ok(Array.isArray(sdkOptions.allowedTools));
+      assert.ok(sdkOptions.allowedTools.includes('Skill'));
+      assert.ok(sdkOptions.allowedTools.includes('Write'));
+      assert.ok(sdkOptions.allowedTools.includes('Read'));
     });
   });
 
