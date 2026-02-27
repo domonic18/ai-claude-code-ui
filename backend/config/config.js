@@ -168,7 +168,7 @@ export const CONTAINER = {
     // API 密钥文件（保留用于兼容性）
     apiKeys: '/workspace/my-workspace/.claude/api_keys.json',
     // 项目元数据目录
-    projects: '/workspace/my-workspace/.claude/projects',
+    projects: '/workspace/.claude/projects',
   },
 
   // 宿主机安全策略文件路径
