@@ -47,6 +47,17 @@ router.get('/:projectName/file', authenticate(), validate({
 }), fileController._asyncHandler(fileController.readFile));
 
 /**
+ * GET /api/projects/:projectName/file/download
+ * 下载文件（用于二进制文件如 docx, pdf 等）
+ * 以二进制流方式返回，保持文件完整性
+ */
+router.get('/:projectName/file/download', authenticate(), validate({
+  query: {
+    filePath: { required: true, type: 'string' }
+  }
+}), fileController._asyncHandler(fileController.downloadFile));
+
+/**
  * PUT /api/projects/:projectName/file
  * 保存文件内容到项目
  */

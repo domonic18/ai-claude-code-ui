@@ -15,6 +15,7 @@ import { ALLOWED_UPLOAD_EXTENSIONS } from '../../services/files/constants.js';
 import fs from 'fs/promises';
 import path from 'path';
 import { execSync } from 'child_process';
+import tar from 'tar';
 
 /**
  * 文件控制器
@@ -421,6 +422,114 @@ export class FileController extends BaseController {
       this._handleError(error, req, res, next);
     }
   }
+
+  /**
+   * 下载文件（用于二进制文件如 docx, pdf 等）
+   * 从容器中读取文件并以二进制流方式返回
+   * @param {Object} req - Express 请求对象
+   * @param {Object} res - Express 响应对象
+   * @param {Function} next - 下一个中间件
+   */
+  async downloadFile(req, res, next) {
+    try {
+      const userId = this._getUserId(req);
+      const { filePath } = req.query;
+      const { projectName } = req.params;
+
+      if (!filePath) {
+        throw new ValidationError('filePath is required');
+      }
+
+      // 使用 Docker getArchive API 从容器中提取文件
+      const container = await containerManager.getOrCreateContainer(userId);
+      const dockerContainer = containerManager.docker.getContainer(container.id);
+
+      // 文件在容器内的路径
+      const containerPath = filePath.startsWith('/') ? filePath : `/workspace/${projectName}/${filePath}`;
+
+      // 获取文件名（用于下载）
+      const fileName = path.basename(containerPath);
+
+      // 检测文件扩展名以设置 Content-Type
+      const ext = fileName.split('.').pop()?.toLowerCase() || '';
+      const contentTypes = {
+        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        pdf: 'application/pdf',
+        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        zip: 'application/zip',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        png: 'image/png',
+        gif: 'image/gif',
+        svg: 'image/svg+xml',
+        webp: 'image/webapp',
+        ico: 'image/x-icon',
+        mp3: 'audio/mpeg',
+        mp4: 'video/mp4',
+      };
+
+      const contentType = contentTypes[ext] || 'application/octet-stream';
+
+      // 使用 Docker getArchive API 获取 tar 流
+      const tarStream = await new Promise((resolve, reject) => {
+        dockerContainer.getArchive({ path: containerPath }, (err, stream) => {
+          if (err) {
+            reject(new Error(`getArchive failed: ${err.message}`));
+            return;
+          }
+          resolve(stream);
+        });
+      });
+
+      // 使用 tar 模块解析并在内存中提取文件
+      const entries = [];
+      await new Promise((resolve, reject) => {
+        const parser = new tar.Parse();
+
+        parser.on('entry', (entry) => {
+          const chunks = [];
+          entry.on('data', (chunk) => chunks.push(chunk));
+          entry.on('end', () => {
+            entries.push({
+              path: entry.path,
+              data: Buffer.concat(chunks)
+            });
+          });
+          entry.resume();
+        });
+
+        parser.on('end', resolve);
+        parser.on('error', reject);
+
+        tarStream.pipe(parser);
+      });
+
+      // 找到目标文件
+      const targetEntry = entries.find(e => e.path.endsWith(fileName) || path.basename(e.path) === fileName);
+      if (!targetEntry) {
+        console.error('[FileController.downloadFile] File not found in archive. Available entries:', entries.map(e => e.path));
+        throw new Error('File not found in archive');
+      }
+
+      const fileContent = targetEntry.data;
+
+      console.log('[FileController.downloadFile] User', userId, 'downloaded:', containerPath, 'size:', fileContent.length, 'entry:', targetEntry.path);
+
+      // 设置响应头并发送文件
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Length', fileContent.length);
+      res.setHeader('Cache-Control', 'no-cache');
+      res.attachment(fileName);
+
+      // 发送文件内容
+      res.send(fileContent);
+
+    } catch (error) {
+      this._handleError(error, req, res, next);
+    }
+  }
+
 }
 
 export default FileController;
