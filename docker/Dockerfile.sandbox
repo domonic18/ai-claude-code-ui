@@ -25,6 +25,10 @@ RUN apt-get update && apt-get install -y \
     vim-tiny \
     poppler-utils \
     pandoc \
+    texlive-xetex \
+    texlive-fonts-recommended \
+    texlive-lang-chinese \
+    fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
 # Create workspace and config directories
