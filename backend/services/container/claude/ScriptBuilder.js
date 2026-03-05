@@ -151,6 +151,9 @@ async function filterSDKOptions(options, userId) {
     : [];
   const hasUserDisallowedTools = userDisallowedTools.length > 0;
 
+  // 跟踪是否使用了默认工具列表
+  const usingDefaultTools = !sdkOptions.allowedTools || sdkOptions.allowedTools.length === 0;
+
   // 如果前端明确传入了 permissionMode，使用前端传入的值
   if (sdkOptions.permissionMode) {
     // 如果前端要求 bypassPermissions 但存在用户设置的禁止工具，发出警告
@@ -163,6 +166,12 @@ async function filterSDKOptions(options, userId) {
   else if (settings.skipPermissions && !hasUserDisallowedTools) {
     sdkOptions.permissionMode = 'bypassPermissions';
     console.log('[ScriptBuilder] Setting permissionMode: bypassPermissions (reason: skipPermissions=true, no user disallowedTools)');
+  }
+  // 新增：如果使用默认工具列表且没有用户设置的禁止工具，则使用 bypassPermissions
+  // 这样新用户可以直接使用所有预配置的工具（包括 PDF 转换等）
+  else if (usingDefaultTools && !hasUserDisallowedTools) {
+    sdkOptions.permissionMode = 'bypassPermissions';
+    console.log('[ScriptBuilder] Setting permissionMode: bypassPermissions (reason: using default tools, no user disallowedTools)');
   }
   // 其他情况（包括有用户设置禁止工具的情况），使用 default 模式
   else {
