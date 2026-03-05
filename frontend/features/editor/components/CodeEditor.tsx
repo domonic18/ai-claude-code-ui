@@ -340,7 +340,7 @@ function CodeEditor({
         if (isBinaryFile) {
           // For binary files, don't try to read the content
           // Set a special message to show instead of content
-          setContent(`This is a binary file (${file.name}) that cannot be displayed in the text editor.\n\nPlease use the Download button to save the file to your computer.`);
+          setContent(`这个二进制文件 (${file.name}) 现在还不能在文本编辑器中预览.\n\n请你点击下载按钮保存到本地查看。`);
           setLoading(false);
           return;
         }
