@@ -61,6 +61,8 @@ async function filterSDKOptions(options, userId) {
   delete sdkOptions.isContainerProject;
   delete sdkOptions.projectPath;
   delete sdkOptions.toolsSettings;
+  delete sdkOptions.images;     // 图片数据在 DockerExecutor 中处理
+  delete sdkOptions.imagePaths; // 图片路径在脚本中单独处理
 
   // 设置默认工具，如果最终没有配置任何工具
   if (!sdkOptions.allowedTools || sdkOptions.allowedTools.length === 0) {
@@ -224,6 +226,10 @@ export async function buildSDKScript(command, options, userId) {
   // 提取 sessionId 以便在脚本中使用
   const sessionId = options.sessionId || '';
 
+  // 提取图片路径（已由 DockerExecutor 复制到容器内）
+  const imagePaths = options.imagePaths || [];
+  console.log('[ScriptBuilder] Image paths received:', imagePaths);
+
   // 过滤并处理 options（现在是异步的）
   const sdkOptions = await filterSDKOptions(options, userId);
 
@@ -251,7 +257,17 @@ async function execute() {
     const options = JSON.parse(optionsJson);
 
     // 从 base64 解码命令
-    const command = Buffer.from("${commandBase64}", "base64").toString("utf-8");
+    let command = Buffer.from("${commandBase64}", "base64").toString("utf-8");
+
+    // 添加图片路径到命令（如果有）
+    const imagePaths = ${JSON.stringify(imagePaths)};
+    if (imagePaths.length > 0) {
+      console.error("[SDK] Images available at:", imagePaths);
+      const imageNote = "\\n\\n[Images provided at the following paths:]\\n" +
+        imagePaths.map((p, i) => (i + 1) + ". " + p).join("\\n") +
+        "\\n\\nPlease use the Read tool to view these images and analyze them.";
+      command = command + imageNote;
+    }
 
     console.error("[SDK] Options:", JSON.stringify(options, null, 2));
     console.error("[SDK] Command:", command);

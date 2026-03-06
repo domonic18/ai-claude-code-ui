@@ -39,12 +39,14 @@ export function handleChatConnection(ws, connectedClients) {
                 // 处理附件：将文件路径追加到命令文本中
                 let command = data.command || '';
 
-                // 检查是否有新附件（使用 path 字段判断，因为图片可能没有 path）
-                const hasNewAttachments = data.attachments && Array.isArray(data.attachments) && data.attachments.some(f => f.path);
+                // 分离不同类型的附件
+                const attachments = data.attachments || [];
+                const documentAttachments = attachments.filter(f => f.path); // 文档附件（有 path）
+                const imageAttachments = attachments.filter(f => f.data);    // 图片附件（有 base64 data）
 
-                if (hasNewAttachments) {
-                    const filePaths = data.attachments
-                        .filter(f => f.path) // 只包含有 path 的附件
+                // 处理文档附件：将文件路径追加到命令中
+                if (documentAttachments.length > 0) {
+                    const filePaths = documentAttachments
                         .map(f => ({ path: f.path, name: f.name, type: f.type }));
 
                     // 使用 FileDocumentReader 生成读取指令
@@ -58,7 +60,8 @@ export function handleChatConnection(ws, connectedClients) {
                     userId: ws.user.userId,  // JWT payload 中是 userId，不是 id
                     isContainerProject: true,
                     projectPath: originalProjectName,
-                    // 不要在这里设置 cwd - 让 SDK 函数根据 isContainerProject 确定
+                    // 传递图片附件给容器执行器
+                    images: imageAttachments.length > 0 ? imageAttachments : undefined,
                 };
 
                 try {
