@@ -2,7 +2,7 @@
 # Base image containing system dependencies and Node.js modules, without application code
 # Purpose: Accelerate subsequent image builds by avoiding repeated dependency installation
 #
-# Build: docker build -f docker/Dockerfile.base -t ccr.ccs.tencentyun.com/patent/claude-code-ui:base .
+# Build: docker build -f docker/Dockerfile.base -t claude-code-ui:base .
 
 # Use full node:20 image (not slim) which includes Node.js headers
 # This is required for building native modules like better-sqlite3

@@ -125,6 +125,7 @@ fi
 echo ""
 info "2/3 构建主应用镜像 (claude-code-ui)..."
 docker build \
+  --build-arg BASE_IMAGE="$BASE_IMAGE" \
   -f "$MAIN_DOCKERFILE" \
   -t "$MAIN_IMAGE" \
   .
