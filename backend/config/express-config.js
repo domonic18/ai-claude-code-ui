@@ -15,7 +15,7 @@ import cookieParser from 'cookie-parser';
 import { FILES, SERVER, CORS } from './config.js';
 
 // 路由导入 - 新结构（按功能分组）
-import { auth, settings, users, saml } from '../routes/core/index.js';
+import { auth, settings, modelsRouter, users, saml } from '../routes/core/index.js';
 import { projects, sessions, files, git, userSettings, mcpServers, extensions } from '../routes/api/index.js';
 import { claude, cursor, codex, mcp, taskmaster, agent } from '../routes/integrations/index.js';
 import { commands, system, uploads } from '../routes/tools/index.js';
@@ -78,11 +78,15 @@ export function configureExpress(app, wss) {
     });
 
     // ===== 公共路由（无需身份验证）=====
+    // 公开模型列表端点
+    app.use('/api/models', modelsRouter);
+
     // SAML 路由（必须在 validateApiKey 之前定义）
     // 统一使用 /api/auth/saml 前缀：/api/auth/saml/sso-login, /api/auth/saml/callback, /api/auth/saml/status, /api/auth/saml/metadata, /api/auth/saml/logout
     console.log('[CONFIG] Registering SAML routes...');
     app.use('/api/auth/saml', saml);
     console.log('[CONFIG] SAML routes registered successfully');
+
     // 认证路由必须在 validateApiKey 之前定义
     app.use('/api/auth', auth);
 

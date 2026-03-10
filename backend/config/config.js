@@ -220,6 +220,43 @@ export const CLAUDE = {
 };
 
 /**
+ * AI 模型配置
+ *
+ * 从环境变量 AVAILABLE_MODELS 读取可用模型列表。
+ * 如果未设置，使用默认模型列表。
+ */
+export const MODELS = {
+  // 从环境变量解析模型列表
+  available: (() => {
+    try {
+      if (process.env.AVAILABLE_MODELS) {
+        const models = JSON.parse(process.env.AVAILABLE_MODELS);
+        console.log(`[MODELS] Loaded ${models.length} models from AVAILABLE_MODELS env var`);
+        return models;
+      }
+    } catch (error) {
+      console.error(`[MODELS] Error parsing AVAILABLE_MODELS: ${error.message}`);
+    }
+
+    // 默认模型列表（当环境变量未设置时使用）
+    return [
+      { name: 'glm-4.7', provider: 'Zhipu GLM', description: 'Latest flagship model' },
+      { name: 'glm-5', provider: 'Zhipu GLM', description: 'Next generation model' },
+      { name: 'kimi-k2.5', provider: 'Kimi', description: 'Moonshot AI Kimi model' }
+    ];
+  })(),
+
+  // 默认模型
+  default: process.env.ANTHROPIC_MODEL || 'glm-4.7',
+
+  // API 配置
+  api: {
+    baseURL: process.env.ANTHROPIC_BASE_URL,
+    apiKey: process.env.ANTHROPIC_API_KEY
+  }
+};
+
+/**
  * 文件操作配置
  */
 export const FILES = {
@@ -508,6 +545,7 @@ export default {
   CONTAINER,
   RESOURCE_LIMITS,
   CLAUDE,
+  MODELS,
   FILES,
   WEBSOCKET,
   LOG,
