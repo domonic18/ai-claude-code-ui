@@ -1,15 +1,22 @@
 /**
  * Centralized Model Definitions
  *
- * 单一数据源原则：所有模型配置通过后端 API 获取
- * 前端通过 GET /api/models 端点获取可用模型列表
+ * Claude SDK Models:
+ * - 用于后端 SDK 集成和默认模型选择
+ * - 主要使用在 OptionsMapper.js、agent.js 等后端服务中
+ * - 这些是向后兼容的常量，主要用于 Cursor 和 Codex 集成
+ *
+ * 前端模型选择:
+ * - 前端通过 GET /api/models 端点获取可用模型列表
+ * - 模型列表从 AVAILABLE_MODELS 环境变量解析
+ * - 格式：model:provider|model:provider
  *
  * @module shared/modelConstants
  */
 
 /**
  * Claude (Anthropic) Models
- * 注意：这些常量用于后端 SDK 集成
+ * 注意：这些常量用于后端 SDK 集成和默认模型选择
  */
 export const CLAUDE_MODELS = {
   OPTIONS: [
@@ -60,47 +67,30 @@ export const CODEX_MODELS = {
 };
 
 /**
- * 默认模型列表（用于前端 API 调用失败时的回退）
- */
-const DEFAULT_MODELS_FALLBACK = [
-  { name: 'glm-4.7', provider: 'Zhipu GLM', description: 'Latest flagship model' },
-  { name: 'glm-5', provider: 'Zhipu GLM', description: 'Next generation model' },
-  { name: 'kimi-k2.5', provider: 'Kimi', description: 'Moonshot AI Kimi model' }
-];
-
-/**
  * 获取模型选项的异步函数（前端专用）
  * 从后端 API 获取可用模型列表
  *
  * @returns {Promise<Array>} 模型选项数组
+ * @throws {Error} 如果获取失败
  */
 export async function getAllModelOptions() {
   try {
     const response = await fetch('/api/models');
     if (!response.ok) {
-      throw new Error(`Failed to fetch models: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Failed to fetch models (${response.status}): ${errorText}`);
     }
     const data = await response.json();
-    return data.models || DEFAULT_MODELS_FALLBACK;
+
+    // 确保返回的是数组，如果 API 返回格式错误则抛出明确错误
+    if (!Array.isArray(data.models)) {
+      throw new Error('Invalid API response: models field is missing or not an array');
+    }
+
+    return data.models;
   } catch (error) {
     console.error('[modelConstants] Error fetching models:', error);
-    // 返回默认模型作为回退
-    return DEFAULT_MODELS_FALLBACK;
+    // 直接重新抛出原始错误，保留完整的错误信息和堆栈
+    throw error;
   }
-}
-
-/**
- * 默认模型名称
- * 如果 API 调用失败，使用此默认值
- */
-export const DEFAULT_MODEL = 'glm-4.7';
-
-/**
- * 获取默认模型的同步函数
- * 用于初始化，实际模型列表通过异步 API 获取
- *
- * @returns {string} 默认模型名称
- */
-export function getDefaultModel() {
-  return DEFAULT_MODEL;
 }

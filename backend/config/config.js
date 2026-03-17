@@ -59,12 +59,14 @@ export function loadEnvironment() {
     console.log(`[CONFIG] Loaded ${loadedCount} environment variables from .env`);
 
     // 关键变量检查
-    const criticalVars = ['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_MODEL'];
+    const criticalVars = ['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'AVAILABLE_MODELS'];
     console.log('[CONFIG] Critical environment variables status:');
     criticalVars.forEach(varName => {
       const isSet = !!process.env[varName];
       const value = isSet ? (varName.includes('TOKEN') || varName.includes('KEY')
         ? `${process.env[varName].substring(0, 10)}...`
+        : varName === 'AVAILABLE_MODELS'
+        ? `${process.env[varName].substring(0, 50)}...`
         : process.env[varName])
         : 'NOT SET';
       console.log(`[CONFIG] - ${varName}: ${value}`);
@@ -222,34 +224,86 @@ export const CLAUDE = {
 /**
  * AI 模型配置
  *
- * 从环境变量 AVAILABLE_MODELS 读取可用模型列表。
- * 如果未设置，使用默认模型列表。
+ * 从 AVAILABLE_MODELS 环境变量解析可用模型列表。
+ * 格式：模型名:提供商|模型名:提供商
+ * 示例：AVAILABLE_MODELS=glm-4.7:Zhipu GLM|glm-5:Zhipu GLM|kimi-k2.5:Moonshot AI
  */
 export const MODELS = {
-  // 从环境变量解析模型列表
+  /**
+   * 解析并验证 AVAILABLE_MODELS 环境变量
+   * @returns {Array<{name: string, provider: string}>} 模型数组
+   * @throws {Error} 如果环境变量无效
+   */
   available: (() => {
-    try {
-      if (process.env.AVAILABLE_MODELS) {
-        const models = JSON.parse(process.env.AVAILABLE_MODELS);
-        console.log(`[MODELS] Loaded ${models.length} models from AVAILABLE_MODELS env var`);
-        return models;
-      }
-    } catch (error) {
-      console.error(`[MODELS] Error parsing AVAILABLE_MODELS: ${error.message}`);
+    if (!process.env.AVAILABLE_MODELS) {
+      throw new Error(
+        'AVAILABLE_MODELS environment variable is required.\n' +
+        'Format: model:provider|model:provider\n' +
+        'Example: AVAILABLE_MODELS=glm-4.7:Zhipu GLM|glm-5:Zhipu GLM|kimi-k2.5:Moonshot AI'
+      );
     }
 
-    // 默认模型列表（当环境变量未设置时使用）
-    return [
-      { name: 'glm-4.7', provider: 'Zhipu GLM', description: 'Latest flagship model' },
-      { name: 'glm-5', provider: 'Zhipu GLM', description: 'Next generation model' },
-      { name: 'kimi-k2.5', provider: 'Kimi', description: 'Moonshot AI Kimi model' }
-    ];
+    try {
+      // 新格式：model:provider|model:provider
+      // 例如：glm-4.7:Zhipu GLM|glm-5:Zhipu GLM|kimi-k2.5:Moonshot AI
+      const entries = process.env.AVAILABLE_MODELS.split('|');
+
+      const models = entries.map((entry, index) => {
+        const parts = entry.split(':');
+        if (parts.length < 2) {
+          throw new Error(
+            `Invalid model entry at index ${index}: "${entry}".\n` +
+            'Expected format: model:provider\n' +
+            `Example: glm-4.7:Zhipu GLM`
+          );
+        }
+
+        const name = parts[0].trim();
+        const provider = parts.slice(1).join(':').trim(); // Provider 可能包含空格，使用 join(':') 处理
+
+        if (!name || !provider) {
+          throw new Error(
+            `Model name or provider cannot be empty at index ${index}: "${entry}"`
+          );
+        }
+
+        return { name, provider, description: '' };
+      });
+
+      if (models.length === 0) {
+        throw new Error('AVAILABLE_MODELS must contain at least one model');
+      }
+
+      console.log(`[MODELS] Loaded ${models.length} models from AVAILABLE_MODELS`);
+      return models;
+    } catch (error) {
+      if (error.message.startsWith('AVAILABLE_MODELS') ||
+          error.message.startsWith('Invalid model entry')) {
+        throw error; // 重新抛出我们自己的验证错误
+      }
+      throw new Error(
+        `Failed to parse AVAILABLE_MODELS: ${error.message}\n` +
+        `Format: model:provider|model:provider\n` +
+        `Example: AVAILABLE_MODELS=glm-4.7:Zhipu GLM|glm-5:Zhipu GLM|kimi-k2.5:Moonshot AI`
+      );
+    }
   })(),
 
-  // 默认模型
-  default: process.env.ANTHROPIC_MODEL || 'glm-4.7',
+  /**
+   * 默认模型（使用第一个可用模型）
+   */
+  default: (() => {
+    try {
+      return MODELS.available[0]?.name;
+    } catch {
+      return undefined; // 如果解析失败，返回 undefined 让调用者知道有问题
+    }
+  })(),
 
-  // API 配置
+  /**
+   * API 配置（保留用于向后兼容）
+   * 注意：SDK 现在使用前端传入的 model 参数，不再依赖这些环境变量
+   */
   api: {
     baseURL: process.env.ANTHROPIC_BASE_URL,
     apiKey: process.env.ANTHROPIC_API_KEY

@@ -31,6 +31,9 @@ BASE_IMAGE="${REGISTRY}/${NAMESPACE}/claude-code-ui:base"
 MAIN_IMAGE="${REGISTRY}/${NAMESPACE}/claude-code-ui:${VERSION}"
 SANDBOX_IMAGE="${REGISTRY}/${NAMESPACE}/claude-code-sandbox:${VERSION}"
 
+# 为了方便本地开发，也创建 latest 标签的镜像
+SANDBOX_LATEST="${REGISTRY}/${NAMESPACE}/claude-code-sandbox:latest"
+
 # Dockerfile 路径
 BASE_DOCKERFILE="docker/Dockerfile.base"
 MAIN_DOCKERFILE="docker/Dockerfile.main"
@@ -147,8 +150,11 @@ docker build \
   -t "$SANDBOX_IMAGE" \
   .
 
+# 同时打上 latest 标签，方便本地开发
+docker tag "$SANDBOX_IMAGE" "$SANDBOX_LATEST"
 info "沙箱镜像构建完成！"
 echo "  - $SANDBOX_IMAGE"
+echo "  - $SANDBOX_LATEST (用于本地开发)"
 
 # ==================== 完成 ====================
 echo ""
