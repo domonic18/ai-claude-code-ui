@@ -85,19 +85,41 @@ export function processOutputLine(line, writer, sessionId, state) {
       }
     }
     
-    // 发送 claude-response
-    console.log('[MessageTransformer] Sending claude-response, type:', sdkMessage.type);
-    writer.send({
-      type: 'claude-response',
-      data: sdkMessage
-    });
-    
-    // 如果是 result 消息，也发送 token-budget
-    const tokenBudget = extractTokenBudget(sdkMessage);
-    if (tokenBudget) {
+    // 根据 sdkMessage 类型分别处理，避免 result 消息重复发送内容
+    if (sdkMessage.type === 'assistant') {
+      // assistant 消息：发送完整的响应内容
+      console.log('[MessageTransformer] Sending claude-response, type: assistant');
       writer.send({
-        type: 'token-budget',
-        data: tokenBudget
+        type: 'claude-response',
+        data: sdkMessage
+      });
+    } else if (sdkMessage.type === 'result') {
+      // result 消息：只发送 token-budget，不发送内容（避免与 assistant 消息重复）
+      const tokenBudget = extractTokenBudget(sdkMessage);
+      if (tokenBudget) {
+        writer.send({
+          type: 'token-budget',
+          data: tokenBudget
+        });
+      }
+
+      // 检查是否是错误信息（如 "Unknown skill"）
+      // 使用更严格的模式，避免误判正常对话中的 "error" 关键词
+      const isError = sdkMessage.result &&
+        /^(Unknown skill|Error:|Failed:)/i.test(sdkMessage.result);
+      if (isError) {
+        console.error('[MessageTransformer] Sending claude-error from result:', sdkMessage.result);
+        writer.send({
+          type: 'claude-error',
+          error: sdkMessage.result
+        });
+      }
+    } else {
+      // 其他类型（system、thinking 等）：发送 claude-response
+      console.log('[MessageTransformer] Sending claude-response, type:', sdkMessage.type);
+      writer.send({
+        type: 'claude-response',
+        data: sdkMessage
       });
     }
   } 

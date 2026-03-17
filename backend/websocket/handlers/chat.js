@@ -31,6 +31,11 @@ export function handleChatConnection(ws, connectedClients) {
         try {
             const data = JSON.parse(message);
 
+            // 调试：打印完整 data.options 对象
+            if (data.type === 'claude-command') {
+                console.log('[WebSocket] Received claude-command, model:', data.options?.model);
+            }
+
             if (data.type === 'claude-command') {
                 // 容器模式：使用 queryClaudeSDKInContainer
                 // 将 projectPath（例如 "my/workspace"）转换回项目名（例如 "my-workspace"）

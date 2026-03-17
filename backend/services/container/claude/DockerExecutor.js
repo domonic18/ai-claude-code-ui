@@ -183,19 +183,10 @@ export async function executeInContainer(userId, command, options, writer, sessi
     }
 
     // 构建 SDK 脚本（传递图片路径而非数据）
-    console.log('[DockerExecutor] Building SDK script...');
     const sdkScript = await buildSDKScript(command, { ...options, imagePaths }, userId);
-    console.log('[DockerExecutor] Script length:', sdkScript.length);
-
-    // 记录环境变量状态
-    console.log('[DockerExecutor] Host environment:');
-    const authToken = process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY;
-    console.log('[DockerExecutor] - ANTHROPIC_AUTH_TOKEN:',
-      authToken ? `SET (${authToken.substring(0, 15)}...)` : 'NOT SET');
-    console.log('[DockerExecutor] - ANTHROPIC_BASE_URL:', process.env.ANTHROPIC_BASE_URL || 'NOT SET');
-    console.log('[DockerExecutor] - ANTHROPIC_MODEL:', process.env.ANTHROPIC_MODEL || 'NOT SET');
 
     // 验证必需的环境变量
+    const authToken = process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY;
     if (!authToken) {
       throw new Error('ANTHROPIC_AUTH_TOKEN or ANTHROPIC_API_KEY must be set in environment or .env file');
     }
@@ -212,8 +203,8 @@ export async function executeInContainer(userId, command, options, writer, sessi
           HOME: '/workspace',
           CLAUDE_CONFIG_DIR: '/workspace/.claude',
           ANTHROPIC_AUTH_TOKEN: authToken,
-          ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL,
-          ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL
+          ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL
+          // 不传递 ANTHROPIC_MODEL 环境变量，让 SDK 使用前端传入的 model 参数
         }
       }
     );
@@ -234,7 +225,6 @@ export async function executeInContainer(userId, command, options, writer, sessi
     const stderr = new PassThrough();
 
     // 使用 Docker 的 modem.demuxStream 来分离
-    console.log('[DockerExecutor] Demuxing stream...');
     docker.modem.demuxStream(stream, stdout, stderr);
 
     return new Promise((resolve, reject) => {
@@ -271,7 +261,6 @@ export async function executeInContainer(userId, command, options, writer, sessi
       stdout.on('data', (chunk) => {
         dataCount++;
         const output = chunk.toString();
-        console.log(`[DockerExecutor] STDOUT #${dataCount}:`, output.substring(0, 100));
         stdoutChunks.push(output);
 
         // 通过 writer 发送到 WebSocket
