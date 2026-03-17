@@ -2,6 +2,8 @@
  * useMessageSender Hook
  *
  * Handles message sending logic.
+ *
+ * 注意：模型名称直接使用后端 API 返回的格式，无需转换
  */
 
 import { useCallback } from 'react';
@@ -16,7 +18,7 @@ export interface UseMessageSenderOptions {
   currentSessionId: string | null;
   /** Attached files */
   attachedFiles: FileAttachment[];
-  /** Selected model */
+  /** Selected model (backend format, e.g., 'glm-4.7') */
   selectedModel: string;
   /** Selected project */
   selectedProject?: {
@@ -45,25 +47,6 @@ export interface UseMessageSenderOptions {
 export interface UseMessageSenderResult {
   /** Handle send message */
   handleSend: () => Promise<void>;
-}
-
-/**
- * Convert frontend model ID to backend model format
- *
- * Examples:
- * - 'claude-sonnet' -> 'sonnet'
- * - 'claude-opus' -> 'opus'
- * - 'claude-custom' -> 'custom' (uses ANTHROPIC_MODEL env var)
- * - 'claude-haiku' -> 'haiku'
- */
-function convertModelIdToBackend(modelId: string): string {
-  // Remove provider prefix and return the value
-  // e.g., 'claude-sonnet' -> 'sonnet', 'claude-custom' -> 'custom'
-  const parts = modelId.split('-');
-  if (parts.length > 1) {
-    return parts.slice(1).join('-');
-  }
-  return modelId;
 }
 
 /**
@@ -128,9 +111,6 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
       // Create temporary session ID if needed
       const sessionId = currentSessionId || `temp-${Date.now()}`;
 
-      // Convert frontend model ID to backend format
-      const backendModel = convertModelIdToBackend(selectedModel);
-
       // Send message in the format expected by the backend
       sendMessage({
         type: 'claude-command',
@@ -139,7 +119,7 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
         options: {
           projectPath: selectedProject?.name,
           sessionId,
-          model: backendModel,
+          model: selectedModel, // Directly use the selected model name (backend format)
           resume: !!currentSessionId,
         },
       });

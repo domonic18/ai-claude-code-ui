@@ -147,9 +147,57 @@ export function ChatInterface({
   const [tasks, setTasks] = useState<any[]>([]);
   const [tokenBudget, setTokenBudget] = useState<any>(null);
   const [permissionMode, setPermissionMode] = useState<'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'>('default');
+  const [availableModels, setAvailableModels] = useState<Array<{ name: string; provider: string }>>([]);
+  const [modelSwitchNotification, setModelSwitchNotification] = useState<{ show: boolean; message: string }>({ show: false, message: '' });
+  // Load available models from API
+  useEffect(() => {
+    fetch('/api/models')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.models)) {
+          setAvailableModels(data.models);
+        }
+      })
+      .catch(error => {
+        console.error('[ChatInterface] Error loading models:', error);
+      });
+  }, []);
+
+  // 监听模型切换事件，显示通知
+  const notificationTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const handleModelSwitch = (event: CustomEvent) => {
+      const { newModel, reason } = event.detail;
+      if (reason === 'image-attachment') {
+        setModelSwitchNotification({
+          show: true,
+          message: `当前模型不支持图片，已切换到 ${newModel}`
+        });
+
+        // 3秒后自动隐藏通知
+        notificationTimeoutRef.current = window.setTimeout(() => {
+          setModelSwitchNotification({ show: false, message: '' });
+          notificationTimeoutRef.current = null;
+        }, 3000);
+      }
+    };
+
+    window.addEventListener('model-switch', handleModelSwitch as EventListener);
+    return () => {
+      window.removeEventListener('model-switch', handleModelSwitch as EventListener);
+      if (notificationTimeoutRef.current) {
+        window.clearTimeout(notificationTimeoutRef.current);
+        notificationTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   // Use model selection hook
-  const { selectedModel, handleModelSelect } = useModelSelection();
+  const { selectedModel, handleModelSelect } = useModelSelection({
+    availableModels,
+    hasImageAttachment: attachedFiles.length > 0 && attachedFiles.some(f => f.type?.startsWith('image/'))
+  });
 
   // Hooks
   const {
@@ -408,13 +456,26 @@ export function ChatInterface({
     setIsLoading(true);
     startStream();
 
+    // Convert image files to images array for display in UserMessage
+    const images = files
+      .filter(f => f.type?.startsWith('image/'))
+      .map(f => ({
+        name: f.name,
+        data: f.data || '',
+        type: f.type
+      }));
+
+    // Non-image files keep as files array
+    const documentFiles = files.filter(f => !f.type?.startsWith('image/'));
+
     // Add user message
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       type: 'user',
       content,
       timestamp: Date.now(),
-      files: files.length > 0 ? files : undefined,
+      images: images.length > 0 ? images : undefined,
+      files: documentFiles.length > 0 ? documentFiles : undefined,
     };
 
     addMessage(userMessage);
@@ -424,22 +485,21 @@ export function ChatInterface({
       // Create temporary session ID if needed
       const sessionId = currentSessionId || `temp-${Date.now()}`;
 
-      // Convert frontend model ID to backend format
-      const backendModel = selectedModel.split('-').slice(1).join('-');
-
       // Send message in the format expected by the backend
-      sendMessage({
+      const messageToSend = {
         type: 'claude-command',
         command: content,
         attachments: files.length > 0 ? files : undefined, // Include attached files
         options: {
           projectPath: selectedProject?.name,
           sessionId,
-          model: backendModel,
+          model: selectedModel, // Directly use the selected model name (backend format)
           resume: !!currentSessionId,
           permissionMode, // Include permission mode
         },
-      });
+      };
+
+      sendMessage(messageToSend);
 
       onSessionProcessing?.(sessionId);
     }
@@ -527,6 +587,18 @@ export function ChatInterface({
             isStreaming={isStreaming}
             content={streamingContent}
           />
+        </div>
+      )}
+
+      {/* Model switch notification banner */}
+      {modelSwitchNotification.show && (
+        <div className="px-4 pb-2">
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-200 px-4 py-3 rounded-lg flex items-center gap-2">
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-sm">{modelSwitchNotification.message}</span>
+          </div>
         </div>
       )}
 

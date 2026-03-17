@@ -13,7 +13,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getAllModelOptions, DEFAULT_MODEL } from '../../../../shared/modelConstants';
+import { getAllModelOptions } from '../../../../shared/modelConstants';
 import type { TokenBudget } from './TokenDisplay';
 
 export interface ModelOption {
@@ -48,7 +48,7 @@ interface ModelSelectorProps {
  * ModelSelector Component
  */
 export function ModelSelector({
-  selectedModel = DEFAULT_MODEL,
+  selectedModel,
   models,
   onModelSelect,
   disabled = false,
@@ -64,15 +64,19 @@ export function ModelSelector({
   useEffect(() => {
     if (!models) {
       getAllModelOptions().then(setLoadedModels).catch(error => {
-        console.error('[ModelSelector] Failed to load models:', error);
+        // Error is logged by getAllModelOptions
       });
     }
   }, [models]);
 
   const currentModels = models || loadedModels;
+  const isModelsLoaded = currentModels.length > 0;
 
   // Find current model
-  const currentModel = currentModels.find(m => m.name === selectedModel) || currentModels[0];
+  // 如果模型列表未加载完成，不显示任何模型（避免显示加载中的第一个模型）
+  const currentModel = isModelsLoaded
+    ? currentModels.find(m => m.name === selectedModel) || currentModels[0]
+    : null;
 
   // Calculate token percentage for badge
   const tokenPercentage = React.useMemo(() => {
@@ -156,7 +160,9 @@ export function ModelSelector({
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
         </svg>
-        <span className="text-sm font-medium">{currentModel?.name || 'Loading...'}</span>
+        <span className="text-sm font-medium">
+          {isModelsLoaded ? (currentModel?.name || 'Loading...') : 'Loading models...'}
+        </span>
         {!disabled && (
           <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -184,55 +190,61 @@ export function ModelSelector({
       {/* Dropdown */}
       {isOpen && !disabled && (
         <div className="absolute z-50 mt-2 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-96 overflow-y-auto">
-          {Object.entries(groupedModels).map(([provider, providerModels]) => (
-            <div key={provider}>
-              {/* Provider header */}
-              <div className="px-3 py-2 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-                <p className="text-xs font-semibold uppercase text-gray-600 dark:text-gray-400">
-                  {provider}
-                </p>
-              </div>
+          {isModelsLoaded ? (
+            Object.entries(groupedModels).map(([provider, providerModels]) => (
+              <div key={provider}>
+                {/* Provider header */}
+                <div className="px-3 py-2 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+                  <p className="text-xs font-semibold uppercase text-gray-600 dark:text-gray-400">
+                    {provider}
+                  </p>
+                </div>
 
-              {/* Models */}
-              {providerModels.map(model => (
-                <button
-                  key={model.name}
-                  type="button"
-                  onClick={() => handleSelect(model.name)}
-                  className={`
-                    w-full px-3 py-2 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors
-                    ${model.name === selectedModel
-                      ? 'bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-500'
-                      : 'border-l-4 border-transparent'
-                    }
-                  `}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-medium ${model.name === selectedModel ? 'text-blue-700 dark:text-blue-300' : 'text-gray-900 dark:text-white'}`}>
-                        {model.name}
-                      </p>
-                      {model.description && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                          {model.description}
+                {/* Models */}
+                {providerModels.map(model => (
+                  <button
+                    key={model.name}
+                    type="button"
+                    onClick={() => handleSelect(model.name)}
+                    className={`
+                      w-full px-3 py-2 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors
+                      ${model.name === selectedModel
+                        ? 'bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-500'
+                        : 'border-l-4 border-transparent'
+                      }
+                    `}
+                  >
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium ${model.name === selectedModel ? 'text-blue-700 dark:text-blue-300' : 'text-gray-900 dark:text-white'}`}>
+                          {model.name}
                         </p>
-                      )}
-                      {model.contextWindow && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                          {t('chat.context', { tokens: model.contextWindow.toLocaleString() })}
-                        </p>
+                        {model.description && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            {model.description}
+                          </p>
+                        )}
+                        {model.contextWindow && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            {t('chat.context', { tokens: model.contextWindow.toLocaleString() })}
+                          </p>
+                        )}
+                      </div>
+                      {model.name === selectedModel && (
+                        <svg className="w-5 h-5 text-blue-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
                       )}
                     </div>
-                    {model.name === selectedModel && (
-                      <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </div>
-                </button>
-              ))}
+                  </button>
+                ))}
+              </div>
+            ))
+          ) : (
+            <div className="px-3 py-4 text-center text-gray-500 dark:text-gray-400">
+              Loading models...
             </div>
-          ))}
+          )}
         </div>
       )}
     </div>

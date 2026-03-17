@@ -13,7 +13,7 @@
 
 import { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import ReactDOM from 'react-dom';
+import { createPortal } from 'react-dom';
 import SidebarHeader from './SidebarHeader';
 import ProjectList from './ProjectList';
 import ProjectCreationWizard from './ProjectCreationWizard';
@@ -334,7 +334,7 @@ export const Sidebar = memo(function Sidebar({
   return (
     <>
       {/* Project Creation Wizard Modal */}
-      {showNewProject && ReactDOM.createPortal(
+      {showNewProject && createPortal(
         <ProjectCreationWizard
           isOpen={showNewProject}
           onClose={() => setShowNewProject(false)}
