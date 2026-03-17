@@ -149,9 +149,18 @@ export class ContainerConfigBuilder {
       containerEnv.push(`ANTHROPIC_BASE_URL=${process.env.ANTHROPIC_BASE_URL}`);
     }
 
-    if (process.env.ANTHROPIC_MODEL) {
-      containerEnv.push(`ANTHROPIC_MODEL=${process.env.ANTHROPIC_MODEL}`);
+    // 传递 AVAILABLE_MODELS 到容器（用于前端获取可用模型列表）
+    // 注意：容器内的 backend/index.js 会解析此环境变量
+    if (process.env.AVAILABLE_MODELS) {
+      containerEnv.push(`AVAILABLE_MODELS=${process.env.AVAILABLE_MODELS}`);
     }
+
+    // 不传递 ANTHROPIC_MODEL 环境变量到容器
+    // 原因：
+    // 1. 前端通过 WebSocket 消息传递 model 参数
+    // 2. SDK 直接使用传入的 model 参数，无需环境变量
+    // 3. 避免环境变量覆盖用户选择的模型
+    // 4. 支持运行时切换模型，无需重启容器
 
     return containerEnv;
   }

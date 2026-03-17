@@ -149,7 +149,8 @@ export class CodexDiscovery extends BaseDiscovery {
               lastActivity: sessionData.timestamp,
               metadata: {
                 cwd: sessionData.cwd,
-                model: sessionData.model,
+                // 兼容 Codex 旧格式：使用 model_provider，否则使用 model
+                model: sessionData.model_provider || sessionData.model,
                 filePath: filePath
               }
             }));

@@ -237,6 +237,10 @@ export async function buildSDKScript(command, options, userId) {
   const optionsJson = JSON.stringify(sdkOptions);
   const optionsBase64 = Buffer.from(optionsJson).toString('base64');
 
+  // 调试：在编码前打印 options
+  console.log('[ScriptBuilder] Original sdkOptions.model:', sdkOptions.model);
+  console.log('[ScriptBuilder] optionsJson:', optionsJson);
+
   // 对命令也使用 base64 编码，避免特殊字符问题
   const commandBase64 = Buffer.from(command, 'utf-8').toString('base64');
 
@@ -254,6 +258,7 @@ async function execute() {
 
     // 从 base64 解码 options
     const optionsJson = Buffer.from("${optionsBase64}", "base64").toString("utf-8");
+    console.error("[SDK] Decoded options JSON:", optionsJson);
     const options = JSON.parse(optionsJson);
 
     // 从 base64 解码命令
