@@ -35,7 +35,7 @@
 
 # 🚀 快速开始
 
-## 本地开发
+## 首次设置（仅需一次）
 
 ```bash
 # 克隆仓库
@@ -48,31 +48,26 @@ git submodule update --init --recursive
 # 安装依赖
 npm install
 
-# 构建 base 镜像（仅首次需要，使用 docker build）
-docker build -f docker/Dockerfile.base -t claude-code-ui:base .
-
-# 构建前端
-npm run build
-
-# 构建沙箱镜像（用于用户隔离容器，仅首次需要）
-docker build -f docker/Dockerfile.sandbox -t claude-code-sandbox:latest .
-
-# 构建并启动服务
-docker-compose up
+# 构建基础镜像
+./scripts/build-image.sh
 ```
 
-> **说明**：本地开发使用 `docker build` 构建镜像；发布到远程仓库使用 `scripts/build-image.sh` 脚本。
+## 日常开发
+
+```bash
+# 启动开发环境
+npm run dev
+```
+
+## 修改代码后
+
+| 修改类型 | 操作 |
+|---------|------|
+| 前端代码 | Vite 热时编译，浏览器刷新即可 |
+| 后端代码 | 无需操作（Node.js 热重载） |
+| 沙箱代码 | `docker build -f docker/Dockerfile.sandbox -t claude-code-sandbox:latest`，重启后端服务 |
 
 访问 http://localhost:3001
-
-### 代码修改后操作
-
-| 改动类型 | 操作 |
-|---------|------|
-| 前端代码 | `npm run build` → 刷新浏览器 |
-| 后端代码 | `docker-compose restart app` |
-| 前端+后端 | `npm run build` → `docker-compose restart app` → 刷新浏览器 |
-| Dockerfile | `docker-compose build` → `docker-compose up` |
 
 ### 子模块操作
 

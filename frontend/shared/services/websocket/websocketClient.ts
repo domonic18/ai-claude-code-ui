@@ -129,7 +129,6 @@ export class WebSocketClient implements IWebSocketClient {
   sendMessage(message: any): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
-      console.log('[WebSocketClient] Sent message:', message.type);
     } else {
       console.warn('[WebSocketClient] Cannot send message: not connected. State:', {
         wsState: this.ws?.readyState,
