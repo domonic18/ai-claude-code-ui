@@ -1,7 +1,8 @@
 /**
- * Claude 查询编排器
+ * Claude Query Orchestrator
  *
- * 主入口模块，协调容器获取、工作目录映射、会话管理和执行。
+ * Main entry point that coordinates container acquisition, working directory
+ * mapping, session management, and execution.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -11,6 +12,11 @@ import { executeInContainer } from './DockerExecutor.js';
 import { createSession, updateSession } from './SessionManager.js';
 import { CONTAINER } from '../../../config/config.js';
 import { memoryService } from '../../memory/index.js';
+
+// Memory markers used to wrap memory context in commands
+const MEMORY_START = '--- Memory Context ---';
+const MEMORY_END = '--- End Memory Context ---';
+const MEMORY_SEPARATOR = '\n';
 
 /**
  * 映射工作目录
@@ -38,28 +44,26 @@ function mapWorkingDirectory(isContainerProject, projectPath, cwd) {
 }
 
 /**
- * 加载记忆内容并添加到命令上下文
- * @param {string} command - 原始用户命令
+ * 加载记忆内容
  * @param {number} userId - 用户 ID
  * @param {object} options - 选项
- * @returns {Promise<string>} 增强后的命令
+ * @returns {Promise<string|null>} 记忆内容，如果没有记忆则返回 null
  */
-async function loadMemoryContext(command, userId, options) {
+async function loadMemoryContext(userId, options) {
   try {
     const memoryResult = await memoryService.readMemory(userId, {
       containerMode: options.containerMode
     });
 
     if (memoryResult && memoryResult.content) {
-      // 按优先级构建上下文：用户命令 → 记忆
-      const memoryContext = `\n\n--- Memory Context ---\n${memoryResult.content}\n--- End Memory Context ---\n\n`;
-      return `${command}${memoryContext}`;
+      // 返回原始记忆内容，不添加标记
+      return memoryResult.content;
     }
   } catch (error) {
     // 如果读取记忆失败，记录警告但继续执行
     console.warn('[ClaudeQuery] Failed to load memory context:', error.message);
   }
-  return command;
+  return null;
 }
 
 /**
@@ -88,10 +92,10 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
 
   try {
     // 1. 加载记忆上下文
-    const enhancedCommand = await loadMemoryContext(command, userId, {
+    const memoryContext = await loadMemoryContext(userId, {
       containerMode: options.containerMode
     });
-    console.log('[ClaudeQuery] Memory context loaded');
+    console.log('[ClaudeQuery] Memory context loaded:', memoryContext ? `${memoryContext.length} chars` : 'none');
 
     // 2. 获取或创建用户容器
     console.log('[ClaudeQuery] Getting container for user:', userId);
@@ -117,12 +121,22 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
     createSession(sessionId, {
       userId,
       containerId: container.id,
-      command: enhancedCommand,
+      command: command,
       options: mappedOptions
     });
     console.log('[ClaudeQuery] Session created:', sessionId);
 
-    // 5. 发送初始消息
+    // 5. 发送记忆上下文消息（如果有）
+    if (writer && memoryContext) {
+      console.log('[ClaudeQuery] Sending memory-context');
+      writer.send({
+        type: 'memory-context',
+        sessionId,
+        content: memoryContext
+      });
+    }
+
+    // 6. 发送初始消息
     if (writer) {
       console.log('[ClaudeQuery] Sending session_start');
       writer.send({
@@ -133,7 +147,12 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
       });
     }
 
-    // 6. 执行查询（使用增强后的命令）
+    // 7. Build enhanced command (original command + memory context) and execute
+    let enhancedCommand = command;
+    if (memoryContext) {
+      // Add memory to command at execution time
+      enhancedCommand = `${command}${MEMORY_SEPARATOR}${MEMORY_SEPARATOR}${MEMORY_START}${MEMORY_SEPARATOR}${memoryContext}${MEMORY_SEPARATOR}${MEMORY_END}${MEMORY_SEPARATOR}${MEMORY_SEPARATOR}`;
+    }
     console.log('[ClaudeQuery] Executing in container...');
     await executeInContainer(
       userId,
@@ -144,7 +163,7 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
     );
     console.log('[ClaudeQuery] Execution completed');
 
-    // 7. 更新会话状态
+    // 8. 更新会话状态
     updateSession(sessionId, {
       status: 'completed',
       endTime: Date.now()

@@ -9,11 +9,13 @@
  * - Claude: claude-response, claude-output, claude-interactive-prompt, claude-error
  * - Cursor: cursor-system, cursor-user, cursor-tool-use, cursor-error, cursor-result
  * - Codex: codex-response, codex-complete
- * - Other: session-aborted, token-budget
+ * - Other: session-aborted, token-budget, memory-context
  */
 
 import { t as translate } from '@/shared/i18n';
+import { filterMemoryContext } from '@/shared/utils';
 import type { ChatMessage } from '../types';
+import type { WebSocketMessage } from '@/shared/types';
 
 // Message ID counter to ensure unique IDs
 let messageIdCounter = 0;
@@ -24,16 +26,6 @@ let messageIdCounter = 0;
  */
 function generateMessageId(prefix: string): string {
   return `${prefix}-${Date.now()}-${++messageIdCounter}`;
-}
-
-export interface WebSocketMessage {
-  type: string;
-  sessionId?: string;
-  data?: any;
-  error?: string;
-  tool?: string;
-  input?: any;
-  exitCode?: number;
 }
 
 export interface MessageHandlerCallbacks {
@@ -65,6 +57,9 @@ export interface MessageHandlerCallbacks {
   resetStream?: () => void;
   updateStreamContent?: (content: string) => void;
   updateStreamThinking?: (thinking: string) => void;
+
+  // Memory context
+  onMemoryContext?: (content: string, sessionId: string) => void;
 
   // Current state
   getCurrentSessionId: () => string | null;
@@ -140,6 +135,9 @@ export function handleWebSocketMessage(
       // Session initialization message - just acknowledge it
       console.log(`📝 ${translate('websocket.log.sessionStarted')}:`, message.sessionId);
       return true;
+
+    case 'memory-context':
+      return handleMemoryContext(message, callbacks);
 
     case 'session-created':
       return handleSessionCreated(message, callbacks, currentSessionId);
@@ -237,6 +235,20 @@ function handleTokenBudget(message: WebSocketMessage, callbacks: MessageHandlerC
   if (message.data && callbacks.onSetTokenBudget) {
     callbacks.onSetTokenBudget(message.data);
   }
+  return true;
+}
+
+/**
+ * Handle memory-context message
+ * Memory context is sent to AI but not displayed in chat
+ */
+function handleMemoryContext(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
+  if (message.content && message.sessionId && callbacks.onMemoryContext) {
+    // Call the callback for debugging/monitoring purposes
+    // Memory context is NOT added to the chat messages
+    callbacks.onMemoryContext(message.content, message.sessionId);
+  }
+  console.log('[WS] Memory context received:', message.content?.length, 'chars');
   return true;
 }
 
@@ -378,11 +390,42 @@ function handleClaudeResponse(message: WebSocketMessage, callbacks: MessageHandl
       }
     }
 
-    // Handle user messages (tool_result) - these are already shown so skip them
+    // Handle user messages from SDK (when resuming sessions)
     // Note: user messages have structure {type: "user", message: {role: "user", content: [...]}}
     if (sdkType === 'user' || dataRole === 'user') {
-      console.log('[WS] Skipping user message (tool result)');
-      return true; // Return true to indicate we handled it (by ignoring)
+      // Extract text content and filter out memory context
+      let userText = '';
+
+      if (Array.isArray(messageData?.content)) {
+        for (const part of messageData.content) {
+          if (part.type === 'text' && part.text) {
+            userText += decodeHtmlEntities(part.text);
+          }
+        }
+      }
+
+      // Filter out memory context from user text
+      const filteredUserText = filterMemoryContext(userText);
+      if (filteredUserText !== userText) {
+        console.log('[WS] Filtered memory context from user message');
+        userText = filteredUserText;
+      }
+
+      // Only add user message if it's not a tool result
+      // and has content after filtering
+      if (userText && !userText.startsWith('[Request interrupted')) {
+        console.log('[WS] Adding user message:', userText.substring(0, 50));
+        callbacks.onAddMessage({
+          id: generateMessageId('user'),
+          type: 'user',
+          content: userText,
+          timestamp: Date.now()
+        });
+      } else {
+        console.log('[WS] Skipping user message (tool result or empty)');
+      }
+
+      return true;
     }
   }
 
