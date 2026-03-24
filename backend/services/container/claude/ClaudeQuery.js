@@ -1,6 +1,6 @@
 /**
  * Claude 查询编排器
- * 
+ *
  * 主入口模块，协调容器获取、工作目录映射、会话管理和执行。
  */
 
@@ -10,6 +10,7 @@ import containerManager from '../core/index.js';
 import { executeInContainer } from './DockerExecutor.js';
 import { createSession, updateSession } from './SessionManager.js';
 import { CONTAINER } from '../../../config/config.js';
+import { memoryService } from '../../memory/index.js';
 
 /**
  * 映射工作目录
@@ -37,6 +38,31 @@ function mapWorkingDirectory(isContainerProject, projectPath, cwd) {
 }
 
 /**
+ * 加载记忆内容并添加到命令上下文
+ * @param {string} command - 原始用户命令
+ * @param {number} userId - 用户 ID
+ * @param {object} options - 选项
+ * @returns {Promise<string>} 增强后的命令
+ */
+async function loadMemoryContext(command, userId, options) {
+  try {
+    const memoryResult = await memoryService.readMemory(userId, {
+      containerMode: options.containerMode
+    });
+
+    if (memoryResult && memoryResult.content) {
+      // 按优先级构建上下文：用户命令 → 记忆
+      const memoryContext = `\n\n--- Memory Context ---\n${memoryResult.content}\n--- End Memory Context ---\n\n`;
+      return `${command}${memoryContext}`;
+    }
+  } catch (error) {
+    // 如果读取记忆失败，记录警告但继续执行
+    console.warn('[ClaudeQuery] Failed to load memory context:', error.message);
+  }
+  return command;
+}
+
+/**
  * 在用户容器内执行 Claude SDK 查询
  * @param {string} command - 用户命令
  * @param {object} options - 执行选项
@@ -61,14 +87,20 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
   console.log('[ClaudeQuery] isContainerProject:', isContainerProject, 'projectPath:', projectPath);
 
   try {
-    // 1. 获取或创建用户容器
+    // 1. 加载记忆上下文
+    const enhancedCommand = await loadMemoryContext(command, userId, {
+      containerMode: options.containerMode
+    });
+    console.log('[ClaudeQuery] Memory context loaded');
+
+    // 2. 获取或创建用户容器
     console.log('[ClaudeQuery] Getting container for user:', userId);
     const container = await containerManager.getOrCreateContainer(userId, {
       tier: userTier
     });
     console.log('[ClaudeQuery] Container obtained:', container.name);
 
-    // 2. 映射工作目录
+    // 3. 映射工作目录
     const workingDir = mapWorkingDirectory(isContainerProject, projectPath, cwd);
     console.log('[ClaudeQuery] Working directory (mapped):', workingDir);
 
@@ -81,16 +113,16 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
       cwd: workingDir
     };
 
-    // 3. 创建会话
+    // 4. 创建会话
     createSession(sessionId, {
       userId,
       containerId: container.id,
-      command,
+      command: enhancedCommand,
       options: mappedOptions
     });
     console.log('[ClaudeQuery] Session created:', sessionId);
 
-    // 4. 发送初始消息
+    // 5. 发送初始消息
     if (writer) {
       console.log('[ClaudeQuery] Sending session_start');
       writer.send({
@@ -101,18 +133,18 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
       });
     }
 
-    // 5. 执行查询
+    // 6. 执行查询（使用增强后的命令）
     console.log('[ClaudeQuery] Executing in container...');
     await executeInContainer(
       userId,
-      command,
+      enhancedCommand,
       mappedOptions,
       writer,
       sessionId
     );
     console.log('[ClaudeQuery] Execution completed');
 
-    // 6. 更新会话状态
+    // 7. 更新会话状态
     updateSession(sessionId, {
       status: 'completed',
       endTime: Date.now()

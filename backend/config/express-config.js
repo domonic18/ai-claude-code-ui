@@ -16,7 +16,7 @@ import { FILES, SERVER, CORS } from './config.js';
 
 // 路由导入 - 新结构（按功能分组）
 import { auth, settings, modelsRouter, users, saml } from '../routes/core/index.js';
-import { projects, sessions, files, git, userSettings, mcpServers, extensions } from '../routes/api/index.js';
+import { projects, sessions, files, git, userSettings, mcpServers, extensions, memory } from '../routes/api/index.js';
 import { claude, cursor, codex, mcp, taskmaster, agent } from '../routes/integrations/index.js';
 import { commands, system, uploads } from '../routes/tools/index.js';
 
@@ -106,12 +106,14 @@ export function configureExpress(app, wss) {
     // ===== 资源路由 =====
     // /api/files: 文件上传（无需项目名前缀）
     // /api/projects/:projectName/*: 项目相关的文件操作
+    // /api/memory: 记忆文件管理
     // files 路由必须在 projects 之前注册，避免 /:projectName 被错误匹配
     app.use('/api/files', authenticateToken, files);
     app.use('/api/projects', authenticateToken, files);
     app.use('/api/projects', authenticateToken, projects);
     app.use('/api/sessions', authenticateToken, sessions);
     app.use('/api/git', authenticateToken, git);
+    app.use('/api/memory', authenticateToken, memory);
 
     // ===== 集成路由 - AI 提供商 =====
     app.use('/api/claude', authenticateToken, claude);
