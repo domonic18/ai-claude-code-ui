@@ -51,6 +51,11 @@ export const ROUTES = {
   SETTINGS_PROFILE: '/settings/profile',
 
   /**
+   * Memory routes
+   */
+  MEMORY: '/memory',
+
+  /**
    * Admin routes
    */
   ADMIN: '/admin',
@@ -93,6 +98,7 @@ export const ROUTE_TITLES: Record<keyof Omit<typeof ROUTES, 'PROJECT' | 'PROJECT
   SETTINGS_MCP_SERVERS: 'MCP Servers',
   SETTINGS_CREDENTIALS: 'Credentials',
   SETTINGS_PROFILE: 'Profile',
+  MEMORY: 'Memory',
   ADMIN: 'Admin',
   ADMIN_EXTENSIONS: 'Extension Management',
   FILES: 'Files',
@@ -176,6 +182,12 @@ export const ROUTE_META: Record<string, RouteMeta> = {
   [ROUTES.SETTINGS_PROFILE]: {
     title: 'Profile',
     description: 'User profile settings',
+    requiresAuth: true,
+    hideFromNav: true,
+  },
+  [ROUTES.MEMORY]: {
+    title: 'Memory',
+    description: 'Manage long-term memory and preferences',
     requiresAuth: true,
     hideFromNav: true,
   },

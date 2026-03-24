@@ -211,4 +211,14 @@ export const api = {
 
   // Generic GET method for any endpoint
   get: (endpoint: string) => authenticatedFetch(`/api${endpoint}`),
+
+  // Memory endpoints
+  memory: {
+    read: () => authenticatedFetch('/api/memory'),
+    write: (content: string) =>
+      authenticatedFetch('/api/memory', {
+        method: 'PUT',
+        body: JSON.stringify({ content }),
+      }),
+  },
 };

@@ -8,3 +8,6 @@
 // API Services
 export { authenticatedFetch, api } from './api';
 export { WebSocketClient, createWebSocketClient } from './websocket';
+
+// Feature Services
+export { memoryService } from './memoryService';

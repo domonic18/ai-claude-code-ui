@@ -12,7 +12,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
-import { Settings, LogOut, Languages, ChevronUp, Shield } from 'lucide-react';
+import { Settings, LogOut, Languages, ChevronUp, Shield, Brain } from 'lucide-react';
 import { LanguageSwitcher } from '@/shared/components/common/LanguageSwitcher';
 import { useAuth } from '@/shared/contexts/AuthContext';
 import { useUserRole } from '@/features/auth/hooks/useAuth';
@@ -111,6 +111,16 @@ export const UserMenu = ({
               </div>
             </div>
 
+            {/* 记忆管理 */}
+            <Link
+              to="/memory"
+              onClick={() => setIsOpen(false)}
+              className="w-full px-4 py-2 flex items-center gap-3 hover:bg-accent/50 transition-colors"
+            >
+              <Brain className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm text-foreground">{t('memory.title')}</span>
+            </Link>
+
             {/* 设置 */}
             {onShowSettings && (
               <button
@@ -130,7 +140,7 @@ export const UserMenu = ({
                 className="w-full px-4 py-2 flex items-center gap-3 hover:bg-accent/50 transition-colors"
               >
                 <Shield className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm text-foreground">{t('common.adminConsole') || '管理控制台'}</span>
+                <span className="text-sm text-foreground">{t('common.adminConsole')}</span>
               </Link>
             )}
 

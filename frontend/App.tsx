@@ -37,7 +37,7 @@ import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import useLocalStorage from '@/shared/hooks/useLocalStorage';
 import { api, authenticatedFetch } from '@/shared/services';
 import { APP_NAME } from '@/shared/constants/app.constants';
-import { Homepage, ChatPage, SettingsPage, AdminPage, NotFoundPage } from '@/pages';
+import { Homepage, ChatPage, SettingsPage, AdminPage, MemoryPage, NotFoundPage } from '@/pages';
 import { LoginForm, SetupForm } from '@/features/auth';
 
 // Initialize i18n
@@ -552,6 +552,7 @@ function App() {
                   <Route path="/chat" element={<AppContent />} />
                   <Route path="/settings" element={<SettingsPage />} />
                   <Route path="/admin" element={<AdminPage />} />
+                  <Route path="/memory" element={<MemoryPage />} />
                 </Route>
 
                 {/* 404 page - must be last */}
