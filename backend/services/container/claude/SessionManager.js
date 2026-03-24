@@ -23,6 +23,10 @@ export function setSessionStream(sessionId, stream) {
  * 创建新会话
  * @param {string} sessionId - 会话 ID
  * @param {object} sessionInfo - 会话信息
+ * @param {number} sessionInfo.userId - 用户 ID
+ * @param {string} sessionInfo.containerId - 容器 ID
+ * @param {string} sessionInfo.command - 用户原始命令
+ * @param {object} sessionInfo.options - 其他选项
  */
 export function createSession(sessionId, sessionInfo) {
   containerSessions.set(sessionId, {
