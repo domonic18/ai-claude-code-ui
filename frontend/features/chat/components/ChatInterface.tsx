@@ -420,6 +420,11 @@ export function ChatInterface({
         updateStreamThinking: (thinking) => {
           updateStreamThinking(thinking);
         },
+        onMemoryContext: (content, sessionId) => {
+          // Memory context is received but not displayed in chat
+          // Used for debugging/monitoring purposes only
+          console.log('[ChatInterface] Memory context received:', content?.length, 'chars for session:', sessionId);
+        },
         getCurrentSessionId: () => currentSessionId,
         getSelectedProjectName: () => selectedProject?.name,
       });
@@ -532,7 +537,7 @@ export function ChatInterface({
   const handleAddFile = useCallback((file: FileAttachment) => {
     setAttachedFiles(prev => {
       // Check if file with same ID already exists, update it
-      const existingIndex = prev.findIndex(f => f.id === file.id);
+      const existingIndex = attachedFiles.findIndex(f => f.id === file.id);
       if (existingIndex >= 0) {
         const updated = [...prev];
         updated[existingIndex] = file;
