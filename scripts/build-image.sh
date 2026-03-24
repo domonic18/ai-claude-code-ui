@@ -3,8 +3,8 @@
 # 三阶段构建：base -> 主应用镜像 -> 运行时镜像
 #
 # 使用方式：
-#   ./scripts/build-image.sh              # 完整构建（包括 base）
-#   ./scripts/build-image.sh --app-only   # 仅构建应用和运行时镜像
+#   ./scripts/build-image.sh              # 完整构建（前端 + base + 应用 + 运行时）
+#   ./scripts/build-image.sh --app-only   # 仅构建应用和运行时镜像（跳过 base）
 #   ./scripts/build-image.sh --rebuild-base # 强制重建 base 镜像
 
 set -e
@@ -60,9 +60,10 @@ while [[ $# -gt 0 ]]; do
       echo "  $0 --rebuild-base         # 强制重建 base 镜像"
       echo ""
       echo "镜像构建顺序："
-      echo "  1. $BASE_IMAGE"
-      echo "  2. $MAIN_IMAGE (基于 base)"
-      echo "  3. $SANDBOX_IMAGE"
+      echo "  1. 前端构建 (npm run build)"
+      echo "  2. $BASE_IMAGE"
+      echo "  3. $MAIN_IMAGE (基于 base)"
+      echo "  4. $SANDBOX_IMAGE"
       exit 0
       ;;
     *)
@@ -80,6 +81,12 @@ echo "=========================================="
 echo "Project Root: $PROJECT_ROOT"
 echo "Registry: $REGISTRY"
 echo "=========================================="
+
+# ==================== 阶段 0: 构建前端 ====================
+echo ""
+info "0/3 构建前端 (vite build)..."
+npm run build
+info "前端构建完成！"
 
 # ==================== 阶段 1: 基础镜像 ====================
 BUILD_BASE=false
