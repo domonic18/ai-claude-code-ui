@@ -139,10 +139,10 @@ export async function getProjectsInContainer(userId) {
             }
           }
 
-          // 加载每个项目的会话信息
+          // 加载每个项目的会话信息（初始加载 20 个）
           for (const project of projectList) {
             try {
-              const sessionResult = await getSessionsInContainer(userId, project.name, 5, 0);
+              const sessionResult = await getSessionsInContainer(userId, project.name, 20, 0);
               project.sessions = sessionResult.sessions || [];
               project.sessionMeta = {
                 hasMore: sessionResult.hasMore,

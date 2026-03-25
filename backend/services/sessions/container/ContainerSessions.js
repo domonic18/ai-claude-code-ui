@@ -217,7 +217,7 @@ function parseJsonlContent(content) {
       }
     }
 
-    // Filter out sessions with JSON responses (Task Master errors)
+    // 过滤出 JSON 响应错误（Task Master 错误）
     const allSessions = Array.from(sessions.values());
     const filteredSessions = allSessions.filter(session => {
       const shouldFilter = session.summary.startsWith('{ "');

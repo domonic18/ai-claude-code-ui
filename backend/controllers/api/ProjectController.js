@@ -86,19 +86,19 @@ export class ProjectController extends BaseController {
   async getProjectSessions(req, res, next) {
     try {
       const userId = this._getUserId(req);
-      const { projectId } = req.params;
+      const { projectName } = req.params;
       const { limit = 50, offset = 0 } = this._getPagination(req);
 
       // Get the full project to obtain fullPath
       const projects = await this.claudeDiscovery.getProjects({ userId });
-      const project = projects.find(p => p.name === projectId || p.id === projectId);
+      const project = projects.find(p => p.name === projectName || p.id === projectName);
 
       if (!project) {
-        throw new NotFoundError('Project', projectId);
+        throw new NotFoundError('Project', projectName);
       }
 
       // Use fullPath as the project identifier for proper decoding
-      const projectIdentifier = project.fullPath || projectId;
+      const projectIdentifier = project.fullPath || projectName;
 
       const result = await this.claudeDiscovery.getProjectSessions(projectIdentifier, {
         userId,
