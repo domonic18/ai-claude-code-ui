@@ -67,10 +67,15 @@ export const ACTIVE_SESSION_THRESHOLD = 10 * 60 * 1000;
  * Session pagination defaults
  */
 export const SESSION_PAGINATION = {
-  DEFAULT_LIMIT: 5,
-  INITIAL_LIMIT: 5,
-  LOAD_MORE_LIMIT: 5,
+  INITIAL_LOAD_LIMIT: 20, // Initial load: 20 sessions (industry standard)
+  LOAD_MORE_LIMIT: 20,     // Load 20 more when scrolling
+  MIN_LOAD_MORE_LIMIT: 5,
 } as const;
+
+/**
+ * Scroll threshold for showing scrollbar in session list
+ */
+export const SHOW_SCROLL_THRESHOLD = 20;
 
 /**
  * Search debounce delay (milliseconds)
