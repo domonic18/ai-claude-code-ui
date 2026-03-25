@@ -30,6 +30,7 @@ export const ProjectList = memo(function ProjectList({
   editingProject,
   editingName,
   loadingSessions,
+  hasMoreSessions,
   currentTime,
   isLoading,
   onToggleProject,
@@ -141,7 +142,7 @@ export const ProjectList = memo(function ProjectList({
           // Display all sessions from all projects in a flat list
           projects.map((project) => {
             const allSessions = getAllSessions(project);
-            const hasMoreSessions = project.sessionMeta?.hasMore !== false;
+            const hasMoreSessionsForProject = hasMoreSessions[project.name] !== false;
             const isLoadingSessionsForProject = loadingSessions[project.name];
 
             // Skip projects with no sessions
@@ -160,7 +161,7 @@ export const ProjectList = memo(function ProjectList({
                 currentTime={currentTime}
                 isLoadingSessions={isLoadingSessionsForProject}
                 initialSessionsLoaded={initialSessionsLoaded.has(project.name)}
-                hasMoreSessions={hasMoreSessions}
+                hasMoreSessions={hasMoreSessionsForProject}
                 onSessionClick={(session: Session) => handleSessionClick(session, project.name)}
                 onSessionDelete={(projectName: string, sessionId: string, provider?: SessionProvider) =>
                   handleSessionDelete(projectName, sessionId, provider)}

@@ -7,16 +7,19 @@
  * - Loading skeleton while sessions are being fetched
  * - Empty state when no sessions exist
  * - Session items with click handlers
- * - Load more button for pagination
+ * - Infinite scroll with Intersection Observer
+ * - Auto-load more sessions when scrolling to bottom
  */
 
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
+import { cn } from '@/lib/utils';
 import SessionItem from './SessionItem';
 import type { Session, SessionProvider } from '../types/sidebar.types';
 import { getAllSessions, formatTimeAgo } from '../utils/timeFormatters';
+import { SHOW_SCROLL_THRESHOLD, ACTIVE_SESSION_THRESHOLD } from '../constants/sidebar.constants';
 
 /**
  * SessionList Props
@@ -61,7 +64,7 @@ interface SessionListProps {
 }
 
 /**
- * SessionList Component
+ * SessionList Component with Infinite Scroll
  */
 export const SessionList = memo(function SessionList({
   projectName,
@@ -86,9 +89,65 @@ export const SessionList = memo(function SessionList({
   const { t } = useTranslation();
   const allSessions = getAllSessions({ sessions, cursorSessions, codexSessions });
 
+  // Refs for Intersection Observer and loading state tracking
+  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const isLoadingRef = useRef(false);
+  /**
+   * Ref to handleLoadMore to avoid closure issues in Intersection Observer callback
+   */
+  const handleLoadMoreRef = useRef<(() => Promise<void>) | null>(null);
+
+  // Handle loading more sessions
   const handleLoadMore = useCallback(async () => {
+    if (isLoadingRef.current) return;
+    isLoadingRef.current = true;
     await onLoadMoreSessions();
+    isLoadingRef.current = false;
   }, [onLoadMoreSessions]);
+
+  // Sync handleLoadMore to ref
+  useEffect(() => {
+    handleLoadMoreRef.current = handleLoadMore;
+  }, [handleLoadMore]);
+
+  // Setup Intersection Observer for infinite scroll
+  useEffect(() => {
+    // Only set up observer if there are more sessions to load
+    if (!hasMoreSessions || !loadMoreTriggerRef.current) {
+      return;
+    }
+
+    // Don't start loading if already loading
+    if (isLoadingSessions) {
+      return;
+    }
+
+    // Create Intersection Observer
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // When the trigger element becomes visible, load more sessions
+        if (entries[0].isIntersecting && !isLoadingRef.current) {
+          handleLoadMoreRef.current?.();
+        }
+      },
+      {
+        threshold: 0.1, // Trigger when 10% of the element is visible
+        rootMargin: '100px', // Start loading 100px before reaching the bottom
+      }
+    );
+
+    observer.observe(loadMoreTriggerRef.current);
+    observerRef.current = observer;
+
+    // Cleanup on unmount or when conditions change
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+        observerRef.current = null;
+      }
+    };
+  }, [hasMoreSessions, isLoadingSessions, handleLoadMoreRef]);
 
   // Loading skeleton
   if (!initialSessionsLoaded) {
@@ -121,8 +180,11 @@ export const SessionList = memo(function SessionList({
     );
   }
 
+  // Show scrollbar when there are enough sessions for better UX
+  const shouldShowScroll = allSessions.length >= SHOW_SCROLL_THRESHOLD;
+
   return (
-    <div className="space-y-1">
+    <div className={cn('space-y-1', shouldShowScroll && 'max-h-[85vh] overflow-y-auto')}>
       {/* New Session Button - Mobile */}
       {onNewSession && (
         <div className="md:hidden px-3 pt-2 pb-1">
@@ -154,7 +216,7 @@ export const SessionList = memo(function SessionList({
 
       {allSessions.map((session) => {
         const isSelected = selectedSessionId === session.id;
-        const isActive = currentTime.getTime() - new Date(session.lastActivity).getTime() < 10 * 60 * 1000;
+        const isActive = currentTime.getTime() - new Date(session.lastActivity).getTime() < ACTIVE_SESSION_THRESHOLD;
         const isEditing = editingSession?.id === session.id;
 
         return (
@@ -182,27 +244,21 @@ export const SessionList = memo(function SessionList({
         );
       })}
 
-      {/* Load More Button */}
-      {allSessions.length > 0 && hasMoreSessions && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-center gap-2 mt-2 text-muted-foreground"
-          onClick={handleLoadMore}
-          disabled={isLoadingSessions}
-        >
+      {hasMoreSessions && (
+        <div className="flex justify-center py-3">
           {isLoadingSessions ? (
-            <>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <div className="w-3 h-3 animate-spin rounded-full border border-muted-foreground border-t-transparent" />
-              {t('common.loading')}
-            </>
+              <span>{t('common.loading')}</span>
+            </div>
           ) : (
-            <>
-              <ChevronDown className="w-3 h-3" />
-              {t('sidebar.showMoreSessions')}
-            </>
+            <div
+              ref={loadMoreTriggerRef}
+              style={{ height: '1px' }}
+              aria-hidden="true"
+            />
           )}
-        </Button>
+        </div>
       )}
     </div>
   );

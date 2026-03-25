@@ -19,7 +19,7 @@ import ProjectList from './ProjectList';
 import ProjectCreationWizard from './ProjectCreationWizard';
 import UserMenu from './UserMenu';
 import { ConfirmDialog } from '@/shared/components/ui';
-import { TIMESTAMP_UPDATE_INTERVAL } from '../constants/sidebar.constants';
+import { TIMESTAMP_UPDATE_INTERVAL, SESSION_PAGINATION } from '../constants/sidebar.constants';
 import type { SidebarProps, ExpandedProjects, SessionProvider } from '../types/sidebar.types';
 import { useProjects } from '../hooks';
 import { useSessions } from '../hooks';
@@ -61,12 +61,17 @@ export const Sidebar = memo(function Sidebar({
     renameSession,
     deleteSession,
     additionalSessions,
+    hasMore,
+    initializeHasMore,
   } = useSessions();
 
   const {
     starredProjects,
     toggleStar,
   } = useStarredProjects();
+
+  // Sort projects
+  const displayProjects = getSortedProjects(starredProjects);
 
   // Local state
   const [expandedProjects, setExpandedProjects] = useState<ExpandedProjects>(new Set());
@@ -91,6 +96,15 @@ export const Sidebar = memo(function Sidebar({
     provider: undefined,
   });
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Initialize hasMore state from project sessionMeta
+  useEffect(() => {
+    displayProjects.forEach(project => {
+      if (project.sessionMeta?.hasMore !== undefined && hasMore[project.name] === undefined) {
+        initializeHasMore(project.name, project.sessionMeta.hasMore);
+      }
+    });
+  }, [displayProjects, hasMore, initializeHasMore]);
 
   // Auto-update timestamps every minute
   useEffect(() => {
@@ -128,9 +142,6 @@ export const Sidebar = memo(function Sidebar({
       prevSelectionRef.current = currentSelection;
     }
   }, [selectedSession?.id, selectedProject?.name]);
-
-  // Sort projects
-  const displayProjects = getSortedProjects(starredProjects);
 
   // Merge additional sessions into projects (since we only have one project now)
   const mergedProjects = useMemo(() => {
@@ -318,10 +329,12 @@ export const Sidebar = memo(function Sidebar({
       baseSessionCount,
       additionalSessionCount,
       offset,
+      currentHasMore: hasMore[project.name],
     });
 
-    await loadMoreSessions(project.name, 5, offset);
-  }, [displayProjects, additionalSessions, loadMoreSessions]);
+    // Load more sessions (use consistent batch size)
+    await loadMoreSessions(project.name, SESSION_PAGINATION.LOAD_MORE_LIMIT, offset);
+  }, [displayProjects, additionalSessions, hasMore, loadMoreSessions]);
 
   // Since we only have one project now, create a wrapper for onNewSession
   // that doesn't require projectName parameter
@@ -391,6 +404,7 @@ export const Sidebar = memo(function Sidebar({
           editingProject={editingProject}
           editingName={editingName}
           loadingSessions={loadingSessions}
+          hasMoreSessions={hasMore}
           currentTime={currentTime}
           isLoading={isLoading}
           onToggleProject={handleToggleProject}
