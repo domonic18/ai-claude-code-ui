@@ -537,7 +537,7 @@ export function ChatInterface({
   const handleAddFile = useCallback((file: FileAttachment) => {
     setAttachedFiles(prev => {
       // Check if file with same ID already exists, update it
-      const existingIndex = attachedFiles.findIndex(f => f.id === file.id);
+      const existingIndex = prev.findIndex(f => f.id === file.id);
       if (existingIndex >= 0) {
         const updated = [...prev];
         updated[existingIndex] = file;

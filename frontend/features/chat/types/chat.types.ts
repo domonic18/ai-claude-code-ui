@@ -188,7 +188,7 @@ export interface ChatInputProps {
   /** Add file handler */
   onAddFile: (file: FileAttachment) => void;
   /** Remove file handler */
-  onRemoveFile: (fileName: string) => void;
+  onRemoveFile: (fileId: string) => void;
   /** Whether disabled */
   disabled?: boolean;
   /** Whether to send by Ctrl+Enter */

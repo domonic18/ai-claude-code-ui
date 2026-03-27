@@ -23,7 +23,7 @@ interface ChatInputComponentProps extends Omit<ChatInputProps, 'files' | 'onAddF
   /** Add file callback */
   onAddFile?: (file: FileAttachment) => void;
   /** Remove file callback */
-  onRemoveFile?: (fileName: string) => void;
+  onRemoveFile?: (fileId: string) => void;
   /** Whether currently loading */
   isLoading?: boolean;
   /** Placeholder text */
@@ -202,6 +202,7 @@ export function ChatInput({
 
     try {
       attachment.uploadProgress = 0;
+      // Only add file once on initial upload
       onAddFile?.(attachment);
 
       const response = await authenticatedFetch('/api/files/upload', {
@@ -218,10 +219,12 @@ export function ChatInput({
       const data = await response.json();
       attachment.path = data.data?.path;
       attachment.uploadProgress = 100;
+      // Update the existing file instead of adding a duplicate
       onAddFile?.(attachment);
     } catch (error) {
       console.error('[handleFileUpload] File upload error:', error);
       attachment.error = error instanceof Error ? error.message : 'Upload failed';
+      // Update the existing file with error state
       onAddFile?.(attachment);
     }
   }, [authenticatedFetch, selectedProject, onAddFile]);
@@ -277,8 +280,8 @@ export function ChatInput({
   /**
    * Handle remove file
    */
-  const handleRemoveFile = useCallback((fileName: string) => {
-    onRemoveFile?.(fileName);
+  const handleRemoveFile = useCallback((fileId: string) => {
+    onRemoveFile?.(fileId);
   }, [onRemoveFile]);
 
   // Use menu position hook for command menu
