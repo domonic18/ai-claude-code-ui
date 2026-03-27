@@ -36,11 +36,11 @@ export async function getProjectsInContainer(userId) {
     // 我们需要从 /workspace 列出所有目录，排除 .claude 等系统目录
     const workspacePath = CONTAINER.paths.workspace;
 
-    // 列出容器中的项目目录（排除 .claude 等系统目录）
+    // 列出容器中的项目目录（排除 .claude 和 memory 等系统目录）
     // 使用单个命令完成：列出目录 + 过滤 + 验证
     const { stream, exec } = await containerManager.execInContainer(
       userId,
-      `ls -1 "${workspacePath}" 2>/dev/null | grep -v "^\\.claude$" || echo ""`
+      `ls -1 "${workspacePath}" 2>/dev/null | grep -v "^\\.claude$" | grep -v "^memory$" || echo ""`
     );
 
     // 收集输出
