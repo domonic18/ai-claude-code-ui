@@ -14,6 +14,7 @@
 
 import { t as translate } from '@/shared/i18n';
 import { filterMemoryContext } from '@/shared/utils';
+import { convertSessionMessages } from '../utils/messageConversion';
 import type { ChatMessage } from '../types';
 import type { WebSocketMessage } from '@/shared/types';
 
@@ -393,36 +394,15 @@ function handleClaudeResponse(message: WebSocketMessage, callbacks: MessageHandl
     // Handle user messages from SDK (when resuming sessions)
     // Note: user messages have structure {type: "user", message: {role: "user", content: [...]}}
     if (sdkType === 'user' || dataRole === 'user') {
-      // Extract text content and filter out memory context
-      let userText = '';
+      // Convert the message using the same logic as session loading
+      // This properly filters out skill prompts, memory context, and other internal messages
+      const convertedMessages = convertSessionMessages([{ message: messageData, timestamp: message.timestamp || Date.now() }]);
 
-      if (Array.isArray(messageData?.content)) {
-        for (const part of messageData.content) {
-          if (part.type === 'text' && part.text) {
-            userText += decodeHtmlEntities(part.text);
-          }
+      // Add any valid user messages from the conversion
+      for (const msg of convertedMessages) {
+        if (msg.type === 'user') {
+          callbacks.onAddMessage(msg);
         }
-      }
-
-      // Filter out memory context from user text
-      const filteredUserText = filterMemoryContext(userText);
-      if (filteredUserText !== userText) {
-        console.log('[WS] Filtered memory context from user message');
-        userText = filteredUserText;
-      }
-
-      // Only add user message if it's not a tool result
-      // and has content after filtering
-      if (userText && !userText.startsWith('[Request interrupted')) {
-        console.log('[WS] Adding user message:', userText.substring(0, 50));
-        callbacks.onAddMessage({
-          id: generateMessageId('user'),
-          type: 'user',
-          content: userText,
-          timestamp: Date.now()
-        });
-      } else {
-        console.log('[WS] Skipping user message (tool result or empty)');
       }
 
       return true;
