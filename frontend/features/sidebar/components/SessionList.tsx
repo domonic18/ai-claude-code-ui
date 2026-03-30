@@ -248,7 +248,7 @@ export const SessionList = memo(function SessionList({
         <div className="flex justify-center py-3">
           {isLoadingSessions ? (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <div className="w-3 h-3 animate-spin rounded-full border border-muted-foreground border-t-transparent" />
+              <div className="w-3 h-3 rounded-full border border-muted-foreground border-t-transparent" />
               <span>{t('common.loading')}</span>
             </div>
           ) : (

@@ -50,6 +50,7 @@ export function MemoryPage() {
       setIsSaving(true);
       setError(null);
       await memoryService.writeMemory(content);
+      setIsSaving(false);
       setSaveSuccess(true);
 
       // 3秒后隐藏成功提示
@@ -57,9 +58,8 @@ export function MemoryPage() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save memory';
       setError(errorMessage);
-      console.error('[MemoryPage] Error saving memory:', err);
-    } finally {
       setIsSaving(false);
+      console.error('[MemoryPage] Error saving memory:', err);
     }
   }, [content]);
 
@@ -126,12 +126,13 @@ export function MemoryPage() {
             />
             <div className="flex justify-end">
               <Button
+                key={isSaving ? 'saving' : 'idle'}
                 onClick={handleSave}
                 disabled={isSaving || isLoading}
               >
                 {isSaving ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Loader2 className="w-4 h-4 mr-2" />
                     {t('memory.saving')}
                   </>
                 ) : (
