@@ -122,7 +122,7 @@ async function filterSDKOptions(options, userId) {
       sdkOptions.plugins = [
         {
           type: 'local',
-          path: '/workspace/my-workspace/.claude'
+          path: '/workspace/.claude'
         }
       ];
       console.log('[ScriptBuilder] Configured plugins for skills scanning');
@@ -277,17 +277,11 @@ async function execute() {
     console.error("[SDK] Options:", JSON.stringify(options, null, 2));
     console.error("[SDK] Command:", command);
 
-    // 重要：设置 SDK 的工作目录环境变量
-    // SDK 使用 HOME 或 USERPROFILE 等环境变量来确定配置文件位置
-    // 我们通过设置这些环境变量来确保 SDK 在正确的位置创建会话文件
+    // 切换到项目目录，确保工具在正确的位置执行
+    // 注意：不修改 HOME 环境变量，确保记忆文件和配置文件位置一致
+    // SDK 会从 CLAUDE.md 中读取记忆文件路径 (.claude/memory/MEMORY.md)
     if (options.cwd) {
       const projectDir = options.cwd;
-      console.error("[SDK] Setting HOME to project directory:", projectDir);
-      process.env.HOME = projectDir;
-      // 也设置其他可能的环境变量
-      process.env.USERPROFILE = projectDir;
-
-      // 切换到项目目录，确保工具在正确的位置执行
       console.error("[SDK] Changing CWD to:", projectDir);
       try {
         process.chdir(projectDir);
