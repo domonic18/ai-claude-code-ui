@@ -19,6 +19,7 @@ import { ContainerStateMachine, ContainerState } from './ContainerStateMachine.j
 import containerStateStore from './ContainerStateStore.js';
 import { syncExtensions } from '../../extensions/extension-sync.js';
 import { createExtensionTar } from '../../extensions/extension-tar.js';
+import { DEFAULT_MEMORY_TEMPLATE, MEMORY_SETUP_TIMEOUT } from '../../../shared/constants/memory.js';
 
 const { Container } = repositories;
 
@@ -847,10 +848,9 @@ export class ContainerLifecycleManager {
         includeConfig: true
       });
 
-      // 使用 Docker Modem 的 putArchive 方法上传 tar 包到容器
-      // 解压到 /workspace/my-workspace，与 SDK 的 HOME 目录一致
+      // 同步扩展到 /workspace（SDK 从这里查找扩展）
       await new Promise((resolve, reject) => {
-        container.putArchive(tarStream, { path: '/workspace/my-workspace' }, (err) => {
+        container.putArchive(tarStream, { path: '/workspace' }, (err) => {
           if (err) {
             reject(err);
           } else {
@@ -859,8 +859,32 @@ export class ContainerLifecycleManager {
         });
       });
 
-      // 设置 hooks 脚本的执行权限
+      // 同步扩展到 /workspace/my-workspace（settings.json 中的 hooks 路径和用户期望）
+      // 注意：这会重复复制扩展文件，但确保 hooks 和 PROJECT_ROOT 计算正确
+      const tarStream2 = await createExtensionTar({
+        includeSkills: true,
+        includeAgents: true,
+        includeCommands: true,
+        includeHooks: true,
+        includeKnowledge: true,
+        includeConfig: true
+      });
+
+      await new Promise((resolve, reject) => {
+        container.putArchive(tarStream2, { path: '/workspace/my-workspace' }, (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      // 设置 hooks 脚本的执行权限（两处都要设置）
       await this._setHooksPermissions(container);
+
+      // 创建用户级记忆目录和默认记忆文件
+      await this._createMemoryDirectoryAndFile(container);
 
     } catch (error) {
       throw new Error(`Failed to sync extensions: ${error.message}`);
@@ -868,20 +892,56 @@ export class ContainerLifecycleManager {
   }
 
   /**
-   * 设置容器内 hooks 脚本的执行权限
+   * 创建用户级记忆目录和默认记忆文件
+   * @private
+   * @param {object} container - Docker 容器实例
+   * @returns {Promise<void>}
+   */
+  async _createMemoryDirectoryAndFile(container) {
+    try {
+      // 创建 /workspace/.claude/memory 目录
+      const mkdirResult = await this._execWithTimeout(container, 'mkdir -p /workspace/.claude/memory', MEMORY_SETUP_TIMEOUT);
+      if (mkdirResult.success) {
+        console.log('[Lifecycle] Created memory directory: /workspace/.claude/memory');
+      }
+
+      // 如果记忆文件不存在，创建默认记忆文件
+      const checkResult = await this._execWithTimeout(container, 'test -f /workspace/.claude/memory/MEMORY.md && echo "EXISTS" || echo "NOT_EXISTS"', MEMORY_SETUP_TIMEOUT);
+      if (checkResult.success && checkResult.stdout.trim() === 'NOT_EXISTS') {
+        // 使用 base64 编码创建文件，避免特殊字符问题
+        const base64Content = Buffer.from(DEFAULT_MEMORY_TEMPLATE, 'utf8').toString('base64');
+        const createResult = await this._execWithTimeout(
+          container,
+          `echo '${base64Content}' | base64 -d > /workspace/.claude/memory/MEMORY.md`,
+          MEMORY_SETUP_TIMEOUT
+        );
+        if (createResult.success) {
+          console.log('[Lifecycle] Created default memory file: /workspace/.claude/memory/MEMORY.md');
+        }
+      }
+    } catch (error) {
+      console.warn('[Lifecycle] Failed to create memory directory/file:', error.message);
+      // 不抛出错误，记忆文件创建失败不应阻止容器启动
+    }
+  }
+
+  /**
+   * 设置容器内 hooks 脚本的执行权限（两处都要设置）
    * @private
    * @param {object} container - Docker 容器实例
    * @returns {Promise<void>}
    */
   async _setHooksPermissions(container) {
-    const result = await this._execWithTimeout(
-      container,
-      'chmod +x /workspace/my-workspace/.claude/hooks/*.sh 2>/dev/null || true',
-      5000
-    );
+    const commands = [
+      'chmod +x /workspace/.claude/hooks/*.sh 2>/dev/null || true',
+      'chmod +x /workspace/my-workspace/.claude/hooks/*.sh 2>/dev/null || true'
+    ];
 
-    if (!result.success) {
-      // 静默处理 hooks 权限设置失败
+    for (const cmd of commands) {
+      const result = await this._execWithTimeout(container, cmd, 5000);
+      if (!result.success) {
+        // 静默处理 hooks 权限设置失败
+      }
     }
   }
 

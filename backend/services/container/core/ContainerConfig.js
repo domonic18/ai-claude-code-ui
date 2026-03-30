@@ -127,10 +127,10 @@ export class ContainerConfigBuilder {
    */
   _buildEnvironment(userId, tier) {
     const containerEnv = [
-      // 关键配置：设置 HOME 指向 /workspace/my-workspace
-      // 这样 ~/.claude/ = /workspace/my-workspace/.claude/，确保 SDK 能正确加载自定义 Skills
-      // 注意：扩展文件通过 putArchive 解压到 /workspace/my-workspace/.claude/
-      `HOME=/workspace/my-workspace`,
+      // 设置 HOME 指向 /workspace，这样 ~/.claude/ = /workspace/.claude/
+      // SDK 的 settingSources: ['user'] 会从 ~/.claude/ 加载配置
+      // 这样 SDK 可以正确读取用户级记忆文件：/workspace/.claude/memory/MEMORY.md
+      `HOME=/workspace`,
       `USER_ID=${userId}`,
       `NODE_ENV=production`,
       `USER_TIER=${tier}`,
