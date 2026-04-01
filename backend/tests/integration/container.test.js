@@ -5,16 +5,42 @@
  */
 
 import containerManager from '../../services/container/index.js';
+import { repositories } from '../../database/db.js';
+import bcrypt from 'bcrypt';
 
-const testUserId = 999999; // Use a test user ID
+const { User } = repositories;
+
+const testUserName = 'container-test-user';
+let testUserId = null;
+
+async function setupTestUser() {
+  // Setup: Create test user if not exists
+  try {
+    let user = User.getByUsername(testUserName);
+    if (!user) {
+      const passwordHash = await bcrypt.hash('test123456', 10);
+      user = User.create(testUserName, passwordHash);
+      console.log(`✓ Created test user: ${user.id}`);
+    } else {
+      console.log(`✓ Test user already exists: ${user.id}`);
+    }
+    return user.id;
+  } catch (error) {
+    console.warn('Failed to setup test user:', error.message);
+    throw error;
+  }
+}
 
 async function runTests() {
   console.log('=== Container Manager Tests ===\n');
 
   try {
+    // Setup test user
+    testUserId = await setupTestUser();
+
     // Test 1: Create container
-    console.log('Test 1: Creating container...');
-    const container = await containerManager.createContainer(testUserId, {
+    console.log('Test 1: Getting or creating container...');
+    const container = await containerManager.getOrCreateContainer(testUserId, {
       tier: 'free'
     });
     console.log('✓ Container created:', container.id);
@@ -88,13 +114,34 @@ async function runTests() {
 
     console.log('=== All tests passed! ===');
 
+    // Cleanup: Delete test user
+    try {
+      const user = User.getByUsername(testUserName);
+      if (user) {
+        User.delete(user.id);
+        console.log('✓ Deleted test user');
+      }
+    } catch (e) {
+      // Ignore cleanup errors
+    }
   } catch (error) {
     console.error('✗ Test failed:', error.message);
     console.error(error.stack);
 
     // Cleanup on failure
     try {
-      await containerManager.destroyContainer(testUserId, false);
+      if (testUserId) {
+        await containerManager.destroyContainer(testUserId, false);
+      }
+      // Clean up test user
+      try {
+        const user = User.getByUsername(testUserName);
+        if (user) {
+          User.delete(user.id);
+        }
+      } catch (e) {
+        // Ignore
+      }
     } catch (e) {
       // Ignore cleanup errors
     }
