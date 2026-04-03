@@ -382,6 +382,7 @@ export const Sidebar = memo(function Sidebar({
 
       <div
         className="h-full flex flex-col bg-card md:select-none"
+        data-tour="sidebar"
         style={isPWA && isMobile ? { paddingTop: '44px' } : {}}
       >
         {/* Header */}

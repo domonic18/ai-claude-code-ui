@@ -147,3 +147,6 @@ certs/
 *.pem
 *.key
 *.crt
+
+# Stability test scripts and results (not committed)
+tests/stability/
