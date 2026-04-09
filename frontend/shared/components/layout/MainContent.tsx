@@ -330,7 +330,7 @@ function MainContent({
 
           {/* Modern Tab Navigation - Right Side */}
           <div className="flex-shrink-0 hidden sm:block">
-            <div className="relative flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+            <div className="relative flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1" data-tour="tab-nav">
               <Tooltip content={t('common.chat')} position="bottom">
                 <button
                   onClick={() => setActiveTab('chat')}

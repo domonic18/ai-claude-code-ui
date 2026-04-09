@@ -301,7 +301,7 @@ export function ChatInput({
   const canSend = value.trim().length > 0 && !isLoading && !disabled;
 
   return (
-    <div className="relative">
+    <div className="relative" data-tour="chat-input">
       {/* File attachments preview - use modular component */}
       {files.length > 0 && (
         <FileAttachmentsPreview

@@ -11,8 +11,9 @@
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Moon, Sun } from 'lucide-react';
+import { Moon, Sun, RotateCcw } from 'lucide-react';
 import { useTheme } from '@/shared/contexts/ThemeContext';
+import { useTourContext } from '@/shared/contexts/TourContext';
 import { useCodeEditorSettings } from '../hooks';
 
 /**
@@ -21,6 +22,7 @@ import { useCodeEditorSettings } from '../hooks';
 export function AppearanceTab() {
   const { t } = useTranslation();
   const { isDarkMode, toggleDarkMode } = useTheme();
+  const { startTour } = useTourContext();
   const { settings, setCodeEditorTheme, setCodeEditorWordWrap, setCodeEditorShowMinimap, setCodeEditorLineNumbers, setCodeEditorFontSize } = useCodeEditorSettings();
 
   // Local state for project sorting
@@ -246,6 +248,31 @@ export function AppearanceTab() {
               <option value="18">18px</option>
               <option value="20">20px</option>
             </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Product Tour */}
+      <div className="space-y-4">
+        <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-medium text-foreground">
+                {t('tour.title')}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {t('tour.showTourAgain')}
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                startTour();
+              }}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+            >
+              <RotateCcw className="w-4 h-4" />
+              {t('tour.showTourAgain')}
+            </button>
           </div>
         </div>
       </div>

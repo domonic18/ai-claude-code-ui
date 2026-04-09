@@ -444,5 +444,18 @@
     "saving": "保存中...",
     "saved": "已保存",
     "placeholder": "长期记忆可以记录用户的工作习惯、要求和准则等"
+  },
+  "tour": {
+    "title": "产品导览",
+    "step1Title": "对话列表",
+    "step1Desc": "所有的对话都在这里显示",
+    "step2Title": "聊天输入",
+    "step2Desc": "可以上传文档和图片，并发送信息",
+    "step3Title": "切换标签页",
+    "step3Desc": "可以选择聊天，也可以切换到文件查看用户上传的文件和AI生成的文件",
+    "nextStep": "下一步",
+    "complete": "完成",
+    "loading": "页面加载中...",
+    "showTourAgain": "重新查看导览"
   }
 }

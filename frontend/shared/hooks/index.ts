@@ -4,3 +4,5 @@ export { useVersionCheck } from './useVersionCheck';
 export type { ReleaseInfo, UseVersionCheckResult } from './useVersionCheck';
 export { useAudioRecorder } from './useAudioRecorder';
 export type { UseAudioRecorderResult } from './useAudioRecorder';
+export { useProductTour } from './useProductTour';
+export type { UseProductTourResult } from './useProductTour';

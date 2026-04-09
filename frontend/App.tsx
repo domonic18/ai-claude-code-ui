@@ -31,10 +31,13 @@ import { VersionUpgradeModal, useProjectManager, useSessionProtection } from './
 import { ThemeProvider } from '@/shared/contexts/ThemeContext';
 import { AuthProvider, useAuth } from '@/shared/contexts/AuthContext';
 import { WebSocketProvider, useWebSocketContext } from '@/shared/contexts/WebSocketContext';
+import { TourContext } from '@/shared/contexts/TourContext';
 import { QueryClientProvider, queryClient } from '@/shared/libs/query';
 import { ProtectedRoute } from '@/router';
 import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import useLocalStorage from '@/shared/hooks/useLocalStorage';
+import { useProductTour } from '@/shared/hooks/useProductTour';
+import { ProductTour } from '@/shared/components/tour';
 import { api, authenticatedFetch } from '@/shared/services';
 import { APP_NAME } from '@/shared/constants/app.constants';
 import { Homepage, ChatPage, SettingsPage, AdminPage, MemoryPage, NotFoundPage } from '@/pages';
@@ -99,6 +102,16 @@ function AppContent() {
   const [sendByCtrlEnter, setSendByCtrlEnter] = useLocalStorage('sendByCtrlEnter', false);
   const [sidebarVisible, setSidebarVisible] = useLocalStorage('sidebarVisible', true);
   const [autoRefreshInterval] = useLocalStorage('autoRefreshInterval', 0);
+
+  // Product Tour
+  const TOTAL_TOUR_STEPS = 3;
+  const {
+    isTourActive,
+    startTour,
+    completeTour,
+    nextStep,
+    currentStep,
+  } = useProductTour(TOTAL_TOUR_STEPS);
 
   // Stable config object for useProjectManager to prevent infinite loops
   const projectManagerConfig = useMemo(() => ({
@@ -258,7 +271,10 @@ function AppContent() {
   // Version Upgrade Modal (now using extracted component from features/system)
   // Note: The modal component has been extracted to features/system/components/VersionUpgradeModal.tsx
 
+  const tourContextValue = useMemo(() => ({ startTour }), [startTour]);
+
   return (
+    <TourContext.Provider value={tourContextValue}>
     <div className="fixed inset-0 flex bg-background">
       {/* Fixed Desktop Sidebar */}
       {!isMobile && (
@@ -451,7 +467,17 @@ function AppContent() {
         currentVersion={currentVersion}
         releaseInfo={releaseInfo}
       />
+
+      {/* Product Tour */}
+      <ProductTour
+        isActive={isTourActive}
+        currentStep={currentStep}
+        totalSteps={TOTAL_TOUR_STEPS}
+        onNext={nextStep}
+        onComplete={completeTour}
+      />
     </div>
+    </TourContext.Provider>
   );
 }
 
