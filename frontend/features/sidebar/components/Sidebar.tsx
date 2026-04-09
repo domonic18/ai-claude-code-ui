@@ -52,6 +52,7 @@ export const Sidebar = memo(function Sidebar({
     createProject,
     renameProject,
     deleteProject,
+    updateSessionSummary,
     getSortedProjects,
   } = useProjects(propProjects);
 
@@ -295,18 +296,17 @@ export const Sidebar = memo(function Sidebar({
   const handleUpdateSessionSummary = useCallback(async (projectName: string, sessionId: string, summary: string) => {
     try {
       await renameSession(projectName, sessionId, summary);
+      // Optimistic local update: update the session summary in useProjects state
+      // so the UI reflects the change immediately without a full server refresh
+      updateSessionSummary(projectName, sessionId, summary);
       // Close editing state
       setEditingSession(null);
       setEditingSessionName('');
-      // Refresh to get updated data
-      if (onRefresh) {
-        await onRefresh();
-      }
     } catch (error) {
       console.error('Error updating session summary:', error);
       // Don't close editing state on error, allowing user to retry
     }
-  }, [renameSession, onRefresh]);
+  }, [renameSession, updateSessionSummary]);
 
   const handleLoadMoreSessions = useCallback(async (project: any) => {
     // Find the original project from displayProjects (not merged)
