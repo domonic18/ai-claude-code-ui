@@ -49,6 +49,8 @@ export interface UseProjectsReturn {
   renameProject: (projectName: string, newName: string) => Promise<void>;
   /** Delete a project */
   deleteProject: (projectName: string) => Promise<void>;
+  /** Update session summary locally (optimistic update) */
+  updateSessionSummary: (projectName: string, sessionId: string, newSummary: string) => void;
   /** Get sorted projects */
   getSortedProjects: (starredProjects: StarredProjects) => Project[];
 }
@@ -196,6 +198,29 @@ export function useProjects(initialProjects?: Project[] | null): UseProjectsRetu
     }
   }, [service]);
 
+  /**
+   * Update session summary in local state (optimistic update).
+   * Updates the summary field of a session across all session arrays
+   * (sessions, cursorSessions, codexSessions) within the matching project.
+   */
+  const updateSessionSummary = useCallback((projectName: string, sessionId: string, newSummary: string) => {
+    setProjects(prev =>
+      prev.map(project => {
+        if (project.name !== projectName) return project;
+
+        const updateArray = (arr: any[] | undefined) =>
+          arr ? arr.map(s => (s.id === sessionId ? { ...s, summary: newSummary } : s)) : arr;
+
+        return {
+          ...project,
+          sessions: updateArray(project.sessions),
+          cursorSessions: updateArray(project.cursorSessions),
+          codexSessions: updateArray(project.codexSessions),
+        };
+      })
+    );
+  }, []);
+
   // Get sorted projects
   const getSortedProjects = useCallback((starredProjects: StarredProjects): Project[] => {
     // Defensive check: ensure projects is an array
@@ -244,6 +269,7 @@ export function useProjects(initialProjects?: Project[] | null): UseProjectsRetu
     createProject,
     renameProject,
     deleteProject,
+    updateSessionSummary,
     getSortedProjects,
   };
 }
