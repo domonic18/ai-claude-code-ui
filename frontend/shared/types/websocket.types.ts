@@ -46,3 +46,13 @@ export interface MessageQueueItem {
   timestamp: number;
   retries: number;
 }
+
+/**
+ * Memory context message
+ * Sent by backend to provide memory context to the AI
+ */
+export interface MemoryContextMessage {
+  type: 'memory-context';
+  sessionId: string;
+  content: string;
+}

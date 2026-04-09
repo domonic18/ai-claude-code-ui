@@ -202,7 +202,6 @@ function authenticateJwt(options = {}) {
 
       return _checkRoles(req, res, next, requiredRoles);
     } catch (error) {
-      console.error('Token verification error:', error);
       if (optional) {
         req.user = null;
         return next();
@@ -262,7 +261,6 @@ function authenticateExternalApiKey(options = {}) {
 
       next();
     } catch (error) {
-      console.error('API key verification error:', error);
       if (optional) {
         req.apiKey = null;
         return next();
@@ -290,7 +288,6 @@ function authenticateWebSocket(token) {
       }
       return null;
     } catch (error) {
-      console.error('Platform mode WebSocket error:', error);
       return null;
     }
   }
@@ -304,14 +301,11 @@ function authenticateWebSocket(token) {
     const user = User.getById(decoded.userId);
 
     if (!user) {
-      console.warn(`[WS AUTH] Failed: User ${decoded.userId} not found in database`);
       return null;
     }
 
-    console.log(`[WS AUTH] Success: User ${decoded.userId} (${decoded.username}) verified from database`);
     return { userId: user.id, username: user.username, authType: AuthType.JWT };
   } catch (error) {
-    console.error('[WS AUTH] Token verification error:', error.message);
     return null;
   }
 }

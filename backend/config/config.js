@@ -59,12 +59,14 @@ export function loadEnvironment() {
     console.log(`[CONFIG] Loaded ${loadedCount} environment variables from .env`);
 
     // 关键变量检查
-    const criticalVars = ['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_MODEL'];
+    const criticalVars = ['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'AVAILABLE_MODELS'];
     console.log('[CONFIG] Critical environment variables status:');
     criticalVars.forEach(varName => {
       const isSet = !!process.env[varName];
       const value = isSet ? (varName.includes('TOKEN') || varName.includes('KEY')
         ? `${process.env[varName].substring(0, 10)}...`
+        : varName === 'AVAILABLE_MODELS'
+        ? `${process.env[varName].substring(0, 50)}...`
         : process.env[varName])
         : 'NOT SET';
       console.log(`[CONFIG] - ${varName}: ${value}`);
@@ -128,6 +130,16 @@ export const AUTH = {
 };
 
 /**
+ * CORS 配置
+ */
+export const CORS = {
+  // 允许的源（逗号分隔）
+  origins: process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
+    : ['http://localhost:5173', 'http://localhost:3001'],
+};
+
+/**
  * 容器配置
  *
  * 注意：项目现在完全基于容器化运行，所有操作都在 Docker 容器中执行。
@@ -141,24 +153,32 @@ export const CONTAINER = {
   },
 
   // Docker 镜像
-  image: process.env.CONTAINER_IMAGE || 'claude-code-runtime:latest',
+  image: process.env.CONTAINER_IMAGE || 'claude-code-sandbox:latest',
 
   // Docker 网络
-  network: process.env.CONTAINER_NETWORK || 'claude-network',
+  network: process.env.CONTAINER_NETWORK || 'claude-code-network',
 
-  // 容器内路径规范（符合 docs/arch/data-storage-design.md v3.1）
+  // 容器内路径规范
   paths: {
-    // 统一工作目录（通过 HOME=/workspace，~ 也指向此目录）
+    // 统一工作目录
     workspace: '/workspace',
-    // Claude 配置根目录（用户级配置，~/.claude/）
-    claudeConfig: '/workspace/.claude',
+    // Claude 配置根目录（指向项目工作区，以便 SDK 能读取 customAgents）
+    // 注意：SDK 的 CLAUDE_CONFIG_DIR 决定了 settings.json 的读取位置
+    claudeConfig: '/workspace/my-workspace/.claude',
     // 设置文件
-    settings: '/workspace/.claude/settings.json',
+    settings: '/workspace/my-workspace/.claude/settings.json',
     // API 密钥文件（保留用于兼容性）
-    apiKeys: '/workspace/.claude/api_keys.json',
-    // 项目元数据目录（注意：官方文档未明确说明，保留用于路径验证）
-    // 此目录可能由 SDK 自动管理用于会话元数据
+    apiKeys: '/workspace/my-workspace/.claude/api_keys.json',
+    // 项目元数据目录
     projects: '/workspace/.claude/projects',
+  },
+
+  // 宿主机安全策略文件路径
+  security: {
+    // Seccomp 配置文件路径（系统调用过滤）
+    seccompProfile: process.env.SECCOMP_PROFILE || path.join(PROJECT_ROOT, 'workspace/containers/seccomp/claude-code.json'),
+    // AppArmor 配置文件名称（需要在系统上预加载）
+    apparmorProfile: process.env.APPARMOR_PROFILE || 'docker-claude-code',
   }
 };
 
@@ -199,6 +219,95 @@ export const CLAUDE = {
 
   // 上下文窗口大小
   contextWindow: parseInt(process.env.CONTEXT_WINDOW || '200000', 10),
+};
+
+/**
+ * AI 模型配置
+ *
+ * 从 AVAILABLE_MODELS 环境变量解析可用模型列表。
+ * 格式：模型名:提供商|模型名:提供商
+ * 示例：AVAILABLE_MODELS=glm-4.7:Zhipu GLM|glm-5:Zhipu GLM|kimi-k2.5:Moonshot AI
+ */
+export const MODELS = {
+  /**
+   * 解析并验证 AVAILABLE_MODELS 环境变量
+   * @returns {Array<{name: string, provider: string}>} 模型数组
+   * @throws {Error} 如果环境变量无效
+   */
+  available: (() => {
+    if (!process.env.AVAILABLE_MODELS) {
+      throw new Error(
+        'AVAILABLE_MODELS environment variable is required.\n' +
+        'Format: model:provider|model:provider\n' +
+        'Example: AVAILABLE_MODELS=glm-4.7:Zhipu GLM|glm-5:Zhipu GLM|kimi-k2.5:Moonshot AI'
+      );
+    }
+
+    try {
+      // 新格式：model:provider|model:provider
+      // 例如：glm-4.7:Zhipu GLM|glm-5:Zhipu GLM|kimi-k2.5:Moonshot AI
+      const entries = process.env.AVAILABLE_MODELS.split('|');
+
+      const models = entries.map((entry, index) => {
+        const parts = entry.split(':');
+        if (parts.length < 2) {
+          throw new Error(
+            `Invalid model entry at index ${index}: "${entry}".\n` +
+            'Expected format: model:provider\n' +
+            `Example: glm-4.7:Zhipu GLM`
+          );
+        }
+
+        const name = parts[0].trim();
+        const provider = parts.slice(1).join(':').trim(); // Provider 可能包含空格，使用 join(':') 处理
+
+        if (!name || !provider) {
+          throw new Error(
+            `Model name or provider cannot be empty at index ${index}: "${entry}"`
+          );
+        }
+
+        return { name, provider, description: '' };
+      });
+
+      if (models.length === 0) {
+        throw new Error('AVAILABLE_MODELS must contain at least one model');
+      }
+
+      console.log(`[MODELS] Loaded ${models.length} models from AVAILABLE_MODELS`);
+      return models;
+    } catch (error) {
+      if (error.message.startsWith('AVAILABLE_MODELS') ||
+          error.message.startsWith('Invalid model entry')) {
+        throw error; // 重新抛出我们自己的验证错误
+      }
+      throw new Error(
+        `Failed to parse AVAILABLE_MODELS: ${error.message}\n` +
+        `Format: model:provider|model:provider\n` +
+        `Example: AVAILABLE_MODELS=glm-4.7:Zhipu GLM|glm-5:Zhipu GLM|kimi-k2.5:Moonshot AI`
+      );
+    }
+  })(),
+
+  /**
+   * 默认模型（使用第一个可用模型）
+   */
+  default: (() => {
+    try {
+      return MODELS.available[0]?.name;
+    } catch {
+      return undefined; // 如果解析失败，返回 undefined 让调用者知道有问题
+    }
+  })(),
+
+  /**
+   * API 配置（保留用于向后兼容）
+   * 注意：SDK 现在使用前端传入的 model 参数，不再依赖这些环境变量
+   */
+  api: {
+    baseURL: process.env.ANTHROPIC_BASE_URL,
+    apiKey: process.env.ANTHROPIC_API_KEY
+  }
 };
 
 /**
@@ -354,8 +463,14 @@ export function getProjectRoot() {
 
 /**
  * 获取 workspace 目录的绝对路径
+ * 优先使用 WORKSPACE_DIR 环境变量（用于 Docker 部署）
  */
 export function getWorkspaceDir() {
+  // 在 Docker 部署环境中，使用 WORKSPACE_DIR 环境变量
+  // 这样可以与命名卷挂载点保持一致
+  if (process.env.WORKSPACE_DIR) {
+    return process.env.WORKSPACE_DIR;
+  }
   return path.join(PROJECT_ROOT, 'workspace');
 }
 
@@ -480,9 +595,11 @@ export default {
   SERVER,
   DATABASE,
   AUTH,
+  CORS,
   CONTAINER,
   RESOURCE_LIMITS,
   CLAUDE,
+  MODELS,
   FILES,
   WEBSOCKET,
   LOG,

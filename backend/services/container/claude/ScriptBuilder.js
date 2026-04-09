@@ -5,6 +5,7 @@
  */
 
 import { UserSettingsService } from '../../settings/UserSettingsService.js';
+import { loadAgentsForSDK } from '../../../services/extensions/extension-sync.js';
 
 /**
  * 过滤 SDK 选项，移除不需要传给 SDK 的字段
@@ -60,13 +61,21 @@ async function filterSDKOptions(options, userId) {
   delete sdkOptions.isContainerProject;
   delete sdkOptions.projectPath;
   delete sdkOptions.toolsSettings;
+  delete sdkOptions.images;     // 图片数据在 DockerExecutor 中处理
+  delete sdkOptions.imagePaths; // 图片路径在脚本中单独处理
 
   // 设置默认工具，如果最终没有配置任何工具
   if (!sdkOptions.allowedTools || sdkOptions.allowedTools.length === 0) {
     sdkOptions.allowedTools = [
+      // Git 相关命令
       'Bash(git log:*)',
       'Bash(git diff:*)',
       'Bash(git status:*)',
+      // 文档处理命令（PDF、Word 等）
+      'Bash(pdftotext:*)',
+      'Bash(pandoc:*)',
+      'Bash(file:*)',
+      // 其他工具
       'Write',
       'Read',
       'Edit',
@@ -77,17 +86,101 @@ async function filterSDKOptions(options, userId) {
       'TodoWrite',
       'TodoRead',
       'WebFetch',
-      'WebSearch'
+      'WebSearch',
+      'Skill'           // 关键修复：启用 Skill 工具，否则 SDK 不会加载 Skills
     ];
     console.log('[ScriptBuilder] Setting default allowedTools');
   }
 
+  // 关键修复：设置 settingSources 以从文件系统加载扩展
+  // 根据 Claude Agent SDK 文档，必须显式设置此选项才能加载扩展
+  // - "user": 从 ~/.claude/ 加载（HOME 环境变量指向的目录）
+  // - "project": 从当前工作目录的 .claude/ 加载
+  //
+  // SDK 将自动从以下位置加载：
+  // - settings.json (包含 customAgents 配置，直接注册无需前缀)
+  // - CLAUDE.md (上下文文档)
+  // - skills/ (技能目录)
+  // - agents/ (代理目录)
+  // - commands/ (命令目录)
+  // - hooks/ (钩子目录)
+  // - knowledge/ (知识目录)
+  sdkOptions.settingSources = ['user', 'project'];
+  console.log('[ScriptBuilder] Setting settingSources: user, project');
+
+  // 动态加载 agents 和配置 plugins（从 extensions/.claude/ 目录）
+  // 注意：skills 不能通过 sdkOptions.skills 传递给子 agents
+  // 必须使用 plugins 让 SDK 自动扫描，这样主对话和子 agents 都能使用 skills
+  if (options.enableExtensions !== false) {
+    try {
+      // 动态加载 agents（从 .md 文件读取）
+      sdkOptions.agents = await loadAgentsForSDK();
+      console.log('[ScriptBuilder] Loaded agents:', Object.keys(sdkOptions.agents));
+
+      // 配置 plugins 指向 skills 目录
+      // SDK 会自动扫描 plugins 目录下的 skills，主对话和子 agents 都能使用
+      sdkOptions.plugins = [
+        {
+          type: 'local',
+          path: '/workspace/.claude'
+        }
+      ];
+      console.log('[ScriptBuilder] Configured plugins for skills scanning');
+    } catch (error) {
+      console.error('[ScriptBuilder] Failed to load extensions:', error);
+      // 如果加载失败，设置为空
+      sdkOptions.agents = {};
+      sdkOptions.plugins = [];
+    }
+  }
+
+  // 定义系统级禁用的交互式规划工具（前端暂不支持）
+  // 这些工具需要用户实时交互，Web 界面暂时不支持
+  const interactivePlanningTools = [
+    'EnterPlanMode',   // 进入规划模式
+    'AskUserQuestion', // 向用户提问
+    'ExitPlanMode'     // 退出规划模式
+  ];
+
   // 处理权限模式
-  // 如果前端指定了 skipPermissions，或者在容器模式下且没有明确指定 permissionMode
-  if (settings.skipPermissions || !sdkOptions.permissionMode || sdkOptions.permissionMode === 'default') {
+  // 优先级：前端传入的 permissionMode > 用户设置的 skipPermissions > 默认值
+  // 注意：只有用户设置的 disallowedTools 才会影响 bypassPermissions 模式
+  // 系统级禁用（interactivePlanningTools）不影响权限模式选择
+
+  // 提取用户设置的禁止工具（不包括系统级的 interactivePlanningTools）
+  const userDisallowedTools = sdkOptions.disallowedTools
+    ? sdkOptions.disallowedTools.filter(tool => !interactivePlanningTools.includes(tool))
+    : [];
+  const hasUserDisallowedTools = userDisallowedTools.length > 0;
+
+  // 跟踪是否使用了默认工具列表
+  const usingDefaultTools = !sdkOptions.allowedTools || sdkOptions.allowedTools.length === 0;
+
+  // 如果前端明确传入了 permissionMode，使用前端传入的值
+  if (sdkOptions.permissionMode) {
+    // 如果前端要求 bypassPermissions 但存在用户设置的禁止工具，发出警告
+    if (sdkOptions.permissionMode === 'bypassPermissions' && hasUserDisallowedTools) {
+      console.warn('[ScriptBuilder] WARNING: bypassPermissions mode will disable user-set disallowedTools:', userDisallowedTools);
+    }
+    console.log('[ScriptBuilder] Using frontend permissionMode:', sdkOptions.permissionMode);
+  }
+  // 如果用户设置 skipPermissions 为 true，且没有用户设置的禁止工具，则使用 bypassPermissions
+  else if (settings.skipPermissions && !hasUserDisallowedTools) {
     sdkOptions.permissionMode = 'bypassPermissions';
-    console.log('[ScriptBuilder] Setting permissionMode: bypassPermissions (reason:',
-      settings.skipPermissions ? 'skipPermissions' : (sdkOptions.permissionMode || 'default'), ')');
+    console.log('[ScriptBuilder] Setting permissionMode: bypassPermissions (reason: skipPermissions=true, no user disallowedTools)');
+  }
+  // 新增：如果使用默认工具列表且没有用户设置的禁止工具，则使用 bypassPermissions
+  // 这样新用户可以直接使用所有预配置的工具（包括 PDF 转换等）
+  else if (usingDefaultTools && !hasUserDisallowedTools) {
+    sdkOptions.permissionMode = 'bypassPermissions';
+    console.log('[ScriptBuilder] Setting permissionMode: bypassPermissions (reason: using default tools, no user disallowedTools)');
+  }
+  // 其他情况（包括有用户设置禁止工具的情况），使用 default 模式
+  else {
+    sdkOptions.permissionMode = 'default';
+    console.log('[ScriptBuilder] Setting permissionMode: default (reason: ',
+      hasUserDisallowedTools ? 'has user disallowedTools' : 'default fallback',
+      ')');
   }
 
   // 处理 resume 参数：
@@ -100,22 +193,13 @@ async function filterSDKOptions(options, userId) {
     delete sdkOptions.resume;
   }
 
-  // 禁用交互式规划工具（前端暂不支持）
-  // 这些工具需要用户实时交互，Web 界面暂时不支持
-  const interactivePlanningTools = [
-    'EnterPlanMode',   // 进入规划模式
-    'AskUserQuestion', // 向用户提问
-    'ExitPlanMode'     // 退出规划模式
-  ];
-
-  // 合并已有的 disallowedTools
-  if (sdkOptions.disallowedTools && sdkOptions.disallowedTools.length > 0) {
-    sdkOptions.disallowedTools = [...sdkOptions.disallowedTools, ...interactivePlanningTools];
-  } else {
-    sdkOptions.disallowedTools = interactivePlanningTools;
-  }
-
+  // 合并系统级和用户级的 disallowedTools
+  // 用户设置的禁止工具优先保留，然后添加系统级禁用工具
+  sdkOptions.disallowedTools = [...userDisallowedTools, ...interactivePlanningTools];
   console.log('[ScriptBuilder] Disallowed interactive planning tools:', interactivePlanningTools);
+  if (userDisallowedTools.length > 0) {
+    console.log('[ScriptBuilder] User disallowed tools:', userDisallowedTools);
+  }
 
   // 移除 sessionId（SDK 不需要这个参数）
   delete sdkOptions.sessionId;
@@ -124,6 +208,9 @@ async function filterSDKOptions(options, userId) {
   if (sdkOptions.model === 'custom') {
     delete sdkOptions.model;
   }
+
+  // 调试：检查返回前的 sdkOptions keys
+  console.log('[ScriptBuilder] Returning sdkOptions keys:', Object.keys(sdkOptions));
 
   return sdkOptions;
 }
@@ -139,12 +226,20 @@ export async function buildSDKScript(command, options, userId) {
   // 提取 sessionId 以便在脚本中使用
   const sessionId = options.sessionId || '';
 
+  // 提取图片路径（已由 DockerExecutor 复制到容器内）
+  const imagePaths = options.imagePaths || [];
+  console.log('[ScriptBuilder] Image paths received:', imagePaths);
+
   // 过滤并处理 options（现在是异步的）
   const sdkOptions = await filterSDKOptions(options, userId);
 
   // 使用 base64 编码来避免转义问题（包括 options 和 command）
   const optionsJson = JSON.stringify(sdkOptions);
   const optionsBase64 = Buffer.from(optionsJson).toString('base64');
+
+  // 调试：在编码前打印 options
+  console.log('[ScriptBuilder] Original sdkOptions.model:', sdkOptions.model);
+  console.log('[ScriptBuilder] optionsJson:', optionsJson);
 
   // 对命令也使用 base64 编码，避免特殊字符问题
   const commandBase64 = Buffer.from(command, 'utf-8').toString('base64');
@@ -163,25 +258,30 @@ async function execute() {
 
     // 从 base64 解码 options
     const optionsJson = Buffer.from("${optionsBase64}", "base64").toString("utf-8");
+    console.error("[SDK] Decoded options JSON:", optionsJson);
     const options = JSON.parse(optionsJson);
 
     // 从 base64 解码命令
-    const command = Buffer.from("${commandBase64}", "base64").toString("utf-8");
+    let command = Buffer.from("${commandBase64}", "base64").toString("utf-8");
+
+    // 添加图片路径到命令（如果有）
+    const imagePaths = ${JSON.stringify(imagePaths)};
+    if (imagePaths.length > 0) {
+      console.error("[SDK] Images available at:", imagePaths);
+      const imageNote = "\\n\\n[Images provided at the following paths:]\\n" +
+        imagePaths.map((p, i) => (i + 1) + ". " + p).join("\\n") +
+        "\\n\\nPlease use the Read tool to view these images and analyze them.";
+      command = command + imageNote;
+    }
 
     console.error("[SDK] Options:", JSON.stringify(options, null, 2));
     console.error("[SDK] Command:", command);
 
-    // 重要：设置 SDK 的工作目录环境变量
-    // SDK 使用 HOME 或 USERPROFILE 等环境变量来确定配置文件位置
-    // 我们通过设置这些环境变量来确保 SDK 在正确的位置创建会话文件
+    // 切换到项目目录，确保工具在正确的位置执行
+    // 注意：不修改 HOME 环境变量，确保记忆文件和配置文件位置一致
+    // SDK 会从 CLAUDE.md 中读取记忆文件路径 (.claude/memory/MEMORY.md)
     if (options.cwd) {
       const projectDir = options.cwd;
-      console.error("[SDK] Setting HOME to project directory:", projectDir);
-      process.env.HOME = projectDir;
-      // 也设置其他可能的环境变量
-      process.env.USERPROFILE = projectDir;
-
-      // 切换到项目目录，确保工具在正确的位置执行
       console.error("[SDK] Changing CWD to:", projectDir);
       try {
         process.chdir(projectDir);

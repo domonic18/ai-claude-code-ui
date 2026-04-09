@@ -35,7 +35,7 @@
 
 # 🚀 快速开始
 
-## 本地开发
+## 首次设置（仅需一次）
 
 ```bash
 # 克隆仓库
@@ -48,12 +48,26 @@ git submodule update --init --recursive
 # 安装依赖
 npm install
 
-# 构建 Docker 镜像（必须，容器模式依赖）
-docker build -f docker/Dockerfile.runtime -t claude-code-runtime:latest .
+# 构建基础镜像
+./scripts/build-image.sh
+```
 
-# 启动开发服务
+## 日常开发
+
+```bash
+# 启动开发环境
 npm run dev
 ```
+
+## 修改代码后
+
+| 修改类型 | 操作 |
+|---------|------|
+| 前端代码 | Vite 热时编译，浏览器刷新即可 |
+| 后端代码 | 无需操作（Node.js 热重载） |
+| 沙箱代码 | `docker build -f docker/Dockerfile.sandbox -t claude-code-sandbox:latest`，重启后端服务 |
+
+访问 http://localhost:3001
 
 ### 子模块操作
 
@@ -80,7 +94,7 @@ JWT_SECRET=your-secret-key-change-in-production
 
 # Docker 容器配置
 CONTAINER_MODE=enabled
-CONTAINER_IMAGE=claude-code-runtime:latest
+CONTAINER_IMAGE=claude-code-sandbox:latest
 
 # Claude API 配置（可选）
 ANTHROPIC_API_KEY=your-api-key
@@ -90,20 +104,27 @@ ANTHROPIC_MODEL=glm-4.7
 
 ## Docker 部署
 
-使用 Docker Compose 部署：
+### 构建并推送镜像
 
 ```bash
-# 构建镜像
-docker build -f docker/Dockerfile.runtime -t claude-code-runtime:latest .
+# 构建镜像（带版本号）
+./scripts/build-image.sh
 
-# 启动服务
-docker-compose up -d
+# 推送到远程仓库
+./scripts/push-image.sh
+```
+
+### 目标机器部署
+
+```bash
+# 启动服务（使用远程镜像）
+docker-compose -f docker-compose.deploy.yml up -d
 
 # 查看日志
-docker-compose logs -f
+docker-compose -f docker-compose.deploy.yml logs -f
 
 # 停止服务
-docker-compose down
+docker-compose -f docker-compose.deploy.yml down
 ```
 
 ## CLI 命令

@@ -124,7 +124,34 @@ export function convertSessionMessages(rawMessages: any[]): ChatMessage[] {
         content = decodeHtmlEntities(String(msg.message.content));
       }
 
-      // Skip command messages, system messages, and empty content
+      // Check if content is a skill system prompt (should be hidden from users)
+      // These are SDK-internal messages that should not be displayed to users
+
+      // Pattern 1: Skill directory message - SDK generated
+      // "Base directory for this skill: /workspace/.claude/skills/..."
+      const isSkillDirectoryMessage = content.includes('Base directory for this skill:') ||
+        (content.includes('/.claude/skills/') && content.includes('# '));
+
+      // Pattern 2: YAML frontmatter with skill metadata
+      // Matches skill definition files starting with "---" containing name/description/tools
+      const isSkillYamlPrompt = content.startsWith('---') &&
+        content.includes('name:') &&
+        content.includes('description:') &&
+        content.includes('tools:');
+
+      // Pattern 3: Multi-pattern skill instruction detection
+      // Must match at least 2 of these indicators to avoid false positives:
+      const skillIndicators = [
+        '## 角色设定', '## 任务目标', '## 工作流程',
+        '## 何时使用此工作流', '## 标准评估报告模板',
+        'Base directory for this skill'
+      ];
+      const indicatorCount = skillIndicators.filter(indicator => content.includes(indicator)).length;
+      const isSkillInstructionMessage = indicatorCount >= 2 && content.length > 1000;
+
+      const isSkillSystemPrompt = isSkillDirectoryMessage || isSkillYamlPrompt || isSkillInstructionMessage;
+
+      // Skip command messages, system messages, skill prompts, and empty content
       const shouldSkip = !content ||
         content.startsWith('<command-name>') ||
         content.startsWith('<command-message>') ||
@@ -133,7 +160,8 @@ export function convertSessionMessages(rawMessages: any[]): ChatMessage[] {
         content.startsWith('<system-reminder>') ||
         content.startsWith('Caveat:') ||
         content.startsWith('This session is being continued from a previous') ||
-        content.startsWith('[Request interrupted');
+        content.startsWith('[Request interrupted') ||
+        isSkillSystemPrompt;
 
       if (!shouldSkip) {
         // Unescape with math formula protection

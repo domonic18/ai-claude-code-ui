@@ -75,6 +75,17 @@ export class FileOperationsService {
   }
 
   /**
+   * 重命名文件或目录
+   * @param {string} oldPath - 旧路径
+   * @param {string} newName - 新名称
+   * @param {Object} options - 选项
+   * @returns {Promise<{success: boolean, newPath: string}>}
+   */
+  async renameFile(oldPath, newName, options = {}) {
+    return await this.adapter.renameFile(oldPath, newName, options);
+  }
+
+  /**
    * 检查文件是否存在
    * @param {string} filePath - 文件路径
    * @param {Object} options - 选项
@@ -92,6 +103,17 @@ export class FileOperationsService {
    */
   async createDirectory(dirPath, options = {}) {
     return await this.adapter.createDirectory(dirPath, options);
+  }
+
+  /**
+   * 移动文件或目录
+   * @param {string} sourcePath - 源路径
+   * @param {string} targetDir - 目标目录路径（空字符串表示根目录）
+   * @param {Object} options - 选项
+   * @returns {Promise<{success: boolean, newPath: string}>}
+   */
+  async moveFile(sourcePath, targetDir, options = {}) {
+    return await this.adapter.moveFile(sourcePath, targetDir, options);
   }
 
   /**

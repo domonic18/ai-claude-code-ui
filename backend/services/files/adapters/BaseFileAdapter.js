@@ -24,6 +24,8 @@ import {
   ERROR_MESSAGES,
   FILE_TREE_CONFIG
 } from '../constants.js';
+import { CONTAINER } from '../../../config/config.js';
+import { PathUtils } from '../../core/utils/path-utils.js';
 
 /**
  * 抽象文件适配器基类
@@ -155,8 +157,37 @@ export class BaseFileAdapter extends IFileOperations {
       };
     }
 
-    // 检查路径遍历
+    // 检查路径遍历攻击 - 使用更严格的验证
+    // 1. 检查原始的 .. 模式
     if (filePath.includes('..')) {
+      return {
+        valid: false,
+        error: ERROR_MESSAGES[ERROR_TYPES.PATH_TRAVERSAL].replace('{path}', filePath),
+        safePath: ''
+      };
+    }
+
+    // 2. 检查 URL 编码的路径遍历尝试
+    try {
+      const decodedPath = decodeURIComponent(filePath);
+      if (decodedPath.includes('..')) {
+        return {
+          valid: false,
+          error: ERROR_MESSAGES[ERROR_TYPES.PATH_TRAVERSAL].replace('{path}', filePath),
+          safePath: ''
+        };
+      }
+    } catch (e) {
+      // URI 解码失败，视为无效路径
+      return {
+        valid: false,
+        error: ERROR_MESSAGES[ERROR_TYPES.INVALID_PATH].replace('{path}', filePath),
+        safePath: ''
+      };
+    }
+
+    // 3. 检查空字节注入
+    if (filePath.includes('\0')) {
       return {
         valid: false,
         error: ERROR_MESSAGES[ERROR_TYPES.PATH_TRAVERSAL].replace('{path}', filePath),
@@ -235,6 +266,83 @@ export class BaseFileAdapter extends IFileOperations {
    */
   async _readStreamOutput(stream, options = {}) {
     return readStreamOutput(stream, options);
+  }
+
+  /**
+   * 解析并标准化容器路径
+   * 统一处理相对路径和绝对路径，消除重复的路径清理逻辑
+   * @protected
+   * @param {string} filePath - 原始文件路径
+   * @param {Object} options - 选项
+   * @param {string} options.projectPath - 项目路径
+   * @param {boolean} options.isContainerProject - 是否为容器项目
+   * @returns {string} 完整的容器内路径
+   * @throws {Error} 如果路径验证失败
+   */
+  _resolveContainerPath(filePath, options = {}) {
+    const { projectPath = '', isContainerProject = false } = options;
+
+    // 清理路径中的 ./ 和 //
+    let cleanPath = normalizePath(filePath);
+
+    // 检查是否是绝对路径（以 /workspace 开头）
+    if (cleanPath.startsWith('/workspace')) {
+      // 验证路径安全性
+      if (cleanPath.includes('..')) {
+        throw new Error('Path traversal detected');
+      }
+      return cleanPath;
+    }
+
+    // 相对路径处理
+    if (cleanPath.startsWith('/')) {
+      cleanPath = cleanPath.substring(1);
+    }
+
+    // 验证路径
+    const validation = this._validatePath(cleanPath, options);
+    if (!validation.valid) {
+      throw new Error(validation.error);
+    }
+
+    // 构建容器路径
+    return this._buildContainerPath(validation.safePath, { projectPath, isContainerProject });
+  }
+
+  /**
+   * 构建容器内路径
+   * @protected
+   * @param {string} safePath - 安全路径
+   * @param {Object} options - 选项
+   * @param {string} options.projectPath - 项目路径
+   * @param {boolean} options.isContainerProject - 是否为容器项目
+   * @returns {string} 容器路径
+   */
+  _buildContainerPath(safePath, options = {}) {
+    const { projectPath = '', isContainerProject = false } = options;
+
+    // 处理当前目录 '.' 的情况
+    const processedSafePath = (safePath === '.' || safePath === './') ? '' : safePath;
+
+    let path;
+    if (isContainerProject && projectPath) {
+      // 容器项目：项目代码在 /workspace 下
+      path = processedSafePath
+        ? `${CONTAINER.paths.workspace}/${projectPath}/${processedSafePath}`
+        : `${CONTAINER.paths.workspace}/${projectPath}`;
+    } else if (projectPath) {
+      // 会话项目：使用 .claude/projects
+      path = processedSafePath
+        ? `${CONTAINER.paths.projects}/${PathUtils.encodeProjectName(projectPath)}/${processedSafePath}`
+        : `${CONTAINER.paths.projects}/${PathUtils.encodeProjectName(projectPath)}`;
+    } else {
+      // 默认：workspace
+      path = processedSafePath
+        ? `${CONTAINER.paths.workspace}/${processedSafePath}`
+        : CONTAINER.paths.workspace;
+    }
+
+    return path.replace(/\/+/g, '/');
   }
 
   /**

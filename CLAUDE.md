@@ -7,12 +7,12 @@
 - **核心架构：**
   - 前端：React 18 + Vite + Tailwind CSS
   - 后端：Express.js + WebSocket (ws) + SQLite
-  - AI 集成：@anthropic-ai/claude-agent-sdk、OpenAI Codex SDK
+  - AI 集成：@anthropic-ai/claude-agent-sdk、@openai/codex-sdk
 - **开发策略：** 前后端分离，实时优先（WebSocket 流式响应），安全优先（工具默认禁用）
 
 ## 2. 项目结构
 
-**⚠️ 重要：** 在执行任何任务前，必须先阅读 [架构调研文档](/docs/architecture-research.md)，了解完整的技术栈、数据流和系统架构。
+**⚠️ 重要：** 在执行任何任务前，必须先阅读 [架构调研文档](/docs/arch/architecture-overview.md)，了解完整的技术栈、数据流和系统架构。
 
 完整的技术栈和文件树结构：
 - **前端** (`frontend/`): React 组件、Context 状态管理、自定义 Hooks
@@ -98,6 +98,7 @@ async function queryClaudeSDK(command, options = {}, ws) {
 - 让状态变更明确且可追踪
 - 使用 React Context 进行全局状态管理
 - 使用 localStorage 持久化用户配置
+- 使用 React Hooks 规范：编写前端代码时必须遵守 [React Hooks 编码规范](/docs/standard/react-hooks-编码规范.md)，特别是 setState 函数式更新和 Observer/Timer 回调的 useRef 中转规则
 
 ### API 设计原则
 - RESTful 设计，带一致的 URL 模式
@@ -125,4 +126,4 @@ async function queryClaudeSDK(command, options = {}, ws) {
 
 
 **文档维护**：请根据项目发展及时更新此文件
-**最后更新**：2026-01-11
+**最后更新**：2026-04-09

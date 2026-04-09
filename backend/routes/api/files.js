@@ -8,11 +8,33 @@
  */
 
 import express from 'express';
+import multer from 'multer';
 import { FileController } from '../../controllers/api/index.js';
 import { authenticate, validate } from '../../middleware/index.js';
+import { MAX_FILE_SIZE, MAX_FILES_COUNT, ALLOWED_UPLOAD_EXTENSIONS } from '../../services/files/constants.js';
 
 const router = express.Router();
 const fileController = new FileController();
+
+// 配置 multer 用于内存存储文件上传
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: MAX_FILE_SIZE,
+    files: MAX_FILES_COUNT
+  },
+  fileFilter: (req, file, cb) => {
+    // 允许的文件类型
+    const originalName = file.originalname.toLowerCase();
+    const hasValidExtension = ALLOWED_UPLOAD_EXTENSIONS.some(ext => originalName.endsWith(ext));
+
+    if (hasValidExtension) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Invalid file type. Allowed: ${ALLOWED_UPLOAD_EXTENSIONS.join(', ')}`));
+    }
+  }
+});
 
 /**
  * GET /api/projects/:projectName/file
@@ -23,6 +45,17 @@ router.get('/:projectName/file', authenticate(), validate({
     filePath: { required: true, type: 'string' }
   }
 }), fileController._asyncHandler(fileController.readFile));
+
+/**
+ * GET /api/projects/:projectName/file/download
+ * 下载文件（用于二进制文件如 docx, pdf 等）
+ * 以二进制流方式返回，保持文件完整性
+ */
+router.get('/:projectName/file/download', authenticate(), validate({
+  query: {
+    filePath: { required: true, type: 'string' }
+  }
+}), fileController._asyncHandler(fileController.downloadFile));
 
 /**
  * PUT /api/projects/:projectName/file
@@ -72,6 +105,17 @@ router.delete('/:projectName/files', authenticate(), validate({
 }), fileController._asyncHandler(fileController.deleteFile));
 
 /**
+ * PUT /api/projects/:projectName/rename
+ * 重命名文件或目录
+ */
+router.put('/:projectName/rename', authenticate(), validate({
+  body: {
+    oldPath: { required: true, type: 'string' },
+    newName: { required: true, type: 'string' }
+  }
+}), fileController._asyncHandler(fileController.renameFile));
+
+/**
  * POST /api/projects/:projectName/directory
  * 创建目录
  */
@@ -82,6 +126,17 @@ router.post('/:projectName/directory', authenticate(), validate({
 }), fileController._asyncHandler(fileController.createDirectory));
 
 /**
+ * POST /api/projects/:projectName/move
+ * 移动文件或目录
+ */
+router.post('/:projectName/move', authenticate(), validate({
+  body: {
+    sourcePath: { required: true, type: 'string' },
+    targetPath: { type: 'string' }
+  }
+}), fileController._asyncHandler(fileController.moveFile));
+
+/**
  * GET /api/projects/:projectName/files/exists
  * 检查文件是否存在
  */
@@ -90,5 +145,19 @@ router.get('/:projectName/files/exists', authenticate(), validate({
     path: { required: true, type: 'string' }
   }
 }), fileController._asyncHandler(fileController.fileExists));
+
+/**
+ * POST /api/files/upload
+ * 上传文件附件
+ */
+router.post('/upload', authenticate(), (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) {
+      console.error('[UPLOAD] Multer error:', err);
+      return next(err);
+    }
+    next();
+  });
+}, fileController._asyncHandler(fileController.uploadFile));
 
 export default router;

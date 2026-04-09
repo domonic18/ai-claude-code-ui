@@ -2,7 +2,8 @@
  * Extension Sync Service
  *
  * Manages synchronization of pre-configured extensions (agents, commands, skills, hooks, knowledge)
- * from the project root extensions/.claude/ directory to user .claude/ directories.
+ * and configuration files (CLAUDE.md, settings.json) from the project root extensions/.claude/
+ * directory to user .claude/ directories.
  *
  * @module services/extensions/extension-sync
  */
@@ -37,7 +38,8 @@ export async function syncExtensions(targetDir, options = {}) {
     commands: { synced: 0, errors: [] },
     skills: { synced: 0, errors: [] },
     hooks: { synced: 0, errors: [] },
-    knowledge: { synced: 0, errors: [] }
+    knowledge: { synced: 0, errors: [] },
+    config: { synced: 0, errors: [] }  // For CLAUDE.md and settings.json
   };
 
   try {
@@ -54,6 +56,16 @@ export async function syncExtensions(targetDir, options = {}) {
     await syncResourceType('skills', targetDir, results.skills, overwriteUserFiles);
     await syncResourceType('hooks', targetDir, results.hooks, overwriteUserFiles);
     await syncResourceType('knowledge', targetDir, results.knowledge, overwriteUserFiles);
+
+    // Sync configuration files (CLAUDE.md and settings.json)
+    await syncConfigFiles(targetDir, results.config, overwriteUserFiles);
+
+    // 打印汇总日志
+    const totalSynced = results.agents.synced + results.commands.synced + results.skills.synced +
+                       results.hooks.synced + results.knowledge.synced + results.config.synced;
+    if (totalSynced > 0) {
+      console.log(`[ExtensionSync] Synced ${totalSynced} extensions (${results.agents.synced} agents, ${results.commands.synced} commands, ${results.skills.synced} skills, ${results.hooks.synced} hooks, ${results.knowledge.synced} knowledge, ${results.config.synced} config)`);
+    }
 
     return results;
   } catch (error) {
@@ -84,9 +96,9 @@ async function syncResourceType(type, targetDir, results, overwrite) {
 
   // File extension mapping for different resource types
   const fileExtensions = {
-    agents: ['.json'],
+    agents: ['.json', '.md'],  // 支持 JSON 和 Markdown 格式
     commands: ['.md'],
-    hooks: ['.js', '.md'],
+    hooks: ['.js', '.md', '.sh', '.py'],  // Shell scripts and Python scripts
     knowledge: ['.md', '.txt']
   };
 
@@ -111,7 +123,6 @@ async function syncResourceType(type, targetDir, results, overwrite) {
 
           await copyDirectory(sourcePath, targetPath);
           results.synced++;
-          console.log(`[ExtensionSync] Synced skill: ${entry.name}`);
         }
       } else if (type === 'hooks' || type === 'knowledge') {
         // Hooks and Knowledge support both files and directories
@@ -130,7 +141,6 @@ async function syncResourceType(type, targetDir, results, overwrite) {
 
             await fs.copyFile(sourcePath, targetPath);
             results.synced++;
-            console.log(`[ExtensionSync] Synced ${type.slice(0, -1)}: ${entry.name}`);
           }
         } else if (entry.isDirectory()) {
           // Support subdirectories (useful for knowledge categorization)
@@ -144,7 +154,6 @@ async function syncResourceType(type, targetDir, results, overwrite) {
 
           await copyDirectory(sourcePath, targetPath);
           results.synced++;
-          console.log(`[ExtensionSync] Synced ${type.slice(0, -1)} directory: ${entry.name}`);
         }
       } else {
         // Agents and Commands are files
@@ -160,13 +169,51 @@ async function syncResourceType(type, targetDir, results, overwrite) {
 
           await fs.copyFile(sourcePath, targetPath);
           results.synced++;
-          console.log(`[ExtensionSync] Synced ${type.slice(0, -1)}: ${entry.name}`);
         }
       }
     } catch (error) {
       const errorMsg = `${entry.name}: ${error.message}`;
       results.errors.push({ resource: entry.name, error: error.message });
       console.error(`[ExtensionSync] Failed to sync ${entry.name}:`, error.message);
+    }
+  }
+}
+
+/**
+ * Synchronize configuration files (CLAUDE.md and settings.json)
+ *
+ * @private
+ * @param {string} targetDir - Target .claude directory
+ * @param {Object} results - Results object to update
+ * @param {boolean} overwrite - Whether to overwrite existing files
+ */
+async function syncConfigFiles(targetDir, results, overwrite) {
+  const configFiles = ['CLAUDE.md', 'settings.json'];
+
+  for (const filename of configFiles) {
+    const sourcePath = path.join(EXTENSIONS_DIR, filename);
+    const targetPath = path.join(targetDir, filename);
+
+    try {
+      // Check if source file exists
+      if (!(await fileExists(sourcePath))) {
+        console.log(`[ExtensionSync] Config file not found: ${filename}, skipping`);
+        continue;
+      }
+
+      // Check if target exists and skip if not overwriting
+      if (!overwrite && await fileExists(targetPath)) {
+        console.log(`[ExtensionSync] Skipping existing config file: ${filename}`);
+        continue;
+      }
+
+      // Copy the file
+      await fs.copyFile(sourcePath, targetPath);
+      results.synced++;
+    } catch (error) {
+      const errorMsg = `${filename}: ${error.message}`;
+      results.errors.push({ resource: filename, error: error.message });
+      console.error(`[ExtensionSync] Failed to sync ${filename}:`, error.message);
     }
   }
 }
@@ -292,14 +339,14 @@ export async function getAllExtensions() {
     }
   }
 
-  // Read Hooks (.js and .md files)
+  // Read Hooks (.js, .md, .sh, and .py files)
   const hooksDir = path.join(EXTENSIONS_DIR, 'hooks');
   if (await directoryExists(hooksDir)) {
     const entries = await fs.readdir(hooksDir, { withFileTypes: true });
     for (const entry of entries) {
       if (entry.isFile()) {
         const ext = path.extname(entry.name);
-        if (ext === '.js' || ext === '.md') {
+        if (ext === '.js' || ext === '.md' || ext === '.sh' || ext === '.py') {
           const filePath = path.join(hooksDir, entry.name);
 
           let description = '';
@@ -309,18 +356,33 @@ export async function getAllExtensions() {
             if (ext === '.js') {
               const match = content.match(/\/\*\*\s*([^*]|\*(?!\/))*\*\//);
               description = match ? match[0].substring(2, match[0].length - 2).trim().substring(0, 100) : 'JavaScript Hook';
-            } else {
+            } else if (ext === '.md') {
               // For .md files, extract first heading
               const match = content.match(/^#\s+(.+)$/m);
               description = match ? match[1] : '';
+            } else if (ext === '.sh') {
+              // For .sh files, extract description from comment or use default
+              const match = content.match(/^#\s*(.+)$/m);
+              description = match ? match[1] : 'Shell Script Hook';
+            } else {
+              // For .py files, extract description from docstring or comment
+              const docstringMatch = content.match(/"""[\s\S]*?"""/);
+              if (docstringMatch) {
+                description = docstringMatch[0].replace(/"/g, '').trim().substring(0, 100);
+              } else {
+                const commentMatch = content.match(/^#\s*(.+)$/m);
+                description = commentMatch ? commentMatch[1] : 'Python Script Hook';
+              }
             }
           } catch {
-            description = ext === '.js' ? 'JavaScript Hook' : 'Markdown Hook';
+            description = ext === '.js' ? 'JavaScript Hook' :
+                         ext === '.md' ? 'Markdown Hook' :
+                         ext === '.sh' ? 'Shell Script Hook' : 'Python Script Hook';
           }
 
           extensions.hooks.push({
             filename: entry.name,
-            name: entry.name.replace(/\.(js|md)$/, ''),
+            name: entry.name.replace(/\.(js|md|sh|py)$/, ''),
             type: ext.substring(1),
             description
           });
@@ -433,8 +495,157 @@ async function copyDirectory(source, target) {
   }
 }
 
+/**
+ * Parse YAML frontmatter from markdown content
+ *
+ * @private
+ * @param {string} content - Markdown content with frontmatter
+ * @returns {Object} Parsed frontmatter as key-value pairs
+ */
+function parseFrontmatter(content) {
+  const match = content.match(/^---\n([\s\S]+?)\n---/);
+  if (!match) return {};
+
+  const frontmatter = {};
+  const lines = match[1].split('\n');
+
+  for (const line of lines) {
+    const colonIndex = line.indexOf(':');
+    if (colonIndex === -1) continue;
+
+    const key = line.slice(0, colonIndex).trim();
+    let value = line.slice(colonIndex + 1).trim();
+
+    // 处理数组（逗号分隔）
+    if (value.includes(',')) {
+      value = value.split(',').map(v => v.trim());
+    }
+
+    frontmatter[key] = value;
+  }
+
+  return frontmatter;
+}
+
+/**
+ * Load agents in SDK format from extensions directory
+ *
+ * Reads agent markdown files from extensions/.claude/agents/,
+ * parses YAML frontmatter, and returns SDK-compatible format.
+ *
+ * @returns {Promise<Object>} Agents object with SDK format
+ * @example
+ * {
+ *   'generate-docs-agent': {
+ *     description: '文档生成工作流编排器',
+ *     tools: ['Skill', 'Task', 'Read'],
+ *     prompt: '你是智能文档生成专家...'
+ *   }
+ * }
+ */
+export async function loadAgentsForSDK() {
+  const agentsDir = path.join(EXTENSIONS_DIR, 'agents');
+
+  if (!await directoryExists(agentsDir)) {
+    console.warn('[ExtensionSync] Agents directory not found:', agentsDir);
+    return {};
+  }
+
+  const agents = {};
+  const entries = await fs.readdir(agentsDir, { withFileTypes: true });
+
+  // 预加载所有 skills 名称，用于添加到 agents 中
+  const skillNames = await loadSkillsForSDK();
+  console.log(`[ExtensionSync] Preloaded ${skillNames.length} skills for agents`);
+
+  for (const entry of entries) {
+    // 跳过非 .md 文件、隐藏文件和 README
+    if (!entry.isFile() || !entry.name.endsWith('.md') || entry.name.startsWith('.') || entry.name.toLowerCase() === 'readme.md') {
+      continue;
+    }
+
+    const filePath = path.join(agentsDir, entry.name);
+
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      const frontmatter = parseFrontmatter(content);
+
+      // 提取 prompt（frontmatter 之后的内容）
+      const promptMatch = content.match(/^---[\s\S]*?---\n([\s\S]*)$/);
+      const prompt = promptMatch ? promptMatch[1].trim() : content;
+
+      const name = frontmatter.name || entry.name.replace('.md', '');
+      const description = frontmatter.description || '';
+      const tools = frontmatter.tools || ['Skill', 'Task', 'Read', 'Write', 'Edit', 'Glob', 'Grep'];
+
+      // 确保 tools 是数组
+      const toolsArray = Array.isArray(tools) ? tools : [tools];
+
+      const agentDef = {
+        description,
+        tools: toolsArray,
+        prompt
+      };
+
+      // 将所有 skills 添加到 agent 中，这样子 agent 也能使用 skills
+      if (skillNames.length > 0) {
+        agentDef.skills = skillNames;
+      }
+
+      agents[name] = agentDef;
+
+      console.log(`[ExtensionSync] Loaded agent: ${name} with ${skillNames.length} skills`);
+    } catch (error) {
+      console.error(`[ExtensionSync] Failed to load agent ${entry.name}:`, error.message);
+    }
+  }
+
+  console.log(`[ExtensionSync] Loaded ${Object.keys(agents).length} agents for SDK`);
+  return agents;
+}
+
+/**
+ * Load skill names in SDK format from extensions directory
+ *
+ * Reads skill directories from extensions/.claude/skills/
+ * and returns an array of skill names.
+ *
+ * @returns {Promise<Array<string>>} Array of skill names
+ * @example
+ * ['patent-tech-disclosure', 'technical-tech-solution', 'patent-three-elements-generator']
+ */
+export async function loadSkillsForSDK() {
+  const skillsDir = path.join(EXTENSIONS_DIR, 'skills');
+
+  if (!await directoryExists(skillsDir)) {
+    console.warn('[ExtensionSync] Skills directory not found:', skillsDir);
+    return [];
+  }
+
+  const entries = await fs.readdir(skillsDir, { withFileTypes: true });
+  const skills = [];
+
+  for (const entry of entries) {
+    // 跳过隐藏目录和非目录
+    if (!entry.isDirectory() || entry.name.startsWith('.')) {
+      continue;
+    }
+
+    const skillMdPath = path.join(skillsDir, entry.name, 'SKILL.md');
+
+    if (await fileExists(skillMdPath)) {
+      skills.push(entry.name);
+    }
+  }
+
+  console.log(`[ExtensionSync] Loaded ${skills.length} skills for SDK`);
+  return skills;
+}
+
 export default {
   syncExtensions,
   syncToAllUsers,
-  getAllExtensions
+  getAllExtensions,
+  loadAgentsForSDK,
+  loadSkillsForSDK
 };

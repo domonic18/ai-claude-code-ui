@@ -348,6 +348,8 @@ export interface ProjectListProps {
   editingName: string;
   /** Loading sessions */
   loadingSessions: LoadingSessions;
+  /** Has more sessions per project */
+  hasMoreSessions: Record<string, boolean>;
   /** Current time */
   currentTime: Date;
   /** Whether projects are loading */

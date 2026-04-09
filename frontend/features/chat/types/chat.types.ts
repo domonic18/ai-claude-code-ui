@@ -71,6 +71,8 @@ export interface ChatMessage {
  * File attachment structure
  */
 export interface FileAttachment {
+  /** Unique identifier for the attachment */
+  id: string;
   /** File name */
   name: string;
   /** File size in bytes */
@@ -79,6 +81,8 @@ export interface FileAttachment {
   type: string;
   /** File data (base64 or reference) */
   data?: string;
+  /** Server file path (for uploaded documents) */
+  path?: string;
   /** Upload progress (0-100) */
   uploadProgress?: number;
   /** Upload error message */
@@ -184,7 +188,7 @@ export interface ChatInputProps {
   /** Add file handler */
   onAddFile: (file: FileAttachment) => void;
   /** Remove file handler */
-  onRemoveFile: (fileName: string) => void;
+  onRemoveFile: (fileId: string) => void;
   /** Whether disabled */
   disabled?: boolean;
   /** Whether to send by Ctrl+Enter */

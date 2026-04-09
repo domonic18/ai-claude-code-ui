@@ -9,8 +9,30 @@
 
 import containerManager from '../../services/container/index.js';
 import { CONTAINER } from '../../config/config.js';
+import { repositories } from '../../database/db.js';
+import bcrypt from 'bcrypt';
 
-const testUserId = 999898; // 使用独立的测试用户 ID
+const { User } = repositories;
+
+const testUserName = 'container-home-env-user';
+let testUserId = null;
+
+async function setupTestUser() {
+  try {
+    let user = User.getByUsername(testUserName);
+    if (!user) {
+      const passwordHash = await bcrypt.hash('test123456', 10);
+      user = User.create(testUserName, passwordHash);
+      console.log(`✓ Created test user: ${user.id}`);
+    } else {
+      console.log(`✓ Test user already exists: ${user.id}`);
+    }
+    return user.id;
+  } catch (error) {
+    console.warn('Failed to setup test user:', error.message);
+    throw error;
+  }
+}
 
 /**
  * 测试套件
@@ -19,6 +41,9 @@ async function runTests() {
   console.log('=== Container HOME Environment Variable Tests ===\n');
   console.log('Design Doc Reference: docs/arch/data-storage-design.md v3.1\n');
 
+  // Setup test user
+  testUserId = await setupTestUser();
+
   let testResults = {
     passed: 0,
     failed: 0,
@@ -26,7 +51,7 @@ async function runTests() {
   };
 
   try {
-    // Test 1: 验证容器创建时设置了 HOME=/workspace
+    // Test1: 验证容器创建时设置了 HOME=/workspace
     await runTest('Test 1: Verify HOME=/workspace is set', async () => {
       const container = await containerManager.getOrCreateContainer(testUserId, {
         tier: 'free'
@@ -61,7 +86,7 @@ async function runTests() {
       return { container };
     }, testResults);
 
-    // Test 2: 验证 ~/.claude/ 指向 /workspace/.claude/
+    // Test2: 验证 ~/.claude/ 指向 /workspace/.claude/
     await runTest('Test 2: Verify ~/.claude/ maps to /workspace/.claude/', async () => {
       // 创建测试目录
       await containerManager.execInContainer(
@@ -100,7 +125,7 @@ async function runTests() {
       );
     }, testResults);
 
-    // Test 3: 验证用户级配置目录可从 ~ 访问
+    // Test3: 验证用户级配置目录可从 ~ 访问
     await runTest('Test 3: Verify user-level config accessible from ~', async () => {
       // 创建测试文件
       await containerManager.execInContainer(
@@ -139,7 +164,7 @@ async function runTests() {
       );
     }, testResults);
 
-    // Test 4: 验证工作目录与 HOME 的关系
+    // Test4: 验证工作目录与 HOME 的关系
     await runTest('Test 4: Verify workspace directory is HOME', async () => {
       const { stream } = await containerManager.execInContainer(
         testUserId,
@@ -168,7 +193,7 @@ async function runTests() {
       console.log(`  ✓ ~ (HOME) correctly points to workspace directory`);
     }, testResults);
 
-    // Test 5: 验证项目级配置目录结构
+    // Test5: 验证项目级配置目录结构
     await runTest('Test 5: Verify project-level config structure', async () => {
       const projectName = 'test-workspace';
 
@@ -215,7 +240,7 @@ async function runTests() {
       );
     }, testResults);
 
-    // Test 6: 验证用户级和项目级配置分离
+    // Test6: 验证用户级和项目级配置分离
     await runTest('Test 6: Verify user-level and project-level config separation', async () => {
       const projectName = 'separation-test';
 
@@ -278,7 +303,7 @@ async function runTests() {
       );
     }, testResults);
 
-    // Test 7: 验证环境变量持久化（容器重启后）
+    // Test7: 验证环境变量持久化（容器重启后）
     await runTest('Test 7: Verify HOME environment persists after restart', async () => {
       // 重启容器
       await containerManager.stopContainer(testUserId);
@@ -301,6 +326,7 @@ async function runTests() {
       });
 
       const homeValue = output.trim();
+      console.log(`  HOME value after restart: ${homeValue}`);
 
       if (homeValue !== CONTAINER.paths.workspace) {
         throw new Error(
@@ -318,6 +344,17 @@ async function runTests() {
     console.log('\nCleaning up test container...');
     await containerManager.destroyContainer(testUserId, false);
     console.log('✓ Test container destroyed');
+
+    // Cleanup: Delete test user
+    try {
+      const user = User.getByUsername(testUserName);
+      if (user) {
+        User.delete(user.id);
+        console.log('✓ Deleted test user');
+      }
+    } catch (e) {
+      // Ignore cleanup errors
+    }
 
     if (testResults.failed > 0) {
       process.exit(1);

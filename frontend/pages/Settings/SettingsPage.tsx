@@ -90,7 +90,7 @@ export function SettingsPage({ initialTab = 'agents' }: SettingsPageProps) {
                     : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted'
                 }`}
               >
-                {tab.label}
+                {t(`settings.tabs.${tab.id}`)}
               </button>
             ))}
           </div>

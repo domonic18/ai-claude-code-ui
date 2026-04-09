@@ -9,10 +9,14 @@
  * - Claude: claude-response, claude-output, claude-interactive-prompt, claude-error
  * - Cursor: cursor-system, cursor-user, cursor-tool-use, cursor-error, cursor-result
  * - Codex: codex-response, codex-complete
- * - Other: session-aborted, token-budget
+ * - Other: session-aborted, token-budget, memory-context
  */
 
+import { t as translate } from '@/shared/i18n';
+import { filterMemoryContext } from '@/shared/utils';
+import { convertSessionMessages } from '../utils/messageConversion';
 import type { ChatMessage } from '../types';
+import type { WebSocketMessage } from '@/shared/types';
 
 // Message ID counter to ensure unique IDs
 let messageIdCounter = 0;
@@ -23,16 +27,6 @@ let messageIdCounter = 0;
  */
 function generateMessageId(prefix: string): string {
   return `${prefix}-${Date.now()}-${++messageIdCounter}`;
-}
-
-export interface WebSocketMessage {
-  type: string;
-  sessionId?: string;
-  data?: any;
-  error?: string;
-  tool?: string;
-  input?: any;
-  exitCode?: number;
 }
 
 export interface MessageHandlerCallbacks {
@@ -65,6 +59,9 @@ export interface MessageHandlerCallbacks {
   updateStreamContent?: (content: string) => void;
   updateStreamThinking?: (thinking: string) => void;
 
+  // Memory context
+  onMemoryContext?: (content: string, sessionId: string) => void;
+
   // Current state
   getCurrentSessionId: () => string | null;
   getSelectedProjectName: () => string | undefined;
@@ -94,14 +91,14 @@ const safeLocalStorage = {
     try {
       localStorage.setItem(key, value);
     } catch (e) {
-      console.warn('Failed to set localStorage item:', e);
+      console.warn(`${translate('websocket.error.localStorageSetFailed')}:`, e);
     }
   },
   removeItem: (key: string): void => {
     try {
       localStorage.removeItem(key);
     } catch (e) {
-      console.warn('Failed to remove localStorage item:', e);
+      console.warn(`${translate('websocket.error.localStorageRemoveFailed')}:`, e);
     }
   }
 };
@@ -130,15 +127,18 @@ export function handleWebSocketMessage(
 
   // For new sessions (currentSessionId is null), allow messages through
   if (!isGlobalMessage && message.sessionId && currentSessionId && message.sessionId !== currentSessionId) {
-    console.log('⏭️ Skipping message for different session:', message.sessionId, 'current:', currentSessionId);
+    console.log(`⏭️ ${translate('websocket.log.skippingMessage')}:`, message.sessionId, 'current:', currentSessionId);
     return false;
   }
 
   switch (message.type) {
     case 'session-start':
       // Session initialization message - just acknowledge it
-      console.log('📝 Session started:', message.sessionId);
+      console.log(`📝 ${translate('websocket.log.sessionStarted')}:`, message.sessionId);
       return true;
+
+    case 'memory-context':
+      return handleMemoryContext(message, callbacks);
 
     case 'session-created':
       return handleSessionCreated(message, callbacks, currentSessionId);
@@ -236,6 +236,20 @@ function handleTokenBudget(message: WebSocketMessage, callbacks: MessageHandlerC
   if (message.data && callbacks.onSetTokenBudget) {
     callbacks.onSetTokenBudget(message.data);
   }
+  return true;
+}
+
+/**
+ * Handle memory-context message
+ * Memory context is sent to AI but not displayed in chat
+ */
+function handleMemoryContext(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
+  if (message.content && message.sessionId && callbacks.onMemoryContext) {
+    // Call the callback for debugging/monitoring purposes
+    // Memory context is NOT added to the chat messages
+    callbacks.onMemoryContext(message.content, message.sessionId);
+  }
+  console.log('[WS] Memory context received:', message.content?.length, 'chars');
   return true;
 }
 
@@ -353,11 +367,45 @@ function handleClaudeResponse(message: WebSocketMessage, callbacks: MessageHandl
       return true;
     }
 
-    // Handle user messages (tool_result) - these are already shown so skip them
+    // Handle result messages (e.g., "Unknown skill: xxx", errors)
+    if (messageData.type === 'result' && messageData.result) {
+      const resultText = typeof messageData.result === 'string' ? messageData.result : JSON.stringify(messageData.result);
+      if (resultText.trim()) {
+        // Check if this is an error/warning message
+        const isError = /Unknown skill|Error|error|Failed|failed/.test(resultText);
+
+        callbacks.onAddMessage({
+          id: generateMessageId(isError ? 'error' : 'assistant'),
+          type: isError ? 'error' : 'assistant',
+          content: isError ? `⚠️ ${resultText}` : resultText,
+          timestamp: Date.now()
+        });
+
+        // Also complete the stream if this is an error
+        if (isError) {
+          callbacks.onSetLoading?.(false);
+          callbacks.completeStream?.();
+        }
+
+        return true;
+      }
+    }
+
+    // Handle user messages from SDK (when resuming sessions)
     // Note: user messages have structure {type: "user", message: {role: "user", content: [...]}}
     if (sdkType === 'user' || dataRole === 'user') {
-      console.log('[WS] Skipping user message (tool result)');
-      return true; // Return true to indicate we handled it (by ignoring)
+      // Convert the message using the same logic as session loading
+      // This properly filters out skill prompts, memory context, and other internal messages
+      const convertedMessages = convertSessionMessages([{ message: messageData, timestamp: message.timestamp || Date.now() }]);
+
+      // Add any valid user messages from the conversion
+      for (const msg of convertedMessages) {
+        if (msg.type === 'user') {
+          callbacks.onAddMessage(msg);
+        }
+      }
+
+      return true;
     }
   }
 

@@ -13,7 +13,7 @@
  * 使用 requestDeduplicator 防止 React StrictMode 导致的双重请求
  */
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { api } from '@/shared/services';
 import { requestDeduplicator } from '@/shared/utils';
 import type { User } from '@/shared/types';
@@ -53,7 +53,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState<boolean>(true); // 初始为 true，防止闪烁
   const [needsSetup, setNeedsSetup] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasChecked, setHasChecked] = useState<boolean>(false);
+  // 使用 ref 存储检查状态，避免 checkAuthStatus 因状态变化而重新创建
+  const hasCheckedRef = useRef<boolean>(false);
 
   /**
    * 初始化时检查认证状态
@@ -68,12 +69,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser({ username: 'platform-user', id: 'platform' });
       setNeedsSetup(false);
       setIsLoading(false);
-      setHasChecked(true);
+      hasCheckedRef.current = true;
       return;
     }
-    
+
     // 使用 requestDeduplicator 防止 StrictMode 导致的双重调用
-    if (!hasChecked) {
+    if (!hasCheckedRef.current) {
       checkAuthStatus();
     }
   }, []);
@@ -83,15 +84,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
    *
    * 使用 requestDeduplicator 确保并发调用只执行一次请求。
    * 这比使用 ref 更优雅，因为它基于 Promise 共享机制。
+   *
+   * 使用 useCallback 包装以避免在 ProtectedRoute 中触发无限循环。
+   *
+   * @param {boolean} force - 强制重新检查，忽略 hasChecked 标志
    */
-  const checkAuthStatus = async () => {
-    // 如果已经检查过，直接返回
-    if (hasChecked) {
+  const checkAuthStatus = useCallback(async (force = false) => {
+    // 如果已经检查过且不强制重新检查，直接返回
+    if (hasCheckedRef.current && !force) {
       return;
     }
 
     // 使用统一的请求去重器，key: 'auth:checkStatus'
-    return requestDeduplicator.dedupe('auth:checkStatus', async () => {
+    // 当 force=true 时，使用不同的 key 来避免缓存
+    const dedupeKey = force ? 'auth:checkStatus:force' : 'auth:checkStatus';
+
+    return requestDeduplicator.dedupe(dedupeKey, async () => {
       try {
         setIsLoading(true);
         setError(null);
@@ -101,7 +109,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         if (statusData.data?.needsSetup) {
           setNeedsSetup(true);
-          setHasChecked(true);
+          hasCheckedRef.current = true;
           setIsLoading(false);
           return;
         }
@@ -114,25 +122,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setUser(userData.data);
             setNeedsSetup(false);
           } else {
-            // 401 是正常的未登录状态，不需要显示错误
             setUser(null);
           }
         } catch (err) {
-          // 网络错误时静默处理
           setUser(null);
         }
       } catch (err) {
-        // 只在真正的错误时才记录
         console.error('Auth status check failed:', err);
         setError('Failed to check authentication status');
       } finally {
         setIsLoading(false);
-        setHasChecked(true);
+        hasCheckedRef.current = true;
       }
     });
-  };
+  }, []);
 
-  const login = async (username: string, password: string): Promise<AuthResult> => {
+  const login = useCallback(async (username: string, password: string): Promise<AuthResult> => {
     try {
       setError(null);
       const response = await api.auth.login(username, password);
@@ -159,9 +164,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setError(errorMessage);
       return { success: false, error: errorMessage };
     }
-  };
+  }, []);
 
-  const register = async (username: string, password: string): Promise<AuthResult> => {
+  const register = useCallback(async (username: string, password: string): Promise<AuthResult> => {
     try {
       setError(null);
       const response = await api.auth.register(username, password);
@@ -182,16 +187,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setError(errorMessage);
       return { success: false, error: errorMessage };
     }
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     setUser(null);
     try {
       await api.auth.logout();
     } catch (err) {
       console.error('Logout endpoint error:', err);
     }
-  };
+  }, []);
 
   const value: AuthContextValue = {
     user,

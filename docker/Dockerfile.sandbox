@@ -1,0 +1,66 @@
+# Claude Code Sandbox Container Image
+# This image provides the sandbox runtime environment for Claude Code in containerized deployments
+#
+# Build: docker build -f docker/Dockerfile.sandbox -t ccr.ccs.tencentyun.com/patent/claude-code-sandbox:latest .
+# Run:   docker run -d --name claude-sandbox claude-code-sandbox:latest
+# Build with custom base: docker build --build-arg BASE_IMAGE=myregistry/base:latest -f docker/Dockerfile.sandbox ...
+
+# Base image which contains all Node.js dependencies
+# Use --build-arg to override the default
+ARG BASE_IMAGE=claude-code-ui:base
+FROM ${BASE_IMAGE}
+
+# Switch to root user for setup
+USER root
+
+# Install runtime dependencies (build tools already in base image)
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    wget \
+    bash \
+    jq \
+    python3 \
+    python3-pip \
+    vim-tiny \
+    poppler-utils \
+    pandoc \
+    texlive-xetex \
+    texlive-fonts-recommended \
+    texlive-lang-chinese \
+    fonts-noto-cjk \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create workspace and config directories
+RUN mkdir -p /workspace /app /workspace/.claude/projects && \
+    chown -R node:node /workspace /app
+
+# Copy application files to /app directory
+COPY --chown=node:node backend /app/backend
+COPY --chown=node:node shared /app/shared
+COPY --chown=node:node extensions/.claude /app/extensions/.claude
+
+# Install gosu for user switching
+RUN apt-get update && apt-get install -y gosu && rm -rf /var/lib/apt/lists/*
+
+# Copy entrypoint script
+COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# Set working directory
+WORKDIR /workspace
+
+# Set environment variables
+ENV NODE_ENV=production \
+    CLAUDE_CONFIG_DIR=/workspace/my-workspace/.claude \
+    NODE_PATH=/app/node_modules
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD pgrep -f "node.*container-entrypoint.js" >/dev/null || exit 1
+
+# Use entrypoint to fix permissions before switching to node user
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+
+# Container entrypoint - keeps container running
+CMD ["node", "/app/backend/container-entrypoint.js"]

@@ -18,7 +18,7 @@ out/
 .env.development.local
 .env.test.local
 .env.production.local
-
+.env.deploy
 # IDE and editor files
 .vscode/
 .idea/
@@ -141,3 +141,12 @@ tasks/
 
 # Deprecated backup files
 *.deprecated
+
+# SAML/SSO certificates and keys (keep local only)
+certs/
+*.pem
+*.key
+*.crt
+
+# Stability test scripts and results (not committed)
+tests/stability/

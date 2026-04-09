@@ -14,6 +14,8 @@ import { EditorView, showPanel, ViewPlugin } from '@codemirror/view';
 import { X, Save, Download, Maximize2, Minimize2, Eye, Edit } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import { api } from '@/shared/services';
 import type { CodeEditorComponentProps, EditorFile, EditorLanguage } from '../types/editor.types';
 
@@ -23,6 +25,13 @@ declare global {
     openSettings?: (tab: string) => void;
   }
 }
+
+// Binary file extensions that should not be displayed as text
+const BINARY_EXTENSIONS = [
+  '.docx', '.pdf', '.xlsx', '.pptx', '.zip',
+  '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico',
+  '.mp3', '.mp4'
+];
 
 function CodeEditor({
   file,
@@ -324,6 +333,18 @@ function CodeEditor({
           return;
         }
 
+        // Check if this is a binary file that should not be loaded as text
+        const fileExt = '.' + file.name.split('.').pop()?.toLowerCase() || '';
+        const isBinaryFile = BINARY_EXTENSIONS.includes(fileExt);
+
+        if (isBinaryFile) {
+          // For binary files, don't try to read the content
+          // Set a special message to show instead of content
+          setContent(`这个二进制文件 (${file.name}) 现在还不能在文本编辑器中预览.\n\n请你点击下载按钮保存到本地查看。`);
+          setLoading(false);
+          return;
+        }
+
         // Otherwise, load from disk
         const response = await api.readFile(file.projectName, file.path);
 
@@ -348,41 +369,27 @@ function CodeEditor({
 
   const handleSave = async () => {
     setSaving(true);
+    setSaveSuccess(false);
+
     try {
-      console.log('Saving file:', {
-        projectName: file.projectName,
-        path: file.path,
-        contentLength: content?.length
-      });
-
       const response = await api.saveFile(file.projectName, file.path, content);
-
-      console.log('Save response:', {
-        status: response.status,
-        ok: response.ok,
-        contentType: response.headers.get('content-type')
-      });
 
       if (!response.ok) {
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `Save failed: ${response.status}`);
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || errorData.message || `Save failed: ${response.status}`);
         } else {
-          const textError = await response.text();
-          console.error('Non-JSON error response:', textError);
           throw new Error(`Save failed: ${response.status} ${response.statusText}`);
         }
       }
 
-      const result = await response.json();
-      console.log('Save successful:', result);
+      await response.json().catch(() => ({}));
 
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
 
     } catch (error) {
-      console.error('Error saving file:', error);
       alert(`Error saving file: ${error.message}`);
     } finally {
       setSaving(false);
@@ -390,15 +397,32 @@ function CodeEditor({
   };
 
   const handleDownload = () => {
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = file.name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // Check if file is a binary file that should be downloaded from server
+    const fileExt = '.' + file.name.split('.').pop()?.toLowerCase() || '';
+    const isBinaryFile = BINARY_EXTENSIONS.includes(fileExt);
+
+    if (isBinaryFile) {
+      // For binary files, always download directly from server
+      // This ensures the original binary file is downloaded without any corruption
+      const downloadUrl = `/api/projects/${file.projectName}/file/download?filePath=${encodeURIComponent(file.path)}`;
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = file.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      // For text files, use the current Blob method
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
   };
 
   const toggleFullscreen = () => {
@@ -762,7 +786,8 @@ function CodeEditor({
               <div className="h-full overflow-auto p-6 bg-white dark:bg-gray-900">
                 <div className="max-w-none prose prose-sm dark:prose-invert">
                   <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
+                    remarkPlugins={[remarkGfm, remarkMath]}
+                    rehypePlugins={[[rehypeKatex, { strict: false }]]}
                     components={{
                       code: ({node, className, children, ...props}: any) => {
                         const match = /language-(\w+)/.exec(className || '');

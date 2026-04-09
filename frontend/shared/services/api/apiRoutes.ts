@@ -93,6 +93,26 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ filePath, content }),
     }),
+  deleteFile: (projectName: string, filePath: string) =>
+    authenticatedFetch(`/api/projects/${projectName}/files`, {
+      method: 'DELETE',
+      body: JSON.stringify({ path: filePath }),
+    }),
+  renameFile: (projectName: string, oldPath: string, newName: string) =>
+    authenticatedFetch(`/api/projects/${projectName}/rename`, {
+      method: 'PUT',
+      body: JSON.stringify({ oldPath, newName }),
+    }),
+  createDirectory: (projectName: string, dirPath: string) =>
+    authenticatedFetch(`/api/projects/${projectName}/directory`, {
+      method: 'POST',
+      body: JSON.stringify({ path: dirPath }),
+    }),
+  moveFile: (projectName: string, sourcePath: string, targetPath: string) =>
+    authenticatedFetch(`/api/projects/${projectName}/move`, {
+      method: 'POST',
+      body: JSON.stringify({ sourcePath, targetPath }),
+    }),
   getFiles: (projectName: string) =>
     authenticatedFetch(`/api/projects/${projectName}/files`),
   transcribe: (formData: FormData) =>
@@ -191,4 +211,14 @@ export const api = {
 
   // Generic GET method for any endpoint
   get: (endpoint: string) => authenticatedFetch(`/api${endpoint}`),
+
+  // Memory endpoints
+  memory: {
+    read: () => authenticatedFetch('/api/memory'),
+    write: (content: string) =>
+      authenticatedFetch('/api/memory', {
+        method: 'PUT',
+        body: JSON.stringify({ content }),
+      }),
+  },
 };

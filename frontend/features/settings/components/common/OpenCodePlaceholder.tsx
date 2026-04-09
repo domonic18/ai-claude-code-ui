@@ -6,11 +6,14 @@
  */
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * OpenCodePlaceholder - Coming soon placeholder for OpenCode settings
  */
 export const OpenCodePlaceholder: React.FC = () => {
+  const { t } = useTranslation();
+
   return (
     <div className="flex flex-col items-center justify-center h-full">
       <div className="text-center space-y-4">
@@ -20,17 +23,17 @@ export const OpenCodePlaceholder: React.FC = () => {
           </svg>
         </div>
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-          OpenCode
+          {t('agent.opencode')}
         </h3>
         <p className="text-sm text-gray-600 dark:text-gray-400 max-w-md">
-          OpenCode integration is coming soon. This feature is currently under development and will be available in a future update.
+          {t('agent.opencodeDescription')}
         </p>
         <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
           <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">
-            Coming Soon
+            {t('agent.comingSoon')}
           </span>
         </div>
       </div>

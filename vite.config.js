@@ -13,13 +13,16 @@ export default defineConfig(({ command, mode }) => {
       alias: {
         '@': path.resolve(__dirname, './frontend'),
         '@/features': path.resolve(__dirname, './frontend/features'),
-        '@/shared': path.resolve(__dirname, './frontend/shared'),
+        '@/shared': path.resolve(__dirname, './shared'),
+        '@/shared-frontend': path.resolve(__dirname, './frontend/shared'),
         '@/config': path.resolve(__dirname, './frontend/config'),
         '@/lib': path.resolve(__dirname, './frontend/lib'),
       },
+      extensions: ['.js', '.jsx', '.ts', '.tsx'],
     },
     server: {
       port: parseInt(env.VITE_PORT) || 5173,
+      allowedHosts: ['brain.bj33smarter.com'],
       proxy: {
         '/api': {
           target: `http://localhost:${env.PORT || 3001}`,
@@ -43,6 +46,7 @@ export default defineConfig(({ command, mode }) => {
       outDir: 'dist',
       chunkSizeWarningLimit: 500,
       cssMinify: false,
+      sourcemap: true, // 启用 source map，方便调试
       rollupOptions: {
         output: {
           manualChunks: {

@@ -9,6 +9,9 @@ import { buildSDKScript } from './ScriptBuilder.js';
 import { processOutput } from './MessageTransformer.js';
 import { setSessionStream, getSession } from './SessionManager.js';
 import { SDK } from '../../../config/config.js';
+import { promises as fs } from 'fs';
+import path from 'path';
+import tar from 'tar';
 
 /**
  * 检查 stderr 是否包含真正的错误
@@ -23,8 +26,126 @@ function hasRealError(stderrOutput) {
     /^\s+at\s+/m,                  // 堆栈跟踪
     /process\.exit\(1\)/           // 进程退出
   ];
-  
+
   return errorPatterns.some(pattern => pattern.test(stderrOutput));
+}
+
+/**
+ * 将图片复制到容器内
+ * @param {object} container - Docker 容器实例
+ * @param {Array} images - 图片附件数组
+ * @param {string} cwd - 容器内工作目录
+ * @returns {Promise<Array<string>>} 容器内图片路径数组
+ */
+async function copyImagesToContainer(container, images, cwd) {
+  if (!images || images.length === 0) {
+    return [];
+  }
+
+  const tempDir = path.join(process.cwd(), '.tmp', 'images', Date.now().toString());
+  await fs.mkdir(tempDir, { recursive: true });
+
+  const imagePaths = [];
+
+  try {
+    // 保存图片到临时目录
+    for (let i = 0; i < images.length; i++) {
+      const image = images[i];
+      const matches = image.data.match(/^data:([^;]+);base64,(.+)$/);
+      if (!matches) {
+        console.error('[DockerExecutor] Invalid image data format for image', i);
+        continue;
+      }
+
+      const [, mimeType, base64Data] = matches;
+      const extension = mimeType.split('/')[1] || 'png';
+      const filename = `image_${i}.${extension}`;
+      const filepath = path.join(tempDir, filename);
+
+      await fs.writeFile(filepath, Buffer.from(base64Data, 'base64'));
+      imagePaths.push({
+        localPath: filepath,
+        containerPath: `${cwd}/.tmp/images/${filename}`,
+        filename
+      });
+    }
+
+    if (imagePaths.length === 0) {
+      return [];
+    }
+
+    // 创建包含 images 子目录的 tar 文件结构
+    // tar 内容: images/image_0.png, images/image_1.png, ...
+    const imagesDir = path.join(tempDir, 'images');
+    await fs.mkdir(imagesDir, { recursive: true });
+
+    // 移动图片到 images 子目录
+    for (const img of imagePaths) {
+      const newPath = path.join(imagesDir, img.filename);
+      await fs.rename(img.localPath, newPath);
+    }
+
+    // 创建 tar 文件，包含 images 目录
+    const tarPath = path.join(tempDir, 'images.tar');
+    await tar.c({
+      file: tarPath,
+      cwd: tempDir,
+      gzip: false
+    }, ['images']);
+
+    // 读取 tar 文件
+    const tarBuffer = await fs.readFile(tarPath);
+
+    // 确保容器内 .tmp 目录存在
+    const mkdirExec = await container.exec({
+      Cmd: ['mkdir', '-p', `${cwd}/.tmp`],
+      AttachStdout: true,
+      AttachStderr: true
+    });
+
+    await new Promise((resolve, reject) => {
+      mkdirExec.start({ Detach: false }, (err, stream) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        if (stream) {
+          stream.on('close', resolve);
+          stream.on('error', reject);
+          // 设置超时
+          setTimeout(resolve, 1000);
+        } else {
+          resolve();
+        }
+      });
+    });
+
+    // 上传 tar 文件到容器，解压到 .tmp 目录
+    // tar 中的 images/ 目录会被解压到 ${cwd}/.tmp/images/
+    await new Promise((resolve, reject) => {
+      container.putArchive(tarBuffer, { path: `${cwd}/.tmp` }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    console.log('[DockerExecutor] Copied', imagePaths.length, 'images to container');
+
+    // 清理本地临时文件
+    await fs.rm(tempDir, { recursive: true, force: true });
+
+    return imagePaths.map(p => p.containerPath);
+
+  } catch (error) {
+    console.error('[DockerExecutor] Error copying images to container:', error);
+    // 清理临时文件
+    try {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    } catch (e) {
+      // 忽略清理错误
+    }
+    return [];
+  }
 }
 
 /**
@@ -43,24 +164,33 @@ export async function executeInContainer(userId, command, options, writer, sessi
   console.log('[DockerExecutor] cwd:', options.cwd);
 
   try {
-    // 构建 SDK 脚本（传递 userId 以加载用户设置）
-    console.log('[DockerExecutor] Building SDK script...');
-    const sdkScript = await buildSDKScript(command, options, userId);
-    console.log('[DockerExecutor] Script length:', sdkScript.length);
+    // 获取容器信息
+    const containerInfo = containerManager.getContainerByUserId(userId);
+    if (!containerInfo) {
+      throw new Error(`No container found for user ${userId}`);
+    }
 
-    // 记录环境变量状态
-    console.log('[DockerExecutor] Host environment:');
-    const authToken = process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY;
-    console.log('[DockerExecutor] - ANTHROPIC_AUTH_TOKEN:',
-      authToken ? `SET (${authToken.substring(0, 15)}...)` : 'NOT SET');
-    console.log('[DockerExecutor] - ANTHROPIC_BASE_URL:', process.env.ANTHROPIC_BASE_URL || 'NOT SET');
-    console.log('[DockerExecutor] - ANTHROPIC_MODEL:', process.env.ANTHROPIC_MODEL || 'NOT SET');
+    // 获取 Docker 容器实例
+    const docker = containerManager.docker;
+    const container = docker.getContainer(containerInfo.id);
+
+    // 处理图片：复制到容器内
+    let imagePaths = [];
+    if (options.images && options.images.length > 0) {
+      console.log('[DockerExecutor] Copying', options.images.length, 'images to container...');
+      imagePaths = await copyImagesToContainer(container, options.images, options.cwd || '/workspace/my-workspace');
+      console.log('[DockerExecutor] Image paths in container:', imagePaths);
+    }
+
+    // 构建 SDK 脚本（传递图片路径而非数据）
+    const sdkScript = await buildSDKScript(command, { ...options, imagePaths }, userId);
 
     // 验证必需的环境变量
+    const authToken = process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY;
     if (!authToken) {
       throw new Error('ANTHROPIC_AUTH_TOKEN or ANTHROPIC_API_KEY must be set in environment or .env file');
     }
-    
+
     // 在容器中执行
     const { stream, exec } = await containerManager.execInContainer(
       userId,
@@ -70,9 +200,11 @@ export async function executeInContainer(userId, command, options, writer, sessi
         tty: false,  // 不使用 TTY，以便可以分离 stdout 和 stderr
         env: {
           NODE_PATH: '/app/node_modules',
+          HOME: '/workspace',
+          CLAUDE_CONFIG_DIR: '/workspace/.claude',
           ANTHROPIC_AUTH_TOKEN: authToken,
-          ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL,
-          ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL
+          ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL
+          // 不传递 ANTHROPIC_MODEL 环境变量，让 SDK 使用前端传入的 model 参数
         }
       }
     );
@@ -93,8 +225,6 @@ export async function executeInContainer(userId, command, options, writer, sessi
     const stderr = new PassThrough();
 
     // 使用 Docker 的 modem.demuxStream 来分离
-    const docker = containerManager.docker;
-    console.log('[DockerExecutor] Demuxing stream...');
     docker.modem.demuxStream(stream, stdout, stderr);
 
     return new Promise((resolve, reject) => {
@@ -131,7 +261,6 @@ export async function executeInContainer(userId, command, options, writer, sessi
       stdout.on('data', (chunk) => {
         dataCount++;
         const output = chunk.toString();
-        console.log(`[DockerExecutor] STDOUT #${dataCount}:`, output.substring(0, 100));
         stdoutChunks.push(output);
 
         // 通过 writer 发送到 WebSocket
@@ -149,7 +278,10 @@ export async function executeInContainer(userId, command, options, writer, sessi
       // 监听 stderr（错误和调试信息）
       stderr.on('data', (chunk) => {
         const errorMsg = chunk.toString();
-        console.error('[DockerExecutor] STDERR:', errorMsg);
+        // 只输出可打印的调试日志，避免输出二进制数据污染日志
+        if (errorMsg.startsWith('[SDK]') || errorMsg.includes('Error') || errorMsg.includes('Exception')) {
+          console.error('[DockerExecutor] STDERR:', errorMsg.substring(0, 500));
+        }
         stderrChunks.push(errorMsg);
       });
 

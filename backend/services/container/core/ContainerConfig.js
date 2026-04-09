@@ -8,6 +8,7 @@
  */
 
 import { RESOURCE_LIMITS, CONTAINER } from '../../../config/config.js';
+import fs from 'fs';
 
 /**
  * 容器配置构建器类
@@ -29,6 +30,10 @@ export class ContainerConfigBuilder {
     const tier = userConfig.tier || 'free';
     const resourceLimits = RESOURCE_LIMITS[tier] || RESOURCE_LIMITS.free;
 
+    // 使用命名卷支持 Docker-in-Docker 环境
+    // 命名卷在 Docker 层级，所有容器都能访问
+    const volumeName = `claude-user-${userId}-workspace`;
+
     return {
       name: name,
       Image: image,
@@ -45,15 +50,21 @@ export class ContainerConfigBuilder {
       Cmd: ['/bin/sh', '-c', 'exec /bin/sh -i 2>&1'],
       Env: this._buildEnvironment(userId, tier),
       HostConfig: {
-        // 单一挂载点：所有数据统一在 /workspace 下
+        // 使用命名卷而不是 bind mount，支持 Docker-in-Docker 环境
+        // 格式：卷名:容器路径:选项
         Binds: [
-          `${userDataDir}:${CONTAINER.paths.workspace}:rw`    // 统一工作目录
+          `${volumeName}:${CONTAINER.paths.workspace}:rw`,      // 用户工作区命名卷
+          '/var/run/docker.sock:/var/run/docker.sock:rw'        // Docker socket
         ],
         Memory: resourceLimits.memory,
         CpuQuota: resourceLimits.cpuQuota,
         CpuPeriod: resourceLimits.cpuPeriod,
         NetworkMode: network,
         ReadonlyRootfs: false,
+        // Seccomp 安全策略：直接传递 JSON 对象
+        Seccomp: this._loadSeccompProfile(),
+        // AppArmor 和其他安全选项
+        SecurityOpt: this._buildSecurityOptions(),
         LogConfig: {
           Type: 'json-file',
           Config: {
@@ -62,8 +73,49 @@ export class ContainerConfigBuilder {
           }
         }
       },
-      Labels: this._buildLabels(userId, tier)
+      // 定义容器内的挂载点（Docker API 要求）
+      Volumes: {
+        [CONTAINER.paths.workspace]: {}
+      },
+      Labels: this._buildLabels(userId, tier, volumeName)
     };
+  }
+
+  /**
+   * 加载 Seccomp 安全配置
+   * @returns {object|null} Seccomp 配置对象，如果文件不存在则返回 null
+   * @private
+   */
+  _loadSeccompProfile() {
+    try {
+      const seccompPath = CONTAINER.security.seccompProfile;
+      const content = fs.readFileSync(seccompPath, 'utf8');
+      return JSON.parse(content);
+    } catch (error) {
+      console.warn(`[ContainerConfig] Failed to load seccomp profile: ${error.message}`);
+      // 返回 undefined 将使用 Docker 默认 seccomp profile
+      return undefined;
+    }
+  }
+
+  /**
+   * 构建容器安全选项
+   * @returns {Array<string>} 安全选项数组
+   * @private
+   */
+  _buildSecurityOptions() {
+    const securityOptions = [];
+
+    // AppArmor 配置：强制访问控制
+    // 注意：AppArmor 配置需要先在系统上加载：
+    //   sudo apparmor_parser -r workspace/containers/apparmor/docker-claude-code
+    // 如果 AppArmor 未安装或未加载，Docker 会忽略此选项并使用默认配置
+    securityOptions.push(`apparmor=${CONTAINER.security.apparmorProfile}`);
+
+    // 禁止提权：防止进程通过 exec 系统调用获得新的权限
+    securityOptions.push('no-new-privileges');
+
+    return securityOptions;
   }
 
   /**
@@ -75,8 +127,9 @@ export class ContainerConfigBuilder {
    */
   _buildEnvironment(userId, tier) {
     const containerEnv = [
-      // 关键配置：设置 HOME 指向 /workspace
-      // 这样 ~/.claude/ = /workspace/.claude/，符合 Claude Code 官方标准
+      // 设置 HOME 指向 /workspace，这样 ~/.claude/ = /workspace/.claude/
+      // SDK 的 settingSources: ['user'] 会从 ~/.claude/ 加载配置
+      // 这样 SDK 可以正确读取用户级记忆文件：/workspace/.claude/memory/MEMORY.md
       `HOME=/workspace`,
       `USER_ID=${userId}`,
       `NODE_ENV=production`,
@@ -96,9 +149,18 @@ export class ContainerConfigBuilder {
       containerEnv.push(`ANTHROPIC_BASE_URL=${process.env.ANTHROPIC_BASE_URL}`);
     }
 
-    if (process.env.ANTHROPIC_MODEL) {
-      containerEnv.push(`ANTHROPIC_MODEL=${process.env.ANTHROPIC_MODEL}`);
+    // 传递 AVAILABLE_MODELS 到容器（用于前端获取可用模型列表）
+    // 注意：容器内的 backend/index.js 会解析此环境变量
+    if (process.env.AVAILABLE_MODELS) {
+      containerEnv.push(`AVAILABLE_MODELS=${process.env.AVAILABLE_MODELS}`);
     }
+
+    // 不传递 ANTHROPIC_MODEL 环境变量到容器
+    // 原因：
+    // 1. 前端通过 WebSocket 消息传递 model 参数
+    // 2. SDK 直接使用传入的 model 参数，无需环境变量
+    // 3. 避免环境变量覆盖用户选择的模型
+    // 4. 支持运行时切换模型，无需重启容器
 
     return containerEnv;
   }
@@ -107,10 +169,11 @@ export class ContainerConfigBuilder {
    * 构建容器标签
    * @param {number} userId - 用户 ID
    * @param {string} tier - 用户层级
+   * @param {string} volumeName - 命名卷名称
    * @returns {object} 标签对象
    * @private
    */
-  _buildLabels(userId, tier) {
+  _buildLabels(userId, tier, volumeName) {
     return {
       // Docker Compose 风格标签 - 用于在 Docker 客户端中分组显示
       'com.docker.compose.project': 'claude-code-ui',
@@ -121,6 +184,7 @@ export class ContainerConfigBuilder {
       'com.claude-code.user': String(userId),
       'com.claude-code.managed': 'true',
       'com.claude-code.tier': tier,
+      'com.claude-code.volume': volumeName,
       'com.claude-code.created': new Date().toISOString()
     };
   }

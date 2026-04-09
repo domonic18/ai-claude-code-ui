@@ -155,6 +155,43 @@ class ContainerManager {
 - **工作目录**：`/workspace` (用户专属文件系统)
 - **运行时**：Node.js 20.x
 
+#### 2.2.4 扩展系统加载流程
+
+本项目支持三种类型的扩展：**Skills**（技能）、**Agents**（代理）、**Commands**（斜杠命令）。
+
+**扩展加载方式对比**：
+
+| 扩展类型 | 加载方式 | 传递方式 | 用户容器需要文件 |
+|---------|---------|---------|----------------|
+| **Skills** | plugins 自动扫描 | 配置扫描路径 | ✅ 需要 |
+| **Agents** | 主容器读取并序列化 | 内存传递 (SDK 选项) | ❌ 不需要 |
+| **Commands** | 主容器读取文件名 | 内存传递 + 文件同步 | ✅ 需要 |
+
+**Skills 加载流程**：
+```
+1. 主容器配置: sdkOptions.plugins = [{ type: 'local', path: '/workspace/my-workspace/.claude' }]
+2. 文件同步: putArchive() → /workspace/my-workspace/.claude/skills/
+3. SDK 扫描: 自动扫描 skills/*/SKILL.md
+4. 结果: 主对话和子 agents 都能使用这些 skills
+```
+
+**Agents 加载流程**：
+```
+1. 主容器读取: loadAgentsForSDK() 读取 agents/*.md
+2. 解析内容: 提取 frontmatter (name, description, tools) + prompt
+3. 序列化: JSON.stringify() → base64 编码
+4. 嵌入脚本: 作为 sdkOptions.agents 传递给 SDK
+5. SDK 使用: 直接从内存中的 agents 对象获取
+```
+
+**Commands 加载流程**：
+```
+1. 主容器读取: loadCommandsForSDK() 提取文件名
+2. 序列化: 作为 sdkOptions.slash_commands 传递
+3. 文件同步: putArchive() → /workspace/my-workspace/.claude/commands/
+4. SDK 使用: 从数组获取命令名 → 读取文件内容 → 执行
+```
+
 ### 2.3 通信流程图
 
 ```

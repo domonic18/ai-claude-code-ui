@@ -48,7 +48,7 @@ export class ContainerStateStore {
         timestamp: Date.now()
       });
 
-      console.log(`[StateStore] Saved state for user ${userId}: ${stateMachine.getState()}`);
+      // 保存操作静默进行（由 Lifecycle 状态转换日志覆盖）
     } catch (error) {
       console.error(`[StateStore] Failed to save state for user ${userId}:`, error.message);
       throw error;

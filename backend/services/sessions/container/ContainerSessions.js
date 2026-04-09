@@ -12,6 +12,7 @@
 
 import containerManager from '../../container/core/index.js';
 import { CONTAINER } from '../../../config/config.js';
+import { filterMemoryContext } from '../../../utils/memoryUtils.js';
 
 /**
  * 编码项目名称为容器内存储格式
@@ -143,22 +144,28 @@ function parseJsonlContent(content) {
                 textContent = content[0].text;
               }
 
-              const isSystemMessage = typeof textContent === 'string' && (
-                textContent.startsWith('<command-name>') ||
-                textContent.startsWith('<command-message>') ||
-                textContent.startsWith('<command-args>') ||
-                textContent.startsWith('<local-command-stdout>') ||
-                textContent.startsWith('<system-reminder>') ||
-                textContent.startsWith('Caveat:') ||
-                textContent.startsWith('This session is being continued from a previous') ||
-                textContent.startsWith('Invalid API key') ||
-                textContent.includes('{"subtasks":') ||
-                textContent.includes('CRITICAL: You MUST respond with ONLY a JSON') ||
-                textContent === 'Warmup'
+              // 过滤记忆上下文内容
+              const filteredTextContent = filterMemoryContext(textContent);
+              if (filteredTextContent !== textContent) {
+                console.log('[ContainerSessions] Filtered memory context from user message');
+              }
+
+              const isSystemMessage = typeof filteredTextContent === 'string' && (
+                filteredTextContent.startsWith('<command-name>') ||
+                filteredTextContent.startsWith('<command-message>') ||
+                filteredTextContent.startsWith('<command-args>') ||
+                filteredTextContent.startsWith('<local-command-stdout>') ||
+                filteredTextContent.startsWith('<system-reminder>') ||
+                filteredTextContent.startsWith('Caveat:') ||
+                filteredTextContent.startsWith('This session is being continued from a previous') ||
+                filteredTextContent.startsWith('Invalid API key') ||
+                filteredTextContent.includes('{"subtasks":') ||
+                filteredTextContent.includes('CRITICAL: You MUST respond with ONLY a JSON') ||
+                filteredTextContent === 'Warmup'
               );
 
-              if (typeof textContent === 'string' && textContent.length > 0 && !isSystemMessage) {
-                session.lastUserMessage = textContent;
+              if (typeof filteredTextContent === 'string' && filteredTextContent.length > 0 && !isSystemMessage) {
+                session.lastUserMessage = filteredTextContent;
               }
             } else if (entry.message?.role === 'assistant' && entry.message?.content) {
               if (entry.isApiErrorMessage === true) {
@@ -210,7 +217,7 @@ function parseJsonlContent(content) {
       }
     }
 
-    // Filter out sessions with JSON responses (Task Master errors)
+    // 过滤出 JSON 响应错误（Task Master 错误）
     const allSessions = Array.from(sessions.values());
     const filteredSessions = allSessions.filter(session => {
       const shouldFilter = session.summary.startsWith('{ "');
@@ -229,6 +236,48 @@ function parseJsonlContent(content) {
 }
 
 /**
+ * Write JSONL content to container file
+ * Shared utility for writing modified JSONL files back to container
+ *
+ * @param {number} userId - User ID
+ * @param {string} filePath - Path to the file in container
+ * @param {Array} entries - Array of entries to write
+ * @returns {Promise<void>}
+ */
+async function writeJsonlContentToContainer(userId, filePath, entries) {
+  // Rebuild JSONL content
+  const updatedContent = entries
+    .map(entry => entry._raw || JSON.stringify(entry))
+    .filter(line => line.trim())
+    .join('\n') + '\n';
+
+  // Write back to file using base64 to handle special characters
+  const base64Content = Buffer.from(updatedContent, 'utf8').toString('base64');
+  const { stream } = await containerManager.execInContainer(
+    userId,
+    `printf '%s' "$(echo '${base64Content}' | base64 -d)" > "${filePath}"`
+  );
+
+  await new Promise((resolve, reject) => {
+    let errorOutput = '';
+    stream.on('data', (chunk) => {
+      const output = chunk.toString();
+      if (output.toLowerCase().includes('error')) {
+        errorOutput += output;
+      }
+    });
+    stream.on('error', () => reject(new Error('Failed to write file')));
+    stream.on('end', () => {
+      if (errorOutput) {
+        reject(new Error(`Write failed: ${errorOutput}`));
+      } else {
+        resolve();
+      }
+    });
+  });
+}
+
+/**
  * 从容器内列出项目的会话文件
  * @param {number} userId - 用户 ID
  * @param {string} projectName - 项目名称
@@ -237,8 +286,6 @@ function parseJsonlContent(content) {
 async function listSessionFiles(userId, projectName) {
   const encodedProjectName = encodeProjectName(projectName);
   const projectDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
-
-  console.log(`[ContainerSessions] Listing files in: ${projectDir}`);
 
   // 使用 for 循环查找所有 .jsonl 文件（更可靠）
   const { stream } = await containerManager.execInContainer(
@@ -258,16 +305,14 @@ async function listSessionFiles(userId, projectName) {
 
     stdout.on('data', (chunk) => {
       output += chunk.toString();
-      console.log(`[ContainerSessions] STDOUT chunk:`, JSON.stringify(chunk.toString()));
     });
 
     stderr.on('data', (chunk) => {
-      console.log(`[ContainerSessions] STDERR while listing files:`, chunk.toString());
+      // 静默处理 stderr 错误（目录可能不存在）
     });
 
     stream.on('error', (err) => {
       // Directory might not exist, return empty array
-      console.log(`[ContainerSessions] Error listing files:`, err.message);
       resolve([]);
     });
 
@@ -278,10 +323,8 @@ async function listSessionFiles(userId, projectName) {
         const sessionFiles = files.filter(f =>
           f.endsWith('.jsonl') && !f.startsWith('agent-')
         );
-        console.log(`[ContainerSessions] Found session files:`, sessionFiles);
         resolve(sessionFiles);
       } catch (e) {
-        console.log(`[ContainerSessions] Error parsing file list:`, e.message);
         resolve([]);
       }
     });
@@ -297,18 +340,13 @@ async function listSessionFiles(userId, projectName) {
  * @returns {Promise<Object>} 会话列表和分页信息
  */
 async function getSessionsInContainer(userId, projectName, limit = 5, offset = 0) {
-  console.log(`[ContainerSessions] Getting sessions for project: ${projectName}`);
-
   try {
     // 获取会话文件列表
     const sessionFiles = await listSessionFiles(userId, projectName);
 
     if (sessionFiles.length === 0) {
-      console.log(`[ContainerSessions] No session files found for project: ${projectName}`);
       return { sessions: [], hasMore: false, total: 0 };
     }
-
-    console.log(`[ContainerSessions] Found ${sessionFiles.length} session files`);
 
     // 读取所有会话文件
     const allSessions = new Map();
@@ -392,8 +430,6 @@ async function getSessionsInContainer(userId, projectName, limit = 5, offset = 0
     const paginatedSessions = visibleSessions.slice(offset, offset + limit);
     const hasMore = offset + limit < total;
 
-    console.log(`[ContainerSessions] Returning ${paginatedSessions.length} sessions (total: ${total})`);
-
     return {
       sessions: paginatedSessions,
       hasMore,
@@ -468,8 +504,6 @@ async function getSessionFilesInfo(userId, projectName) {
  * @returns {Promise<Object|Array>} 消息列表和分页信息，或全部消息
  */
 async function getSessionMessagesInContainer(userId, projectName, sessionId, limit = null, offset = 0) {
-  console.log(`[ContainerSessions] Getting messages for session: ${sessionId} in project: ${projectName}`);
-
   try {
     const encodedProjectName = encodeProjectName(projectName);
     const projectDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
@@ -508,6 +542,39 @@ async function getSessionMessagesInContainer(userId, projectName, sessionId, lim
       }
     }
 
+    /**
+     * 过滤用户消息中的记忆上下文
+     * @param {object} entry - 消息条目
+     * @returns {object} 过滤后的条目
+     */
+    function filterMemoryContextFromEntry(entry) {
+      if (entry.message?.role === 'user' && entry.message?.content) {
+        const content = entry.message.content;
+        let textContent = content;
+
+        if (Array.isArray(content) && content.length > 0 && content[0].type === 'text') {
+          textContent = content[0].text;
+        }
+
+        // 使用共享函数过滤记忆上下文
+        const filteredContent = filterMemoryContext(textContent);
+
+        // 如果内容被修改，返回新的条目
+        if (filteredContent !== textContent) {
+          return {
+            ...entry,
+            message: {
+              ...entry.message,
+              content: filteredContent
+            }
+          };
+        }
+      }
+
+      // 不需要过滤，返回原始条目
+      return entry;
+    }
+
     // 按时间戳排序
     messages.sort((a, b) => {
       const timeA = new Date(a.timestamp || 0).getTime();
@@ -515,16 +582,19 @@ async function getSessionMessagesInContainer(userId, projectName, sessionId, lim
       return timeA - timeB;
     });
 
+    // 过滤所有用户消息中的记忆上下文
+    const filteredMessages = messages.map(filterMemoryContextFromEntry);
+
     // 处理分页
-    const total = messages.length;
+    const total = filteredMessages.length;
     const hasMore = limit !== null && offset + limit < total;
 
     if (limit === null) {
       // 返回全部消息（向后兼容）
-      return messages;
+      return filteredMessages;
     } else {
       // 返回分页消息
-      const paginatedMessages = messages.slice(offset, offset + limit);
+      const paginatedMessages = filteredMessages.slice(offset, offset + limit);
       return {
         messages: paginatedMessages,
         total,
@@ -548,8 +618,6 @@ async function getSessionMessagesInContainer(userId, projectName, sessionId, lim
  * @returns {Promise<boolean>} 是否成功
  */
 async function updateSessionSummaryInContainer(userId, projectName, sessionId, newSummary) {
-  console.log(`[ContainerSessions] Updating summary for session: ${sessionId} in project: ${projectName}`);
-
   try {
     const encodedProjectName = encodeProjectName(projectName);
     const projectDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
@@ -558,7 +626,6 @@ async function updateSessionSummaryInContainer(userId, projectName, sessionId, n
     const sessionFiles = await listSessionFiles(userId, projectName);
 
     if (sessionFiles.length === 0) {
-      console.error(`[ContainerSessions] No session files found for project: ${projectName}`);
       return false;
     }
 
@@ -601,7 +668,7 @@ async function updateSessionSummaryInContainer(userId, projectName, sessionId, n
         }
 
         if (sessionFound) {
-          // 如果没有找到 summary 条目，添加一个新的
+          // If no summary entry exists, add a new one
           if (summaryEntryIndex === -1) {
             entries.push({
               type: 'summary',
@@ -611,38 +678,9 @@ async function updateSessionSummaryInContainer(userId, projectName, sessionId, n
             });
           }
 
-          // 重建 JSONL 内容
-          const updatedContent = entries
-            .map(entry => entry._raw || JSON.stringify(entry))
-            .filter(line => line.trim())
-            .join('\n') + '\n';
+          // Write back to file using shared function
+          await writeJsonlContentToContainer(userId, filePath, entries);
 
-          // 写回文件
-          const base64Content = Buffer.from(updatedContent, 'utf8').toString('base64');
-          const { stream } = await containerManager.execInContainer(
-            userId,
-            `printf '%s' "$(echo '${base64Content}' | base64 -d)" > "${filePath}"`
-          );
-
-          await new Promise((resolve, reject) => {
-            let errorOutput = '';
-            stream.on('data', (chunk) => {
-              const output = chunk.toString();
-              if (output.toLowerCase().includes('error')) {
-                errorOutput += output;
-              }
-            });
-            stream.on('error', () => reject(new Error('Failed to write file')));
-            stream.on('end', () => {
-              if (errorOutput) {
-                reject(new Error(`Write failed: ${errorOutput}`));
-              } else {
-                resolve();
-              }
-            });
-          });
-
-          console.log(`[ContainerSessions] Summary updated successfully for session: ${sessionId}`);
           return true;
         }
       } catch (error) {
@@ -650,7 +688,7 @@ async function updateSessionSummaryInContainer(userId, projectName, sessionId, n
       }
     }
 
-    console.error(`[ContainerSessions] Session ${sessionId} not found in any file`);
+    console.warn(`[ContainerSessions] Session ${sessionId} not found`);
     return false;
   } catch (error) {
     console.error(`[ContainerSessions] Error updating session summary:`, error);
@@ -666,8 +704,6 @@ async function updateSessionSummaryInContainer(userId, projectName, sessionId, n
  * @returns {Promise<boolean>} 是否成功
  */
 async function deleteSessionInContainer(userId, projectName, sessionId) {
-  console.log(`[ContainerSessions] Deleting session: ${sessionId} in project: ${projectName}`);
-
   try {
     const encodedProjectName = encodeProjectName(projectName);
     const projectDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
@@ -676,7 +712,6 @@ async function deleteSessionInContainer(userId, projectName, sessionId) {
     const sessionFiles = await listSessionFiles(userId, projectName);
 
     if (sessionFiles.length === 0) {
-      console.error(`[ContainerSessions] No session files found for project: ${projectName}`);
       return false;
     }
 
@@ -710,38 +745,9 @@ async function deleteSessionInContainer(userId, projectName, sessionId) {
         }
 
         if (sessionFound) {
-          // 重建 JSONL 内容
-          const updatedContent = entries
-            .map(entry => entry._raw || JSON.stringify(entry))
-            .filter(line => line.trim())
-            .join('\n') + '\n';
+          // Write back to file using shared function
+          await writeJsonlContentToContainer(userId, filePath, entries);
 
-          // 写回文件
-          const base64Content = Buffer.from(updatedContent, 'utf8').toString('base64');
-          const { stream } = await containerManager.execInContainer(
-            userId,
-            `printf '%s' "$(echo '${base64Content}' | base64 -d)" > "${filePath}"`
-          );
-
-          await new Promise((resolve, reject) => {
-            let errorOutput = '';
-            stream.on('data', (chunk) => {
-              const output = chunk.toString();
-              if (output.toLowerCase().includes('error')) {
-                errorOutput += output;
-              }
-            });
-            stream.on('error', () => reject(new Error('Failed to write file')));
-            stream.on('end', () => {
-              if (errorOutput) {
-                reject(new Error(`Write failed: ${errorOutput}`));
-              } else {
-                resolve();
-              }
-            });
-          });
-
-          console.log(`[ContainerSessions] Session deleted successfully: ${sessionId}`);
           return true;
         }
       } catch (error) {
@@ -749,7 +755,7 @@ async function deleteSessionInContainer(userId, projectName, sessionId) {
       }
     }
 
-    console.error(`[ContainerSessions] Session ${sessionId} not found in any file`);
+    console.warn(`[ContainerSessions] Session ${sessionId} not found`);
     return false;
   } catch (error) {
     console.error(`[ContainerSessions] Error deleting session:`, error);

@@ -160,6 +160,9 @@ export class ContainerStateMachine extends EventEmitter {
 
     // 用于等待状态变化的 Promise 缓存
     this._stateWaiters = new Map();
+
+    // 创建操作保护：防止在创建过程中被强制重置
+    this._isCreating = false;
   }
 
   /**
@@ -219,6 +222,14 @@ export class ContainerStateMachine extends EventEmitter {
     this.stateHistory.push(newState);
     this.lastTransitionTime = new Date();
 
+    // 管理创建操作保护标志
+    if (newState === ContainerState.CREATING) {
+      this._isCreating = true;
+    } else if (previousState === ContainerState.CREATING) {
+      // 离开 CREATING 状态，清除保护标志
+      this._isCreating = false;
+    }
+
     // 清除错误状态（如果转换到非失败状态）
     if (newState !== ContainerState.FAILED) {
       this.error = null;
@@ -247,6 +258,68 @@ export class ContainerStateMachine extends EventEmitter {
   setFailed(error) {
     this.error = error;
     this.transitionTo(ContainerState.FAILED, { error: error.message });
+  }
+
+  /**
+   * 强制重置状态到 NON_EXISTENT
+   * 用于处理卡住的状态（如服务器重启后遗留的 creating 状态）
+   * 此方法绕过正常的转换规则
+   * 如果正在创建中，则跳过重置以避免干扰活跃的创建过程
+   * @returns {boolean} 是否执行了重置
+   */
+  forceReset() {
+    // 如果正在创建中，不允许强制重置
+    if (this.isCreating()) {
+      console.log(`[StateMachine] Skipping force reset for user ${this.userId}: container creation is in progress`);
+      return false;
+    }
+
+    const previousState = this.currentState;
+    this.previousState = previousState;
+    this.currentState = ContainerState.NON_EXISTENT;
+    this.stateHistory.push(ContainerState.NON_EXISTENT);
+    this.lastTransitionTime = new Date();
+    this.error = null;
+
+    console.log(`[StateMachine] Force reset state from ${previousState} to NON_EXISTENT for user ${this.userId}`);
+
+    // 触发状态变化事件
+    this.emit('stateChanged', {
+      from: previousState,
+      to: ContainerState.NON_EXISTENT,
+      userId: this.userId,
+      containerName: this.containerName,
+      timestamp: this.lastTransitionTime,
+      metadata: { forced: true }
+    });
+
+    // 通知等待者
+    this._notifyStateWaiters(ContainerState.NON_EXISTENT);
+
+    return true;
+  }
+
+  /**
+   * 开始创建操作，设置保护标志
+   * 防止创建过程被 forceReset 中断
+   */
+  beginCreation() {
+    this._isCreating = true;
+  }
+
+  /**
+   * 结束创建操作，清除保护标志
+   */
+  endCreation() {
+    this._isCreating = false;
+  }
+
+  /**
+   * 检查是否正在创建中
+   * @returns {boolean}
+   */
+  isCreating() {
+    return this._isCreating;
   }
 
   /**
@@ -363,14 +436,14 @@ export class ContainerStateMachine extends EventEmitter {
       const matchingWaiters = waiters.filter(w => w.targetStates.includes(newState));
 
       if (matchingWaiters.length > 0) {
-        console.log(`[ContainerStateMachine] Notifying ${matchingWaiters.length} waiters from state ${state} for new state ${newState}`);
+        console.log(`[StateMachine] Notifying ${matchingWaiters.length} waiters from state ${state} for new state ${newState}`);
 
         // 通知匹配的等待者
         matchingWaiters.forEach(waiter => {
           try {
             waiter.callback(newState);
           } catch (error) {
-            console.error('[ContainerStateMachine] Error in state waiter callback:', error);
+            console.error('[StateMachine] Error in state waiter callback:', error);
           }
         });
       }
@@ -424,10 +497,20 @@ export class ContainerStateMachine extends EventEmitter {
    * @returns {ContainerStateMachine}
    */
   static fromJSON(data) {
+    // 如果状态是中间状态，服务器重启后这些状态肯定无效，重置为 NON_EXISTENT
+    const intermediateStates = [
+      ContainerState.CREATING,
+      ContainerState.STARTING,
+      ContainerState.HEALTH_CHECKING
+    ];
+    const initialState = intermediateStates.includes(data.currentState)
+      ? ContainerState.NON_EXISTENT
+      : data.currentState;
+
     const machine = new ContainerStateMachine({
       userId: data.userId,
       containerName: data.containerName,
-      initialState: data.currentState
+      initialState
     });
 
     machine.stateHistory = data.stateHistory || [data.currentState];
@@ -435,6 +518,10 @@ export class ContainerStateMachine extends EventEmitter {
 
     if (data.error) {
       machine.error = new Error(data.error);
+    }
+
+    if (initialState !== data.currentState) {
+      console.log(`[StateMachine] Reset stale state from ${data.currentState} to ${initialState} for user ${data.userId}`);
     }
 
     return machine;

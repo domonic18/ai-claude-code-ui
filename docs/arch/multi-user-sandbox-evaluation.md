@@ -250,7 +250,7 @@ seccomp   Docker   Firecracker   KVM/QEMU
 class UserContainerManager {
   async createUserContainer(userId) {
     const container = await docker.createContainer({
-      Image: 'claude-code-runtime:latest',
+      Image: 'claude-code-sandbox:latest',
       Env: [`USER_ID=${userId}`],
       HostConfig: {
         Binds: [`/data/users/${userId}:/workspace`],

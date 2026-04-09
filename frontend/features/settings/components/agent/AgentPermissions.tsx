@@ -9,6 +9,7 @@
  */
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
 import { Shield, AlertTriangle, Plus, X } from 'lucide-react';
@@ -59,6 +60,7 @@ const AgentPermissions: React.FC<AgentPermissionsProps> = ({
   newDisallowedTool,
   setNewDisallowedTool
 }) => {
+  const { t } = useTranslation();
   const addAllowedTool = (tool: string) => {
     if (tool && !allowedTools.includes(tool)) {
       setAllowedTools([...allowedTools, tool]);
@@ -88,7 +90,7 @@ const AgentPermissions: React.FC<AgentPermissionsProps> = ({
         <div className="flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 text-orange-500" />
           <h3 className="text-lg font-medium text-foreground">
-            Permission Settings
+            {t('agentPermissions.title')}
           </h3>
         </div>
         <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
@@ -101,10 +103,10 @@ const AgentPermissions: React.FC<AgentPermissionsProps> = ({
             />
             <div>
               <div className="font-medium text-orange-900 dark:text-orange-100">
-                Skip permission prompts (use with caution)
+                {t('agentPermissions.skipPrompts')}
               </div>
               <div className="text-sm text-orange-700 dark:text-orange-300">
-                Equivalent to --dangerously-skip-permissions flag
+                {t('agentPermissions.skipPromptsDescription')}
               </div>
             </div>
           </label>
@@ -116,18 +118,18 @@ const AgentPermissions: React.FC<AgentPermissionsProps> = ({
         <div className="flex items-center gap-3">
           <Shield className="w-5 h-5 text-green-500" />
           <h3 className="text-lg font-medium text-foreground">
-            Allowed Tools
+            {t('agentPermissions.allowedTools')}
           </h3>
         </div>
         <p className="text-sm text-muted-foreground">
-          Tools that are automatically allowed without prompting for permission
+          {t('agentPermissions.allowedToolsDescription')}
         </p>
 
         <div className="flex flex-col sm:flex-row gap-2">
           <Input
             value={newAllowedTool}
             onChange={(e) => setNewAllowedTool(e.target.value)}
-            placeholder='e.g., "Bash(git log:*)" or "Write"'
+            placeholder={t('agentPermissions.placeholder')}
             onKeyPress={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
@@ -143,14 +145,14 @@ const AgentPermissions: React.FC<AgentPermissionsProps> = ({
             className="h-10 px-4"
           >
             <Plus className="w-4 h-4 mr-2 sm:mr-0" />
-            <span className="sm:hidden">Add</span>
+            <span className="sm:hidden">{t('agentPermissions.add')}</span>
           </Button>
         </div>
 
         {/* Quick add buttons */}
         <div className="space-y-2">
           <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Quick add common tools:
+            {t('agentPermissions.quickAdd')}
           </p>
           <div className="flex flex-wrap gap-2">
             {commonClaudeTools.map(tool => (
@@ -186,7 +188,7 @@ const AgentPermissions: React.FC<AgentPermissionsProps> = ({
           ))}
           {allowedTools.length === 0 && (
             <div className="text-center py-6 text-gray-500 dark:text-gray-400">
-              No allowed tools configured
+              {t('agentPermissions.noAllowedTools')}
             </div>
           )}
         </div>
@@ -197,18 +199,18 @@ const AgentPermissions: React.FC<AgentPermissionsProps> = ({
         <div className="flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 text-red-500" />
           <h3 className="text-lg font-medium text-foreground">
-            Blocked Tools
+            {t('agentPermissions.blockedTools')}
           </h3>
         </div>
         <p className="text-sm text-muted-foreground">
-          Tools that are automatically blocked without prompting for permission
+          {t('agentPermissions.blockedToolsDescription')}
         </p>
 
         <div className="flex flex-col sm:flex-row gap-2">
           <Input
             value={newDisallowedTool}
             onChange={(e) => setNewDisallowedTool(e.target.value)}
-            placeholder='e.g., "Bash(rm:*)"'
+            placeholder={t('agentPermissions.blockedPlaceholder')}
             onKeyPress={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
@@ -224,7 +226,7 @@ const AgentPermissions: React.FC<AgentPermissionsProps> = ({
             className="h-10 px-4"
           >
             <Plus className="w-4 h-4 mr-2 sm:mr-0" />
-            <span className="sm:hidden">Add</span>
+            <span className="sm:hidden">{t('agentPermissions.add')}</span>
           </Button>
         </div>
 
@@ -246,7 +248,7 @@ const AgentPermissions: React.FC<AgentPermissionsProps> = ({
           ))}
           {disallowedTools.length === 0 && (
             <div className="text-center py-6 text-gray-500 dark:text-gray-400">
-              No blocked tools configured
+              {t('agentPermissions.noBlockedTools')}
             </div>
           )}
         </div>
@@ -255,13 +257,13 @@ const AgentPermissions: React.FC<AgentPermissionsProps> = ({
       {/* Help Section */}
       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
         <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
-          Tool Pattern Examples:
+          {t('agentPermissions.examples.title')}
         </h4>
         <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-          <li><code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">"Bash(git log:*)"</code> - Allow all git log commands</li>
-          <li><code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">"Bash(git diff:*)"</code> - Allow all git diff commands</li>
-          <li><code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">"Write"</code> - Allow all Write tool usage</li>
-          <li><code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">"Bash(rm:*)"</code> - Block all rm commands (dangerous)</li>
+          <li><code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">"Bash(git log:*)"</code> - {t('agentPermissions.examples.gitLog')}</li>
+          <li><code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">"Bash(git diff:*)"</code> - {t('agentPermissions.examples.gitDiff')}</li>
+          <li><code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">"Write"</code> - {t('agentPermissions.examples.write')}</li>
+          <li><code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">"Bash(rm:*)"</code> - {t('agentPermissions.examples.rm')}</li>
         </ul>
       </div>
     </div>

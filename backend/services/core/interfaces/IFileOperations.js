@@ -70,6 +70,17 @@ export class IFileOperations {
   }
 
   /**
+   * 重命名文件或目录
+   * @param {string} oldPath - 旧路径
+   * @param {string} newName - 新名称
+   * @param {Object} options - 选项
+   * @returns {Promise<{success: boolean, newPath: string}>}
+   */
+  async renameFile(oldPath, newName, options = {}) {
+    throw new Error('IFileOperations.renameFile() must be implemented');
+  }
+
+  /**
    * 检查文件是否存在
    * @param {string} filePath - 文件路径
    * @returns {Promise<boolean>}

@@ -18,3 +18,6 @@ export { Homepage } from './Homepage';
 export { ChatPage } from './Chat';
 export { SettingsPage } from './Settings';
 export { AdminPage } from './Admin';
+
+// Feature pages
+export { MemoryPage } from '../features/memory';

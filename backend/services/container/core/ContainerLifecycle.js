@@ -18,6 +18,8 @@ import { ContainerHealthMonitor } from './ContainerHealth.js';
 import { ContainerStateMachine, ContainerState } from './ContainerStateMachine.js';
 import containerStateStore from './ContainerStateStore.js';
 import { syncExtensions } from '../../extensions/extension-sync.js';
+import { createExtensionTar } from '../../extensions/extension-tar.js';
+import { DEFAULT_MEMORY_TEMPLATE, MEMORY_SETUP_TIMEOUT } from '../../../shared/constants/memory.js';
 
 const { Container } = repositories;
 
@@ -68,16 +70,61 @@ export class ContainerLifecycleManager {
     const containerName = `claude-user-${userId}`;
     const stateMachine = await containerStateStore.getOrCreate(userId, containerName);
 
+    // 验证状态一致性：如果状态是中间状态但容器不存在，强制重置为 NON_EXISTENT
+    // 只有当中间状态已经持续超过一定时间时才重置（避免干扰活跃的创建过程）
+    const intermediateStates = [ContainerState.CREATING, ContainerState.STARTING, ContainerState.HEALTH_CHECKING];
+    if (intermediateStates.includes(stateMachine.getState())) {
+      const containerExists = await this._verifyContainerExists(containerName);
+      if (!containerExists) {
+        // 检查状态持续时间（容器创建通常在 30 秒内完成）
+        const stateAge = Date.now() - stateMachine.lastTransitionTime.getTime();
+        const staleThreshold = 30000; // 30 秒
+
+        if (stateAge > staleThreshold) {
+          console.log(`[Lifecycle] Container ${containerName} not found, state is ${stateMachine.getState()} for ${Math.floor(stateAge / 1000)}s, force resetting to NON_EXISTENT`);
+          stateMachine.forceReset();
+          await containerStateStore.save(stateMachine);
+        } else {
+          // 状态时间短，可能是活跃的创建过程，不要重置
+          console.log(`[Lifecycle] Container ${containerName} not found but state ${stateMachine.getState()} is recent (${Math.floor(stateAge / 1000)}s), not resetting (active creation in progress)`);
+        }
+      }
+    }
+
     // 缓存状态机
     this.stateMachines.set(userId, stateMachine);
 
-    // 监听状态变化，自动保存
+    // 监听状态变化，自动保存（仅记录重要状态变化）
     stateMachine.on('stateChanged', async (event) => {
-      console.log(`[Lifecycle] State changed for user ${userId}: ${event.from} -> ${event.to}`);
+      const importantTransitions = ['ready', 'failed'];
+      if (importantTransitions.includes(event.to)) {
+        console.log(`[Lifecycle] State changed for user ${userId}: ${event.from} -> ${event.to}`);
+      }
       await containerStateStore.save(stateMachine);
     });
 
     return stateMachine;
+  }
+
+  /**
+   * 验证容器是否真实存在
+   * @private
+   * @param {string} containerName - 容器名称
+   * @returns {Promise<boolean>}
+   */
+  async _verifyContainerExists(containerName) {
+    try {
+      const container = this.docker.getContainer(containerName);
+      await container.inspect();
+      return true;
+    } catch (error) {
+      if (error.statusCode === 404) {
+        return false;
+      }
+      // 其他错误（网络问题等）保守地认为容器可能存在
+      console.warn(`[Lifecycle] Error verifying container ${containerName}: ${error.message}`);
+      return true;
+    }
   }
 
   /**
@@ -155,7 +202,6 @@ export class ContainerLifecycleManager {
       }
 
       // 状态为 READY 但容器不在缓存中或未运行，重置状态
-      console.log(`[Lifecycle] Container state is READY but container not available, resetting to NON_EXISTENT`);
       stateMachine.transitionTo(ContainerState.NON_EXISTENT);
       await containerStateStore.save(stateMachine);
     }
@@ -164,11 +210,8 @@ export class ContainerLifecycleManager {
     if ([ContainerState.CREATING, ContainerState.STARTING, ContainerState.HEALTH_CHECKING].includes(stateMachine.getState())) {
       // 如果设置了不等待，立即抛出错误让调用方处理
       if (options.wait === false) {
-        console.log(`[Lifecycle] Container ${stateMachine.getState()} in progress for user ${userId}, not waiting (wait=false)`);
         throw new Error(`Container is ${stateMachine.getState()}, not ready yet`);
       }
-
-      console.log(`[Lifecycle] Container ${stateMachine.getState()} in progress for user ${userId}, waiting...`);
 
       try {
         await this._waitForReady(userId, options.timeout);
@@ -177,7 +220,6 @@ export class ContainerLifecycleManager {
         // 等待失败，检查是否需要重试
         if (stateMachine.is(ContainerState.FAILED)) {
           // 清理失败状态并重试
-          console.log(`[Lifecycle] Previous creation failed for user ${userId}, resetting...`);
           stateMachine.transitionTo(ContainerState.NON_EXISTENT);
           await containerStateStore.save(stateMachine);
           return this.getOrCreateContainer(userId, userConfig, options);
@@ -188,7 +230,6 @@ export class ContainerLifecycleManager {
 
     // 情况 3: 容器处于失败状态，重置并重试
     if (stateMachine.is(ContainerState.FAILED)) {
-      console.log(`[Lifecycle] Container in failed state for user ${userId}, resetting...`);
       stateMachine.transitionTo(ContainerState.NON_EXISTENT);
       await containerStateStore.save(stateMachine);
     }
@@ -207,6 +248,9 @@ export class ContainerLifecycleManager {
    */
   async _createContainerWithStateMachine(userId, userConfig, stateMachine) {
     const containerName = `claude-user-${userId}`;
+
+    // 设置创建保护标志，防止被 forceReset 中断
+    stateMachine.beginCreation();
 
     try {
       // 转换到 CREATING 状态
@@ -239,10 +283,21 @@ export class ContainerLifecycleManager {
 
     } catch (error) {
       // 设置失败状态
+      console.error(`[Lifecycle] Container creation failed for user ${userId}:`, error);
+      // 清除创建保护标志，允许后续操作重置状态
+      stateMachine.endCreation();
       stateMachine.setFailed(error);
       await containerStateStore.save(stateMachine);
 
       throw new Error(`Failed to create container for user ${userId}: ${error.message}`);
+    } finally {
+      // 确保在任何情况下都清除创建保护标志
+      // 只有当状态不再是 CREATING 时才清除（正常完成的情况）
+      if (stateMachine.getState() !== ContainerState.CREATING &&
+          stateMachine.getState() !== ContainerState.STARTING &&
+          stateMachine.getState() !== ContainerState.HEALTH_CHECKING) {
+        stateMachine.endCreation();
+      }
     }
   }
 
@@ -258,43 +313,29 @@ export class ContainerLifecycleManager {
     const userDataDir = path.join(this.config.dataDir, 'users', `user_${userId}`, 'data');
 
     try {
-      // 1. 创建用户数据目录
+      // 1. 创建用户数据目录（用于备份和本地开发环境）
       await fs.promises.mkdir(userDataDir, { recursive: true });
       console.log(`[Lifecycle] Created user data directory: ${userDataDir}`);
 
-      // 2. 创建 .claude 目录并同步预置扩展
+      // 2. 创建 .claude 目录并同步预置扩展（用于备份）
       const claudeDir = path.join(userDataDir, '.claude');
       await fs.promises.mkdir(claudeDir, { recursive: true });
       console.log(`[Lifecycle] Created .claude directory: ${claudeDir}`);
 
-      // 2.1. 创建默认工作区 my-workspace
-      const myWorkspaceDir = path.join(userDataDir, 'my-workspace');
-      await fs.promises.mkdir(myWorkspaceDir, { recursive: true });
-      const readmePath = path.join(myWorkspaceDir, 'README.md');
-      await fs.promises.writeFile(readmePath, `# My Workspace
-
-Welcome to your Claude Code workspace! This is your default project where you can start coding.
-
-## Getting Started
-
-- Use the chat interface to ask Claude to help you with coding tasks
-- Use the file explorer to browse and edit files
-- Use the terminal to run commands
-
-Happy coding!
-`, 'utf8');
-      console.log(`[Lifecycle] Created default workspace: ${myWorkspaceDir}`);
-
-      // 同步预置扩展（agents, commands, skills）
+      // 同步预置扩展到本地备份目录
       try {
         await syncExtensions(claudeDir, { overwriteUserFiles: true });
-        console.log(`[Lifecycle] Synced extensions for user ${userId}`);
+        console.log(`[Lifecycle] Synced extensions to local backup for user ${userId}`);
       } catch (syncError) {
         // 扩展同步失败不应阻止容器创建，只记录错误
-        console.warn(`[Lifecycle] Failed to sync extensions for user ${userId}:`, syncError.message);
+        console.warn(`[Lifecycle] Failed to sync extensions to local backup:`, syncError.message);
       }
 
-      // 3. 构建容器配置
+      // 3. 创建命名卷（如果不存在）
+      const volumeName = `claude-user-${userId}-workspace`;
+      await this._ensureVolumeExists(volumeName);
+
+      // 4. 构建容器配置
       const containerConfig = this.configBuilder.buildConfig({
         name: containerName,
         userDataDir,
@@ -304,21 +345,76 @@ Happy coding!
         network: this.config.network
       });
 
-      // 3. 清理可能存在的孤立容器
+      // 5. 清理可能存在的孤立容器
       await this._removeOrphanedContainerSync(containerName);
 
-      // 4. 创建容器
-      const container = await new Promise((resolve, reject) => {
-        this.docker.createContainer(containerConfig, (err, container) => {
-          if (err) reject(err);
-          else resolve(container);
+      // 6. 创建容器（使用命名卷）
+      console.log(`[Lifecycle] Creating container ${containerName}...`);
+      let container;
+      try {
+        container = await new Promise((resolve, reject) => {
+          this.docker.createContainer(containerConfig, (err, container) => {
+            if (err) {
+              console.error(`[Lifecycle] Failed to create container:`, err);
+              reject(err);
+            } else {
+              console.log(`[Lifecycle] Container ${containerName} created with ID: ${container.id}`);
+              resolve(container);
+            }
+          });
         });
-      });
+      } catch (createError) {
+        throw new Error(`Failed to create container: ${createError.message}`);
+      }
 
-      // 5. 启动容器
-      await container.start();
+      // 7. 启动容器
+      console.log(`[Lifecycle] Starting container ${containerName}...`);
+      try {
+        await container.start();
+        console.log(`[Lifecycle] Container ${containerName} started`);
+      } catch (startError) {
+        throw new Error(`Failed to start container: ${startError.message}`);
+      }
 
-      // 6. 构建容器信息
+      // 8. 等待容器完全启动
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // 9. 在容器内创建默认工作区目录结构（必须先创建目录，再同步扩展）
+      let workspaceEnsured = false;
+      for (let i = 0; i < 3; i++) {
+        try {
+          await this._ensureDefaultWorkspaceInContainer(container, containerName);
+          workspaceEnsured = true;
+          break;
+        } catch (wsErr) {
+          console.warn(`[Lifecycle] Workspace ensure attempt ${i + 1} failed: ${wsErr.message}`);
+          if (i < 2) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+      }
+      if (!workspaceEnsured) {
+        console.warn(`[Lifecycle] Failed to ensure workspace after 3 attempts, will be created on-demand`);
+      }
+
+      // 10. 同步扩展文件到容器内（必须在目录创建之后执行）
+      try {
+        await this._syncExtensionsToContainer(container, userId);
+        console.log(`[Lifecycle] Extensions synced to container ${containerName}`);
+      } catch (syncError) {
+        // 扩展同步失败不应阻止容器创建，只记录错误
+        console.warn(`[Lifecycle] Failed to sync extensions to container:`, syncError.message);
+      }
+
+      // 11. 在容器内创建 README.md 文件
+      try {
+        await this._createReadmeInContainer(container);
+        console.log(`[Lifecycle] README.md created in container ${containerName}`);
+      } catch (readmeErr) {
+        console.warn(`[Lifecycle] Failed to create README.md:`, readmeErr.message);
+      }
+
+      // 12. 构建容器信息
       const containerInfo = {
         id: container.id,
         name: containerName,
@@ -328,7 +424,7 @@ Happy coding!
         lastActive: new Date()
       };
 
-      // 7. 写入数据库
+      // 13. 写入数据库
       try {
         Container.create(userId, container.id, containerName);
         console.log(`[Lifecycle] Container record saved to database: ${containerName}`);
@@ -340,6 +436,37 @@ Happy coding!
 
     } catch (error) {
       throw new Error(`Container creation failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * 确保命名卷存在，如果不存在则创建
+   * @private
+   * @param {string} volumeName - 卷名称
+   * @returns {Promise<void>}
+   */
+  async _ensureVolumeExists(volumeName) {
+    try {
+      // 检查卷是否已存在
+      const volume = this.docker.getVolume(volumeName);
+      await volume.inspect();
+      console.log(`[Lifecycle] Volume ${volumeName} already exists`);
+    } catch (err) {
+      // 卷不存在，创建新卷
+      if (err.statusCode === 404) {
+        await new Promise((resolve, reject) => {
+          this.docker.createVolume({
+            Name: volumeName,
+            Driver: 'local'
+          }, (err, volume) => {
+            if (err) reject(err);
+            else resolve(volume);
+          });
+        });
+        console.log(`[Lifecycle] Created volume: ${volumeName}`);
+      } else {
+        throw err;
+      }
     }
   }
 
@@ -588,10 +715,10 @@ Happy coding!
             // 容器未运行，更新数据库状态并清理状态机
             Container.updateStatus(container_id, 'stopped');
             console.log(`[Lifecycle] Container ${container_name} is stopped, status updated in database`);
-            // 清理状态机状态
+            // 清理状态机状态 - 使用 forceReset 绕过转换规则
             const stateMachine = this.stateMachines.get(user_id);
             if (stateMachine) {
-              stateMachine.transitionTo(ContainerState.NON_EXISTENT);
+              stateMachine.forceReset();
               await containerStateStore.save(stateMachine);
             }
           }
@@ -600,10 +727,19 @@ Happy coding!
           if (dockerErr.statusCode === 404) {
             console.log(`[Lifecycle] Container ${container_name} not found in Docker, removing from database`);
             Container.delete(container_id);
-            // 清理状态机状态
-            const stateMachine = this.stateMachines.get(user_id);
+            // 清理状态机状态 - 使用 forceReset 绕过转换规则
+            let stateMachine = this.stateMachines.get(user_id);
+            if (!stateMachine) {
+              // 如果不在缓存中，从存储加载
+              try {
+                stateMachine = await containerStateStore.load(user_id);
+              } catch (loadErr) {
+                console.warn(`[Lifecycle] Could not load state machine for user ${user_id}: ${loadErr.message}`);
+              }
+            }
             if (stateMachine) {
-              stateMachine.transitionTo(ContainerState.NON_EXISTENT);
+              // 使用 forceReset 而不是 transitionTo，因为状态可能不允许转换
+              stateMachine.forceReset();
               await containerStateStore.save(stateMachine);
             }
           } else {
@@ -638,6 +774,203 @@ Happy coding!
    */
   getContainerByUserId(userId) {
     return this.containers.get(userId);
+  }
+
+  /**
+   * 在容器内执行命令并设置超时
+   * @private
+   * @param {object} container - Docker 容器实例
+   * @param {string} command - 要执行的命令
+   * @param {number} timeout - 超时时间（毫秒）
+   * @returns {Promise<{success: boolean, output?: string, error?: string}>}
+   */
+  async _execWithTimeout(container, command, timeout = 15000) {
+    const exec = await container.exec({
+      Cmd: ['/bin/sh', '-c', command],
+      AttachStdout: true,
+      AttachStderr: true
+    });
+
+    const stream = await exec.start({ Detach: false });
+
+    return Promise.race([
+      new Promise((resolve) => {
+        let output = '';
+        stream.on('data', (chunk) => { output += chunk.toString(); });
+        stream.on('end', () => resolve({ success: true, output }));
+        stream.on('error', (err) => resolve({ success: false, error: err.message }));
+      }),
+      new Promise((resolve) =>
+        setTimeout(() => resolve({ success: false, error: 'timeout' }), timeout)
+      )
+    ]);
+  }
+
+  /**
+   * 确保容器内有默认工作区
+   * 在容器启动后执行，确保命名卷中的 /workspace 目录结构正确
+   * @private
+   * @param {object} container - Docker 容器实例
+   * @param {string} containerName - 容器名称
+   * @returns {Promise<void>}
+   */
+  async _ensureDefaultWorkspaceInContainer(container, containerName) {
+    // 创建默认项目目录结构（my-workspace 是系统的默认项目名称）
+    // 同时创建 .claude/projects 目录，SDK 需要它来存储会话数据
+    const result = await this._execWithTimeout(
+      container,
+      'mkdir -p /workspace/my-workspace/uploads /workspace/my-workspace/.claude/projects && chmod 755 /workspace && ls -la /workspace/',
+      15000
+    );
+
+    if (!result.success) {
+      throw new Error(result.error || 'Unknown error');
+    }
+  }
+
+  /**
+   * 同步扩展文件到容器内
+   * 在容器启动后执行，通过 docker.putArchive 将扩展文件上传到命名卷
+   * @private
+   * @param {object} container - Docker 容器实例
+   * @param {number} userId - 用户 ID
+   * @returns {Promise<void>}
+   */
+  async _syncExtensionsToContainer(container, userId) {
+    try {
+      // 创建扩展文件的 tar 流
+      const tarStream = await createExtensionTar({
+        includeSkills: true,
+        includeAgents: true,
+        includeCommands: true,
+        includeHooks: true,
+        includeKnowledge: true,
+        includeConfig: true
+      });
+
+      // 同步扩展到 /workspace（SDK 从这里查找扩展）
+      await new Promise((resolve, reject) => {
+        container.putArchive(tarStream, { path: '/workspace' }, (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      // 同步扩展到 /workspace/my-workspace（settings.json 中的 hooks 路径和用户期望）
+      // 注意：这会重复复制扩展文件，但确保 hooks 和 PROJECT_ROOT 计算正确
+      const tarStream2 = await createExtensionTar({
+        includeSkills: true,
+        includeAgents: true,
+        includeCommands: true,
+        includeHooks: true,
+        includeKnowledge: true,
+        includeConfig: true
+      });
+
+      await new Promise((resolve, reject) => {
+        container.putArchive(tarStream2, { path: '/workspace/my-workspace' }, (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      // 设置 hooks 脚本的执行权限（两处都要设置）
+      await this._setHooksPermissions(container);
+
+      // 创建用户级记忆目录和默认记忆文件
+      await this._createMemoryDirectoryAndFile(container);
+
+    } catch (error) {
+      throw new Error(`Failed to sync extensions: ${error.message}`);
+    }
+  }
+
+  /**
+   * 创建用户级记忆目录和默认记忆文件
+   * @private
+   * @param {object} container - Docker 容器实例
+   * @returns {Promise<void>}
+   */
+  async _createMemoryDirectoryAndFile(container) {
+    try {
+      // 创建 /workspace/.claude/memory 目录
+      const mkdirResult = await this._execWithTimeout(container, 'mkdir -p /workspace/.claude/memory', MEMORY_SETUP_TIMEOUT);
+      if (mkdirResult.success) {
+        console.log('[Lifecycle] Created memory directory: /workspace/.claude/memory');
+      }
+
+      // 如果记忆文件不存在，创建默认记忆文件
+      const checkResult = await this._execWithTimeout(container, 'test -f /workspace/.claude/memory/MEMORY.md && echo "EXISTS" || echo "NOT_EXISTS"', MEMORY_SETUP_TIMEOUT);
+      if (checkResult.success && checkResult.stdout.trim() === 'NOT_EXISTS') {
+        // 使用 base64 编码创建文件，避免特殊字符问题
+        const base64Content = Buffer.from(DEFAULT_MEMORY_TEMPLATE, 'utf8').toString('base64');
+        const createResult = await this._execWithTimeout(
+          container,
+          `echo '${base64Content}' | base64 -d > /workspace/.claude/memory/MEMORY.md`,
+          MEMORY_SETUP_TIMEOUT
+        );
+        if (createResult.success) {
+          console.log('[Lifecycle] Created default memory file: /workspace/.claude/memory/MEMORY.md');
+        }
+      }
+    } catch (error) {
+      console.warn('[Lifecycle] Failed to create memory directory/file:', error.message);
+      // 不抛出错误，记忆文件创建失败不应阻止容器启动
+    }
+  }
+
+  /**
+   * 设置容器内 hooks 脚本的执行权限（两处都要设置）
+   * @private
+   * @param {object} container - Docker 容器实例
+   * @returns {Promise<void>}
+   */
+  async _setHooksPermissions(container) {
+    const commands = [
+      'chmod +x /workspace/.claude/hooks/*.sh 2>/dev/null || true',
+      'chmod +x /workspace/my-workspace/.claude/hooks/*.sh 2>/dev/null || true'
+    ];
+
+    for (const cmd of commands) {
+      const result = await this._execWithTimeout(container, cmd, 5000);
+      if (!result.success) {
+        // 静默处理 hooks 权限设置失败
+      }
+    }
+  }
+
+  /**
+   * 在容器内创建 README.md 文件
+   * @private
+   * @param {object} container - Docker 容器实例
+   * @returns {Promise<void>}
+   */
+  async _createReadmeInContainer(container) {
+    const readmeContent = `# My Workspace
+
+Welcome to your Claude Code workspace! This is your default project where you can start coding.
+
+## Getting Started
+
+- Use the chat interface to ask Claude to help you with coding tasks
+- Use the file explorer to browse and edit files
+- Use the terminal to run commands
+
+Happy coding!
+`;
+
+    // 使用 heredoc 语法创建文件（my-workspace 是系统的默认项目名称）
+    const command = `cat > /workspace/my-workspace/README.md << 'EOF'
+${readmeContent}
+EOF`;
+
+    await this._execWithTimeout(container, command, 5000);
   }
 
 }

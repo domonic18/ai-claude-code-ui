@@ -13,6 +13,7 @@
 
 import { useState, useCallback } from 'react';
 import { getSidebarService } from '../services';
+import { SESSION_PAGINATION } from '../constants/sidebar.constants';
 import type { Session, SessionProvider, PaginatedSessionsResponse } from '../types';
 
 /**
@@ -29,6 +30,8 @@ export interface UseSessionsReturn {
   hasMore: Record<string, boolean>;
   /** Load more sessions for a project */
   loadMoreSessions: (projectName: string, limit?: number, offset?: number) => Promise<void>;
+  /** Initialize hasMore state from project sessionMeta */
+  initializeHasMore: (projectName: string, hasMoreValue: boolean) => void;
   /** Rename a session */
   renameSession: (projectName: string, sessionId: string, newSummary: string) => Promise<void>;
   /** Delete a session */
@@ -53,28 +56,18 @@ export function useSessions(): UseSessionsReturn {
    */
   const loadMoreSessions = useCallback(async (
     projectName: string,
-    limit: number = 5,
+    limit: number = SESSION_PAGINATION.LOAD_MORE_LIMIT,
     offset: number = 0
   ): Promise<void> => {
     // Check if already loading
     if (loadingSessions[projectName]) {
-      console.log('[useSessions] Already loading sessions for:', projectName);
       return;
     }
-
-    console.log('[useSessions] Loading more sessions:', { projectName, limit, offset });
 
     setLoadingSessions(prev => ({ ...prev, [projectName]: true }));
 
     try {
       const result: PaginatedSessionsResponse = await service.getSessions(projectName, limit, offset);
-
-      console.log('[useSessions] Received sessions:', {
-        projectName,
-        count: result.sessions?.length || 0,
-        hasMore: result.hasMore,
-        sessions: result.sessions
-      });
 
       // Update sessions
       setAdditionalSessions(prev => {
@@ -85,7 +78,6 @@ export function useSessions(): UseSessionsReturn {
             ...result.sessions,
           ],
         };
-        console.log('[useSessions] Updated additionalSessions:', updated);
         return updated;
       });
 
@@ -100,6 +92,14 @@ export function useSessions(): UseSessionsReturn {
       setLoadingSessions(prev => ({ ...prev, [projectName]: false }));
     }
   }, [service, loadingSessions]);
+
+  /**
+   * Initialize hasMore state from project sessionMeta
+   * This is called when projects are initially loaded
+   */
+  const initializeHasMore = useCallback((projectName: string, hasMoreValue: boolean) => {
+    setHasMore(prev => ({ ...prev, [projectName]: hasMoreValue }));
+  }, []);
 
   /**
    * Rename a session
@@ -178,6 +178,7 @@ export function useSessions(): UseSessionsReturn {
     additionalSessions,
     hasMore,
     loadMoreSessions,
+    initializeHasMore,
     renameSession,
     deleteSession,
     reset,

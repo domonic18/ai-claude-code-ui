@@ -9,5 +9,6 @@ export * from './dom';
 export * from './error';
 export * from './file';
 export * from './format';
+export * from './memory';
 export * from './request';
 export * from './validation';

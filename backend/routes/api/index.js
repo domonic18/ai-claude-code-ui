@@ -11,3 +11,4 @@ export { default as git } from './git.js';
 export { default as userSettings } from './user-settings.js';
 export { default as mcpServers } from './mcp-servers.js';
 export { default as extensions } from './extensions.js';
+export { default as memory } from './memory.js';

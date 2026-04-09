@@ -23,7 +23,7 @@ interface ChatInputComponentProps extends Omit<ChatInputProps, 'files' | 'onAddF
   /** Add file callback */
   onAddFile?: (file: FileAttachment) => void;
   /** Remove file callback */
-  onRemoveFile?: (fileName: string) => void;
+  onRemoveFile?: (fileId: string) => void;
   /** Whether currently loading */
   isLoading?: boolean;
   /** Placeholder text */
@@ -184,6 +184,52 @@ export function ChatInput({
   }, [onFocusChange]);
 
   /**
+   * Handle file upload to server
+   */
+  const handleFileUpload = useCallback(async (file: File, attachment: FileAttachment) => {
+    if (!authenticatedFetch) {
+      console.error('[handleFileUpload] authenticatedFetch not available');
+      attachment.error = 'Upload service unavailable';
+      onAddFile?.(attachment);
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    if (selectedProject) {
+      formData.append('project', selectedProject.name);
+    }
+
+    try {
+      attachment.uploadProgress = 0;
+      // Only add file once on initial upload
+      onAddFile?.(attachment);
+
+      const response = await authenticatedFetch('/api/files/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[handleFileUpload] Upload failed:', response.status, errorText);
+        throw new Error(`Upload failed: ${response.status} ${errorText}`);
+      }
+
+      const data = await response.json();
+      attachment.path = data.data?.path;
+      attachment.uploadProgress = 100;
+      // Update the existing file instead of adding a duplicate
+      onAddFile?.(attachment);
+    } catch (error) {
+      console.error('[handleFileUpload] File upload error:', error);
+      attachment.error = error instanceof Error ? error.message : 'Upload failed';
+      // Update the existing file with error state
+      onAddFile?.(attachment);
+    }
+  }, [authenticatedFetch, selectedProject, onAddFile]);
+
+  /**
    * Handle file drop
    */
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -194,12 +240,14 @@ export function ChatInput({
       }
 
       const attachment: FileAttachment = {
+        id: `${file.name}-${Date.now()}`, // Generate unique ID
         name: file.name,
         size: file.size,
         type: file.type,
       };
 
       if (file.type.startsWith('image/')) {
+        // For images, store as base64 data URL
         const reader = new FileReader();
         reader.onload = (e) => {
           attachment.data = e.target?.result as string;
@@ -207,10 +255,11 @@ export function ChatInput({
         };
         reader.readAsDataURL(file);
       } else {
-        onAddFile?.(attachment);
+        // For documents, upload to server and store path
+        handleFileUpload(file, attachment);
       }
     });
-  }, [maxFileSize, onAddFile]);
+  }, [maxFileSize, onAddFile, handleFileUpload]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -218,14 +267,21 @@ export function ChatInput({
     noKeyboard: true,
     accept: {
       'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp'],
+      'application/pdf': ['.pdf'],
+      'application/msword': ['.doc'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'text/markdown': ['.md'],
+      'text/plain': ['.txt'],
+      'application/json': ['.json'],
+      'text/csv': ['.csv'],
     },
   });
 
   /**
    * Handle remove file
    */
-  const handleRemoveFile = useCallback((fileName: string) => {
-    onRemoveFile?.(fileName);
+  const handleRemoveFile = useCallback((fileId: string) => {
+    onRemoveFile?.(fileId);
   }, [onRemoveFile]);
 
   // Use menu position hook for command menu
@@ -245,7 +301,7 @@ export function ChatInput({
   const canSend = value.trim().length > 0 && !isLoading && !disabled;
 
   return (
-    <div className="relative">
+    <div className="relative" data-tour="chat-input">
       {/* File attachments preview - use modular component */}
       {files.length > 0 && (
         <FileAttachmentsPreview
@@ -315,24 +371,35 @@ export function ChatInput({
         <label className="flex-shrink-0 p-2 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors cursor-pointer">
           <input
             type="file"
-            accept="image/*"
+            accept=".docx,.pdf,.md,.txt,.js,.ts,.jsx,.tsx,.json,.csv,image/*"
             multiple
             onChange={(e) => {
               const files = Array.from(e.target.files || []);
               files.forEach(file => {
                 if (file.size <= maxFileSize) {
-                  const reader = new FileReader();
-                  reader.onload = (ev) => {
-                    onAddFile?.({
-                      name: file.name,
-                      size: file.size,
-                      type: file.type,
-                      data: ev.target?.result as string,
-                    });
+                  const attachment: FileAttachment = {
+                    id: `${file.name}-${Date.now()}`, // Generate unique ID
+                    name: file.name,
+                    size: file.size,
+                    type: file.type,
                   };
-                  reader.readAsDataURL(file);
+
+                  if (file.type.startsWith('image/')) {
+                    // For images, store as base64
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                      attachment.data = ev.target?.result as string;
+                      onAddFile?.(attachment);
+                    };
+                    reader.readAsDataURL(file);
+                  } else {
+                    // For documents, upload to server
+                    handleFileUpload(file, attachment);
+                  }
                 }
               });
+              // Reset input so same file can be selected again
+              e.target.value = '';
             }}
             className="hidden"
           />

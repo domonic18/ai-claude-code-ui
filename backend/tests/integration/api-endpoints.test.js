@@ -183,10 +183,12 @@ async function testHealthCheck() {
 async function testMultiUserRegistration() {
     console.log('Test Group: Multi-User Registration');
 
+    // 使用时间戳生成唯一用户名，避免冲突
+    const timestamp = Date.now();
     const testUsers = [
-        { username: 'testuser1', password: 'password123' },
-        { username: 'testuser2', password: 'password456' },
-        { username: 'testuser3', password: 'password789' }
+        { username: `testuser1_${timestamp}`, password: 'password123' },
+        { username: `testuser2_${timestamp}`, password: 'password456' },
+        { username: `testuser3_${timestamp}`, password: 'password789' }
     ];
 
     // 注册多个测试用户

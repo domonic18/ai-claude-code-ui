@@ -25,3 +25,6 @@ export type { ClaudeStatusProps, ClaudeStatusData } from './ClaudeStatus';
 
 export { default as TokenUsagePie } from './TokenUsagePie';
 export type { TokenUsagePieProps } from './TokenUsagePie';
+
+export { ConfirmDialog } from './ConfirmDialog';
+export type { ConfirmDialogProps, DialogType } from './ConfirmDialog';

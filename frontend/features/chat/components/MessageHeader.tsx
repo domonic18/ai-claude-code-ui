@@ -5,6 +5,7 @@
  */
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { ClaudeLogo, CursorLogo, CodexLogo } from '@/shared/assets/icons';
 import { getAvatarBackgroundClass, getAvatarContent } from '../utils/messageRenderUtils';
 
@@ -28,12 +29,23 @@ export function MessageHeader({
   isGrouped,
   onShowSettings,
 }: MessageHeaderProps) {
+  const { t, i18n } = useTranslation();
+
   // If grouped, don't show header
   if (isGrouped) return null;
 
   const avatarBg = getAvatarBackgroundClass(type);
   const avatarContent = getAvatarContent(type);
-  const displayLabel = displayName || (type === 'tool' ? 'Tool' : type === 'error' ? 'Error' : 'Claude');
+
+  // Use Chinese name for Claude when in Chinese locale
+  const getClaudeDisplayName = () => {
+    if (type === 'assistant' && provider === 'claude') {
+      return i18n.language === 'zh' ? t('agent.claudeChinese') : t('agent.claude');
+    }
+    return t('agent.claude');
+  };
+
+  const displayLabel = displayName || (type === 'tool' ? t('chat.tool') : type === 'error' ? t('chat.error') : getClaudeDisplayName());
 
   return (
     <div className="flex items-center space-x-3 mb-2">

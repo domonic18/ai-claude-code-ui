@@ -21,9 +21,8 @@ import { McpServer } from './repositories/McpServer.repository.js';
 
 /**
  * 初始化数据库
- * @returns {Promise<void>}
  */
-export async function initializeDatabase() {
+export function initializeDatabase() {
     if (isDatabaseInitialized()) {
         return;
     }

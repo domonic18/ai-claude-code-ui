@@ -433,17 +433,15 @@ export function useProjectManager(
         if (nextSessionToSelect && targetProject) {
           const sessionToSelect = nextSessionToSelect as any;
           const provider = (targetProject as any).sessions?.some((s: any) => s.id === sessionToSelect.id) ? 'claude' :
-                          (targetProject as any).cursorSessions?.some((s: any) => s.id === sessionToSelect.id) ? 'cursor' : 'codex';
-          setTimeout(() => {
-            handleSessionSelect({
-              ...sessionToSelect,
-              __projectName: (targetProject as any).name,
-              __provider: provider
-            }, (targetProject as any).name);
-          }, 0);
+                            (targetProject as any).cursorSessions?.some((s: any) => s.id === sessionToSelect.id) ? 'cursor' : 'codex';
+          // 直接调用 handleSessionSelect，不使用 setTimeout
+          handleSessionSelect({
+            ...sessionToSelect,
+            __projectName: (targetProject as any).name,
+            __provider: provider
+          }, (targetProject as any).name);
         } else {
           setSelectedSession(null);
-          // Clear localStorage since no session is selected
           localStorage.removeItem('lastSessionId');
           localStorage.removeItem('lastProjectName');
         }
