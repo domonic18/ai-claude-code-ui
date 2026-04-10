@@ -12,20 +12,97 @@ import type { ChatMessage } from '../types';
 import { MAX_STORED_MESSAGES, MIN_STORED_MESSAGES } from '../constants';
 
 /**
+ * 从 ChatMessage 中剥离大体积数据（如 base64 图片），防止 localStorage 溢出
+ * 仅在持久化时使用，不影响运行时状态
+ */
+function stripLargeDataForStorage(msgs: ChatMessage[]): ChatMessage[] {
+  return msgs.map(msg => {
+    // toolResult 类型为 string | { content: string; ... }
+    // 仅处理对象格式的 toolResult（含 .content 属性）
+    if (msg.toolResult && typeof msg.toolResult === 'object' && msg.toolResult.content) {
+      const content = msg.toolResult.content;
+      if (typeof content === 'string') {
+        // 检测 base64 图片数据（data:image/...;base64,...）
+        const base64Pattern = /data:image\/[a-zA-Z+]+;base64,[A-Za-z0-9+/=]{100,}/g;
+        if (base64Pattern.test(content)) {
+          return {
+            ...msg,
+            toolResult: {
+              content: content.replace(base64Pattern, (match) => {
+                const mimeMatch = match.match(/data:(image\/[a-zA-Z+]+)/);
+                const mediaType = mimeMatch ? mimeMatch[1] : 'image/*';
+                const sizeKB = Math.round(match.length / 1024);
+                return `[图片: ${mediaType}, ${sizeKB}KB - 已省略]`;
+              }),
+              isError: msg.toolResult.isError,
+              toolUseResult: msg.toolResult.toolUseResult
+            }
+          };
+        }
+      } else if (typeof content === 'object' && content !== null) {
+        // 处理对象/数组格式的 content
+        try {
+          const stringified = JSON.stringify(content);
+          if (stringified.length > 100 * 1024) {
+            // 超过 100KB 的对象内容，替换为摘要
+            return {
+              ...msg,
+              toolResult: {
+                content: `[工具结果内容过大（${(stringified.length / 1024).toFixed(0)}KB），已省略]`,
+                isError: msg.toolResult.isError,
+                toolUseResult: msg.toolResult.toolUseResult
+              }
+            };
+          }
+        } catch {
+          // stringify 失败则忽略
+        }
+      }
+    }
+
+    // 处理 string 格式的 toolResult（可能直接包含 base64 数据）
+    if (typeof msg.toolResult === 'string') {
+      const base64Pattern = /data:image\/[a-zA-Z+]+;base64,[A-Za-z0-9+/=]{100,}/g;
+      if (base64Pattern.test(msg.toolResult)) {
+        return {
+          ...msg,
+          toolResult: msg.toolResult.replace(base64Pattern, (match) => {
+            const mimeMatch = match.match(/data:(image\/[a-zA-Z+]+)/);
+            const mediaType = mimeMatch ? mimeMatch[1] : 'image/*';
+            const sizeKB = Math.round(match.length / 1024);
+            return `[图片: ${mediaType}, ${sizeKB}KB - 已省略]`;
+          })
+        };
+      }
+    }
+
+    return msg;
+  });
+}
+
+/**
  * Safe localStorage utility to handle quota exceeded errors
  */
 const safeLocalStorage = {
   setItem: (key: string, value: string) => {
     try {
-      // For chat messages, implement size limits
+      // For chat messages, implement size limits and strip large data
       if (key.startsWith('chat_messages_') && typeof value === 'string') {
         try {
           const parsed = JSON.parse(value);
-          // Limit to last MAX_STORED_MESSAGES to prevent storage bloat
-          if (Array.isArray(parsed) && parsed.length > MAX_STORED_MESSAGES) {
-            console.warn(`Truncating chat history for ${key} from ${parsed.length} to ${MAX_STORED_MESSAGES} messages`);
-            const truncated = parsed.slice(-MAX_STORED_MESSAGES);
-            value = JSON.stringify(truncated);
+          if (Array.isArray(parsed)) {
+            // 先剥离大体积数据
+            const stripped = stripLargeDataForStorage(parsed);
+            let serialized = JSON.stringify(stripped);
+
+            // 如果仍然过大，截断消息数量
+            if (serialized.length > MAX_STORED_MESSAGES * 10 * 1024 && stripped.length > MAX_STORED_MESSAGES) {
+              console.warn(`Truncating chat history for ${key} from ${stripped.length} to ${MAX_STORED_MESSAGES} messages`);
+              const truncated = stripped.slice(-MAX_STORED_MESSAGES);
+              serialized = JSON.stringify(truncated);
+            }
+
+            value = serialized;
           }
         } catch (parseError) {
           console.warn('Could not parse chat messages for truncation:', parseError);
@@ -64,8 +141,8 @@ const safeLocalStorage = {
             try {
               const parsed = JSON.parse(value);
               if (Array.isArray(parsed) && parsed.length > MIN_STORED_MESSAGES) {
-                const minimal = parsed.slice(-MIN_STORED_MESSAGES);
-                localStorage.setItem(key, JSON.stringify(minimal));
+                const stripped = stripLargeDataForStorage(parsed.slice(-MIN_STORED_MESSAGES));
+                localStorage.setItem(key, JSON.stringify(stripped));
                 console.warn(`Saved only last ${MIN_STORED_MESSAGES} messages due to quota constraints`);
               }
             } catch (finalError) {

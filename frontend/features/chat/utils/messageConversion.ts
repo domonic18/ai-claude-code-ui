@@ -70,6 +70,53 @@ interface ToolResultData {
 }
 
 /**
+ * 剥离工具结果中的 base64 图片数据
+ *
+ * 当 tool_result 的 content 是数组且包含 base64 图片时，
+ * 将图片替换为文本占位标记，防止 localStorage 溢出。
+ *
+ * @param content - tool_result 的原始 content
+ * @returns 处理后的 content（base64 图片替换为文本标记）
+ */
+function stripBase64FromToolResultContent(content: any): any {
+  // 处理数组格式的 content（包含 image 对象）
+  if (Array.isArray(content)) {
+    const hasImageData = content.some(
+      (item: any) => item.type === 'image' && item.source?.type === 'base64' && item.source?.data
+    );
+    if (hasImageData) {
+      return content.map((item: any) => {
+        if (item.type === 'image' && item.source?.type === 'base64' && item.source?.data) {
+          const mediaType = item.source.media_type || 'image/png';
+          const dataLength = item.source.data.length;
+          return {
+            type: 'text',
+            text: `[图片: ${mediaType}, ${(dataLength / 1024).toFixed(0)}KB - 历史加载时已省略]`
+          };
+        }
+        return item;
+      });
+    }
+  }
+
+  // 处理字符串格式中可能内嵌的 base64 图片数据
+  if (typeof content === 'string') {
+    // 检测是否包含 base64 图片数据（data:image/...;base64,... 格式）
+    const base64ImagePattern = /data:image\/[a-zA-Z+]+;base64,[A-Za-z0-9+/=]{100,}/g;
+    if (base64ImagePattern.test(content)) {
+      return content.replace(base64ImagePattern, (match) => {
+        const mimeMatch = match.match(/data:(image\/[a-zA-Z+]+)/);
+        const mediaType = mimeMatch ? mimeMatch[1] : 'image/*';
+        const sizeKB = Math.round(match.length / 1024);
+        return `[图片: ${mediaType}, ${sizeKB}KB - 历史加载时已省略]`;
+      });
+    }
+  }
+
+  return content;
+}
+
+/**
  * Convert raw session messages from API to ChatMessage format
  *
  * This function implements a two-pass conversion strategy:
@@ -83,13 +130,13 @@ export function convertSessionMessages(rawMessages: any[]): ChatMessage[] {
   const converted: ChatMessage[] = [];
   const toolResults = new Map<string, ToolResultData>();
 
-  // First pass: collect all tool results
+  // First pass: collect all tool results (strip base64 images to prevent localStorage overflow)
   for (const msg of rawMessages) {
     if (msg.message?.role === 'user' && Array.isArray(msg.message?.content)) {
       for (const part of msg.message.content) {
         if (part.type === 'tool_result') {
           toolResults.set(part.tool_use_id, {
-            content: part.content,
+            content: stripBase64FromToolResultContent(part.content),
             isError: part.is_error || false,
             timestamp: new Date(msg.timestamp || Date.now()),
             toolUseResult: msg.toolUseResult || null

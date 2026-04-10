@@ -15,6 +15,75 @@ import { CONTAINER } from '../../../config/config.js';
 import { filterMemoryContext } from '../../../utils/memoryUtils.js';
 
 /**
+ * 从消息条目中剥离 base64 图片数据
+ *
+ * 当 AI 使用 Read 工具读取图片时，SDK 会将完整的 base64 图片数据写入 JSONL 文件。
+ * 这些数据体积巨大（单张图片可达数百 KB ~ 数 MB），会导致：
+ * 1. API 响应体过大，传输超时或解析失败
+ * 2. 前端 localStorage 溢出，触发消息截断导致内容丢失
+ *
+ * 此函数将 tool_result 中的 base64 图片替换为占位标记，仅保留文本内容。
+ *
+ * @param {object} entry - 消息条目
+ * @returns {object} 处理后的条目（不修改原始对象）
+ */
+function stripBase64ImagesFromEntry(entry) {
+  if (!entry?.message?.content) {
+    return entry;
+  }
+
+  const message = entry.message;
+  const content = message.content;
+
+  // 处理数组格式的 content（标准 SDK 格式）
+  if (Array.isArray(content)) {
+    let needsStripping = false;
+
+    const strippedContent = content.map(part => {
+      // 处理 user 消息中的 tool_result（包含 Read 工具读取的图片结果）
+      if (part.type === 'tool_result' && Array.isArray(part.content)) {
+        const hasImageData = part.content.some(
+          item => item.type === 'image' && item.source?.type === 'base64' && item.source?.data
+        );
+        if (hasImageData) {
+          needsStripping = true;
+          const filteredContent = part.content.map(item => {
+            if (item.type === 'image' && item.source?.type === 'base64' && item.source?.data) {
+              // 保留 media_type 信息，用占位标记替换 base64 数据
+              const mediaType = item.source.media_type || 'image/png';
+              const dataLength = item.source.data.length;
+              return {
+                type: 'text',
+                text: `[图片: ${mediaType}, ${(dataLength / 1024).toFixed(0)}KB - 历史加载时已省略]`
+              };
+            }
+            return item;
+          });
+          return { ...part, content: filteredContent };
+        }
+      }
+      return part;
+    });
+
+    if (needsStripping) {
+      return {
+        ...entry,
+        message: {
+          ...message,
+          content: strippedContent
+        }
+      };
+    }
+  }
+
+  // 处理 user 消息中直接包含的图片引用（用户上传的图片在 .tmp/images/ 路径下）
+  // 这些是通过 Read 工具返回的，content 是字符串形式，不含 base64
+  // 无需处理
+
+  return entry;
+}
+
+/**
  * 编码项目名称为容器内存储格式
  *
  * SDK 在容器内基于工作区路径进行编码：
@@ -582,8 +651,11 @@ async function getSessionMessagesInContainer(userId, projectName, sessionId, lim
       return timeA - timeB;
     });
 
-    // 过滤所有用户消息中的记忆上下文
-    const filteredMessages = messages.map(filterMemoryContextFromEntry);
+    // 第一步：剥离 base64 图片数据（防止大数据导致前端 localStorage 溢出）
+    const strippedMessages = messages.map(stripBase64ImagesFromEntry);
+
+    // 第二步：过滤用户消息中的记忆上下文
+    const filteredMessages = strippedMessages.map(filterMemoryContextFromEntry);
 
     // 处理分页
     const total = filteredMessages.length;

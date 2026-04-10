@@ -64,8 +64,11 @@ async function filterSDKOptions(options, userId) {
   delete sdkOptions.images;     // 图片数据在 DockerExecutor 中处理
   delete sdkOptions.imagePaths; // 图片路径在脚本中单独处理
 
+  // 跟踪是否使用了默认工具列表（必须在设置默认值之前判断）
+  const usingDefaultTools = !sdkOptions.allowedTools || sdkOptions.allowedTools.length === 0;
+
   // 设置默认工具，如果最终没有配置任何工具
-  if (!sdkOptions.allowedTools || sdkOptions.allowedTools.length === 0) {
+  if (usingDefaultTools) {
     sdkOptions.allowedTools = [
       // Git 相关命令
       'Bash(git log:*)',
@@ -152,9 +155,6 @@ async function filterSDKOptions(options, userId) {
     ? sdkOptions.disallowedTools.filter(tool => !interactivePlanningTools.includes(tool))
     : [];
   const hasUserDisallowedTools = userDisallowedTools.length > 0;
-
-  // 跟踪是否使用了默认工具列表
-  const usingDefaultTools = !sdkOptions.allowedTools || sdkOptions.allowedTools.length === 0;
 
   // 如果前端明确传入了 permissionMode，使用前端传入的值
   if (sdkOptions.permissionMode) {
