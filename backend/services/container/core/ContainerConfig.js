@@ -199,9 +199,21 @@ export class ContainerConfigBuilder {
    * @param {object} options.env - 环境变量
    * @returns {object} 执行配置
    */
+  /**
+   * 构建容器执行配置
+   * @param {string|Array} command - 命令字符串（通过 sh -c 执行）或数组（直接执行，不经过 shell）
+   * @param {object} options - 执行选项
+   * @returns {object} 执行配置
+   */
   buildExecConfig(command, options = {}) {
+    // 数组格式直接传递给容器，不经过 shell 解释，避免命令注入风险
+    // 字符串格式保持向后兼容，通过 sh -c 执行
+    const cmd = Array.isArray(command)
+      ? command
+      : ['/bin/sh', '-c', command];
+
     return {
-      Cmd: ['/bin/sh', '-c', command],
+      Cmd: cmd,
       AttachStdout: true,
       AttachStderr: true,
       AttachStdin: !!options.stdin,

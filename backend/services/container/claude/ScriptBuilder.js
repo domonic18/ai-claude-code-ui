@@ -6,6 +6,7 @@
 
 import { UserSettingsService } from '../../settings/UserSettingsService.js';
 import { loadAgentsForSDK } from '../../../services/extensions/extension-sync.js';
+import { randomUUID } from 'crypto';
 
 /**
  * 过滤 SDK 选项，移除不需要传给 SDK 的字段
@@ -233,20 +234,25 @@ export async function buildSDKScript(command, options, userId) {
   // 过滤并处理 options（现在是异步的）
   const sdkOptions = await filterSDKOptions(options, userId);
 
-  // 使用 base64 编码来避免转义问题（包括 options 和 command）
-  const optionsJson = JSON.stringify(sdkOptions);
-  const optionsBase64 = Buffer.from(optionsJson).toString('base64');
-
-  // 调试：在编码前打印 options
+  // 调试：打印 options 摘要
   console.log('[ScriptBuilder] Original sdkOptions.model:', sdkOptions.model);
-  console.log('[ScriptBuilder] optionsJson:', optionsJson);
+  const optionsJsonLength = JSON.stringify(sdkOptions).length;
+  console.log(`[ScriptBuilder] optionsJson size: ${optionsJsonLength} bytes`);
 
-  // 对命令也使用 base64 编码，避免特殊字符问题
+  // 使用 base64 编码来避免转义问题
+  const optionsBase64 = Buffer.from(JSON.stringify(sdkOptions)).toString('base64');
   const commandBase64 = Buffer.from(command, 'utf-8').toString('base64');
 
-  // 生成脚本模板
-  return `cd /app && node --input-type=module -e '
-import { query } from "@anthropic-ai/claude-agent-sdk";
+  // 生成唯一的临时文件名，使用 crypto.randomUUID() 保证唯一性和不可预测性
+  const tmpId = randomUUID();
+  const tmpOptionsFile = `/tmp/sdk_opts_${tmpId}.b64`;
+  const tmpScriptFile = `/tmp/sdk_exec_${tmpId}.mjs`;
+
+  // 生成脚本内容（不包含 base64 数据，从文件读取）
+  // 注意：使用 /app/node_modules 绝对路径导入 SDK，因为脚本文件在 /tmp/ 下，
+  // ESM 模块解析基于脚本文件所在目录而非 cwd，无法通过裸模块名找到 SDK
+  const scriptContent = `import { query } from "/app/node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs";
+import { readFileSync, unlinkSync } from "fs";
 
 async function execute() {
   try {
@@ -256,9 +262,10 @@ async function execute() {
     console.error("[SDK] - ANTHROPIC_BASE_URL:", process.env.ANTHROPIC_BASE_URL || "NOT SET (will use default)");
     console.error("[SDK] - ANTHROPIC_MODEL:", process.env.ANTHROPIC_MODEL || "NOT SET (will use default)");
 
-    // 从 base64 解码 options
-    const optionsJson = Buffer.from("${optionsBase64}", "base64").toString("utf-8");
-    console.error("[SDK] Decoded options JSON:", optionsJson);
+    // 从临时文件读取并解码 options（避免命令行参数过长）
+    const optionsB64 = readFileSync("${tmpOptionsFile}", "utf-8").trim();
+    const optionsJson = Buffer.from(optionsB64, "base64").toString("utf-8");
+    console.error("[SDK] Decoded options JSON length:", optionsJson.length);
     const options = JSON.parse(optionsJson);
 
     // 从 base64 解码命令
@@ -274,12 +281,10 @@ async function execute() {
       command = command + imageNote;
     }
 
-    console.error("[SDK] Options:", JSON.stringify(options, null, 2));
+    console.error("[SDK] Options model:", options.model);
     console.error("[SDK] Command:", command);
 
     // 切换到项目目录，确保工具在正确的位置执行
-    // 注意：不修改 HOME 环境变量，确保记忆文件和配置文件位置一致
-    // SDK 会从 CLAUDE.md 中读取记忆文件路径 (.claude/memory/MEMORY.md)
     if (options.cwd) {
       const projectDir = options.cwd;
       console.error("[SDK] Changing CWD to:", projectDir);
@@ -322,6 +327,10 @@ async function execute() {
       sessionId: "${sessionId}"
     }));
 
+    // 清理临时文件
+    try { unlinkSync("${tmpOptionsFile}"); } catch {}
+    try { unlinkSync("${tmpScriptFile}"); } catch {}
+
   } catch (error) {
     console.error("[SDK] Error occurred:", error.message);
     console.error("[SDK] Stack:", error.stack);
@@ -330,11 +339,23 @@ async function execute() {
       error: error.message,
       stack: error.stack
     }));
+    // 清理临时文件
+    try { unlinkSync("${tmpOptionsFile}"); } catch {}
+    try { unlinkSync("${tmpScriptFile}"); } catch {}
     process.exit(1);
   }
 }
 
 execute();
-'`;
+`;
+
+  // 返回执行所需的信息：脚本内容、options base64 数据、临时文件路径
+  // DockerExecutor 负责将文件写入容器并执行
+  return {
+    scriptContent,
+    optionsBase64,
+    tmpOptionsFile,
+    tmpScriptFile
+  };
 }
 
