@@ -277,12 +277,10 @@ export async function executeInContainer(userId, command, options, writer, sessi
     await writeFileToContainer(container, sdkScriptInfo.tmpScriptFile, sdkScriptInfo.scriptContent);
     console.log('[DockerExecutor] Script files written to container:', sdkScriptInfo.tmpScriptFile);
 
-    // 在容器中执行脚本文件
-    // tmpScriptFile 路径由内部生成（/tmp/sdk_exec_<uuid>.mjs），不含用户输入，无注入风险
-    // cwd 设为 /app 确保 SDK 的相对路径导入可以正常解析
+    // 在容器中执行脚本文件（使用数组格式 Cmd，不经过 shell 解释，无注入风险）
     const { stream, exec } = await containerManager.execInContainer(
       userId,
-      `node ${sdkScriptInfo.tmpScriptFile}`,
+      ['node', sdkScriptInfo.tmpScriptFile],
       {
         cwd: '/app',
         tty: false,
