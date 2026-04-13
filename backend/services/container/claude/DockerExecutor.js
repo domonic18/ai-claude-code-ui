@@ -158,7 +158,9 @@ async function copyImagesToContainer(container, images, cwd) {
  * @returns {Promise<void>}
  */
 async function writeFileToContainer(container, containerFilePath, content) {
-  const tmpDir = path.join(process.cwd(), '.tmp', 'sdk_files', Date.now().toString());
+  // 使用 crypto.randomUUID() 保证唯一性，避免并发冲突
+  const { randomUUID } = await import('crypto');
+  const tmpDir = path.join(process.cwd(), '.tmp', 'sdk_files', randomUUID());
   await fs.mkdir(tmpDir, { recursive: true });
 
   try {
@@ -178,7 +180,7 @@ async function writeFileToContainer(container, containerFilePath, content) {
     // 读取 tar 文件
     const tarBuffer = await fs.readFile(tarPath);
 
-    // 确保目标目录存在
+    // 确保目标目录存在（使用数组格式的 Cmd 避免命令注入风险）
     const targetDir = path.dirname(containerFilePath);
     const mkdirExec = await container.exec({
       Cmd: ['mkdir', '-p', targetDir],
@@ -186,15 +188,21 @@ async function writeFileToContainer(container, containerFilePath, content) {
       AttachStderr: true
     });
 
+    // 等待 mkdir 完成：使用 settled 标志避免 resolve/reject 被多次调用
     await new Promise((resolve, reject) => {
+      let settled = false;
+      const safeResolve = () => { if (!settled) { settled = true; resolve(); } };
+      const safeReject = (err) => { if (!settled) { settled = true; reject(err); } };
+
       mkdirExec.start({ Detach: false }, (err, stream) => {
-        if (err) { reject(err); return; }
+        if (err) { safeReject(err); return; }
         if (stream) {
-          stream.on('close', resolve);
-          stream.on('error', reject);
-          setTimeout(resolve, 1000);
+          stream.on('close', safeResolve);
+          stream.on('error', safeReject);
+          // 超时保护：如果 stream 事件未触发，5 秒后继续
+          setTimeout(safeResolve, 5000);
         } else {
-          resolve();
+          safeResolve();
         }
       });
     });
@@ -269,14 +277,15 @@ export async function executeInContainer(userId, command, options, writer, sessi
     await writeFileToContainer(container, sdkScriptInfo.tmpScriptFile, sdkScriptInfo.scriptContent);
     console.log('[DockerExecutor] Script files written to container:', sdkScriptInfo.tmpScriptFile);
 
-    // 在容器中执行脚本文件（而非 node -e '...' 内联脚本，避免命令行长度限制）
-    const execCommand = `cd /app && node ${sdkScriptInfo.tmpScriptFile}`;
+    // 在容器中执行脚本文件
+    // tmpScriptFile 路径由内部生成（/tmp/sdk_exec_<uuid>.mjs），不含用户输入，无注入风险
+    // cwd 设为 /app 确保 SDK 的相对路径导入可以正常解析
     const { stream, exec } = await containerManager.execInContainer(
       userId,
-      execCommand,
+      `node ${sdkScriptInfo.tmpScriptFile}`,
       {
-        cwd: options.cwd || '/workspace',
-        tty: false,  // 不使用 TTY，以便可以分离 stdout 和 stderr
+        cwd: '/app',
+        tty: false,
         env: {
           NODE_PATH: '/app/node_modules',
           HOME: '/workspace',

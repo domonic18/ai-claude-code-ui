@@ -6,6 +6,7 @@
 
 import { UserSettingsService } from '../../settings/UserSettingsService.js';
 import { loadAgentsForSDK } from '../../../services/extensions/extension-sync.js';
+import { randomUUID } from 'crypto';
 
 /**
  * 过滤 SDK 选项，移除不需要传给 SDK 的字段
@@ -242,8 +243,8 @@ export async function buildSDKScript(command, options, userId) {
   const optionsBase64 = Buffer.from(JSON.stringify(sdkOptions)).toString('base64');
   const commandBase64 = Buffer.from(command, 'utf-8').toString('base64');
 
-  // 生成唯一的临时文件名，避免并发冲突
-  const tmpId = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+  // 生成唯一的临时文件名，使用 crypto.randomUUID() 保证唯一性和不可预测性
+  const tmpId = randomUUID();
   const tmpOptionsFile = `/tmp/sdk_opts_${tmpId}.b64`;
   const tmpScriptFile = `/tmp/sdk_exec_${tmpId}.mjs`;
 
