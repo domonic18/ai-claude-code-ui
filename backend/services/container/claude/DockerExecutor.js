@@ -149,6 +149,83 @@ async function copyImagesToContainer(container, images, cwd) {
 }
 
 /**
+ * 将文件内容写入容器内的指定路径
+ * 使用 Docker putArchive API 传输文件，完全绕过命令行参数长度限制
+ *
+ * @param {object} container - Docker 容器实例
+ * @param {string} containerFilePath - 容器内的目标文件路径（如 /tmp/sdk_opts_xxx.b64）
+ * @param {string} content - 要写入的文件内容
+ * @returns {Promise<void>}
+ */
+async function writeFileToContainer(container, containerFilePath, content) {
+  // 使用 crypto.randomUUID() 保证唯一性，避免并发冲突
+  const { randomUUID } = await import('crypto');
+  const tmpDir = path.join(process.cwd(), '.tmp', 'sdk_files', randomUUID());
+  await fs.mkdir(tmpDir, { recursive: true });
+
+  try {
+    // 写入本地临时文件
+    const filename = path.basename(containerFilePath);
+    const localFilePath = path.join(tmpDir, filename);
+    await fs.writeFile(localFilePath, content);
+
+    // 创建 tar 文件
+    const tarPath = path.join(tmpDir, 'payload.tar');
+    await tar.c({
+      file: tarPath,
+      cwd: tmpDir,
+      gzip: false
+    }, [filename]);
+
+    // 读取 tar 文件
+    const tarBuffer = await fs.readFile(tarPath);
+
+    // 确保目标目录存在（使用数组格式的 Cmd 避免命令注入风险）
+    const targetDir = path.dirname(containerFilePath);
+    const mkdirExec = await container.exec({
+      Cmd: ['mkdir', '-p', targetDir],
+      AttachStdout: true,
+      AttachStderr: true
+    });
+
+    // 等待 mkdir 完成
+    await new Promise((resolve, reject) => {
+      let settled = false;
+      const safeResolve = () => { if (!settled) { settled = true; resolve(); } };
+      const safeReject = (err) => { if (!settled) { settled = true; reject(err); } };
+
+      mkdirExec.start({ Detach: false }, (err, stream) => {
+        if (err) { safeReject(err); return; }
+        if (stream) {
+          stream.on('close', safeResolve);
+          stream.on('error', safeReject);
+        } else {
+          safeResolve();
+        }
+      });
+    });
+
+    // 上传 tar 到容器
+    await new Promise((resolve, reject) => {
+      container.putArchive(tarBuffer, { path: targetDir }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    console.log(`[DockerExecutor] File written to container: (${content.length} bytes)`);
+
+  } finally {
+    // 清理本地临时文件
+    try {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    } catch (e) {
+      // 忽略清理错误
+    }
+  }
+}
+
+/**
  * 在容器内执行 SDK 脚本
  * @param {string} userId - 用户 ID
  * @param {string} command - 用户命令
@@ -183,7 +260,7 @@ export async function executeInContainer(userId, command, options, writer, sessi
     }
 
     // 构建 SDK 脚本（传递图片路径而非数据）
-    const sdkScript = await buildSDKScript(command, { ...options, imagePaths }, userId);
+    const sdkScriptInfo = await buildSDKScript(command, { ...options, imagePaths }, userId);
 
     // 验证必需的环境变量
     const authToken = process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY;
@@ -191,13 +268,20 @@ export async function executeInContainer(userId, command, options, writer, sessi
       throw new Error('ANTHROPIC_AUTH_TOKEN or ANTHROPIC_API_KEY must be set in environment or .env file');
     }
 
-    // 在容器中执行
+    // 将 options base64 数据和脚本文件写入容器
+    // 使用 Docker putArchive API 写入文件，完全绕过命令行长度限制
+    // 当 agents prompt 较大时，optionsJson 可能超过 95KB，命令行无法承载
+    await writeFileToContainer(container, sdkScriptInfo.tmpOptionsFile, sdkScriptInfo.optionsBase64);
+    await writeFileToContainer(container, sdkScriptInfo.tmpScriptFile, sdkScriptInfo.scriptContent);
+    console.log('[DockerExecutor] Script files written to container:', sdkScriptInfo.tmpScriptFile);
+
+    // 在容器中执行脚本文件（使用数组格式 Cmd，不经过 shell 解释，无注入风险）
     const { stream, exec } = await containerManager.execInContainer(
       userId,
-      sdkScript,
+      ['node', sdkScriptInfo.tmpScriptFile],
       {
-        cwd: options.cwd || '/workspace',
-        tty: false,  // 不使用 TTY，以便可以分离 stdout 和 stderr
+        cwd: '/app',
+        tty: false,
         env: {
           NODE_PATH: '/app/node_modules',
           HOME: '/workspace',
