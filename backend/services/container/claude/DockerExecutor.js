@@ -215,7 +215,7 @@ async function writeFileToContainer(container, containerFilePath, content) {
       });
     });
 
-    console.log(`[DockerExecutor] File written to container: ${containerFilePath} (${content.length} bytes)`);
+    console.log(`[DockerExecutor] File written to container: (${content.length} bytes)`);
 
   } finally {
     // 清理本地临时文件
