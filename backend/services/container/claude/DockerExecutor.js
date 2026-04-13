@@ -188,7 +188,7 @@ async function writeFileToContainer(container, containerFilePath, content) {
       AttachStderr: true
     });
 
-    // 等待 mkdir 完成：使用 settled 标志避免 resolve/reject 被多次调用
+    // 等待 mkdir 完成
     await new Promise((resolve, reject) => {
       let settled = false;
       const safeResolve = () => { if (!settled) { settled = true; resolve(); } };
@@ -199,8 +199,6 @@ async function writeFileToContainer(container, containerFilePath, content) {
         if (stream) {
           stream.on('close', safeResolve);
           stream.on('error', safeReject);
-          // 超时保护：如果 stream 事件未触发，5 秒后继续
-          setTimeout(safeResolve, 5000);
         } else {
           safeResolve();
         }
