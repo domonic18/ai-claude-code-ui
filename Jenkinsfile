@@ -131,6 +131,8 @@ pipeline {
             steps {
                 echo '--- CI: 运行测试 ---'
                 sh '''
+                    # 从 workspace 外复制环境配置（避免被 CleanBeforeCheckout 清除）
+                    cp /Users/zhugedongming/Code/patent/.env.deploy .env.deploy 2>/dev/null || true
                     npm run test:imports
                     npm run test:database
                     npm run test:user-settings-mcp
