@@ -140,34 +140,58 @@ pipeline {
         stage('CD: Deploy') {
             steps {
                 echo "--- CD: 部署 (version: ${VERSION}) ---"
+                // 校验参数安全性，防止路径遍历和命令注入
+                sh """
+                    # 校验 DEPLOY_DIR：必须是绝对路径且不包含路径遍历字符
+                    case "${params.DEPLOY_DIR}" in
+                        ..*|*..*|*./*|*\\\\*|*['\\"\\\`\\\$\;]*)
+                            echo "ERROR: DEPLOY_DIR 包含非法字符: ${params.DEPLOY_DIR}"
+                            exit 1
+                            ;;
+                    esac
+                    if [ -z "${params.DEPLOY_DIR}" ]; then
+                        echo "ERROR: DEPLOY_DIR 不能为空"
+                        exit 1
+                    fi
+
+                    # 校验 HEALTH_PORT：必须为纯数字且在合法端口范围内
+                    if ! echo "${params.HEALTH_PORT}" | grep -qE '^[0-9]+$'; then
+                        echo "ERROR: HEALTH_PORT 必须为数字: ${params.HEALTH_PORT}"
+                        exit 1
+                    fi
+                    if [ "${params.HEALTH_PORT}" -lt 1 ] || [ "${params.HEALTH_PORT}" -gt 65535 ]; then
+                        echo "ERROR: HEALTH_PORT 超出合法范围 (1-65535): ${params.HEALTH_PORT}"
+                        exit 1
+                    fi
+                """
                 sh """
                     # 确保部署目录存在
-                    mkdir -p ${params.DEPLOY_DIR}
+                    mkdir -p "${params.DEPLOY_DIR}"
 
                     # 复制 docker-compose 模板到部署目录
-                    cp docker-compose.deploy.yml ${params.DEPLOY_DIR}/docker-compose.deploy.yml
+                    cp docker-compose.deploy.yml "${params.DEPLOY_DIR}/docker-compose.deploy.yml"
 
                     # 替换模板中的 \${IMAGE_VERSION}
                     export IMAGE_VERSION="${VERSION}"
                     if command -v envsubst >/dev/null 2>&1; then
-                        envsubst '\${IMAGE_VERSION}' < ${params.DEPLOY_DIR}/docker-compose.deploy.yml > ${params.DEPLOY_DIR}/docker-compose.deploy.resolved.yml
+                        envsubst '\${IMAGE_VERSION}' < "${params.DEPLOY_DIR}/docker-compose.deploy.yml" > "${params.DEPLOY_DIR}/docker-compose.deploy.resolved.yml"
                     else
-                        sed "s/\\\\\\${IMAGE_VERSION}/${VERSION}/g" ${params.DEPLOY_DIR}/docker-compose.deploy.yml > ${params.DEPLOY_DIR}/docker-compose.deploy.resolved.yml
+                        sed "s/\\\\\\${IMAGE_VERSION}/${VERSION}/g" "${params.DEPLOY_DIR}/docker-compose.deploy.yml" > "${params.DEPLOY_DIR}/docker-compose.deploy.resolved.yml"
                     fi
 
                     # 检查 .env.deploy 是否存在
-                    if [ ! -f ${params.DEPLOY_DIR}/.env.deploy ]; then
+                    if [ ! -f "${params.DEPLOY_DIR}/.env.deploy" ]; then
                         echo "ERROR: ${params.DEPLOY_DIR}/.env.deploy 不存在，请先手动创建"
                         exit 1
                     fi
 
                     # 停止旧容器
                     echo '>>> 停止旧容器...'
-                    docker-compose -f ${params.DEPLOY_DIR}/docker-compose.deploy.resolved.yml down --timeout 30 2>/dev/null || true
+                    docker-compose -f "${params.DEPLOY_DIR}/docker-compose.deploy.resolved.yml" down --timeout 30 2>/dev/null || true
 
                     # 启动新容器
                     echo '>>> 启动新容器...'
-                    docker-compose -f ${params.DEPLOY_DIR}/docker-compose.deploy.resolved.yml up -d
+                    docker-compose -f "${params.DEPLOY_DIR}/docker-compose.deploy.resolved.yml" up -d
 
                     # 健康检查
                     echo '>>> 健康检查...'
@@ -185,7 +209,10 @@ pipeline {
 
                     if [ \$ELAPSED -ge \$TIMEOUT ]; then
                         echo 'ERROR: 健康检查失败'
-                        docker-compose -f ${params.DEPLOY_DIR}/docker-compose.deploy.resolved.yml logs --tail 50
+                        # 将容器日志写入文件而非直接输出到 Jenkins 控制台，避免敏感信息泄露
+                        docker-compose -f "${params.DEPLOY_DIR}/docker-compose.deploy.resolved.yml" logs --tail 50 > "${params.DEPLOY_DIR}/deploy-failed.log" 2>&1
+                        echo "容器日志已保存到: ${params.DEPLOY_DIR}/deploy-failed.log"
+                        echo "请登录 Agent 机器查看日志，排查问题后重试"
                         exit 1
                     fi
 
