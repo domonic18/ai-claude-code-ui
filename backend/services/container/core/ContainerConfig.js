@@ -190,19 +190,13 @@ export class ContainerConfigBuilder {
   }
 
   /**
-   * 构建执行配置
-   * @param {string} command - 要执行的命令
+   * 构建容器执行配置
+   * @param {string|Array} command - 命令字符串（通过 sh -c 执行）或数组（直接执行，不经过 shell）
    * @param {object} options - 执行选项
    * @param {boolean} options.stdin - 是否附加标准输入
    * @param {boolean} options.tty - 是否使用 TTY
    * @param {string} options.cwd - 工作目录
    * @param {object} options.env - 环境变量
-   * @returns {object} 执行配置
-   */
-  /**
-   * 构建容器执行配置
-   * @param {string|Array} command - 命令字符串（通过 sh -c 执行）或数组（直接执行，不经过 shell）
-   * @param {object} options - 执行选项
    * @returns {object} 执行配置
    */
   buildExecConfig(command, options = {}) {

@@ -13,6 +13,7 @@
 import containerManager from '../../container/core/index.js';
 import { CONTAINER } from '../../../config/config.js';
 import { filterMemoryContext } from '../../../utils/memoryUtils.js';
+import { writeFileViaPutArchive as writeFileToContainerArchive, writeFileViaShell as writeShell, validateFilePath } from '../../container/utils/containerFileWriter.js';
 
 /**
  * 编码项目名称为容器内存储格式
@@ -50,7 +51,7 @@ function encodeProjectName(projectName) {
 async function readFileFromContainer(userId, filePath) {
   const { stream } = await containerManager.execInContainer(
     userId,
-    `cat "${filePath}"`
+    ['cat', filePath]
   );
 
   // 使用 demuxStream 来正确处理 Docker 的多路复用协议
@@ -245,36 +246,30 @@ function parseJsonlContent(content) {
  * @returns {Promise<void>}
  */
 async function writeJsonlContentToContainer(userId, filePath, entries) {
+  // 安全校验：防止路径包含危险字符
+  validateFilePath(filePath);
+
   // Rebuild JSONL content
   const updatedContent = entries
     .map(entry => entry._raw || JSON.stringify(entry))
     .filter(line => line.trim())
     .join('\n') + '\n';
 
-  // Write back to file using base64 to handle special characters
-  const base64Content = Buffer.from(updatedContent, 'utf8').toString('base64');
-  const { stream } = await containerManager.execInContainer(
-    userId,
-    `printf '%s' "$(echo '${base64Content}' | base64 -d)" > "${filePath}"`
-  );
+  const contentSize = Buffer.byteLength(updatedContent, 'utf8');
 
-  await new Promise((resolve, reject) => {
-    let errorOutput = '';
-    stream.on('data', (chunk) => {
-      const output = chunk.toString();
-      if (output.toLowerCase().includes('error')) {
-        errorOutput += output;
-      }
-    });
-    stream.on('error', () => reject(new Error('Failed to write file')));
-    stream.on('end', () => {
-      if (errorOutput) {
-        reject(new Error(`Write failed: ${errorOutput}`));
-      } else {
-        resolve();
-      }
-    });
-  });
+  // 阈值 80KB：base64 膨胀 ~33%，80KB 编码后约 107KB，
+  // 留出余量避免接近 Linux exec 的 ~128KB 参数长度限制
+  const SHELL_ARG_SIZE_THRESHOLD = 80 * 1024;
+
+  if (contentSize > SHELL_ARG_SIZE_THRESHOLD) {
+    // 大文件：通过 Docker putArchive API 写入，完全绕过命令行参数长度限制
+    const container = await containerManager.getOrCreateContainer(userId);
+    const dockerContainer = containerManager.docker.getContainer(container.id);
+    await writeFileToContainerArchive(dockerContainer, filePath, updatedContent, { logLabel: 'ContainerSessions' });
+  } else {
+    // 小文件：使用 base64 编码写入（原有逻辑，已验证可正常工作）
+    await writeShell(containerManager, userId, filePath, updatedContent);
+  }
 }
 
 /**
@@ -290,7 +285,7 @@ async function listSessionFiles(userId, projectName) {
   // 使用 for 循环查找所有 .jsonl 文件（更可靠）
   const { stream } = await containerManager.execInContainer(
     userId,
-    `for f in "${projectDir}"/*.jsonl; do [ -f "$f" ] && basename "$f"; done 2>/dev/null || echo ""`
+    ['sh', '-c', 'for f in "$1"/*.jsonl; do [ -f "$f" ] && basename "$f"; done 2>/dev/null || echo ""', 'listJsonl', projectDir]
   );
 
   // 使用 demuxStream 来正确处理 Docker 的多路复用协议
@@ -457,7 +452,7 @@ async function getSessionFilesInfo(userId, projectName) {
 
     const { stream } = await containerManager.execInContainer(
       userId,
-      `ls -la "${projectDir}" 2>/dev/null || echo "Directory not found"`
+      ['sh', '-c', 'ls -la "$1" 2>/dev/null || echo "Directory not found"', 'lsDir', projectDir]
     );
 
     // 使用 demuxStream 来正确处理 Docker 的多路复用协议

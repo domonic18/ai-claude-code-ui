@@ -243,6 +243,15 @@ export async function buildSDKScript(command, options, userId) {
   const optionsBase64 = Buffer.from(JSON.stringify(sdkOptions)).toString('base64');
   const commandBase64 = Buffer.from(command, 'utf-8').toString('base64');
 
+  // 安全断言：base64 标准字符集不包含模板字符串特殊字符（" $ `），防止注入
+  const BASE64_SAFE = /^[A-Za-z0-9+/=]+$/;
+  if (!BASE64_SAFE.test(commandBase64)) {
+    throw new Error('commandBase64 contains non-standard base64 characters');
+  }
+  if (!BASE64_SAFE.test(optionsBase64)) {
+    throw new Error('optionsBase64 contains non-standard base64 characters');
+  }
+
   // 生成唯一的临时文件名，使用 crypto.randomUUID() 保证唯一性和不可预测性
   const tmpId = randomUUID();
   const tmpOptionsFile = `/tmp/sdk_opts_${tmpId}.b64`;
@@ -258,7 +267,7 @@ async function execute() {
   try {
     console.error("[SDK] Starting execution...");
     console.error("[SDK] Environment check:");
-    console.error("[SDK] - ANTHROPIC_AUTH_TOKEN:", process.env.ANTHROPIC_AUTH_TOKEN ? "SET (" + process.env.ANTHROPIC_AUTH_TOKEN.substring(0, 10) + "...)" : "NOT SET");
+    console.error("[SDK] - ANTHROPIC_AUTH_TOKEN:", process.env.ANTHROPIC_AUTH_TOKEN ? "SET (length=" + process.env.ANTHROPIC_AUTH_TOKEN.length + ")" : "NOT SET");
     console.error("[SDK] - ANTHROPIC_BASE_URL:", process.env.ANTHROPIC_BASE_URL || "NOT SET (will use default)");
     console.error("[SDK] - ANTHROPIC_MODEL:", process.env.ANTHROPIC_MODEL || "NOT SET (will use default)");
 
@@ -305,10 +314,7 @@ async function execute() {
     let chunkCount = 0;
     for await (const chunk of result) {
       chunkCount++;
-      console.error("[SDK] Received chunk #" + chunkCount);
-      console.error("[SDK] Chunk type:", typeof chunk);
-      console.error("[SDK] Chunk keys:", Object.keys(chunk || {}).join(", "));
-      console.error("[SDK] Full chunk:", JSON.stringify(chunk, null, 2));
+      console.error("[SDK] Received chunk #" + chunkCount + " type=" + (chunk && chunk.type) || "unknown");
 
       // 输出 chunk 到 stdout 供前端接收
       console.log(JSON.stringify({

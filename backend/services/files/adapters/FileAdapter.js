@@ -109,7 +109,7 @@ export class FileAdapter extends BaseFileAdapter {
 
       const { stream } = await containerManager.execInContainer(
         userId,
-        `stat -c "%F|%s|%Y|%A" "${containerPath}"`
+        ['stat', '-c', '%F|%s|%Y|%A', containerPath]
       );
 
       return this._parseFileStats(stream, containerPath);
@@ -177,7 +177,7 @@ export class FileAdapter extends BaseFileAdapter {
 
       const { stream } = await containerManager.execInContainer(
         userId,
-        `rm -rf "${containerPath}"`
+        ['rm', '-rf', containerPath]
       );
 
       return this._handleDeleteResponse(stream, containerPath, userId);
@@ -268,7 +268,7 @@ export class FileAdapter extends BaseFileAdapter {
 
       const { stream } = await containerManager.execInContainer(
         userId,
-        `test -e "${containerPath}" && echo "EXISTS" || echo "NOT_EXISTS"`
+        ['sh', '-c', 'test -e "$1" && echo "EXISTS" || echo "NOT_EXISTS"', 'testExists', containerPath]
       );
 
       return new Promise((resolve) => {

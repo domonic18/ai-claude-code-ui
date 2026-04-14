@@ -82,7 +82,7 @@ export class FileWriter {
 
     const { stream: mkdirStream } = await containerManager.execInContainer(
       userId,
-      `mkdir -p "${dirPath}"`
+      ['mkdir', '-p', dirPath]
     );
 
     await new Promise((resolve, reject) => {
@@ -121,7 +121,7 @@ export class FileWriter {
   async _removeExistingFile(filePath, userId) {
     const { stream: rmStream } = await containerManager.execInContainer(
       userId,
-      `rm -f "${filePath}"`
+      ['rm', '-f', filePath]
     );
 
     await new Promise((resolve) => {

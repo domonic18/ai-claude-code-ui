@@ -93,7 +93,7 @@ async function deleteProject(userId, projectName) {
 
     const { stream } = await containerManager.execInContainer(
       userId,
-      `rm -rf "${projectPath}"`
+      ['rm', '-rf', projectPath]
     );
 
     await new Promise((resolve, reject) => {
@@ -138,7 +138,7 @@ async function addProjectManually(userId, projectName, displayName = null) {
 
     const { stream } = await containerManager.execInContainer(
       userId,
-      `mkdir -p "${projectPath}"`
+      ['mkdir', '-p', projectPath]
     );
 
     // 使用 readStreamOutput 辅助函数，设置超时

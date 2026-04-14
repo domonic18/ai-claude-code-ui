@@ -40,7 +40,7 @@ export class FileReader {
     // 执行 cat 命令读取文件
     const { stream } = await containerManager.execInContainer(
       userId,
-      `cat "${containerPath}"`
+      ['cat', containerPath]
     );
 
     // 使用 demuxStream 来正确处理 Docker 的多路复用协议

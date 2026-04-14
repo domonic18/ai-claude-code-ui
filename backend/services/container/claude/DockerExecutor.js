@@ -4,14 +4,15 @@
  * 负责在 Docker 容器内执行脚本并处理流式输出。
  */
 
+import path from 'path';
+import fs from 'fs/promises';
+import tar from 'tar';
 import containerManager from '../core/index.js';
 import { buildSDKScript } from './ScriptBuilder.js';
 import { processOutput } from './MessageTransformer.js';
 import { setSessionStream, getSession } from './SessionManager.js';
 import { SDK } from '../../../config/config.js';
-import { promises as fs } from 'fs';
-import path from 'path';
-import tar from 'tar';
+import { writeFileViaPutArchive } from '../utils/containerFileWriter.js';
 
 /**
  * 检查 stderr 是否包含真正的错误
@@ -144,89 +145,7 @@ async function copyImagesToContainer(container, images, cwd) {
     } catch (e) {
       // 忽略清理错误
     }
-    return [];
-  }
-}
-
-/**
- * 将文件内容写入容器内的指定路径
- * 使用 Docker putArchive API 传输文件，完全绕过命令行参数长度限制
- *
- * @param {object} container - Docker 容器实例
- * @param {string} containerFilePath - 容器内的目标文件路径（如 /tmp/sdk_opts_xxx.b64）
- * @param {string} content - 要写入的文件内容
- * @returns {Promise<void>}
- */
-async function writeFileToContainer(container, containerFilePath, content) {
-  // 使用 crypto.randomUUID() 保证唯一性，避免并发冲突
-  const { randomUUID } = await import('crypto');
-  const tmpDir = path.join(process.cwd(), '.tmp', 'sdk_files', randomUUID());
-  await fs.mkdir(tmpDir, { recursive: true });
-
-  try {
-    // 写入本地临时文件
-    const filename = path.basename(containerFilePath);
-    const localFilePath = path.join(tmpDir, filename);
-    await fs.writeFile(localFilePath, content);
-
-    // 创建 tar 文件
-    const tarPath = path.join(tmpDir, 'payload.tar');
-    await tar.c({
-      file: tarPath,
-      cwd: tmpDir,
-      gzip: false
-    }, [filename]);
-
-    // 读取 tar 文件
-    const tarBuffer = await fs.readFile(tarPath);
-
-    // 确保目标目录存在（使用数组格式的 Cmd 避免命令注入风险）
-    const targetDir = path.dirname(containerFilePath);
-    const mkdirExec = await container.exec({
-      Cmd: ['mkdir', '-p', targetDir],
-      AttachStdout: true,
-      AttachStderr: true
-    });
-
-    // 等待 mkdir 完成（带超时保护，防止 Docker daemon 无响应时永久阻塞）
-    const MKDIR_TIMEOUT = 5000;
-    await new Promise((resolve, reject) => {
-      let settled = false;
-      const safeSettle = (fn, val) => { if (!settled) { settled = true; fn(val); } };
-
-      const timer = setTimeout(() => {
-        safeSettle(reject, new Error(`mkdir exec timed out after ${MKDIR_TIMEOUT}ms`));
-      }, MKDIR_TIMEOUT);
-
-      mkdirExec.start({ Detach: false }, (err, stream) => {
-        if (err) { clearTimeout(timer); safeSettle(reject, err); return; }
-        if (!stream) { clearTimeout(timer); safeSettle(resolve); return; }
-
-        // 必须消费流数据，否则在某些 Docker/Node 环境下 close/end 事件不触发
-        stream.resume();
-        stream.on('end', () => { clearTimeout(timer); safeSettle(resolve); });
-        stream.on('close', () => { clearTimeout(timer); safeSettle(resolve); });
-        stream.on('error', (e) => { clearTimeout(timer); safeSettle(reject, e); });
-      });
-    });
-
-    // 上传 tar 到容器
-    await new Promise((resolve, reject) => {
-      container.putArchive(tarBuffer, { path: targetDir }, (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
-
-    console.log(`[DockerExecutor] File written to container: (${content.length} bytes)`);
-
-  } finally {
-    // 清理本地临时文件
-    try {
-      await fs.rm(tmpDir, { recursive: true, force: true });
-    } catch (e) {
-      // 忽略清理错误
-    }
+    throw new Error(`图片复制到容器失败: ${error.message}`);
   }
 }
 
@@ -274,11 +193,9 @@ export async function executeInContainer(userId, command, options, writer, sessi
     }
 
     // 将 options base64 数据和脚本文件写入容器
-    // 使用 Docker putArchive API 写入文件，完全绕过命令行长度限制
-    // 当 agents prompt 较大时，optionsJson 可能超过 95KB，命令行无法承载
-    await writeFileToContainer(container, sdkScriptInfo.tmpOptionsFile, sdkScriptInfo.optionsBase64);
-    await writeFileToContainer(container, sdkScriptInfo.tmpScriptFile, sdkScriptInfo.scriptContent);
-    console.log('[DockerExecutor] Script files written to container:', sdkScriptInfo.tmpScriptFile);
+    // 使用共享的 putArchive 工具函数写入文件，完全绕过命令行长度限制
+    await writeFileViaPutArchive(container, sdkScriptInfo.tmpOptionsFile, sdkScriptInfo.optionsBase64, { logLabel: 'DockerExecutor' });
+    await writeFileViaPutArchive(container, sdkScriptInfo.tmpScriptFile, sdkScriptInfo.scriptContent, { logLabel: 'DockerExecutor' });
 
     // 在容器中执行脚本文件（使用数组格式 Cmd，不经过 shell 解释，无注入风险）
     const { stream, exec } = await containerManager.execInContainer(

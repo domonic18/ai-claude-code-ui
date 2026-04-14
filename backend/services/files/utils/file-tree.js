@@ -75,7 +75,7 @@ export async function getFileTreeInContainer(userId, dirPath = '.', options = {}
 
     const { stream } = await containerManager.execInContainer(
       userId,
-      `cd "${containerPath}" && find . -maxdepth 1 ${hiddenFlag} -printf "%P|%y|%s|%T@\\n"`
+      ['sh', '-c', `cd "$1" && find . -maxdepth 1 ${hiddenFlag} -printf "%P|%y|%s|%T@\\n"`, 'findTree', containerPath]
     );
 
     return new Promise((resolve, reject) => {
