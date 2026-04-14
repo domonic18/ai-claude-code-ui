@@ -28,10 +28,9 @@ pipeline {
     }
 
     environment {
-        // VERSION 在 Checkout 阶段之后通过 script 赋值
-        VERSION = 'pending'
         // macOS Agent 通过 SSH 连接时 PATH 不完整，需要手动补充
         PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        // VERSION 在 Checkout 阶段赋值，不要在此初始化（会覆盖）
     }
 
     // 每 5 分钟轮询 jenkins-test 分支，有新提交才触发
