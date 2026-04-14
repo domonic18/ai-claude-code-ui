@@ -3,9 +3,12 @@
 # Used by Jenkins pipeline or manual deployment
 #
 # Usage:
-#   ./scripts/deploy.sh <version>           # Deploy specific version
-#   ./scripts/deploy.sh latest              # Deploy latest tag
+#   ./scripts/deploy.sh <version>           # Deploy specific version (git commit hash)
 #   ./scripts/deploy.sh --rollback <ver>    # Rollback to specific version
+#
+# Environment variables:
+#   DEPLOY_DIR    Project directory (default: /opt/claude-code-ui/deploy)
+#   HEALTH_PORT   Health check port (default: 3001)
 #
 # Prerequisites on macOS server:
 #   - Docker Desktop for Mac installed and running
@@ -26,24 +29,25 @@ warn() { echo -e "\033[33m[WARN]\033[0m $1"; }
 error() { echo -e "\033[31m[ERROR]\033[0m $1"; }
 
 # ==================== Input Validation ====================
-# VERSION 只允许 git short commit hash 格式（十六进制字符）或 "latest"
+# VERSION 只允许 git short commit hash 格式（十六进制字符），不允许 "latest"
 validate_version() {
     local ver="$1"
-    if [ "$ver" = "latest" ]; then
-        return 0
-    fi
     # git short commit: 7-40 个十六进制字符
     if echo "$ver" | grep -qE '^[0-9a-f]{7,40}$'; then
         return 0
     fi
     error "Invalid VERSION: '${ver}'"
-    error "VERSION must be 'latest' or a git commit hash (7-40 hex chars)"
+    error "VERSION must be a git commit hash (7-40 hex chars)"
     exit 1
 }
 
 validate_deploy_dir() {
     local dir="$1"
-    # 拒绝路径遍历
+    if [ -z "$dir" ]; then
+        error "DEPLOY_DIR cannot be empty"
+        exit 1
+    fi
+    # 拒绝路径遍历（.. 出现在任何位置）
     if echo "$dir" | grep -q '\.\.'; then
         error "DEPLOY_DIR contains path traversal ('..'): ${dir}"
         exit 1
@@ -53,7 +57,7 @@ validate_deploy_dir() {
         error "DEPLOY_DIR must be an absolute path: ${dir}"
         exit 1
     fi
-    # 只允许安全字符
+    # 只允许安全字符：字母、数字、-、_、/、.、空格
     if ! echo "$dir" | grep -qE '^[a-zA-Z0-9_/\-.\s]+$'; then
         error "DEPLOY_DIR contains illegal characters: ${dir}"
         exit 1
@@ -84,8 +88,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     -h|--help)
       echo "Usage:"
-      echo "  $0 <version>           Deploy specific version"
-      echo "  $0 latest              Deploy latest tag"
+      echo "  $0 <version>           Deploy specific version (git commit hash)"
       echo "  $0 --rollback <ver>    Rollback to specific version"
       echo ""
       echo "Environment variables:"
@@ -106,7 +109,7 @@ if [ -z "$VERSION" ]; then
   exit 1
 fi
 
-# ==================== Validate All Inputs ====================
+# ==================== Validate All Inputs (纵深防御) ====================
 validate_version "$VERSION"
 validate_deploy_dir "$DEPLOY_DIR"
 validate_port "$HEALTH_PORT"
@@ -134,7 +137,7 @@ echo "Deploy dir:  ${DEPLOY_DIR}"
 echo "=========================================="
 
 # Step 1: Check prerequisites
-info "1/5 Checking prerequisites..."
+info "1/6 Checking prerequisites..."
 if [ ! -f docker-compose.deploy.yml ]; then
   error "docker-compose.deploy.yml not found in ${DEPLOY_DIR}"
   exit 1
@@ -155,11 +158,20 @@ if ! docker image inspect "$SANDBOX_IMAGE" &>/dev/null; then
   exit 1
 fi
 
-# Tag sandbox as latest for container runtime
-docker tag "$SANDBOX_IMAGE" "claude-code-sandbox:latest"
+# Step 2: Save rollback point before making changes
+info "2/6 Saving rollback point..."
+# Save current running image tags for rollback
+ROLLBACK_FILE="${DEPLOY_DIR}/.rollback-version"
+if docker ps --filter "name=claude-code-app" --format '{{.Image}}' 2>/dev/null | head -1 | grep -q 'claude-code-ui:'; then
+  PREV_VERSION=$(docker ps --filter "name=claude-code-app" --format '{{.Image}}' 2>/dev/null | head -1 | sed 's/.*://')
+  echo "$PREV_VERSION" > "$ROLLBACK_FILE"
+  info "Rollback point saved: ${PREV_VERSION}"
+else
+  info "No previous deployment found, skipping rollback point"
+fi
 
-# Step 2: Resolve docker-compose template
-info "2/5 Resolving docker-compose template..."
+# Step 3: Resolve docker-compose template
+info "3/6 Resolving docker-compose template..."
 export IMAGE_VERSION="$VERSION"
 if command -v envsubst &>/dev/null; then
   # Only substitute IMAGE_VERSION, avoid replacing other variables (e.g. secrets in env refs)
@@ -170,16 +182,17 @@ else
   sed "s/\${IMAGE_VERSION}/${VERSION}/g" docker-compose.deploy.yml > docker-compose.deploy.resolved.yml
 fi
 
-# Step 3: Stop old containers
-info "3/5 Stopping old containers (timeout: ${STOP_TIMEOUT}s)..."
+# Step 4: Stop old containers
+info "4/6 Stopping old containers (timeout: ${STOP_TIMEOUT}s)..."
 docker-compose -f docker-compose.deploy.resolved.yml down --timeout "$STOP_TIMEOUT" 2>>"${DEPLOY_DIR}/deploy-debug.log" || true
 
-# Step 4: Start new containers
-info "4/5 Starting new containers..."
+# Step 5: Start new containers
+info "5/6 Starting new containers..."
+docker tag "$SANDBOX_IMAGE" "claude-code-sandbox:latest" 2>/dev/null || true
 docker-compose -f docker-compose.deploy.resolved.yml up -d
 
-# Step 5: Health check (with initial startup buffer)
-info "5/5 Running health check (timeout: ${HEALTH_TIMEOUT}s)..."
+# Step 6: Health check (with initial startup buffer)
+info "6/6 Running health check (timeout: ${HEALTH_TIMEOUT}s)..."
 # Wait 5 seconds before first check to give container time to start
 sleep 5
 elapsed=5
@@ -198,14 +211,38 @@ if [ $elapsed -ge $HEALTH_TIMEOUT ]; then
   # Save logs to file instead of printing to console to avoid credential leakage
   docker-compose -f docker-compose.deploy.resolved.yml logs --tail 30 > "${DEPLOY_DIR}/deploy-failed.log" 2>&1
   error "Container logs saved to: ${DEPLOY_DIR}/deploy-failed.log"
-  error "Please check the log file on the server for details"
-  error "To rollback, run: $0 --rollback <previous-version>"
+
+  # Auto-rollback: stop failed containers and try to restore previous version
+  error "Initiating automatic rollback..."
+  docker-compose -f docker-compose.deploy.resolved.yml down --timeout "$STOP_TIMEOUT" 2>>"${DEPLOY_DIR}/deploy-debug.log" || true
+
+  if [ -f "$ROLLBACK_FILE" ]; then
+    PREV_VER=$(cat "$ROLLBACK_FILE")
+    if docker image inspect "claude-code-ui:${PREV_VER}" &>/dev/null; then
+      warn "Rolling back to previous version: ${PREV_VER}"
+      # Re-resolve template with previous version
+      export IMAGE_VERSION="$PREV_VER"
+      if command -v envsubst &>/dev/null; then
+        envsubst '${IMAGE_VERSION}' < docker-compose.deploy.yml > docker-compose.deploy.resolved.yml
+      else
+        sed "s/\${IMAGE_VERSION}/${PREV_VER}/g" docker-compose.deploy.yml > docker-compose.deploy.resolved.yml
+      fi
+      docker tag "claude-code-sandbox:${PREV_VER}" "claude-code-sandbox:latest" 2>/dev/null || true
+      docker-compose -f docker-compose.deploy.resolved.yml up -d
+      info "Rollback to ${PREV_VER} completed"
+    else
+      warn "Rollback image claude-code-ui:${PREV_VER} not found, skipping rollback"
+    fi
+  fi
+
+  error "Deployment FAILED. To manually retry: $0 ${VERSION}"
   exit 1
 fi
 
-# Cleanup old images
+# Cleanup old images (only dangling images with project label)
 info "Cleaning up old images..."
-docker image prune -f --filter "until=168h" 2>/dev/null || true
+docker image prune -f --filter "label=com.docker.compose.project=claude-code-ui" --filter "until=168h" 2>/dev/null || \
+  docker image prune -f --filter "until=168h" 2>/dev/null || true
 
 echo ""
 echo "=========================================="

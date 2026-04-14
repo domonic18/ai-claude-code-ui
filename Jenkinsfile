@@ -4,6 +4,7 @@
 // 所有构建和部署都在 macOS Agent 上完成，不需要 CCR 中转
 //
 // 触发方式：Poll SCM 每 5 分钟轮询 develop 分支变更
+// TODO: 待网络打通后迁移到 GitHub webhook 触发，减少轮询延迟
 //
 // 前置条件：
 //   1. macOS Agent 节点已注册到 Jenkins Master（通过 SSH）
@@ -46,7 +47,7 @@ pipeline {
     }
 
     stages {
-        // ==================== 参数校验（Groovy 层，在 shell 之前执行） ====================
+        // ==================== 参数校验（Groovy 层，第一层防御） ====================
         stage('Validate Params') {
             steps {
                 script {
@@ -171,77 +172,17 @@ pipeline {
             }
         }
 
-        // ==================== CD: 部署 ====================
+        // ==================== CD: 部署（调用 deploy.sh） ====================
         stage('CD: Deploy') {
             steps {
                 echo "--- CD: 部署 (version: ${VERSION}) ---"
-                // DEPLOY_DIR 和 HEALTH_PORT 已在 Validate Params 阶段通过 Groovy 正则校验
-                // 此处通过 Groovy 拼接将已校验的值注入到 shell 变量中，避免 shell 注入风险
-                sh """#!/bin/bash
-                    set -euo pipefail
-
-                    DEPLOY_DIR="${params.DEPLOY_DIR.trim()}"
-                    HEALTH_PORT="${params.HEALTH_PORT.trim()}"
-
-                    # 确保部署目录存在
-                    mkdir -p "\${DEPLOY_DIR}"
-
-                    # 复制 docker-compose 模板到部署目录
-                    cp docker-compose.deploy.yml "\${DEPLOY_DIR}/docker-compose.deploy.yml"
-
-                    # 替换模板中的 \${IMAGE_VERSION}
-                    export IMAGE_VERSION="${VERSION}"
-                    if command -v envsubst >/dev/null 2>&1; then
-                        envsubst '\${IMAGE_VERSION}' < "\${DEPLOY_DIR}/docker-compose.deploy.yml" > "\${DEPLOY_DIR}/docker-compose.deploy.resolved.yml"
-                    else
-                        sed "s/\\\\\\${IMAGE_VERSION}/${VERSION}/g" "\${DEPLOY_DIR}/docker-compose.deploy.yml" > "\${DEPLOY_DIR}/docker-compose.deploy.resolved.yml"
-                    fi
-
-                    # 检查 .env.deploy 是否存在
-                    if [ ! -f "\${DEPLOY_DIR}/.env.deploy" ]; then
-                        echo "ERROR: \${DEPLOY_DIR}/.env.deploy 不存在，请先手动创建"
-                        exit 1
-                    fi
-
-                    # 停止旧容器
-                    echo ">>> 停止旧容器..."
-                    docker-compose -f "\${DEPLOY_DIR}/docker-compose.deploy.resolved.yml" down --timeout 30 2>/dev/null || true
-
-                    # 启动新容器
-                    echo ">>> 启动新容器..."
-                    docker-compose -f "\${DEPLOY_DIR}/docker-compose.deploy.resolved.yml" up -d
-
-                    # 健康检查（先 sleep 等待容器启动，首次检查时给予启动缓冲）
-                    echo ">>> 健康检查..."
-                    TIMEOUT=90
-                    ELAPSED=0
-                    # 先等待 5 秒，给予容器启动缓冲时间，避免首次 curl 失败
-                    sleep 5
-                    ELAPSED=5
-                    while [ "\${ELAPSED}" -lt "\${TIMEOUT}" ]; do
-                        if curl -sf "http://localhost:\${HEALTH_PORT}/health" >/dev/null 2>&1; then
-                            echo "健康检查通过 (\${ELAPSED}s)"
-                            break
-                        fi
-                        sleep 5
-                        ELAPSED=\$((ELAPSED + 5))
-                        echo "  等待中... (\${ELAPSED}s/\${TIMEOUT}s)"
-                    done
-
-                    if [ "\${ELAPSED}" -ge "\${TIMEOUT}" ]; then
-                        echo "ERROR: 健康检查失败 (\${TIMEOUT}s 超时)"
-                        # 将容器日志写入文件而非直接输出到 Jenkins 控制台，避免敏感信息泄露
-                        docker-compose -f "\${DEPLOY_DIR}/docker-compose.deploy.resolved.yml" logs --tail 50 > "\${DEPLOY_DIR}/deploy-failed.log" 2>&1
-                        echo "容器日志已保存到: \${DEPLOY_DIR}/deploy-failed.log"
-                        echo "请登录 Agent 机器查看日志，排查问题后重试"
-                        exit 1
-                    fi
-
-                    # 清理旧镜像
-                    echo ">>> 清理旧镜像..."
-                    docker image prune -f --filter "until=168h" || true
-
-                    echo ">>> 部署完成: ${VERSION}"
+                // 调用独立部署脚本，所有部署逻辑和纵深防御校验在 deploy.sh 中
+                // Groovy Validate Params 阶段为第一层防御，deploy.sh validate_* 为第二层防御
+                sh """
+                    chmod +x scripts/deploy.sh
+                    DEPLOY_DIR="${params.DEPLOY_DIR.trim()}" \
+                    HEALTH_PORT="${params.HEALTH_PORT.trim()}" \
+                    ./scripts/deploy.sh "${VERSION}"
                 """
             }
         }
@@ -250,13 +191,14 @@ pipeline {
     post {
         success {
             echo "部署成功! 版本: ${VERSION}"
+            // 部署成功时清理工作空间
+            cleanWs()
             // 可加通知：邮件、钉钉、Slack 等
         }
         failure {
             echo "流水线失败，请检查日志"
-        }
-        always {
-            cleanWs()
+            // 部署失败时保留工作空间以便调试
+            echo "工作空间已保留，可用于排查问题"
         }
     }
 }
