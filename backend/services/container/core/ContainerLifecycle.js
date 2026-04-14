@@ -906,8 +906,10 @@ export class ContainerLifecycleManager {
       }
 
       // 如果记忆文件不存在，创建默认记忆文件
+      // 注意：使用 includes 而非 trim+=== 是因为 _execWithTimeout 未做 Docker stream demux，
+      // output 中可能包含多路复用流的二进制 header 字节，无法精确 trim
       const checkResult = await this._execWithTimeout(container, 'test -f /workspace/.claude/memory/MEMORY.md && echo "EXISTS" || echo "NOT_EXISTS"', MEMORY_SETUP_TIMEOUT);
-      if (checkResult.success && checkResult.stdout.trim() === 'NOT_EXISTS') {
+      if (checkResult.success && checkResult.output && checkResult.output.includes('NOT_EXISTS')) {
         // 使用 base64 编码创建文件，避免特殊字符问题
         const base64Content = Buffer.from(DEFAULT_MEMORY_TEMPLATE, 'utf8').toString('base64');
         const createResult = await this._execWithTimeout(

@@ -188,20 +188,25 @@ async function writeFileToContainer(container, containerFilePath, content) {
       AttachStderr: true
     });
 
-    // 等待 mkdir 完成
+    // 等待 mkdir 完成（带超时保护，防止 Docker daemon 无响应时永久阻塞）
+    const MKDIR_TIMEOUT = 5000;
     await new Promise((resolve, reject) => {
       let settled = false;
-      const safeResolve = () => { if (!settled) { settled = true; resolve(); } };
-      const safeReject = (err) => { if (!settled) { settled = true; reject(err); } };
+      const safeSettle = (fn, val) => { if (!settled) { settled = true; fn(val); } };
+
+      const timer = setTimeout(() => {
+        safeSettle(reject, new Error(`mkdir exec timed out after ${MKDIR_TIMEOUT}ms`));
+      }, MKDIR_TIMEOUT);
 
       mkdirExec.start({ Detach: false }, (err, stream) => {
-        if (err) { safeReject(err); return; }
-        if (stream) {
-          stream.on('close', safeResolve);
-          stream.on('error', safeReject);
-        } else {
-          safeResolve();
-        }
+        if (err) { clearTimeout(timer); safeSettle(reject, err); return; }
+        if (!stream) { clearTimeout(timer); safeSettle(resolve); return; }
+
+        // 必须消费流数据，否则在某些 Docker/Node 环境下 close/end 事件不触发
+        stream.resume();
+        stream.on('end', () => { clearTimeout(timer); safeSettle(resolve); });
+        stream.on('close', () => { clearTimeout(timer); safeSettle(resolve); });
+        stream.on('error', (e) => { clearTimeout(timer); safeSettle(reject, e); });
       });
     });
 
