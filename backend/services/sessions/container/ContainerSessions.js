@@ -251,8 +251,34 @@ async function writeJsonlContentToContainer(userId, filePath, entries) {
     .filter(line => line.trim())
     .join('\n') + '\n';
 
-  // Write back to file using base64 to handle special characters
-  const base64Content = Buffer.from(updatedContent, 'utf8').toString('base64');
+  const contentSize = Buffer.byteLength(updatedContent, 'utf8');
+
+  // 阈值 80KB：base64 膨胀 ~33%，80KB 编码后约 107KB，
+  // 留出余量避免接近 Linux exec 的 ~128KB 参数长度限制
+  const SHELL_ARG_SIZE_THRESHOLD = 80 * 1024;
+
+  if (contentSize > SHELL_ARG_SIZE_THRESHOLD) {
+    // 大文件：通过 Docker putArchive API 写入，完全绕过命令行参数长度限制
+    await writeFileViaPutArchive(userId, filePath, updatedContent);
+  } else {
+    // 小文件：使用 base64 编码写入（原有逻辑，已验证可正常工作）
+    await writeFileViaShell(userId, filePath, updatedContent);
+  }
+}
+
+/**
+ * 通过 shell 命令将内容写入容器文件（适用于小文件）
+ *
+ * 使用 base64 编码传输内容，避免特殊字符问题。
+ * 受限于 exec 命令行参数长度，仅适用于 <80KB 的内容。
+ *
+ * @param {number} userId - 用户 ID
+ * @param {string} filePath - 容器内文件路径
+ * @param {string} content - 要写入的内容
+ * @returns {Promise<void>}
+ */
+async function writeFileViaShell(userId, filePath, content) {
+  const base64Content = Buffer.from(content, 'utf8').toString('base64');
   const { stream } = await containerManager.execInContainer(
     userId,
     `printf '%s' "$(echo '${base64Content}' | base64 -d)" > "${filePath}"`
@@ -275,6 +301,74 @@ async function writeJsonlContentToContainer(userId, filePath, entries) {
       }
     });
   });
+}
+
+/**
+ * 通过 Docker putArchive API 将内容写入容器文件（适用于大文件）
+ *
+ * 在宿主机创建临时文件 → 打包为 tar → 通过 putArchive 上传到容器。
+ * 完全绕过 exec 命令行参数长度限制（~128KB），适用于任意大小的文件。
+ *
+ * @param {number} userId - 用户 ID
+ * @param {string} containerFilePath - 容器内目标文件路径
+ * @param {string} content - 要写入的内容
+ * @returns {Promise<void>}
+ */
+async function writeFileViaPutArchive(userId, containerFilePath, content) {
+  const { randomUUID } = await import('crypto');
+  const fs = await import('fs/promises');
+  const path = await import('path');
+  const tar = (await import('tar')).default;
+
+  const tmpDir = path.join(process.cwd(), '.tmp', 'session_writes', randomUUID());
+  await fs.mkdir(tmpDir, { recursive: true });
+
+  try {
+    const filename = path.basename(containerFilePath);
+    const localFilePath = path.join(tmpDir, filename);
+    await fs.writeFile(localFilePath, content, 'utf8');
+
+    const tarPath = path.join(tmpDir, 'payload.tar');
+    await tar.c({ file: tarPath, cwd: tmpDir, gzip: false }, [filename]);
+    const tarBuffer = await fs.readFile(tarPath);
+
+    const container = await containerManager.getOrCreateContainer(userId);
+    const dockerContainer = containerManager.docker.getContainer(container.id);
+    const targetDir = path.dirname(containerFilePath);
+
+    // 确保目标目录存在（数组格式 Cmd 防止命令注入）
+    const mkdirExec = await dockerContainer.exec({
+      Cmd: ['mkdir', '-p', targetDir],
+      AttachStdout: true,
+      AttachStderr: true
+    });
+
+    await new Promise((resolve, reject) => {
+      const MKDIR_TIMEOUT = 5000;
+      let settled = false;
+      const safeSettle = (fn, val) => { if (!settled) { settled = true; fn(val); } };
+      const timer = setTimeout(() => safeSettle(reject, new Error(`mkdir timed out after ${MKDIR_TIMEOUT}ms`)), MKDIR_TIMEOUT);
+
+      mkdirExec.start({ Detach: false }, (err, stream) => {
+        if (err) { clearTimeout(timer); safeSettle(reject, err); return; }
+        if (!stream) { clearTimeout(timer); safeSettle(resolve); return; }
+        stream.resume();
+        stream.on('end', () => { clearTimeout(timer); safeSettle(resolve); });
+        stream.on('close', () => { clearTimeout(timer); safeSettle(resolve); });
+        stream.on('error', (e) => { clearTimeout(timer); safeSettle(reject, e); });
+      });
+    });
+
+    // 上传 tar 到容器目标目录
+    await new Promise((resolve, reject) => {
+      dockerContainer.putArchive(tarBuffer, { path: targetDir }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+  } finally {
+    try { await fs.rm(tmpDir, { recursive: true, force: true }); } catch (_) { /* cleanup failure is non-critical */ }
+  }
 }
 
 /**
