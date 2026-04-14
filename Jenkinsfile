@@ -3,7 +3,7 @@
 // 架构：Jenkins Master (Linux) → macOS Agent 节点
 // 所有构建和部署都在 macOS Agent 上完成，不需要 CCR 中转
 //
-// 触发方式：Poll SCM 每 5 分钟轮询 develop 分支变更
+// 触发方式：Poll SCM 每 5 分钟轮询 jenkins-test 分支变更
 // TODO: 待网络打通后迁移到 GitHub webhook 触发，减少轮询延迟
 //
 // 前置条件：
@@ -31,7 +31,7 @@ pipeline {
         // VERSION 在 Checkout 阶段之后通过 script 赋值，此处不初始化
     }
 
-    // 每 5 分钟轮询 develop 分支，有新提交才触发
+    // 每 5 分钟轮询 jenkins-test 分支，有新提交才触发
     triggers {
         pollSCM('H/5 * * * *')
     }
@@ -86,7 +86,7 @@ pipeline {
             steps {
                 checkout([
                     $class: 'GitSCM',
-                    branches: [[name: '*/develop']],
+                    branches: [[name: '*/jenkins-test']],
                     extensions: [
                         // 拉取 submodule（extensions/ 目录）
                         [$class: 'SubmoduleOption',
