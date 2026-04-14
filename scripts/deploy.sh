@@ -57,8 +57,8 @@ validate_deploy_dir() {
         error "DEPLOY_DIR must be an absolute path: ${dir}"
         exit 1
     fi
-    # 只允许安全字符：字母、数字、-、_、/、.、空格
-    if ! echo "$dir" | grep -qE '^[a-zA-Z0-9_/\-.\s]+$'; then
+    # 只允许安全字符：字母、数字、-、_、/、.、空格（- 放末尾避免被解释为范围）
+    if ! echo "$dir" | grep -qE '^[a-zA-Z0-9_/. -]+$'; then
         error "DEPLOY_DIR contains illegal characters: ${dir}"
         exit 1
     fi
