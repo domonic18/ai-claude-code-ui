@@ -22,19 +22,52 @@ const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 // ============================================================================
 
 /**
- * 从 .env 文件加载环境变量
+ * 环境变量文件的查找优先级：
+ * 1. ENV_FILE 环境变量显式指定的文件（最高优先）
+ * 2. .env（通用默认）
+ * 3. .env.deploy（双镜像部署专用，开发和生产均使用）
+ */
+const ENV_FILE_CANDIDATES = ['.env', '.env.deploy'];
+
+/**
+ * 从环境文件加载环境变量
  * 如果环境变量尚不存在，则设置它们
+ * 按优先级自动查找第一个存在的环境文件，也支持 ENV_FILE 环境变量显式指定
  */
 export function loadEnvironment() {
   try {
-    const envPath = path.join(PROJECT_ROOT, '.env');
-    console.log(`[CONFIG] Loading environment from: ${envPath}`);
+    let envPath = null;
+    let envFileName = null;
 
-    // 检查文件是否存在
-    if (!fs.existsSync(envPath)) {
-      console.log(`[CONFIG] .env file not found at ${envPath}`);
+    // 优先使用 ENV_FILE 环境变量显式指定的文件
+    if (process.env.ENV_FILE) {
+      const explicitPath = path.join(PROJECT_ROOT, process.env.ENV_FILE);
+      if (fs.existsSync(explicitPath)) {
+        envPath = explicitPath;
+        envFileName = process.env.ENV_FILE;
+      } else {
+        console.log(`[CONFIG] ENV_FILE specified but not found: ${explicitPath}`);
+      }
+    }
+
+    // 按优先级自动查找第一个存在的环境文件
+    if (!envPath) {
+      for (const candidate of ENV_FILE_CANDIDATES) {
+        const candidatePath = path.join(PROJECT_ROOT, candidate);
+        if (fs.existsSync(candidatePath)) {
+          envPath = candidatePath;
+          envFileName = candidate;
+          break;
+        }
+      }
+    }
+
+    if (!envPath) {
+      console.log('[CONFIG] No environment file found (tried: .env, .env.deploy)');
       return;
     }
+
+    console.log(`[CONFIG] Loading environment from: ${envPath}`);
 
     const envFile = fs.readFileSync(envPath, 'utf8');
     let loadedCount = 0;
@@ -45,7 +78,7 @@ export function loadEnvironment() {
         const [key, ...valueParts] = trimmedLine.split('=');
         if (key && valueParts.length > 0) {
           const value = valueParts.join('=').trim();
-          // 只有当变量未设置时才从 .env 加载（允许环境变量覆盖 .env）
+          // 只有当变量未设置时才从环境文件加载（允许环境变量覆盖文件配置）
           if (process.env[key] === undefined) {
             process.env[key] = value;
             loadedCount++;
@@ -56,7 +89,7 @@ export function loadEnvironment() {
       }
     });
 
-    console.log(`[CONFIG] Loaded ${loadedCount} environment variables from .env`);
+    console.log(`[CONFIG] Loaded ${loadedCount} environment variables from ${envFileName}`);
 
     // 关键变量检查
     const criticalVars = ['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'AVAILABLE_MODELS'];
