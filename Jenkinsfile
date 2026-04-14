@@ -149,34 +149,34 @@ pipeline {
         stage('CD: Build Images') {
             steps {
                 echo "--- CD: 构建 Docker 镜像 (version: ${env.VERSION}) ---"
-                sh '''
+                sh """
                     # 检查 base 镜像是否存在，不存在则先构建
                     if ! docker image inspect claude-code-ui:base >/dev/null 2>&1; then
-                        echo "base 镜像不存在，首次构建..."
+                        echo 'base 镜像不存在，首次构建...'
                         docker build -f docker/Dockerfile.base -t claude-code-ui:base .
                     fi
 
                     # 构建主应用镜像
-                    echo ">>> 构建主应用镜像..."
-                    docker build \
-                        --build-arg BASE_IMAGE=claude-code-ui:base \
-                        -f docker/Dockerfile.main \
-                        -t claude-code-ui:${env.VERSION} \
-                        -t claude-code-ui:latest \
+                    echo '>>> 构建主应用镜像...'
+                    docker build \\
+                        --build-arg BASE_IMAGE=claude-code-ui:base \\
+                        -f docker/Dockerfile.main \\
+                        -t claude-code-ui:${env.VERSION} \\
+                        -t claude-code-ui:latest \\
                         .
 
                     # 构建沙箱镜像
-                    echo ">>> 构建沙箱镜像..."
-                    docker build \
-                        --build-arg BASE_IMAGE=claude-code-ui:base \
-                        -f docker/Dockerfile.sandbox \
-                        -t claude-code-sandbox:${env.VERSION} \
-                        -t claude-code-sandbox:latest \
+                    echo '>>> 构建沙箱镜像...'
+                    docker build \\
+                        --build-arg BASE_IMAGE=claude-code-ui:base \\
+                        -f docker/Dockerfile.sandbox \\
+                        -t claude-code-sandbox:${env.VERSION} \\
+                        -t claude-code-sandbox:latest \\
                         .
 
-                    echo "镜像构建完成:"
-                    docker images | grep -E "claude-code-(ui|sandbox)" | head -6
-                '''
+                    echo '镜像构建完成:'
+                    docker images | grep -E 'claude-code-(ui|sandbox)' | head -6
+                """
             }
         }
 
