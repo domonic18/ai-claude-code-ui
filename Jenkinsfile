@@ -20,10 +20,10 @@ pipeline {
     agent { label 'macos' }
 
     parameters {
-        // 部署目录（默认值可通过 Jenkins 全局配置覆盖）
-        string(name: 'DEPLOY_DIR', defaultValue: '/Users/zhugedongming/Code/patent/ai-claude-code-ui-jenkins-deploy', description: '项目部署目录（绝对路径）')
+        // 部署目录（绝对路径，不允许包含路径遍历字符）
+        string(name: 'DEPLOY_DIR', defaultValue: '/opt/claude-code-ui/deploy', description: '项目部署目录（绝对路径，禁止包含 .. 或特殊字符）')
         // 健康检查端口（应与 docker-compose.deploy.yml 中的宿主机映射端口一致）
-        string(name: 'HEALTH_PORT', defaultValue: '3001', description: '健康检查端口（宿主机映射端口）')
+        string(name: 'HEALTH_PORT', defaultValue: '3001', description: '健康检查端口（宿主机映射端口，1-65535）')
     }
 
     environment {
@@ -46,6 +46,41 @@ pipeline {
     }
 
     stages {
+        // ==================== 参数校验（Groovy 层，在 shell 之前执行） ====================
+        stage('Validate Params') {
+            steps {
+                script {
+                    // 校验 DEPLOY_DIR：必须为绝对路径，只允许字母、数字、-_/. 和空格
+                    def deployDir = params.DEPLOY_DIR?.trim()
+                    if (!deployDir) {
+                        error 'DEPLOY_DIR 不能为空'
+                    }
+                    // 拒绝路径遍历（.. 出现在任何位置）
+                    if (deployDir.contains('..')) {
+                        error "DEPLOY_DIR 包含路径遍历字符 '..': ${deployDir}"
+                    }
+                    // 必须以 / 开头（绝对路径）
+                    if (!deployDir.startsWith('/')) {
+                        error "DEPLOY_DIR 必须为绝对路径（以 / 开头）: ${deployDir}"
+                    }
+                    // 只允许安全字符：字母、数字、-、_、/、.、空格
+                    if (!(deployDir ==~ /^[a-zA-Z0-9\-_\/.\s]+$/)) {
+                        error "DEPLOY_DIR 包含非法字符，仅允许字母、数字、-、_、/、.、空格: ${deployDir}"
+                    }
+
+                    // 校验 HEALTH_PORT：必须为 1-65535 的纯数字
+                    def portStr = params.HEALTH_PORT?.trim()
+                    if (!(portStr ==~ /^[0-9]+$/)) {
+                        error "HEALTH_PORT 必须为纯数字: ${portStr}"
+                    }
+                    def portNum = portStr.toInteger()
+                    if (portNum < 1 || portNum > 65535) {
+                        error "HEALTH_PORT 超出合法范围 (1-65535): ${portNum}"
+                    }
+                }
+            }
+        }
+
         // ==================== 拉取代码 ====================
         stage('Checkout') {
             steps {
@@ -140,65 +175,51 @@ pipeline {
         stage('CD: Deploy') {
             steps {
                 echo "--- CD: 部署 (version: ${VERSION}) ---"
-                // 校验参数安全性，防止路径遍历和命令注入
-                sh """
-                    # 校验 DEPLOY_DIR：必须是绝对路径且不包含路径遍历字符
-                    case "${params.DEPLOY_DIR}" in
-                        ..*|*..*|*./*|*\\\\*|*['\\"\\\`\\\$\;]*)
-                            echo "ERROR: DEPLOY_DIR 包含非法字符: ${params.DEPLOY_DIR}"
-                            exit 1
-                            ;;
-                    esac
-                    if [ -z "${params.DEPLOY_DIR}" ]; then
-                        echo "ERROR: DEPLOY_DIR 不能为空"
-                        exit 1
-                    fi
+                // DEPLOY_DIR 和 HEALTH_PORT 已在 Validate Params 阶段通过 Groovy 正则校验
+                // 此处通过 Groovy 拼接将已校验的值注入到 shell 变量中，避免 shell 注入风险
+                sh """#!/bin/bash
+                    set -euo pipefail
 
-                    # 校验 HEALTH_PORT：必须为纯数字且在合法端口范围内
-                    if ! echo "${params.HEALTH_PORT}" | grep -qE '^[0-9]+$'; then
-                        echo "ERROR: HEALTH_PORT 必须为数字: ${params.HEALTH_PORT}"
-                        exit 1
-                    fi
-                    if [ "${params.HEALTH_PORT}" -lt 1 ] || [ "${params.HEALTH_PORT}" -gt 65535 ]; then
-                        echo "ERROR: HEALTH_PORT 超出合法范围 (1-65535): ${params.HEALTH_PORT}"
-                        exit 1
-                    fi
-                """
-                sh """
+                    DEPLOY_DIR="${params.DEPLOY_DIR.trim()}"
+                    HEALTH_PORT="${params.HEALTH_PORT.trim()}"
+
                     # 确保部署目录存在
-                    mkdir -p "${params.DEPLOY_DIR}"
+                    mkdir -p "\${DEPLOY_DIR}"
 
                     # 复制 docker-compose 模板到部署目录
-                    cp docker-compose.deploy.yml "${params.DEPLOY_DIR}/docker-compose.deploy.yml"
+                    cp docker-compose.deploy.yml "\${DEPLOY_DIR}/docker-compose.deploy.yml"
 
                     # 替换模板中的 \${IMAGE_VERSION}
                     export IMAGE_VERSION="${VERSION}"
                     if command -v envsubst >/dev/null 2>&1; then
-                        envsubst '\${IMAGE_VERSION}' < "${params.DEPLOY_DIR}/docker-compose.deploy.yml" > "${params.DEPLOY_DIR}/docker-compose.deploy.resolved.yml"
+                        envsubst '\${IMAGE_VERSION}' < "\${DEPLOY_DIR}/docker-compose.deploy.yml" > "\${DEPLOY_DIR}/docker-compose.deploy.resolved.yml"
                     else
-                        sed "s/\\\\\\${IMAGE_VERSION}/${VERSION}/g" "${params.DEPLOY_DIR}/docker-compose.deploy.yml" > "${params.DEPLOY_DIR}/docker-compose.deploy.resolved.yml"
+                        sed "s/\\\\\\${IMAGE_VERSION}/${VERSION}/g" "\${DEPLOY_DIR}/docker-compose.deploy.yml" > "\${DEPLOY_DIR}/docker-compose.deploy.resolved.yml"
                     fi
 
                     # 检查 .env.deploy 是否存在
-                    if [ ! -f "${params.DEPLOY_DIR}/.env.deploy" ]; then
-                        echo "ERROR: ${params.DEPLOY_DIR}/.env.deploy 不存在，请先手动创建"
+                    if [ ! -f "\${DEPLOY_DIR}/.env.deploy" ]; then
+                        echo "ERROR: \${DEPLOY_DIR}/.env.deploy 不存在，请先手动创建"
                         exit 1
                     fi
 
                     # 停止旧容器
-                    echo '>>> 停止旧容器...'
-                    docker-compose -f "${params.DEPLOY_DIR}/docker-compose.deploy.resolved.yml" down --timeout 30 2>/dev/null || true
+                    echo ">>> 停止旧容器..."
+                    docker-compose -f "\${DEPLOY_DIR}/docker-compose.deploy.resolved.yml" down --timeout 30 2>/dev/null || true
 
                     # 启动新容器
-                    echo '>>> 启动新容器...'
-                    docker-compose -f "${params.DEPLOY_DIR}/docker-compose.deploy.resolved.yml" up -d
+                    echo ">>> 启动新容器..."
+                    docker-compose -f "\${DEPLOY_DIR}/docker-compose.deploy.resolved.yml" up -d
 
-                    # 健康检查
-                    echo '>>> 健康检查...'
+                    # 健康检查（先 sleep 等待容器启动，首次检查时给予启动缓冲）
+                    echo ">>> 健康检查..."
                     TIMEOUT=90
                     ELAPSED=0
-                    while [ \$ELAPSED -lt \$TIMEOUT ]; do
-                        if curl -sf http://localhost:${params.HEALTH_PORT}/health >/dev/null 2>&1; then
+                    # 先等待 5 秒，给予容器启动缓冲时间，避免首次 curl 失败
+                    sleep 5
+                    ELAPSED=5
+                    while [ "\${ELAPSED}" -lt "\${TIMEOUT}" ]; do
+                        if curl -sf "http://localhost:\${HEALTH_PORT}/health" >/dev/null 2>&1; then
                             echo "健康检查通过 (\${ELAPSED}s)"
                             break
                         fi
@@ -207,17 +228,17 @@ pipeline {
                         echo "  等待中... (\${ELAPSED}s/\${TIMEOUT}s)"
                     done
 
-                    if [ \$ELAPSED -ge \$TIMEOUT ]; then
-                        echo 'ERROR: 健康检查失败'
+                    if [ "\${ELAPSED}" -ge "\${TIMEOUT}" ]; then
+                        echo "ERROR: 健康检查失败 (\${TIMEOUT}s 超时)"
                         # 将容器日志写入文件而非直接输出到 Jenkins 控制台，避免敏感信息泄露
-                        docker-compose -f "${params.DEPLOY_DIR}/docker-compose.deploy.resolved.yml" logs --tail 50 > "${params.DEPLOY_DIR}/deploy-failed.log" 2>&1
-                        echo "容器日志已保存到: ${params.DEPLOY_DIR}/deploy-failed.log"
+                        docker-compose -f "\${DEPLOY_DIR}/docker-compose.deploy.resolved.yml" logs --tail 50 > "\${DEPLOY_DIR}/deploy-failed.log" 2>&1
+                        echo "容器日志已保存到: \${DEPLOY_DIR}/deploy-failed.log"
                         echo "请登录 Agent 机器查看日志，排查问题后重试"
                         exit 1
                     fi
 
                     # 清理旧镜像
-                    echo '>>> 清理旧镜像...'
+                    echo ">>> 清理旧镜像..."
                     docker image prune -f --filter "until=168h" || true
 
                     echo ">>> 部署完成: ${VERSION}"
