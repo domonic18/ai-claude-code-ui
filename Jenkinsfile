@@ -28,7 +28,8 @@ pipeline {
     }
 
     environment {
-        // VERSION 在 Checkout 阶段之后通过 script 赋值，此处不初始化
+        // VERSION 在 Checkout 阶段之后通过 script 赋值
+        VERSION = 'pending'
     }
 
     // 每 5 分钟轮询 jenkins-test 分支，有新提交才触发
