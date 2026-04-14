@@ -28,7 +28,7 @@ const UNSAFE_PATH_CHARS = /[`$"'|&;(){}!#\\]/;
  * @param {string} filePath - 容器内文件路径
  * @throws {Error} 路径包含危险字符时抛出错误
  */
-function validateFilePath(filePath) {
+export function validateFilePath(filePath) {
   if (typeof filePath !== 'string' || !filePath.trim()) {
     throw new Error('filePath must be a non-empty string');
   }
@@ -130,11 +130,17 @@ export async function writeFileViaPutArchive(container, containerFilePath, conte
 }
 
 /**
- * 通过 shell 命令将内容写入容器文件（仅适用于小文件）
+ * 通过容器 exec 将内容写入容器文件（仅适用于小文件）
  *
- * 使用 base64 编码传输内容，避免特殊字符问题。
+ * 使用 base64 编码传输内容，通过 sh -c + 位置参数传递路径和内容，
+ * 完全避免 shell 拼接注入风险。
  * 受限于 exec 命令行参数长度，仅适用于 <80KB 的内容。
- * filePath 会经过安全校验，拒绝包含危险字符的路径。
+ *
+ * 安全设计：
+ * - filePath 通过 $1 传入，不经 shell 字符串拼接
+ * - base64Content 通过 $2 传入，由 base64 白名单校验保证安全
+ * - validateFilePath 额外拦截危险字符作为纵深防御
+ * - Cmd 使用数组格式，Docker API 直接传递参数给 sh，无注入面
  *
  * @param {object} containerManager - 容器管理器实例
  * @param {number} userId - 用户 ID
@@ -149,14 +155,16 @@ export async function writeFileViaShell(containerManager, userId, filePath, cont
 
   const base64Content = Buffer.from(content, 'utf8').toString('base64');
 
-  // 显式校验 base64 内容只包含合法字符，防止 shell 注入
+  // 显式校验 base64 内容只包含合法字符，防止注入
   if (!BASE64_REGEX.test(base64Content)) {
     throw new Error('writeFileViaShell: base64 content contains unexpected characters');
   }
 
+  // 使用数组格式 Cmd：['sh', '-c', '脚本体', '$0占位', '$1=filePath', '$2=base64Content']
+  // 脚本体中的 $1/$2 由 sh 从参数列表填充，不经过字符串拼接，无注入风险
   const { stream } = await containerManager.execInContainer(
     userId,
-    `printf '%s' "$(echo '${base64Content}' | base64 -d)" > "${filePath}"`
+    ['sh', '-c', 'printf \'%s\' "$2" | base64 -d > "$1"', 'writeFile', filePath, base64Content]
   );
 
   await new Promise((resolve, reject) => {
@@ -167,7 +175,7 @@ export async function writeFileViaShell(containerManager, userId, filePath, cont
         errorOutput += output;
       }
     });
-    stream.on('error', () => reject(new Error('Failed to write file')));
+    stream.on('error', (err) => reject(new Error(`Failed to write file: ${err.message}`)));
     stream.on('end', () => {
       if (errorOutput) {
         reject(new Error(`Write failed: ${errorOutput}`));

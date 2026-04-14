@@ -198,7 +198,7 @@ export class ProjectController extends BaseController {
       // 删除容器中的项目目录
       const projectPath = `${CONTAINER.paths.workspace}/${projectName}`;
 
-      const { stream } = await containerManager.execInContainer(userId, `rm -rf "${projectPath}"`);
+      const { stream } = await containerManager.execInContainer(userId, ['rm', '-rf', projectPath]);
 
       // 等待删除命令完成
       await new Promise((resolve, reject) => {
@@ -318,10 +318,10 @@ export class ProjectController extends BaseController {
           // 创建新工作空间
           try {
             // 创建目录
-            await containerManager.execInContainer(userId, `mkdir -p "${containerPath}"`);
+            await containerManager.execInContainer(userId, ['mkdir', '-p', containerPath]);
 
             // 初始化 git 仓库
-            await containerManager.execInContainer(userId, `cd "${containerPath}" && git init`);
+            await containerManager.execInContainer(userId, ['sh', '-c', 'cd "$1" && git init', 'gitInit', containerPath]);
 
             // 如果提供了 GitHub URL，克隆仓库
             if (cleanGithubUrl) {
@@ -366,9 +366,9 @@ export class ProjectController extends BaseController {
               });
 
               // 移动文件到目标位置
-              await containerManager.execInContainer(userId, `sh -c 'mv "${containerPath}/temp-repo"/.* "${containerPath}/" 2>/dev/null || true'`);
-              await containerManager.execInContainer(userId, `sh -c 'mv "${containerPath}/temp-repo"/* "${containerPath}/" 2>/dev/null || true'`);
-              await containerManager.execInContainer(userId, `rm -rf "${containerPath}/temp-repo"`);
+              await containerManager.execInContainer(userId, ['sh', '-c', 'mv "$1"/temp-repo/.* "$1/" 2>/dev/null || true', 'mvDotfiles', containerPath]);
+              await containerManager.execInContainer(userId, ['sh', '-c', 'mv "$1"/temp-repo/* "$1/" 2>/dev/null || true', 'mvFiles', containerPath]);
+              await containerManager.execInContainer(userId, ['rm', '-rf', `${containerPath}/temp-repo`]);
             }
 
             // 返回项目信息
@@ -389,7 +389,7 @@ export class ProjectController extends BaseController {
           } catch (error) {
             // 清理失败的创建
             try {
-              await containerManager.execInContainer(userId, `rm -rf "${containerPath}"`);
+              await containerManager.execInContainer(userId, ['rm', '-rf', containerPath]);
             } catch (cleanupError) {
               console.error('Failed to clean up workspace:', cleanupError);
             }
@@ -399,7 +399,7 @@ export class ProjectController extends BaseController {
         } else if (workspaceType === 'existing') {
           // 添加现有工作空间（容器中已存在）
           // 检查路径是否存在
-          const { stream } = await containerManager.execInContainer(userId, `ls -la "${containerPath}" 2>/dev/null || echo "NOT_FOUND"`);
+          const { stream } = await containerManager.execInContainer(userId, ['sh', '-c', 'ls -la "$1" 2>/dev/null || echo "NOT_FOUND"', 'lsCheck', containerPath]);
 
           await new Promise((resolve, reject) => {
             let output = '';

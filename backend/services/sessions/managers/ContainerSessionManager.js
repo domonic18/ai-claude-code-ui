@@ -158,7 +158,7 @@ export class ContainerSessionManager extends BaseSessionManager {
       for (const session of sessions) {
         try {
           const filePath = this._getSessionFilePath(projectPath, session.id);
-          const { stream } = await containerManager.execInContainer(userId, `cat "${filePath}"`);
+          const { stream } = await containerManager.execInContainer(userId, ['cat', filePath]);
           const content = await this._readCommandOutput(stream);
           const tokenStats = this._parseJsonlContent(content).stats;
           totalTokens += tokenStats.parseErrors || 0;

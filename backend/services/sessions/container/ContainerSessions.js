@@ -13,7 +13,7 @@
 import containerManager from '../../container/core/index.js';
 import { CONTAINER } from '../../../config/config.js';
 import { filterMemoryContext } from '../../../utils/memoryUtils.js';
-import { writeFileViaPutArchive as writeFileToContainerArchive, writeFileViaShell as writeShell } from '../../container/utils/containerFileWriter.js';
+import { writeFileViaPutArchive as writeFileToContainerArchive, writeFileViaShell as writeShell, validateFilePath } from '../../container/utils/containerFileWriter.js';
 
 /**
  * 编码项目名称为容器内存储格式
@@ -51,7 +51,7 @@ function encodeProjectName(projectName) {
 async function readFileFromContainer(userId, filePath) {
   const { stream } = await containerManager.execInContainer(
     userId,
-    `cat "${filePath}"`
+    ['cat', filePath]
   );
 
   // 使用 demuxStream 来正确处理 Docker 的多路复用协议
@@ -246,6 +246,9 @@ function parseJsonlContent(content) {
  * @returns {Promise<void>}
  */
 async function writeJsonlContentToContainer(userId, filePath, entries) {
+  // 安全校验：防止路径包含危险字符
+  validateFilePath(filePath);
+
   // Rebuild JSONL content
   const updatedContent = entries
     .map(entry => entry._raw || JSON.stringify(entry))
@@ -282,7 +285,7 @@ async function listSessionFiles(userId, projectName) {
   // 使用 for 循环查找所有 .jsonl 文件（更可靠）
   const { stream } = await containerManager.execInContainer(
     userId,
-    `for f in "${projectDir}"/*.jsonl; do [ -f "$f" ] && basename "$f"; done 2>/dev/null || echo ""`
+    ['sh', '-c', 'for f in "$1"/*.jsonl; do [ -f "$f" ] && basename "$f"; done 2>/dev/null || echo ""', 'listJsonl', projectDir]
   );
 
   // 使用 demuxStream 来正确处理 Docker 的多路复用协议
@@ -449,7 +452,7 @@ async function getSessionFilesInfo(userId, projectName) {
 
     const { stream } = await containerManager.execInContainer(
       userId,
-      `ls -la "${projectDir}" 2>/dev/null || echo "Directory not found"`
+      ['sh', '-c', 'ls -la "$1" 2>/dev/null || echo "Directory not found"', 'lsDir', projectDir]
     );
 
     // 使用 demuxStream 来正确处理 Docker 的多路复用协议

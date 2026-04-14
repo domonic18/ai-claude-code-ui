@@ -105,7 +105,7 @@ router.get('/browse-filesystem', authenticateToken, async (req, res) => {
     await containerManager.getOrCreateContainer(userId);
 
     // 在容器中执行 ls 命令列出目录内容
-    const { stream } = await containerManager.execInContainer(userId, `ls -la "${inputPath}" 2>/dev/null || echo "DIRECTORY_NOT_FOUND"`);
+    const { stream } = await containerManager.execInContainer(userId, ['sh', '-c', 'ls -la "$1" 2>/dev/null || echo "DIRECTORY_NOT_FOUND"', 'lsDir', inputPath]);
 
     // 使用 readStreamOutput 辅助函数读取流输出
     const output = await readStreamOutput(stream, { timeout: FILE_TIMEOUTS.streamRead });

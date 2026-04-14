@@ -40,7 +40,7 @@ export async function getProjectsInContainer(userId) {
     // 使用单个命令完成：列出目录 + 过滤 + 验证
     const { stream, exec } = await containerManager.execInContainer(
       userId,
-      `ls -1 "${workspacePath}" 2>/dev/null | grep -v "^\\.claude$" | grep -v "^memory$" || echo ""`
+      ['sh', '-c', 'ls -1 "$1" 2>/dev/null | grep -v "^\\.claude$" | grep -v "^memory$" || echo ""', 'listProjects', workspacePath]
     );
 
     // 收集输出
@@ -109,7 +109,7 @@ export async function getProjectsInContainer(userId) {
               // 在容器内创建 my-workspace 目录
               const { stream: createStream } = await containerManager.execInContainer(
                 userId,
-                `mkdir -p "${workspacePath}/my-workspace" && echo "created"`
+                ['sh', '-c', 'mkdir -p "$1/my-workspace" && echo "created"', 'createDefault', workspacePath]
               );
 
               // 等待命令完成
