@@ -28,8 +28,7 @@ pipeline {
     }
 
     environment {
-        // 镜像版本号 = git short commit hash
-        VERSION = """${sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()}"""
+        // VERSION 在 Checkout 阶段之后通过 script 赋值，此处不初始化
     }
 
     // 每 5 分钟轮询 develop 分支，有新提交才触发
@@ -101,7 +100,11 @@ pipeline {
                         credentialsId: 'github-ssh-key'
                     ]]
                 ])
-                sh "echo '版本: ${VERSION}'"
+                // checkout 完成后才有 .git，此时获取版本号
+                script {
+                    env.VERSION = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+                }
+                sh "echo '版本: ${env.VERSION}'"
                 sh 'git log --oneline -5'
             }
         }
@@ -140,7 +143,7 @@ pipeline {
         // ==================== CD: 构建 Docker 镜像 ====================
         stage('CD: Build Images') {
             steps {
-                echo "--- CD: 构建 Docker 镜像 (version: ${VERSION}) ---"
+                echo "--- CD: 构建 Docker 镜像 (version: ${env.VERSION}) ---"
                 sh '''
                     # 检查 base 镜像是否存在，不存在则先构建
                     if ! docker image inspect claude-code-ui:base >/dev/null 2>&1; then
@@ -153,7 +156,7 @@ pipeline {
                     docker build \
                         --build-arg BASE_IMAGE=claude-code-ui:base \
                         -f docker/Dockerfile.main \
-                        -t claude-code-ui:${VERSION} \
+                        -t claude-code-ui:${env.VERSION} \
                         -t claude-code-ui:latest \
                         .
 
@@ -162,7 +165,7 @@ pipeline {
                     docker build \
                         --build-arg BASE_IMAGE=claude-code-ui:base \
                         -f docker/Dockerfile.sandbox \
-                        -t claude-code-sandbox:${VERSION} \
+                        -t claude-code-sandbox:${env.VERSION} \
                         -t claude-code-sandbox:latest \
                         .
 
@@ -175,14 +178,14 @@ pipeline {
         // ==================== CD: 部署（调用 deploy.sh） ====================
         stage('CD: Deploy') {
             steps {
-                echo "--- CD: 部署 (version: ${VERSION}) ---"
+                echo "--- CD: 部署 (version: ${env.VERSION}) ---"
                 // 调用独立部署脚本，所有部署逻辑和纵深防御校验在 deploy.sh 中
                 // Groovy Validate Params 阶段为第一层防御，deploy.sh validate_* 为第二层防御
                 sh """
                     chmod +x scripts/deploy.sh
                     DEPLOY_DIR="${params.DEPLOY_DIR.trim()}" \
                     HEALTH_PORT="${params.HEALTH_PORT.trim()}" \
-                    ./scripts/deploy.sh "${VERSION}"
+                    ./scripts/deploy.sh "${env.VERSION}"
                 """
             }
         }
@@ -190,7 +193,7 @@ pipeline {
 
     post {
         success {
-            echo "部署成功! 版本: ${VERSION}"
+            echo "部署成功! 版本: ${env.VERSION}"
             // 部署成功时清理工作空间
             cleanWs()
             // 可加通知：邮件、钉钉、Slack 等
