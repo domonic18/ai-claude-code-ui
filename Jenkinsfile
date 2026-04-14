@@ -22,7 +22,7 @@ pipeline {
 
     parameters {
         // 部署目录（绝对路径，不允许包含路径遍历字符）
-        string(name: 'DEPLOY_DIR', defaultValue: '/opt/claude-code-ui/deploy', description: '项目部署目录（绝对路径，禁止包含 .. 或特殊字符）')
+        string(name: 'DEPLOY_DIR', defaultValue: '/Users/zhugedongming/Code/patent/ai-claude-code-ui-jenkins-deploy', description: '项目部署目录（绝对路径，禁止包含 .. 或特殊字符）')
         // 健康检查端口（应与 docker-compose.deploy.yml 中的宿主机映射端口一致）
         string(name: 'HEALTH_PORT', defaultValue: '3001', description: '健康检查端口（宿主机映射端口，1-65535）')
     }
@@ -30,6 +30,8 @@ pipeline {
     environment {
         // VERSION 在 Checkout 阶段之后通过 script 赋值
         VERSION = 'pending'
+        // macOS Agent 通过 SSH 连接时 PATH 不完整，需要手动补充
+        PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
     }
 
     // 每 5 分钟轮询 jenkins-test 分支，有新提交才触发
