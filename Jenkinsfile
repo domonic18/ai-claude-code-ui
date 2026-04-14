@@ -19,11 +19,16 @@ pipeline {
     // 所有阶段都在 macOS Agent 上执行
     agent { label 'macos' }
 
+    parameters {
+        // 部署目录（默认值可通过 Jenkins 全局配置覆盖）
+        string(name: 'DEPLOY_DIR', defaultValue: '/Users/zhugedongming/Code/patent/ai-claude-code-ui-jenkins-deploy', description: '项目部署目录（绝对路径）')
+        // 健康检查端口（应与 docker-compose.deploy.yml 中的宿主机映射端口一致）
+        string(name: 'HEALTH_PORT', defaultValue: '3001', description: '健康检查端口（宿主机映射端口）')
+    }
+
     environment {
         // 镜像版本号 = git short commit hash
         VERSION = """${sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()}"""
-        // 项目部署目录
-        DEPLOY_DIR = '/Users/zhugedongming/Code/patent/ai-claude-code-ui-jenkins-deploy'
     }
 
     // 每 5 分钟轮询 develop 分支，有新提交才触发
@@ -135,61 +140,61 @@ pipeline {
         stage('CD: Deploy') {
             steps {
                 echo "--- CD: 部署 (version: ${VERSION}) ---"
-                sh '''
+                sh """
                     # 确保部署目录存在
-                    mkdir -p ${DEPLOY_DIR}
+                    mkdir -p ${params.DEPLOY_DIR}
 
                     # 复制 docker-compose 模板到部署目录
-                    cp docker-compose.deploy.yml ${DEPLOY_DIR}/docker-compose.deploy.yml
+                    cp docker-compose.deploy.yml ${params.DEPLOY_DIR}/docker-compose.deploy.yml
 
-                    # 替换模板中的 ${IMAGE_VERSION}
+                    # 替换模板中的 \${IMAGE_VERSION}
                     export IMAGE_VERSION="${VERSION}"
                     if command -v envsubst >/dev/null 2>&1; then
-                        envsubst < ${DEPLOY_DIR}/docker-compose.deploy.yml > ${DEPLOY_DIR}/docker-compose.deploy.resolved.yml
+                        envsubst '\${IMAGE_VERSION}' < ${params.DEPLOY_DIR}/docker-compose.deploy.yml > ${params.DEPLOY_DIR}/docker-compose.deploy.resolved.yml
                     else
-                        sed "s/\\$\\{IMAGE_VERSION\\}/${VERSION}/g" ${DEPLOY_DIR}/docker-compose.deploy.yml > ${DEPLOY_DIR}/docker-compose.deploy.resolved.yml
+                        sed "s/\\\\\\${IMAGE_VERSION}/${VERSION}/g" ${params.DEPLOY_DIR}/docker-compose.deploy.yml > ${params.DEPLOY_DIR}/docker-compose.deploy.resolved.yml
                     fi
 
                     # 检查 .env.deploy 是否存在
-                    if [ ! -f ${DEPLOY_DIR}/.env.deploy ]; then
-                        echo "ERROR: ${DEPLOY_DIR}/.env.deploy 不存在，请先手动创建"
+                    if [ ! -f ${params.DEPLOY_DIR}/.env.deploy ]; then
+                        echo "ERROR: ${params.DEPLOY_DIR}/.env.deploy 不存在，请先手动创建"
                         exit 1
                     fi
 
                     # 停止旧容器
-                    echo ">>> 停止旧容器..."
-                    docker-compose -f ${DEPLOY_DIR}/docker-compose.deploy.resolved.yml down --timeout 30 2>/dev/null || true
+                    echo '>>> 停止旧容器...'
+                    docker-compose -f ${params.DEPLOY_DIR}/docker-compose.deploy.resolved.yml down --timeout 30 2>/dev/null || true
 
                     # 启动新容器
-                    echo ">>> 启动新容器..."
-                    docker-compose -f ${DEPLOY_DIR}/docker-compose.deploy.resolved.yml up -d
+                    echo '>>> 启动新容器...'
+                    docker-compose -f ${params.DEPLOY_DIR}/docker-compose.deploy.resolved.yml up -d
 
                     # 健康检查
-                    echo ">>> 健康检查..."
+                    echo '>>> 健康检查...'
                     TIMEOUT=90
                     ELAPSED=0
-                    while [ $ELAPSED -lt $TIMEOUT ]; do
-                        if curl -sf http://localhost:3001/health >/dev/null 2>&1; then
-                            echo "健康检查通过 (${ELAPSED}s)"
+                    while [ \$ELAPSED -lt \$TIMEOUT ]; do
+                        if curl -sf http://localhost:${params.HEALTH_PORT}/health >/dev/null 2>&1; then
+                            echo "健康检查通过 (\${ELAPSED}s)"
                             break
                         fi
                         sleep 5
-                        ELAPSED=$((ELAPSED + 5))
-                        echo "  等待中... (${ELAPSED}s/${TIMEOUT}s)"
+                        ELAPSED=\$((ELAPSED + 5))
+                        echo "  等待中... (\${ELAPSED}s/\${TIMEOUT}s)"
                     done
 
-                    if [ $ELAPSED -ge $TIMEOUT ]; then
-                        echo "ERROR: 健康检查失败"
-                        docker-compose -f ${DEPLOY_DIR}/docker-compose.deploy.resolved.yml logs --tail 50
+                    if [ \$ELAPSED -ge \$TIMEOUT ]; then
+                        echo 'ERROR: 健康检查失败'
+                        docker-compose -f ${params.DEPLOY_DIR}/docker-compose.deploy.resolved.yml logs --tail 50
                         exit 1
                     fi
 
                     # 清理旧镜像
-                    echo ">>> 清理旧镜像..."
+                    echo '>>> 清理旧镜像...'
                     docker image prune -f --filter "until=168h" || true
 
                     echo ">>> 部署完成: ${VERSION}"
-                '''
+                """
             }
         }
     }
