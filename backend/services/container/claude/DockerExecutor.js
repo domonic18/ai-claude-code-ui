@@ -13,7 +13,7 @@ import { processOutput } from './MessageTransformer.js';
 import { setSessionStream, getSession } from './SessionManager.js';
 import { SDK } from '../../../config/config.js';
 import { writeFileViaPutArchive } from '../utils/containerFileWriter.js';
-import { createLogger } from '../../../utils/logger.js';
+import { createLogger, sanitizePreview } from '../../../utils/logger.js';
 const logger = createLogger('services/container/claude/DockerExecutor');
 
 /**
@@ -140,7 +140,7 @@ async function copyImagesToContainer(container, images, cwd) {
     return imagePaths.map(p => p.containerPath);
 
   } catch (error) {
-    logger.error('[DockerExecutor] Error copying images to container:', error);
+    logger.error({ err: error }, '[DockerExecutor] Error copying images to container');
     // 清理临时文件
     try {
       await fs.rm(tempDir, { recursive: true, force: true });
@@ -161,10 +161,8 @@ async function copyImagesToContainer(container, images, cwd) {
  * @returns {Promise<object>} 执行结果 { output, sessionId }
  */
 export async function executeInContainer(userId, command, options, writer, sessionId) {
-  logger.info('[DockerExecutor] Starting execution');
-  logger.info('[DockerExecutor] userId:', userId);
-  logger.info('[DockerExecutor] command:', command);
-  logger.info('[DockerExecutor] cwd:', options.cwd);
+  logger.info({ sessionId, userId, cwd: options.cwd }, '[DockerExecutor] Starting execution');
+  logger.debug({ preview: sanitizePreview(command), totalLength: command?.length || 0 }, '[DockerExecutor] User command');
 
   try {
     // 获取容器信息
@@ -285,12 +283,17 @@ export async function executeInContainer(userId, command, options, writer, sessi
 
       // 监听 stderr（错误和调试信息）
       stderr.on('data', (chunk) => {
-        const errorMsg = chunk.toString();
-        // 只输出可打印的调试日志，避免输出二进制数据污染日志
-        if (errorMsg.startsWith('[SDK]') || errorMsg.includes('Error') || errorMsg.includes('Exception')) {
-          logger.error('[DockerExecutor] STDERR:', errorMsg.substring(0, 500));
+        const stderrText = chunk.toString();
+        stderrChunks.push(stderrText);
+
+        // 区分真正的错误和 SDK 调试输出
+        if (hasRealError(stderrText)) {
+          // 真正的错误：ERROR 级别，记录完整内容
+          logger.error({ sessionId, stderr: stderrText.substring(0, 2000) }, '[DockerExecutor] STDERR error detected');
+        } else if (stderrText.startsWith('[SDK]') || stderrText.includes('Error') || stderrText.includes('Exception')) {
+          // SDK 调试输出或非致命警告：DEBUG 级别
+          logger.debug({ sessionId, stderr: stderrText.substring(0, 500) }, '[DockerExecutor] STDERR debug output');
         }
-        stderrChunks.push(errorMsg);
       });
 
       // 监听流结束
@@ -311,16 +314,14 @@ export async function executeInContainer(userId, command, options, writer, sessi
         const stdoutOutput = stdoutChunks.join('');
         const stderrOutput = stderrChunks.join('');
 
-        logger.info('[DockerExecutor] Stream ended. Total chunks:', dataCount);
-        logger.info('[DockerExecutor] STDOUT length:', stdoutOutput.length);
-        logger.info('[DockerExecutor] STDERR length:', stderrOutput.length);
+        logger.info({ sessionId, totalChunks: dataCount, stdoutLength: stdoutOutput.length, stderrLength: stderrOutput.length }, '[DockerExecutor] Stream ended');
 
         // 检查是否有真正的错误
         if (hasRealError(stderrOutput)) {
-          logger.error('[DockerExecutor] Execution failed:', stderrOutput);
+          logger.error({ sessionId, stderr: stderrOutput.substring(0, 2000) }, '[DockerExecutor] Execution failed');
           settle(reject, new Error(`SDK execution error: ${stderrOutput}`));
         } else {
-          logger.info('[DockerExecutor] Execution completed successfully');
+          logger.info({ sessionId }, '[DockerExecutor] Execution completed successfully');
           settle(resolve, { output: stdoutOutput, sessionId });
         }
       });
@@ -329,13 +330,13 @@ export async function executeInContainer(userId, command, options, writer, sessi
         if (timeoutHandle) {
           clearTimeout(timeoutHandle);
         }
-        logger.error('[DockerExecutor] Stream error:', err);
+        logger.error({ sessionId, err }, '[DockerExecutor] Stream error');
         settle(reject, err);
       });
     });
 
   } catch (error) {
-    logger.error('[DockerExecutor] Exception:', error);
+    logger.error({ sessionId, err: error }, '[DockerExecutor] Exception during execution');
     throw new Error(`在容器中执行 SDK 失败：${error.message}`);
   }
 }

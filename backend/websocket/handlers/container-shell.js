@@ -10,7 +10,7 @@
 import { WebSocket } from 'ws';
 import { PTY_SESSION_TIMEOUT } from './shell-constants.js';
 import containerManager from '../../services/container/core/index.js';
-import { createLogger } from '../../utils/logger.js';
+import { createLogger, sanitizePreview } from '../../utils/logger.js';
 
 const logger = createLogger('websocket/handlers/container-shell');
 
@@ -64,8 +64,8 @@ export async function handleContainerShell(ws, data, ptySessionsMap) {
     logger.debug('[Container Shell] Project:', projectPath);
     logger.debug('[Container Shell] Session key:', ptySessionKey);
     logger.debug('[Container Shell] Provider:', provider);
-    logger.debug('[Container Shell] Initial command:', initialCommand || 'none');
-    logger.debug('[Container Shell] Terminal size:', cols, 'x', rows);
+    logger.debug({ initialCommandPreview: sanitizePreview(initialCommand) || 'none' }, '[Container Shell] Initial command');
+    logger.debug({ cols, rows }, '[Container Shell] Terminal size');
 
     // 欢迎消息
     let welcomeMsg;
@@ -107,7 +107,7 @@ export async function handleContainerShell(ws, data, ptySessionsMap) {
         }
     }
 
-    logger.debug('[Container Shell] Executing command:', shellCommand);
+    logger.debug({ shellCommandPreview: sanitizePreview(shellCommand) }, '[Container Shell] Executing command');
 
     try {
         // 使用 attach 方法获取可写的 Duplex 流
@@ -127,7 +127,7 @@ export async function handleContainerShell(ws, data, ptySessionsMap) {
         // 容器的主进程是 shell，所以我们可以直接发送命令
         // 使用 cd 和 && 来在项目目录中执行命令
         const initialCmd = `${shellCommand}\n`;
-        logger.debug('[Container Shell] Sending initial command to shell:', initialCmd.trim());
+        logger.debug({ commandPreview: sanitizePreview(initialCmd) }, '[Container Shell] Sending initial command to shell');
         if (stream.writable) {
             stream.write(initialCmd);
         } else {

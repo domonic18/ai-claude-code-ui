@@ -19,6 +19,54 @@ import pino from 'pino';
 const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
 
 /**
+ * 日志预览截断长度（字符数）
+ * 仅用于 DEBUG 级别的内容预览，生产环境默认不输出 DEBUG
+ */
+const LOG_PREVIEW_LENGTH = 50;
+
+/**
+ * 敏感信息正则模式列表
+ * 用于在日志预览中脱敏，防止意外泄露密钥、token、密码等
+ */
+const SENSITIVE_PATTERNS = [
+  /sk-[a-zA-Z0-9]{20,}/g,                // OpenAI / Anthropic API keys
+  /token[\s:=]+["']?[^\s"']+/gi,          // token=xxx / token: "xxx"
+  /password[\s:=]+["']?[^\s"']+/gi,       // password=xxx
+  /secret[\s:=]+["']?[^\s"']+/gi,         // secret=xxx
+  /api[-_]?key[\s:=]+["']?[^\s"']+/gi,    // api_key=xxx
+  /["'][a-f0-9]{32,}["']/gi,              // hex secrets in quotes
+];
+
+/**
+ * 对日志预览文本进行脱敏处理
+ *
+ * 替换明显的敏感模式为 ***，然后截断到指定长度。
+ * 仅用于 DEBUG 级别的消息内容预览，不应用于完整数据记录。
+ *
+ * @param {string} text - 原始文本
+ * @param {number} [maxLength=LOG_PREVIEW_LENGTH] - 最大预览长度
+ * @returns {string} 脱敏并截断后的文本
+ *
+ * @example
+ * sanitizePreview('my api_key is sk-abc1234567890123456789012 hello world')
+ * // => 'my api_key is *** hello world'
+ */
+export function sanitizePreview(text, maxLength = LOG_PREVIEW_LENGTH) {
+  if (typeof text !== 'string' || !text) {
+    return '';
+  }
+  let result = text;
+  for (const pattern of SENSITIVE_PATTERNS) {
+    // 每次替换前重置 lastIndex（因为 pattern 带有 /g 标志）
+    pattern.lastIndex = 0;
+    result = result.replace(pattern, '***');
+  }
+  return result.length > maxLength
+    ? result.substring(0, maxLength) + '...'
+    : result;
+}
+
+/**
  * 是否为开发环境
  */
 const IS_DEV = process.env.NODE_ENV !== 'production';

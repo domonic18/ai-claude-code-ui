@@ -12,7 +12,7 @@ import { spawnCursor, abortCursorSession, isCursorSessionActive, getActiveCursor
 import { queryCodex, abortCodexSession, isCodexSessionActive, getActiveCodexSessions } from '../../services/execution/codex/index.js';
 import { WebSocketWriter } from '../writer.js';
 import { formatReadInstructions } from '../../services/files/FileDocumentReader.js';
-import { createLogger } from '../../utils/logger.js';
+import { createLogger, sanitizePreview } from '../../utils/logger.js';
 
 const logger = createLogger('websocket/handlers/chat');
 
@@ -22,7 +22,7 @@ const logger = createLogger('websocket/handlers/chat');
  * @param {Set} connectedClients - 已连接客户端集合，用于项目更新
  */
 export function handleChatConnection(ws, connectedClients) {
-    logger.info('[INFO] Chat WebSocket connected');
+    logger.info('Chat WebSocket connected');
 
     // 添加到已连接客户端集合，用于项目更新
     connectedClients.add(ws);
@@ -34,9 +34,9 @@ export function handleChatConnection(ws, connectedClients) {
         try {
             const data = JSON.parse(message);
 
-            // 调试：打印完整 data.options 对象
+            // 调试：记录命令类型和模型（不含用户内容）
             if (data.type === 'claude-command') {
-                logger.debug('[WebSocket] Received claude-command, model:', data.options?.model);
+                logger.debug({ model: data.options?.model, hasAttachments: !!(data.attachments?.length) }, '[WebSocket] Received claude-command');
             }
 
             if (data.type === 'claude-command') {
@@ -73,9 +73,10 @@ export function handleChatConnection(ws, connectedClients) {
                 };
 
                 try {
+                    logger.debug({ preview: sanitizePreview(command), totalLength: command?.length || 0 }, '[WebSocket] Executing claude-command');
                     await queryClaudeSDKInContainer(command, containerOptions, writer);
                 } catch (sdkError) {
-                    logger.error('[ERROR] queryClaudeSDKInContainer failed:', sdkError);
+                    logger.error({ err: sdkError }, '[WebSocket] queryClaudeSDKInContainer failed');
                     throw sdkError;
                 }
             } else if (data.type === 'cursor-command') {
@@ -149,7 +150,7 @@ export function handleChatConnection(ws, connectedClients) {
                 });
             }
         } catch (error) {
-            logger.error('[ERROR] Chat WebSocket error:', error.message);
+            logger.error({ err: error }, '[WebSocket] Chat message handling error');
             writer.send({
                 type: 'error',
                 error: error.message
@@ -158,7 +159,7 @@ export function handleChatConnection(ws, connectedClients) {
     });
 
     ws.on('close', () => {
-        logger.info('🔌 Chat client disconnected');
+        logger.info('Chat client disconnected');
         // 从已连接客户端集合中移除
         connectedClients.delete(ws);
     });

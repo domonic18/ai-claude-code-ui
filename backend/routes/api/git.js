@@ -6,7 +6,7 @@ import { promises as fs } from 'fs';
 import { extractProjectDirectory } from '../../services/projects/index.js';
 import { queryClaudeSDK } from '../../services/execution/claude/index.js';
 import { spawnCursor } from '../../services/execution/cursor/index.js';
-import { createLogger } from '../../utils/logger.js';
+import { createLogger, sanitizePreview } from '../../utils/logger.js';
 const logger = createLogger('routes/api/git');
 
 const router = express.Router();
@@ -610,18 +610,16 @@ Generate the commit message:`;
       send: (data) => {
         try {
           const parsed = typeof data === 'string' ? JSON.parse(data) : data;
-          logger.info('🔍 Writer received message type:', parsed.type);
+          logger.debug({ messageType: parsed.type }, '[git] Writer received message');
 
           // 处理来自 Claude SDK 和 Cursor CLI 的不同消息格式
           // Claude SDK 发送: {type: 'claude-response', data: {message: {content: [...]}}}
           if (parsed.type === 'claude-response' && parsed.data) {
             const message = parsed.data.message || parsed.data;
-            logger.info('📦 Claude response message:', JSON.stringify(message, null, 2).substring(0, 500));
             if (message.content && Array.isArray(message.content)) {
               // 从内容数组中提取文本
               for (const item of message.content) {
                 if (item.type === 'text' && item.text) {
-                  logger.info('✅ Extracted text chunk:', item.text.substring(0, 100));
                   responseText += item.text;
                 }
               }
@@ -629,24 +627,21 @@ Generate the commit message:`;
           }
           // Cursor CLI 发送: {type: 'cursor-output', output: '...'}
           else if (parsed.type === 'cursor-output' && parsed.output) {
-            logger.info('✅ Cursor output:', parsed.output.substring(0, 100));
             responseText += parsed.output;
           }
           // 同时处理直接文本消息
           else if (parsed.type === 'text' && parsed.text) {
-            logger.info('✅ Direct text:', parsed.text.substring(0, 100));
             responseText += parsed.text;
           }
         } catch (e) {
           // 忽略解析错误
-          logger.error('Error parsing writer data:', e);
+          logger.debug({ err: e }, '[git] Error parsing writer data');
         }
       },
       setSessionId: () => {}, // 此用例的无操作
     };
 
-    logger.info('🚀 Calling AI agent with provider:', provider);
-    logger.info('📝 Prompt length:', prompt.length);
+    logger.info({ provider, promptLength: prompt.length }, '[git] Calling AI agent for commit message');
 
     // 调用相应的代理
     if (provider === 'claude') {
@@ -662,16 +657,16 @@ Generate the commit message:`;
       }, writer);
     }
 
-    logger.info('📊 Total response text collected:', responseText.length, 'characters');
-    logger.info('📄 Response preview:', responseText.substring(0, 200));
+    logger.info({ responseLength: responseText.length }, '[git] AI response collected');
+    logger.debug({ preview: sanitizePreview(responseText, 100), totalLength: responseText.length }, '[git] Response preview');
 
     // 清理响应
     const cleanedMessage = cleanCommitMessage(responseText);
-    logger.info('🧹 Cleaned message:', cleanedMessage.substring(0, 200));
+    logger.debug({ preview: sanitizePreview(cleanedMessage, 100) }, '[git] Cleaned commit message');
 
     return cleanedMessage || 'chore: update files';
   } catch (error) {
-    logger.error('Error generating commit message with AI:', error);
+    logger.error({ err: error }, '[git] Error generating commit message with AI');
     // 回退到简单消息
     return `chore: update ${files.length} file${files.length !== 1 ? 's' : ''}`;
   }
