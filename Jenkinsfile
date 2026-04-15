@@ -19,6 +19,11 @@ pipeline {
     // 所有阶段都在 macOS Agent 上执行
     agent { label 'macos' }
 
+    parameters {
+        // .env.deploy 文件的绝对路径（位于 workspace 外以避免被 CleanBeforeCheckout 清除）
+        string(name: 'ENV_DEPLOY_PATH', defaultValue: '', description: '.env.deploy 文件绝对路径（留空则跳过复制，测试将使用默认值）')
+    }
+
     environment {
         // macOS Agent 通过 SSH 连接时 PATH 不完整，需要手动补充
         PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
@@ -82,7 +87,12 @@ pipeline {
                 echo '--- CI: 运行测试 ---'
                 sh '''
                     # 从 workspace 外复制环境配置（避免被 CleanBeforeCheckout 清除）
-                    cp /Users/zhugedongming/Code/patent/.env.deploy .env.deploy 2>/dev/null || true
+                    if [ -n "${ENV_DEPLOY_PATH}" ] && [ -f "${ENV_DEPLOY_PATH}" ]; then
+                        cp "${ENV_DEPLOY_PATH}" .env.deploy
+                        echo "已复制环境配置: ${ENV_DEPLOY_PATH}"
+                    else
+                        echo "未指定 ENV_DEPLOY_PATH 或文件不存在，跳过（测试将使用默认值）"
+                    fi
                     npm run test:imports
                     npm run test:database
                     npm run test:user-settings-mcp
