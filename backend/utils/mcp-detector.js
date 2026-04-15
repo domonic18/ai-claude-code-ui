@@ -9,6 +9,8 @@
 import { promises as fsPromises } from 'fs';
 import path from 'path';
 import os from 'os';
+import { createLogger } from './logger.js';
+const logger = createLogger('utils/mcp-detector');
 
 /**
  * 检查是否配置了 task-master-ai MCP 服务器
@@ -136,7 +138,7 @@ export async function detectTaskMasterMCPServer() {
             };
         }
     } catch (error) {
-        console.error('检测 MCP 服务器配置时出错:', error);
+        logger.error('检测 MCP 服务器配置时出错:', error);
         return {
             hasMCPServer: false,
             reason: `检查 MCP 配置时出错: ${error.message}`,
@@ -187,7 +189,7 @@ export async function getAllMCPServers() {
             projectServers: configData.projects || {}
         };
     } catch (error) {
-        console.error('获取所有 MCP 服务器时出错:', error);
+        logger.error('获取所有 MCP 服务器时出错:', error);
         return {
             hasConfig: false,
             error: error.message,

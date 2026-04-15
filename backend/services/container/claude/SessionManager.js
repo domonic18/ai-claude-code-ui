@@ -1,3 +1,6 @@
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/container/claude/SessionManager');
+
 /**
  * 容器化 Claude SDK 会话管理器
  *
@@ -85,9 +88,9 @@ export async function abortSession(sessionId) {
     try {
       // 调用 stream.destroy() 中断流，从而终止 exec 进程
       session.stream.destroy();
-      console.log(`[SessionManager] Destroyed stream for session: ${sessionId}`);
+      logger.info(`[SessionManager] Destroyed stream for session: ${sessionId}`);
     } catch (error) {
-      console.error(`[SessionManager] Error destroying stream for session ${sessionId}:`, error.message);
+      logger.error(`[SessionManager] Error destroying stream for session ${sessionId}:`, error.message);
     }
   }
 

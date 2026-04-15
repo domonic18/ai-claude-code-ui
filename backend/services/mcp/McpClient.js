@@ -8,6 +8,8 @@
 
 import { spawn } from 'child_process';
 import { EventEmitter } from 'events';
+import { createLogger } from '../../utils/logger.js';
+const logger = createLogger('services/mcp/McpClient');
 
 /**
  * MCP客户端类
@@ -45,7 +47,7 @@ export class McpClient extends EventEmitter {
         throw new Error(`Unsupported MCP server type: ${this.server.type}`);
       }
     } catch (error) {
-      console.error(`[McpClient] Failed to connect to ${this.server.name}:`, error);
+      logger.error(`[McpClient] Failed to connect to ${this.server.name}:`, error);
       return false;
     }
   }
@@ -65,7 +67,7 @@ export class McpClient extends EventEmitter {
           return;
         }
 
-        console.log(`[McpClient] Starting stdio server: ${command} ${args.join(' ')}`);
+        logger.info(`[McpClient] Starting stdio server: ${command} ${args.join(' ')}`);
 
         // 准备环境变量
         const envOptions = {
@@ -91,19 +93,19 @@ export class McpClient extends EventEmitter {
         // 监听stderr
         this.process.stderr.on('data', (data) => {
           stderr += data.toString();
-          console.error(`[McpClient] stderr: ${data}`);
+          logger.error(`[McpClient] stderr: ${data}`);
         });
 
         // 监听进程退出
         this.process.on('close', (code) => {
-          console.log(`[McpClient] Process exited with code ${code}`);
+          logger.info(`[McpClient] Process exited with code ${code}`);
           this.connected = false;
           this.emit('disconnected');
         });
 
         // 监听错误
         this.process.on('error', (error) => {
-          console.error(`[McpClient] Process error:`, error);
+          logger.error(`[McpClient] Process error:`, error);
           this.connected = false;
           reject(error);
         });
@@ -112,7 +114,7 @@ export class McpClient extends EventEmitter {
         setTimeout(() => {
           if (this.process && !this.process.killed) {
             this.connected = true;
-            console.log(`[McpClient] Connected to ${this.server.name}`);
+            logger.info(`[McpClient] Connected to ${this.server.name}`);
             this.emit('connected');
             resolve(true);
           } else {
@@ -134,7 +136,7 @@ export class McpClient extends EventEmitter {
   async _connectHttp() {
     // HTTP连接需要实现HTTP客户端
     // 这里先返回基础实现
-    console.log(`[McpClient] HTTP connection not fully implemented for ${this.server.name}`);
+    logger.info(`[McpClient] HTTP connection not fully implemented for ${this.server.name}`);
     this.connected = true;
     this.emit('connected');
     return true;
@@ -148,7 +150,7 @@ export class McpClient extends EventEmitter {
   async _connectSse() {
     // SSE连接需要实现SSE客户端
     // 这里先返回基础实现
-    console.log(`[McpClient] SSE connection not fully implemented for ${this.server.name}`);
+    logger.info(`[McpClient] SSE connection not fully implemented for ${this.server.name}`);
     this.connected = true;
     this.emit('connected');
     return true;
@@ -174,7 +176,7 @@ export class McpClient extends EventEmitter {
         }
       }
     } catch (error) {
-      console.error(`[McpClient] Error handling message:`, error);
+      logger.error(`[McpClient] Error handling message:`, error);
     }
   }
 
@@ -196,7 +198,7 @@ export class McpClient extends EventEmitter {
       params
     };
 
-    console.log(`[McpClient] Sending request:`, method);
+    logger.info(`[McpClient] Sending request:`, method);
 
     // 对于stdio，写入stdin
     if (this.server.type === 'stdio' && this.process) {

@@ -20,6 +20,9 @@ import { createWebSocketServer } from './websocket/server.js';
 // 数据库和服务
 import { initializeDatabase } from './database/db.js';
 import { setupProjectsWatcher } from './utils/project-watcher.js';
+import { createLogger } from './utils/logger.js';
+
+const logger = createLogger('backend/index');
 
 // 注意：loadEnvironment() 已在 config.js 模块加载时自动调用
 
@@ -55,31 +58,31 @@ async function startServer() {
         logConfigStatus();
 
         // 记录运行模式
-        console.log(`${c.info('[INFO]')} Using Claude Agents SDK for Claude integration`);
-        console.log(`${c.info('[INFO]')} Running in ${c.bright(isProduction ? 'PRODUCTION' : 'DEVELOPMENT')} mode`);
+        logger.info(`${c.info('[INFO]')} Using Claude Agents SDK for Claude integration`);
+        logger.info(`${c.info('[INFO]')} Running in ${c.bright(isProduction ? 'PRODUCTION' : 'DEVELOPMENT')} mode`);
 
         if (!isProduction) {
-            console.log(`${c.warn('[WARN]')} Note: Requests will be proxied to Vite dev server at ${c.dim('http://localhost:' + SERVER.vitePort)}`);
+            logger.info(`${c.warn('[WARN]')} Note: Requests will be proxied to Vite dev server at ${c.dim('http://localhost:' + SERVER.vitePort)}`);
         }
 
         server.listen(SERVER.port, '0.0.0.0', async () => {
             const appInstallPath = process.cwd();
 
-            console.log('');
-            console.log(c.dim('═'.repeat(63)));
-            console.log(`  ${c.bright('Claude Code UI Server - Ready')}`);
-            console.log(c.dim('═'.repeat(63)));
-            console.log('');
-            console.log(`${c.info('[INFO]')} Server URL:  ${c.bright('http://0.0.0.0:' + SERVER.port)}`);
-            console.log(`${c.info('[INFO]')} Installed at: ${c.dim(appInstallPath)}`);
-            console.log(`${c.tip('[TIP]')}  Run "cloudcli status" for full configuration details`);
-            console.log('');
+            logger.info('');
+            logger.info(c.dim('═'.repeat(63)));
+            logger.info(`  ${c.bright('Claude Code UI Server - Ready')}`);
+            logger.info(c.dim('═'.repeat(63)));
+            logger.info('');
+            logger.info(`${c.info('[INFO]')} Server URL:  ${c.bright('http://0.0.0.0:' + SERVER.port)}`);
+            logger.info(`${c.info('[INFO]')} Installed at: ${c.dim(appInstallPath)}`);
+            logger.info(`${c.tip('[TIP]')}  Run "cloudcli status" for full configuration details`);
+            logger.info('');
 
             // 开始监控项目文件夹的更改
             await setupProjectsWatcher(connectedClients);
         });
     } catch (error) {
-        console.error('[ERROR] Failed to start server:', error);
+        logger.error('[ERROR] Failed to start server:', error);
         process.exit(1);
     }
 }

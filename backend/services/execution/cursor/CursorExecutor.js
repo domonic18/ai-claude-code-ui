@@ -3,6 +3,8 @@ import crossSpawn from 'cross-spawn';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/execution/cursor/CursorExecutor');
 
 // 在 Windows 上使用 cross-spawn 以获得更好的命令执行
 const spawnFunction = process.platform === 'win32' ? crossSpawn : spawn;
@@ -47,15 +49,15 @@ async function spawnCursor(command, options = {}, ws) {
     // 如果启用，则添加跳过权限标志
     if (skipPermissions || settings.skipPermissions) {
       args.push('-f');
-      console.log('⚠️  Using -f flag (skip permissions)');
+      logger.info('⚠️  Using -f flag (skip permissions)');
     }
 
     // 使用 cwd（实际项目目录）而不是 projectPath
     const workingDir = cwd || projectPath || process.cwd();
 
-    console.log('Spawning Cursor CLI:', 'cursor-agent', args.join(' '));
-    console.log('Working directory:', workingDir);
-    console.log('Session info - Input sessionId:', sessionId, 'Resume:', resume);
+    logger.info('Spawning Cursor CLI:', 'cursor-agent', args.join(' '));
+    logger.info('Working directory:', workingDir);
+    logger.info('Session info - Input sessionId:', sessionId, 'Resume:', resume);
     
     const cursorProcess = spawnFunction('cursor-agent', args, {
       cwd: workingDir,
@@ -70,14 +72,14 @@ async function spawnCursor(command, options = {}, ws) {
     // 处理 stdout（流式 JSON 响应）
     cursorProcess.stdout.on('data', (data) => {
       const rawOutput = data.toString();
-      console.log('📤 Cursor CLI stdout:', rawOutput);
+      logger.info('📤 Cursor CLI stdout:', rawOutput);
       
       const lines = rawOutput.split('\n').filter(line => line.trim());
       
       for (const line of lines) {
         try {
           const response = JSON.parse(line);
-          console.log('📄 Parsed JSON response:', response);
+          logger.info('📄 Parsed JSON response:', response);
           
           // 处理不同的消息类型
           switch (response.type) {
@@ -86,7 +88,7 @@ async function spawnCursor(command, options = {}, ws) {
                 // 捕获会话 ID
                 if (response.session_id && !capturedSessionId) {
                   capturedSessionId = response.session_id;
-                  console.log('📝 Captured session ID:', capturedSessionId);
+                  logger.info('📝 Captured session ID:', capturedSessionId);
 
                   // 使用捕获的会话 ID 更新进程键
                   if (processKey !== capturedSessionId) {
@@ -149,7 +151,7 @@ async function spawnCursor(command, options = {}, ws) {
 
             case 'result':
               // 会话完成
-              console.log('Cursor session result:', response);
+              logger.info('Cursor session result:', response);
 
               // 如果我们有缓冲内容，则发送最终消息
               if (messageBuffer) {
@@ -178,7 +180,7 @@ async function spawnCursor(command, options = {}, ws) {
               });
           }
         } catch (parseError) {
-          console.log('📄 Non-JSON response:', line);
+          logger.info('📄 Non-JSON response:', line);
           // 如果不是 JSON，则作为原始文本发送
           ws.send({
             type: 'cursor-output',
@@ -190,7 +192,7 @@ async function spawnCursor(command, options = {}, ws) {
 
     // 处理 stderr
     cursorProcess.stderr.on('data', (data) => {
-      console.error('Cursor CLI stderr:', data.toString());
+      logger.error('Cursor CLI stderr:', data.toString());
       ws.send({
         type: 'cursor-error',
         error: data.toString()
@@ -199,7 +201,7 @@ async function spawnCursor(command, options = {}, ws) {
     
     // 处理进程完成
     cursorProcess.on('close', async (code) => {
-      console.log(`Cursor CLI process exited with code ${code}`);
+      logger.info(`Cursor CLI process exited with code ${code}`);
 
       // 清理进程引用
       const finalSessionId = capturedSessionId || sessionId || processKey;
@@ -221,7 +223,7 @@ async function spawnCursor(command, options = {}, ws) {
 
     // 处理进程错误
     cursorProcess.on('error', (error) => {
-      console.error('Cursor CLI process error:', error);
+      logger.error('Cursor CLI process error:', error);
 
       // 错误时清理进程引用
       const finalSessionId = capturedSessionId || sessionId || processKey;
@@ -243,7 +245,7 @@ async function spawnCursor(command, options = {}, ws) {
 function abortCursorSession(sessionId) {
   const process = activeCursorProcesses.get(sessionId);
   if (process) {
-    console.log(`🛑 Aborting Cursor session: ${sessionId}`);
+    logger.info(`🛑 Aborting Cursor session: ${sessionId}`);
     process.kill('SIGTERM');
     activeCursorProcesses.delete(sessionId);
     return true;

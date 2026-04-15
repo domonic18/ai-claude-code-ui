@@ -12,6 +12,8 @@ import multer from 'multer';
 import { FileController } from '../../controllers/api/index.js';
 import { authenticate, validate } from '../../middleware/index.js';
 import { MAX_FILE_SIZE, MAX_FILES_COUNT, ALLOWED_UPLOAD_EXTENSIONS } from '../../services/files/constants.js';
+import { createLogger } from '../../utils/logger.js';
+const logger = createLogger('routes/api/files');
 
 const router = express.Router();
 const fileController = new FileController();
@@ -153,7 +155,7 @@ router.get('/:projectName/files/exists', authenticate(), validate({
 router.post('/upload', authenticate(), (req, res, next) => {
   upload.single('file')(req, res, (err) => {
     if (err) {
-      console.error('[UPLOAD] Multer error:', err);
+      logger.error('[UPLOAD] Multer error:', err);
       return next(err);
     }
     next();

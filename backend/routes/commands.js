@@ -5,6 +5,8 @@ import { fileURLToPath } from 'url';
 import os from 'os';
 import matter from 'gray-matter';
 import { CLAUDE_MODELS, CURSOR_MODELS, CODEX_MODELS } from '../../shared/modelConstants.js';
+import { createLogger } from '../utils/logger.js';
+const logger = createLogger('routes/commands');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -61,14 +63,14 @@ async function scanCommandsDirectory(dir, baseDir, namespace) {
             metadata: frontmatter
           });
         } catch (err) {
-          console.error(`Error parsing command file ${fullPath}:`, err.message);
+          logger.error(`Error parsing command file ${fullPath}:`, err.message);
         }
       }
     }
   } catch (err) {
     // 目录不存在或无法访问 - 这是正常的
     if (err.code !== 'ENOENT' && err.code !== 'EACCES') {
-      console.error(`Error scanning directory ${dir}:`, err.message);
+      logger.error(`Error scanning directory ${dir}:`, err.message);
     }
   }
 
@@ -220,7 +222,7 @@ Custom commands can be created in:
       version = packageJson.version;
       packageName = packageJson.name;
     } catch (err) {
-      console.error('Error reading package.json:', err);
+      logger.error('Error reading package.json:', err);
     }
 
     const uptime = process.uptime();
@@ -361,7 +363,7 @@ router.post('/list', async (req, res) => {
       count: allCommands.length
     });
   } catch (error) {
-    console.error('Error listing commands:', error);
+    logger.error('Error listing commands:', error);
     res.status(500).json({
       error: 'Failed to list commands',
       message: error.message
@@ -410,7 +412,7 @@ router.post('/load', async (req, res) => {
       });
     }
 
-    console.error('Error loading command:', error);
+    logger.error('Error loading command:', error);
     res.status(500).json({
       error: 'Failed to load command',
       message: error.message
@@ -444,7 +446,7 @@ router.post('/execute', async (req, res) => {
           command: commandName
         });
       } catch (error) {
-        console.error(`Error executing built-in command ${commandName}:`, error);
+        logger.error(`Error executing built-in command ${commandName}:`, error);
         return res.status(500).json({
           error: 'Command execution failed',
           message: error.message,
@@ -510,7 +512,7 @@ router.post('/execute', async (req, res) => {
       });
     }
 
-    console.error('Error executing command:', error);
+    logger.error('Error executing command:', error);
     res.status(500).json({
       error: 'Failed to execute command',
       message: error.message

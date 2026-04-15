@@ -10,6 +10,8 @@
 
 import { getDatabase } from '../connection.js';
 import { DEFAULT_CLAUDE_TOOLS } from '../../shared/constants/defaultTools.js';
+import { createLogger } from '../../utils/logger.js';
+const logger = createLogger('database/repositories/UserSettings.repository');
 
 /**
  * 用户设置数据仓库类
@@ -44,7 +46,7 @@ export class UserSettings {
         updatedAt: row.updated_at
       };
     } catch (error) {
-      console.error(`[UserSettings] Error getting settings for user ${userId}, provider ${provider}:`, error);
+      logger.error(`[UserSettings] Error getting settings for user ${userId}, provider ${provider}:`, error);
       throw new Error(`Failed to get user settings: ${error.message}`);
     }
   }
@@ -95,10 +97,10 @@ export class UserSettings {
         now
       );
 
-      console.log(`[UserSettings] Created settings for user ${userId}, provider ${provider}`);
+      logger.info(`[UserSettings] Created settings for user ${userId}, provider ${provider}`);
       return await this.getByUserId(userId, provider);
     } catch (error) {
-      console.error(`[UserSettings] Error creating settings for user ${userId}, provider ${provider}:`, error);
+      logger.error(`[UserSettings] Error creating settings for user ${userId}, provider ${provider}:`, error);
       throw new Error(`Failed to create user settings: ${error.message}`);
     }
   }
@@ -137,10 +139,10 @@ export class UserSettings {
         return await this.create(userId, provider, data);
       }
 
-      console.log(`[UserSettings] Updated settings for user ${userId}, provider ${provider}`);
+      logger.info(`[UserSettings] Updated settings for user ${userId}, provider ${provider}`);
       return await this.getByUserId(userId, provider);
     } catch (error) {
-      console.error(`[UserSettings] Error updating settings for user ${userId}, provider ${provider}:`, error);
+      logger.error(`[UserSettings] Error updating settings for user ${userId}, provider ${provider}:`, error);
       throw new Error(`Failed to update user settings: ${error.message}`);
     }
   }
@@ -162,13 +164,13 @@ export class UserSettings {
       const result = stmt.run(userId, provider);
 
       if (result.changes > 0) {
-        console.log(`[UserSettings] Deleted settings for user ${userId}, provider ${provider}`);
+        logger.info(`[UserSettings] Deleted settings for user ${userId}, provider ${provider}`);
         return true;
       }
 
       return false;
     } catch (error) {
-      console.error(`[UserSettings] Error deleting settings for user ${userId}, provider ${provider}:`, error);
+      logger.error(`[UserSettings] Error deleting settings for user ${userId}, provider ${provider}:`, error);
       throw new Error(`Failed to delete user settings: ${error.message}`);
     }
   }
@@ -198,7 +200,7 @@ export class UserSettings {
         updatedAt: row.updated_at
       }));
     } catch (error) {
-      console.error(`[UserSettings] Error getting all settings for user ${userId}:`, error);
+      logger.error(`[UserSettings] Error getting all settings for user ${userId}:`, error);
       throw new Error(`Failed to get all user settings: ${error.message}`);
     }
   }
@@ -224,7 +226,7 @@ export class UserSettings {
         // 其他 provider 的默认设置
         break;
       default:
-        console.warn(`[UserSettings] Unknown provider: ${provider}, using empty defaults`);
+        logger.warn(`[UserSettings] Unknown provider: ${provider}, using empty defaults`);
     }
 
     return defaults;
@@ -245,7 +247,7 @@ export class UserSettings {
     try {
       return JSON.parse(jsonString);
     } catch (error) {
-      console.error('[UserSettings] Error parsing JSON:', error);
+      logger.error('[UserSettings] Error parsing JSON:', error);
       return defaultValue;
     }
   }

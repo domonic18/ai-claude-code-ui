@@ -9,6 +9,7 @@
  */
 
 import { authenticatedFetch } from '@/shared/services';
+import { logger } from '@/shared/utils/logger';
 
 /**
  * Chat service configuration
@@ -95,7 +96,7 @@ export class ChatService {
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error('Error loading messages:', error);
+      logger.error('Error loading messages:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -139,7 +140,7 @@ export class ChatService {
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error('Error uploading file:', error);
+      logger.error('Error uploading file:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Upload failed',
@@ -179,7 +180,7 @@ export class ChatService {
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error('Error getting file info:', error);
+      logger.error('Error getting file info:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to get file info',
@@ -223,7 +224,7 @@ export class ChatService {
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error('Error executing command:', error);
+      logger.error('Error executing command:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Command execution failed',

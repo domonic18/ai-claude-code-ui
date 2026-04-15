@@ -5,6 +5,7 @@
  */
 
 import type { ReleaseInfo, UpdateProgress } from '../types';
+import { logger } from '@/shared/utils/logger';
 
 /**
  * System service class
@@ -27,7 +28,7 @@ export class SystemService {
       }
       return await response.json();
     } catch (error) {
-      console.error('Error checking for updates:', error);
+      logger.error('Error checking for updates:', error);
       return {
         updateAvailable: false,
         latestVersion: '',
@@ -84,7 +85,7 @@ export class SystemService {
         error: null,
       };
     } catch (error) {
-      console.error('Error performing update:', error);
+      logger.error('Error performing update:', error);
       return {
         success: false,
         output: '',

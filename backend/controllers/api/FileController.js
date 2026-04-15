@@ -16,6 +16,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import { execSync } from 'child_process';
 import tar from 'tar';
+import { createLogger } from '../../utils/logger.js';
+const logger = createLogger('controllers/api/FileController');
 
 /**
  * 文件控制器
@@ -158,10 +160,10 @@ export class FileController extends BaseController {
         recursive
       });
 
-      console.log('[FileController.deleteFile] User', userId, 'deleted:', path);
+      logger.info('[FileController.deleteFile] User', userId, 'deleted:', path);
       this._success(res, result, 'File deleted successfully');
     } catch (error) {
-      console.error('[FileController.deleteFile] Error:', error);
+      logger.error('[FileController.deleteFile] Error:', error);
       this._handleError(error, req, res, next);
     }
   }
@@ -182,10 +184,10 @@ export class FileController extends BaseController {
         containerMode: req.containerMode
       });
 
-      console.log('[FileController.renameFile] User', userId, 'renamed:', oldPath, '->', result.newPath);
+      logger.info('[FileController.renameFile] User', userId, 'renamed:', oldPath, '->', result.newPath);
       this._success(res, result, 'File renamed successfully');
     } catch (error) {
-      console.error('[FileController.renameFile] Error:', error);
+      logger.error('[FileController.renameFile] Error:', error);
       this._handleError(error, req, res, next);
     }
   }
@@ -220,7 +222,7 @@ export class FileController extends BaseController {
 
       this._success(res, result, 'Directory created successfully');
     } catch (error) {
-      console.error('[FileController.createDirectory] Error:', error);
+      logger.error('[FileController.createDirectory] Error:', error);
       this._handleError(error, req, res, next);
     }
   }
@@ -255,10 +257,10 @@ export class FileController extends BaseController {
         containerMode: req.containerMode
       });
 
-      console.log('[FileController.moveFile] User', userId, 'moved:', sourcePath, '->', result.newPath);
+      logger.info('[FileController.moveFile] User', userId, 'moved:', sourcePath, '->', result.newPath);
       this._success(res, result, 'File moved successfully');
     } catch (error) {
-      console.error('[FileController.moveFile] Error:', error);
+      logger.error('[FileController.moveFile] Error:', error);
       this._handleError(error, req, res, next);
     }
   }
@@ -415,10 +417,10 @@ export class FileController extends BaseController {
         date: today,
       };
 
-      console.log('[FileController.uploadFile] User', userId, 'uploaded:', originalName, '->', containerPath);
+      logger.info('[FileController.uploadFile] User', userId, 'uploaded:', originalName, '->', containerPath);
       this._success(res, responseData, 'File uploaded successfully');
     } catch (error) {
-      console.error('[FileController.uploadFile] Error:', error);
+      logger.error('[FileController.uploadFile] Error:', error);
       this._handleError(error, req, res, next);
     }
   }
@@ -508,13 +510,13 @@ export class FileController extends BaseController {
       // 找到目标文件
       const targetEntry = entries.find(e => e.path.endsWith(fileName) || path.basename(e.path) === fileName);
       if (!targetEntry) {
-        console.error('[FileController.downloadFile] File not found in archive. Available entries:', entries.map(e => e.path));
+        logger.error('[FileController.downloadFile] File not found in archive. Available entries:', entries.map(e => e.path));
         throw new Error('File not found in archive');
       }
 
       const fileContent = targetEntry.data;
 
-      console.log('[FileController.downloadFile] User', userId, 'downloaded:', containerPath, 'size:', fileContent.length, 'entry:', targetEntry.path);
+      logger.info('[FileController.downloadFile] User', userId, 'downloaded:', containerPath, 'size:', fileContent.length, 'entry:', targetEntry.path);
 
       // 设置响应头并发送文件
       res.setHeader('Content-Type', contentType);

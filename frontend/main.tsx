@@ -4,6 +4,7 @@ import App from './App'
 import ErrorBoundary from '@/shared/components/common/ErrorBoundary'
 import './index.css'
 import 'katex/dist/katex.min.css'
+import { logger } from '@/shared/utils/logger';
 
 /**
  * Clean up stale service workers on app load to prevent caching issues after builds
@@ -14,7 +15,7 @@ if ('serviceWorker' in navigator) {
       registration.unregister();
     });
   }).catch((err: Error) => {
-    console.warn('Failed to unregister service workers:', err);
+    logger.warn('Failed to unregister service workers:', err);
   });
 }
 

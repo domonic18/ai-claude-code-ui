@@ -20,6 +20,9 @@ import containerStateStore from './ContainerStateStore.js';
 import { syncExtensions } from '../../extensions/extension-sync.js';
 import { createExtensionTar } from '../../extensions/extension-tar.js';
 import { DEFAULT_MEMORY_TEMPLATE, MEMORY_SETUP_TIMEOUT } from '../../../shared/constants/memory.js';
+import { createLogger } from '../../../utils/logger.js';
+
+const logger = createLogger('container/core/ContainerLifecycle');
 
 const { Container } = repositories;
 
@@ -81,12 +84,12 @@ export class ContainerLifecycleManager {
         const staleThreshold = 30000; // 30 秒
 
         if (stateAge > staleThreshold) {
-          console.log(`[Lifecycle] Container ${containerName} not found, state is ${stateMachine.getState()} for ${Math.floor(stateAge / 1000)}s, force resetting to NON_EXISTENT`);
+          logger.info(`Container ${containerName} not found, state is ${stateMachine.getState()} for ${Math.floor(stateAge / 1000)}s, force resetting to NON_EXISTENT`);
           stateMachine.forceReset();
           await containerStateStore.save(stateMachine);
         } else {
           // 状态时间短，可能是活跃的创建过程，不要重置
-          console.log(`[Lifecycle] Container ${containerName} not found but state ${stateMachine.getState()} is recent (${Math.floor(stateAge / 1000)}s), not resetting (active creation in progress)`);
+          logger.info(`Container ${containerName} not found but state ${stateMachine.getState()} is recent (${Math.floor(stateAge / 1000)}s), not resetting (active creation in progress)`);
         }
       }
     }
@@ -98,7 +101,7 @@ export class ContainerLifecycleManager {
     stateMachine.on('stateChanged', async (event) => {
       const importantTransitions = ['ready', 'failed'];
       if (importantTransitions.includes(event.to)) {
-        console.log(`[Lifecycle] State changed for user ${userId}: ${event.from} -> ${event.to}`);
+        logger.info(`State changed for user ${userId}: ${event.from} -> ${event.to}`);
       }
       await containerStateStore.save(stateMachine);
     });
@@ -122,7 +125,7 @@ export class ContainerLifecycleManager {
         return false;
       }
       // 其他错误（网络问题等）保守地认为容器可能存在
-      console.warn(`[Lifecycle] Error verifying container ${containerName}: ${error.message}`);
+      logger.warn(`Error verifying container ${containerName}: ${error.message}`);
       return true;
     }
   }
@@ -191,13 +194,13 @@ export class ContainerLifecycleManager {
             try {
               Container.updateLastActive(containerInfo.id);
             } catch (err) {
-              console.warn(`[Lifecycle] Failed to update last_active: ${err.message}`);
+              logger.warn(`Failed to update last_active: ${err.message}`);
             }
             return containerInfo;
           }
         } catch (err) {
           // 容器可能已被删除，重置状态并重新创建
-          console.warn(`[Lifecycle] Container check failed: ${err.message}, resetting state to NON_EXISTENT`);
+          logger.warn(`Container check failed: ${err.message}, resetting state to NON_EXISTENT`);
         }
       }
 
@@ -278,12 +281,12 @@ export class ContainerLifecycleManager {
       stateMachine.transitionTo(ContainerState.READY);
       await containerStateStore.save(stateMachine);
 
-      console.log(`[Lifecycle] Container ${containerName} is ready for user ${userId}`);
+      logger.info(`Container ${containerName} is ready for user ${userId}`);
       return containerInfo;
 
     } catch (error) {
       // 设置失败状态
-      console.error(`[Lifecycle] Container creation failed for user ${userId}:`, error);
+      logger.error(`Container creation failed for user ${userId}:`, error);
       // 清除创建保护标志，允许后续操作重置状态
       stateMachine.endCreation();
       stateMachine.setFailed(error);
@@ -315,20 +318,20 @@ export class ContainerLifecycleManager {
     try {
       // 1. 创建用户数据目录（用于备份和本地开发环境）
       await fs.promises.mkdir(userDataDir, { recursive: true });
-      console.log(`[Lifecycle] Created user data directory: ${userDataDir}`);
+      logger.debug(`Created user data directory: ${userDataDir}`);
 
       // 2. 创建 .claude 目录并同步预置扩展（用于备份）
       const claudeDir = path.join(userDataDir, '.claude');
       await fs.promises.mkdir(claudeDir, { recursive: true });
-      console.log(`[Lifecycle] Created .claude directory: ${claudeDir}`);
+      logger.debug(`Created .claude directory: ${claudeDir}`);
 
       // 同步预置扩展到本地备份目录
       try {
         await syncExtensions(claudeDir, { overwriteUserFiles: true });
-        console.log(`[Lifecycle] Synced extensions to local backup for user ${userId}`);
+        logger.debug(`Synced extensions to local backup for user ${userId}`);
       } catch (syncError) {
         // 扩展同步失败不应阻止容器创建，只记录错误
-        console.warn(`[Lifecycle] Failed to sync extensions to local backup:`, syncError.message);
+        logger.warn(`Failed to sync extensions to local backup:`, syncError.message);
       }
 
       // 3. 创建命名卷（如果不存在）
@@ -349,16 +352,16 @@ export class ContainerLifecycleManager {
       await this._removeOrphanedContainerSync(containerName);
 
       // 6. 创建容器（使用命名卷）
-      console.log(`[Lifecycle] Creating container ${containerName}...`);
+      logger.info(`Creating container ${containerName}...`);
       let container;
       try {
         container = await new Promise((resolve, reject) => {
           this.docker.createContainer(containerConfig, (err, container) => {
             if (err) {
-              console.error(`[Lifecycle] Failed to create container:`, err);
+              logger.error(`Failed to create container:`, err);
               reject(err);
             } else {
-              console.log(`[Lifecycle] Container ${containerName} created with ID: ${container.id}`);
+              logger.info(`Container ${containerName} created with ID: ${container.id}`);
               resolve(container);
             }
           });
@@ -368,10 +371,10 @@ export class ContainerLifecycleManager {
       }
 
       // 7. 启动容器
-      console.log(`[Lifecycle] Starting container ${containerName}...`);
+      logger.info(`Starting container ${containerName}...`);
       try {
         await container.start();
-        console.log(`[Lifecycle] Container ${containerName} started`);
+        logger.info(`Container ${containerName} started`);
       } catch (startError) {
         throw new Error(`Failed to start container: ${startError.message}`);
       }
@@ -387,31 +390,31 @@ export class ContainerLifecycleManager {
           workspaceEnsured = true;
           break;
         } catch (wsErr) {
-          console.warn(`[Lifecycle] Workspace ensure attempt ${i + 1} failed: ${wsErr.message}`);
+          logger.warn(`Workspace ensure attempt ${i + 1} failed: ${wsErr.message}`);
           if (i < 2) {
             await new Promise(resolve => setTimeout(resolve, 1000));
           }
         }
       }
       if (!workspaceEnsured) {
-        console.warn(`[Lifecycle] Failed to ensure workspace after 3 attempts, will be created on-demand`);
+        logger.warn(`Failed to ensure workspace after 3 attempts, will be created on-demand`);
       }
 
       // 10. 同步扩展文件到容器内（必须在目录创建之后执行）
       try {
         await this._syncExtensionsToContainer(container, userId);
-        console.log(`[Lifecycle] Extensions synced to container ${containerName}`);
+        logger.debug(`Extensions synced to container ${containerName}`);
       } catch (syncError) {
         // 扩展同步失败不应阻止容器创建，只记录错误
-        console.warn(`[Lifecycle] Failed to sync extensions to container:`, syncError.message);
+        logger.warn(`Failed to sync extensions to container:`, syncError.message);
       }
 
       // 11. 在容器内创建 README.md 文件
       try {
         await this._createReadmeInContainer(container);
-        console.log(`[Lifecycle] README.md created in container ${containerName}`);
+        logger.debug(`README.md created in container ${containerName}`);
       } catch (readmeErr) {
-        console.warn(`[Lifecycle] Failed to create README.md:`, readmeErr.message);
+        logger.warn(`Failed to create README.md:`, readmeErr.message);
       }
 
       // 12. 构建容器信息
@@ -427,9 +430,9 @@ export class ContainerLifecycleManager {
       // 13. 写入数据库
       try {
         Container.create(userId, container.id, containerName);
-        console.log(`[Lifecycle] Container record saved to database: ${containerName}`);
+        logger.debug(`Container record saved to database: ${containerName}`);
       } catch (dbErr) {
-        console.warn(`[Lifecycle] Failed to save container to database: ${dbErr.message}`);
+        logger.warn(`Failed to save container to database: ${dbErr.message}`);
       }
 
       return containerInfo;
@@ -450,7 +453,7 @@ export class ContainerLifecycleManager {
       // 检查卷是否已存在
       const volume = this.docker.getVolume(volumeName);
       await volume.inspect();
-      console.log(`[Lifecycle] Volume ${volumeName} already exists`);
+      logger.debug(`Volume ${volumeName} already exists`);
     } catch (err) {
       // 卷不存在，创建新卷
       if (err.statusCode === 404) {
@@ -463,7 +466,7 @@ export class ContainerLifecycleManager {
             else resolve(volume);
           });
         });
-        console.log(`[Lifecycle] Created volume: ${volumeName}`);
+        logger.debug(`Created volume: ${volumeName}`);
       } else {
         throw err;
       }
@@ -484,7 +487,7 @@ export class ContainerLifecycleManager {
       // 如果容器正在运行，先停止
       if (info.State.Running || info.State.Paused) {
         await existingContainer.stop({ t: 5 }).catch(err => {
-          console.warn(`[Lifecycle] Failed to stop orphaned container: ${err.message}`);
+          logger.warn(`Failed to stop orphaned container: ${err.message}`);
         });
       }
 
@@ -494,7 +497,7 @@ export class ContainerLifecycleManager {
       // 等待容器确实被删除
       await this._waitForContainerRemoved(containerName, 10000);
 
-      console.log(`[Lifecycle] Removed orphaned container: ${containerName}`);
+      logger.debug(`Removed orphaned container: ${containerName}`);
 
     } catch (err) {
       // 容器不存在或已删除，这是正常的
@@ -605,9 +608,9 @@ export class ContainerLifecycleManager {
       // 从数据库中删除
       try {
         Container.delete(containerInfo.id);
-        console.log(`[Lifecycle] Container record removed from database: ${containerInfo.name}`);
+        logger.debug(`Container record removed from database: ${containerInfo.name}`);
       } catch (dbErr) {
-        console.warn(`[Lifecycle] Failed to remove container from database: ${dbErr.message}`);
+        logger.warn(`Failed to remove container from database: ${dbErr.message}`);
       }
 
       // 可选删除卷
@@ -689,7 +692,7 @@ export class ContainerLifecycleManager {
    */
   async loadContainersFromDatabase() {
     try {
-      console.log('[Lifecycle] Loading containers from database...');
+      logger.info('Loading containers from database...');
       const activeContainers = Container.listActive();
 
       for (const dbContainer of activeContainers) {
@@ -710,11 +713,11 @@ export class ContainerLifecycleManager {
               createdAt: new Date(created_at),
               lastActive: new Date(last_active)
             });
-            console.log(`[Lifecycle] Restored container for user ${user_id}: ${container_name}`);
+            logger.info(`Restored container for user ${user_id}: ${container_name}`);
           } else {
             // 容器未运行，更新数据库状态并清理状态机
             Container.updateStatus(container_id, 'stopped');
-            console.log(`[Lifecycle] Container ${container_name} is stopped, status updated in database`);
+            logger.info(`Container ${container_name} is stopped, status updated in database`);
             // 清理状态机状态 - 使用 forceReset 绕过转换规则
             const stateMachine = this.stateMachines.get(user_id);
             if (stateMachine) {
@@ -725,7 +728,7 @@ export class ContainerLifecycleManager {
         } catch (dockerErr) {
           // 容器在 Docker 中不存在，从数据库中删除并清理状态机
           if (dockerErr.statusCode === 404) {
-            console.log(`[Lifecycle] Container ${container_name} not found in Docker, removing from database`);
+            logger.info(`Container ${container_name} not found in Docker, removing from database`);
             Container.delete(container_id);
             // 清理状态机状态 - 使用 forceReset 绕过转换规则
             let stateMachine = this.stateMachines.get(user_id);
@@ -734,7 +737,7 @@ export class ContainerLifecycleManager {
               try {
                 stateMachine = await containerStateStore.load(user_id);
               } catch (loadErr) {
-                console.warn(`[Lifecycle] Could not load state machine for user ${user_id}: ${loadErr.message}`);
+                logger.warn(`Could not load state machine for user ${user_id}: ${loadErr.message}`);
               }
             }
             if (stateMachine) {
@@ -743,18 +746,18 @@ export class ContainerLifecycleManager {
               await containerStateStore.save(stateMachine);
             }
           } else {
-            console.warn(`[Lifecycle] Error checking container ${container_name}: ${dockerErr.message}`);
+            logger.warn(`Error checking container ${container_name}: ${dockerErr.message}`);
           }
         }
       }
 
-      console.log(`[Lifecycle] Loaded ${this.containers.size} containers from database`);
+      logger.info(`Loaded ${this.containers.size} containers from database`);
     } catch (error) {
       // 如果表不存在（数据库尚未迁移），静默忽略
       if (error.code === 'SQLITE_ERROR' && error.message.includes('no such table')) {
-        console.log('[Lifecycle] Database not yet initialized, skipping container load');
+        logger.info('Database not yet initialized, skipping container load');
       } else {
-        console.warn('[Lifecycle] Failed to load containers from database:', error.message);
+        logger.warn('Failed to load containers from database:', error.message);
       }
     }
   }
@@ -902,7 +905,7 @@ export class ContainerLifecycleManager {
       // 创建 /workspace/.claude/memory 目录
       const mkdirResult = await this._execWithTimeout(container, 'mkdir -p /workspace/.claude/memory', MEMORY_SETUP_TIMEOUT);
       if (mkdirResult.success) {
-        console.log('[Lifecycle] Created memory directory: /workspace/.claude/memory');
+        logger.debug('Created memory directory: /workspace/.claude/memory');
       }
 
       // 如果记忆文件不存在，创建默认记忆文件
@@ -918,11 +921,11 @@ export class ContainerLifecycleManager {
           MEMORY_SETUP_TIMEOUT
         );
         if (createResult.success) {
-          console.log('[Lifecycle] Created default memory file: /workspace/.claude/memory/MEMORY.md');
+          logger.debug('Created default memory file: /workspace/.claude/memory/MEMORY.md');
         }
       }
     } catch (error) {
-      console.warn('[Lifecycle] Failed to create memory directory/file:', error.message);
+      logger.warn('Failed to create memory directory/file:', error.message);
       // 不抛出错误，记忆文件创建失败不应阻止容器启动
     }
   }

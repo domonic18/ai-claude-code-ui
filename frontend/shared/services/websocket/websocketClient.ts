@@ -12,6 +12,7 @@ import type {
   WebSocketState,
   IWebSocketClient,
 } from './websocketTypes';
+import { logger } from '@/shared/utils/logger';
 
 /**
  * WebSocket Client Class
@@ -59,12 +60,12 @@ export class WebSocketClient implements IWebSocketClient {
     try {
       const wsUrl = this.buildWebSocketUrl();
 
-      console.log('[WebSocketClient] Connecting to:', wsUrl.replace(/token=[^&]+/, 'token=***'));
+      logger.info('[WebSocketClient] Connecting to:', wsUrl.replace(/token=[^&]+/, 'token=***'));
 
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = (event: Event) => {
-        console.log('[WebSocketClient] Connected successfully');
+        logger.info('[WebSocketClient] Connected successfully');
         this.state = 'connected';
         this.isConnecting = false;
         this.eventHandlers.onOpen?.(event);
@@ -75,7 +76,7 @@ export class WebSocketClient implements IWebSocketClient {
       };
 
       this.ws.onclose = (event: CloseEvent) => {
-        console.log('[WebSocketClient] Disconnected, code:', event.code, 'reason:', event.reason);
+        logger.info('[WebSocketClient] Disconnected, code:', event.code, 'reason:', event.reason);
         this.state = 'disconnected';
         this.ws = null;
         this.isConnecting = false;
@@ -85,21 +86,21 @@ export class WebSocketClient implements IWebSocketClient {
         // Attempt reconnection if not a normal close
         if (event.code !== 1000) {
           this.reconnectTimeout = setTimeout(() => {
-            console.log('[WebSocketClient] Attempting to reconnect...');
+            logger.info('[WebSocketClient] Attempting to reconnect...');
             this.connect();
           }, this.config.reconnectInterval);
         }
       };
 
       this.ws.onerror = (event: Event) => {
-        console.error('[WebSocketClient] Error:', event);
+        logger.error('[WebSocketClient] Error:', event);
         this.state = 'error';
         this.isConnecting = false;
         this.eventHandlers.onError?.(event);
       };
 
     } catch (error) {
-      console.error('[WebSocketClient] Error creating connection:', error);
+      logger.error('[WebSocketClient] Error creating connection:', error);
       this.state = 'error';
       this.isConnecting = false;
     }
@@ -130,7 +131,7 @@ export class WebSocketClient implements IWebSocketClient {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
     } else {
-      console.warn('[WebSocketClient] Cannot send message: not connected. State:', {
+      logger.warn('[WebSocketClient] Cannot send message: not connected. State:', {
         wsState: this.ws?.readyState,
         state: this.state,
       });

@@ -11,6 +11,8 @@ import express from 'express';
 import { syncExtensions, syncToAllUsers, getAllExtensions } from '../../services/extensions/extension-sync.js';
 import { authenticateToken } from '../../middleware/auth.js';
 import { getWorkspaceDir } from '../../config/config.js';
+import { createLogger } from '../../utils/logger.js';
+const logger = createLogger('routes/api/extensions');
 
 const router = express.Router();
 
@@ -29,7 +31,7 @@ router.get('/', authenticateToken, async (req, res) => {
       data: extensions
     });
   } catch (error) {
-    console.error('[Extensions API] Failed to get extensions:', error);
+    logger.error('[Extensions API] Failed to get extensions:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -50,14 +52,14 @@ router.post('/sync-all', authenticateToken, async (req, res) => {
     const { overwriteUserFiles = false } = req.body;
     const results = await syncToAllUsers({ overwriteUserFiles });
 
-    console.log(`[Extensions API] Synced to ${results.synced}/${results.total} users, ${results.failed} failed`);
+    logger.info(`[Extensions API] Synced to ${results.synced}/${results.total} users, ${results.failed} failed`);
 
     res.json({
       success: true,
       data: results
     });
   } catch (error) {
-    console.error('[Extensions API] Failed to sync to all users:', error);
+    logger.error('[Extensions API] Failed to sync to all users:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -89,14 +91,14 @@ router.post('/sync-user', authenticateToken, async (req, res) => {
 
     const results = await syncExtensions(claudeDir, { overwriteUserFiles });
 
-    console.log(`[Extensions API] Synced extensions for user ${userId}`);
+    logger.info(`[Extensions API] Synced extensions for user ${userId}`);
 
     res.json({
       success: true,
       data: results
     });
   } catch (error) {
-    console.error('[Extensions API] Failed to sync to user:', error);
+    logger.error('[Extensions API] Failed to sync to user:', error);
     res.status(500).json({
       success: false,
       error: error.message

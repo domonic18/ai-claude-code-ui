@@ -12,6 +12,9 @@ import { spawnCursor, abortCursorSession, isCursorSessionActive, getActiveCursor
 import { queryCodex, abortCodexSession, isCodexSessionActive, getActiveCodexSessions } from '../../services/execution/codex/index.js';
 import { WebSocketWriter } from '../writer.js';
 import { formatReadInstructions } from '../../services/files/FileDocumentReader.js';
+import { createLogger } from '../../utils/logger.js';
+
+const logger = createLogger('websocket/handlers/chat');
 
 /**
  * 处理聊天 WebSocket 连接
@@ -19,7 +22,7 @@ import { formatReadInstructions } from '../../services/files/FileDocumentReader.
  * @param {Set} connectedClients - 已连接客户端集合，用于项目更新
  */
 export function handleChatConnection(ws, connectedClients) {
-    console.log('[INFO] Chat WebSocket connected');
+    logger.info('[INFO] Chat WebSocket connected');
 
     // 添加到已连接客户端集合，用于项目更新
     connectedClients.add(ws);
@@ -33,7 +36,7 @@ export function handleChatConnection(ws, connectedClients) {
 
             // 调试：打印完整 data.options 对象
             if (data.type === 'claude-command') {
-                console.log('[WebSocket] Received claude-command, model:', data.options?.model);
+                logger.debug('[WebSocket] Received claude-command, model:', data.options?.model);
             }
 
             if (data.type === 'claude-command') {
@@ -72,7 +75,7 @@ export function handleChatConnection(ws, connectedClients) {
                 try {
                     await queryClaudeSDKInContainer(command, containerOptions, writer);
                 } catch (sdkError) {
-                    console.error('[ERROR] queryClaudeSDKInContainer failed:', sdkError);
+                    logger.error('[ERROR] queryClaudeSDKInContainer failed:', sdkError);
                     throw sdkError;
                 }
             } else if (data.type === 'cursor-command') {
@@ -146,7 +149,7 @@ export function handleChatConnection(ws, connectedClients) {
                 });
             }
         } catch (error) {
-            console.error('[ERROR] Chat WebSocket error:', error.message);
+            logger.error('[ERROR] Chat WebSocket error:', error.message);
             writer.send({
                 type: 'error',
                 error: error.message
@@ -155,7 +158,7 @@ export function handleChatConnection(ws, connectedClients) {
     });
 
     ws.on('close', () => {
-        console.log('🔌 Chat client disconnected');
+        logger.info('🔌 Chat client disconnected');
         // 从已连接客户端集合中移除
         connectedClients.delete(ws);
     });

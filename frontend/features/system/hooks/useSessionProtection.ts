@@ -8,6 +8,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { Project, Session as SidebarSession } from '@/features/sidebar/types/sidebar.types';
 import type { SessionProtectionState, SessionProtectionActions } from '../types';
+import { logger } from '@/shared/utils/logger';
 
 /**
  * Hook return type
@@ -70,7 +71,7 @@ export function useSessionProtection(
   const markSessionAsActive = useCallback((sessionId: string) => {
     if (sessionId) {
       setActiveSessions(prev => new Set([...prev, sessionId]));
-      console.log(`[SessionProtection] Session marked as active: ${sessionId}`);
+      logger.info(`[SessionProtection] Session marked as active: ${sessionId}`);
     }
   }, []);
 
@@ -82,7 +83,7 @@ export function useSessionProtection(
       setActiveSessions(prev => {
         const newSet = new Set(prev);
         newSet.delete(sessionId);
-        console.log(`[SessionProtection] Session marked as inactive: ${sessionId}`);
+        logger.info(`[SessionProtection] Session marked as inactive: ${sessionId}`);
         return newSet;
       });
     }
@@ -94,7 +95,7 @@ export function useSessionProtection(
   const markSessionAsProcessing = useCallback((sessionId: string) => {
     if (sessionId) {
       setProcessingSessions(prev => new Set([...prev, sessionId]));
-      console.log(`[SessionProtection] Session marked as processing: ${sessionId}`);
+      logger.info(`[SessionProtection] Session marked as processing: ${sessionId}`);
     }
   }, []);
 
@@ -106,7 +107,7 @@ export function useSessionProtection(
       setProcessingSessions(prev => {
         const newSet = new Set(prev);
         newSet.delete(sessionId);
-        console.log(`[SessionProtection] Session marked as not processing: ${sessionId}`);
+        logger.info(`[SessionProtection] Session marked as not processing: ${sessionId}`);
         return newSet;
       });
     }
@@ -117,7 +118,7 @@ export function useSessionProtection(
    */
   const clearAllActiveSessions = useCallback(() => {
     setActiveSessions(new Set());
-    console.log('[SessionProtection] All active sessions cleared');
+    logger.info('[SessionProtection] All active sessions cleared');
   }, []);
 
   /**
@@ -149,7 +150,7 @@ export function useSessionProtection(
    */
   const replaceTemporarySession = useCallback(async (tempId: string, realSessionId: string) => {
     if (realSessionId) {
-      console.log(`[SessionProtection] Replacing temporary session ${tempId} with: ${realSessionId}`);
+      logger.info(`[SessionProtection] Replacing temporary session ${tempId} with: ${realSessionId}`);
 
       setActiveSessions(prev => {
         const newSet = new Set<string>();
@@ -170,7 +171,7 @@ export function useSessionProtection(
       
       // Refresh sidebar to show the new session
       if (onRefresh) {
-        console.log('[SessionProtection] Refreshing sidebar to show new session');
+        logger.info('[SessionProtection] Refreshing sidebar to show new session');
         await onRefresh();
       }
     }

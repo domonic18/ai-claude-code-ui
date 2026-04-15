@@ -461,7 +461,7 @@ class ContainerManager {
       const idleTime = now - container.lastActive.getTime();
 
       if (idleTime > idleTimeout) {
-        console.log(`Cleaning up idle container for user ${userId}`);
+        logger(`Cleaning up idle container for user ${userId}`);
         await this.destroyContainer(userId, false);
       }
     }

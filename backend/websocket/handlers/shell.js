@@ -19,6 +19,9 @@ import {
     resizeSessionTerminal
 } from './session-manager.js';
 import { PTY_SESSION_TIMEOUT } from './shell-constants.js';
+import { createLogger } from '../../utils/logger.js';
+
+const logger = createLogger('websocket/handlers/shell');
 
 /**
  * 处理 shell WebSocket 连接
@@ -29,13 +32,13 @@ import { PTY_SESSION_TIMEOUT } from './shell-constants.js';
  * @param {Map} ptySessionsMap - 用于管理 PTY 会话的映射
  */
 export function handleShellConnection(ws, ptySessionsMap) {
-    console.log('🐚 Shell client connected');
+    logger.info('🐚 Shell client connected');
     let ptySessionKey = null;
 
     ws.on('message', async (message) => {
         try {
             const data = JSON.parse(message);
-            console.log('📨 Shell message received:', data.type);
+            logger.debug('📨 Shell message received:', data.type);
 
             if (data.type === 'init') {
                 const projectPath = data.projectPath || process.cwd();
@@ -45,16 +48,16 @@ export function handleShellConnection(ws, ptySessionsMap) {
                 const initialCommand = data.initialCommand;
                 const isPlainShell = data.isPlainShell || (!!initialCommand && !hasSession) || provider === 'plain-shell';
 
-                console.log('[Shell Debug] projectPath:', projectPath);
-                console.log('[Shell Debug] sessionId:', sessionId);
-                console.log('[Shell Debug] provider:', provider);
-                console.log('[Shell Debug] isPlainShell:', isPlainShell);
+                logger.debug('[Shell Debug] projectPath:', projectPath);
+                logger.debug('[Shell Debug] sessionId:', sessionId);
+                logger.debug('[Shell Debug] provider:', provider);
+                logger.debug('[Shell Debug] isPlainShell:', isPlainShell);
 
                 // 获取用户 ID（容器模式需要）
                 const userId = ws.user?.userId || ws.user?.id;
 
                 if (!userId) {
-                    console.error('[Shell] No userId found in ws.user');
+                    logger.error('[Shell] No userId found in ws.user');
                     ws.send(JSON.stringify({
                         type: 'output',
                         data: `\r\n\x1b[31mError: User authentication required\x1b[0m\r\n`
@@ -72,7 +75,7 @@ export function handleShellConnection(ws, ptySessionsMap) {
                     isContainerMode: true  // 始终为 true
                 });
 
-                console.log('[Shell] Container mode: Starting shell in container for project:', projectPath);
+                logger.info('[Shell] Container mode: Starting shell in container for project:', projectPath);
 
                 // 检查是否已有现有会话
                 if (reconnectToSession(ptySessionsMap, sessionKey, ws)) {
@@ -81,11 +84,11 @@ export function handleShellConnection(ws, ptySessionsMap) {
                 }
 
                 // 没有现有会话，创建新的容器 shell 会话
-                console.log('[Shell] No existing session, creating new container session');
+                logger.info('[Shell] No existing session, creating new container session');
                 const newSessionKey = await handleContainerShell(ws, data, ptySessionsMap);
                 if (newSessionKey) {
                     ptySessionKey = newSessionKey;
-                    console.log('[Shell] Container session key:', ptySessionKey);
+                    logger.info('[Shell] Container session key:', ptySessionKey);
                 }
 
             } else if (data.type === 'input') {
@@ -93,10 +96,10 @@ export function handleShellConnection(ws, ptySessionsMap) {
                 if (ptySessionKey) {
                     const success = await sendInputToSession(ptySessionsMap, ptySessionKey, data.data);
                     if (!success) {
-                        console.warn('Failed to send input to session');
+                        logger.warn('Failed to send input to session');
                     }
                 } else {
-                    console.warn('No active shell process to send input to');
+                    logger.warn('No active shell process to send input to');
                 }
 
             } else if (data.type === 'resize') {
@@ -104,13 +107,13 @@ export function handleShellConnection(ws, ptySessionsMap) {
                 if (ptySessionKey) {
                     const success = await resizeSessionTerminal(ptySessionsMap, ptySessionKey, data.cols, data.rows);
                     if (!success) {
-                        console.warn('Failed to resize terminal');
+                        logger.warn('Failed to resize terminal');
                     }
                 }
             }
 
         } catch (error) {
-            console.error('[ERROR] Shell WebSocket error:', error.message);
+            logger.error('[ERROR] Shell WebSocket error:', error.message);
             if (ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({
                     type: 'output',
@@ -121,7 +124,7 @@ export function handleShellConnection(ws, ptySessionsMap) {
     });
 
     ws.on('close', () => {
-        console.log('🔌 Shell client disconnected');
+        logger.info('🔌 Shell client disconnected');
 
         if (ptySessionKey) {
             handleWebSocketClose(ptySessionsMap, ptySessionKey, PTY_SESSION_TIMEOUT);
@@ -129,7 +132,7 @@ export function handleShellConnection(ws, ptySessionsMap) {
     });
 
     ws.on('error', (error) => {
-        console.error('[ERROR] Shell WebSocket error:', error);
+        logger.error('[ERROR] Shell WebSocket error:', error);
     });
 }
 

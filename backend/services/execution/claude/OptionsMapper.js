@@ -8,6 +8,8 @@
  */
 
 import { CLAUDE_MODELS } from '../../../../shared/modelConstants.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/execution/claude/OptionsMapper');
 
 /**
  * 获取自定义 API 配置
@@ -106,22 +108,22 @@ export function mapCliOptionsToSDK(options = {}) {
   // 映射模型
   if (customConfig.model) {
     sdkOptions.model = customConfig.model;
-    console.log(`Using custom model from environment: ${sdkOptions.model}`);
+    logger.info(`Using custom model from environment: ${sdkOptions.model}`);
   } else {
     sdkOptions.model = options.model || CLAUDE_MODELS.DEFAULT;
-    console.log(`Using model: ${sdkOptions.model}`);
+    logger.info(`Using model: ${sdkOptions.model}`);
   }
 
   // 如果指定了自定义 API 基础 URL
   if (customConfig.baseURL) {
     sdkOptions.baseURL = customConfig.baseURL;
-    console.log(`Using custom API endpoint: ${customConfig.baseURL}`);
+    logger.info(`Using custom API endpoint: ${customConfig.baseURL}`);
   }
 
   // 如果指定了自定义 API 密钥
   if (customConfig.apiKey) {
     sdkOptions.apiKey = customConfig.apiKey;
-    console.log(`Using custom API key from environment`);
+    logger.info(`Using custom API key from environment`);
   }
 
   // 映射系统提示配置

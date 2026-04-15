@@ -8,6 +8,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { getSettingsService } from '../services/settingsService';
 import type { McpServer } from '../types/settings.types';
+import { logger } from '@/shared/utils/logger';
 
 export interface McpServerState {
   servers: McpServer[];
@@ -63,7 +64,7 @@ export function useMcpServers(): UseMcpServersReturn {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch MCP servers';
       setError(message);
-      console.error('[useMcpServers] Error fetching servers:', err);
+      logger.error('[useMcpServers] Error fetching servers:', err);
     } finally {
       setLoading(false);
     }

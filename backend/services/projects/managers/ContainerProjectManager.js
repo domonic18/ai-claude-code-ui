@@ -12,6 +12,8 @@ import containerManager from '../../container/core/index.js';
 import { getSessionsInContainer } from '../../sessions/container/ContainerSessions.js';
 import { CONTAINER, FILE_TIMEOUTS } from '../../../config/config.js';
 import { loadProjectConfig } from '../config/index.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/projects/managers/ContainerProjectManager');
 
 /**
  * 从容器内获取项目列表
@@ -53,7 +55,7 @@ export async function getProjectsInContainer(userId) {
       });
 
       stream.on('error', (err) => {
-        console.warn(`[ContainerProjectManager] Stream error: ${err.message}`);
+        logger.warn(`[ContainerProjectManager] Stream error: ${err.message}`);
         resolve([]);
       });
 
@@ -104,7 +106,7 @@ export async function getProjectsInContainer(userId) {
 
           // 如果没有项目，自动创建默认工作区
           if (projectList.length === 0) {
-            console.log(`[ContainerProjectManager] No projects found in container, creating default workspace`);
+            logger.info(`[ContainerProjectManager] No projects found in container, creating default workspace`);
             try {
               // 在容器内创建 my-workspace 目录
               const { stream: createStream } = await containerManager.execInContainer(
@@ -133,9 +135,9 @@ export async function getProjectsInContainer(userId) {
                 codexSessions: []
               });
 
-              console.log(`[ContainerProjectManager] Default workspace created successfully: my-workspace`);
+              logger.info(`[ContainerProjectManager] Default workspace created successfully: my-workspace`);
             } catch (createError) {
-              console.warn(`[ContainerProjectManager] Failed to create default workspace: ${createError.message}`);
+              logger.warn(`[ContainerProjectManager] Failed to create default workspace: ${createError.message}`);
             }
           }
 

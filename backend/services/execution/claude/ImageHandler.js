@@ -9,6 +9,8 @@
 
 import { promises as fs } from 'fs';
 import path from 'path';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/execution/claude/ImageHandler');
 
 /**
  * 处理图像 - 将 base64 图像保存到临时文件并修改提示
@@ -36,7 +38,7 @@ export async function handleImages(command, images, cwd) {
       // 提取 base64 数据和 mime 类型
       const matches = image.data.match(/^data:([^;]+);base64,(.+)$/);
       if (!matches) {
-        console.error('Invalid image data format');
+        logger.error('Invalid image data format');
         continue;
       }
 
@@ -57,10 +59,10 @@ export async function handleImages(command, images, cwd) {
       modifiedCommand = command + imageNote;
     }
 
-    console.log(`Processed ${tempImagePaths.length} images to temp directory: ${tempDir}`);
+    logger.info(`Processed ${tempImagePaths.length} images to temp directory: ${tempDir}`);
     return { modifiedCommand, tempImagePaths, tempDir };
   } catch (error) {
-    console.error('Error processing images for SDK:', error);
+    logger.error('Error processing images for SDK:', error);
     return { modifiedCommand: command, tempImagePaths, tempDir };
   }
 }
@@ -80,20 +82,20 @@ export async function cleanupTempFiles(tempImagePaths, tempDir) {
     // 删除单个临时文件
     for (const imagePath of tempImagePaths) {
       await fs.unlink(imagePath).catch(err =>
-        console.error(`Failed to delete temp image ${imagePath}:`, err)
+        logger.error(`Failed to delete temp image ${imagePath}:`, err)
       );
     }
 
     // 删除临时目录
     if (tempDir) {
       await fs.rm(tempDir, { recursive: true, force: true }).catch(err =>
-        console.error(`Failed to delete temp directory ${tempDir}:`, err)
+        logger.error(`Failed to delete temp directory ${tempDir}:`, err)
       );
     }
 
-    console.log(`Cleaned up ${tempImagePaths.length} temp image files`);
+    logger.info(`Cleaned up ${tempImagePaths.length} temp image files`);
   } catch (error) {
-    console.error('Error during temp file cleanup:', error);
+    logger.error('Error during temp file cleanup:', error);
   }
 }
 

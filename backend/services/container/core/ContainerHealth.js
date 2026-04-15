@@ -7,6 +7,8 @@
  */
 
 import { CONTAINER_TIMEOUTS } from '../../../config/config.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/container/core/ContainerHealth');
 
 /**
  * 容器健康监控器类
@@ -60,7 +62,7 @@ export class ContainerHealthMonitor {
             if (!health) {
               // StartPeriod 期间，健康状态尚未初始化，继续等待
             } else if (health.Status === 'healthy') {
-              console.log(`[HealthCheck] Container ${containerId.substring(0, 12)} is healthy`);
+              logger.info(`[HealthCheck] Container ${containerId.substring(0, 12)} is healthy`);
               return true;
             } else if (health.Status === 'unhealthy') {
               throw new Error(`Container ${containerId} is unhealthy`);

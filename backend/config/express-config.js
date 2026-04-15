@@ -28,6 +28,8 @@ import mcpUtilsRoutes from '../routes/mcp-utils.js';
 import { validateApiKey, authenticateToken } from '../middleware/auth.js';
 import { responseFormatter, responseHeaders } from '../middleware/response-formatter.middleware.js';
 import { errorHandler, notFoundHandler } from '../middleware/error-handler.middleware.js';
+import { createLogger } from '../utils/logger.js';
+const logger = createLogger('config/express-config');
 
 /**
  * 使用中间件和路由配置 Express 应用
@@ -83,9 +85,9 @@ export function configureExpress(app, wss) {
 
     // SAML 路由（必须在 validateApiKey 之前定义）
     // 统一使用 /api/auth/saml 前缀：/api/auth/saml/sso-login, /api/auth/saml/callback, /api/auth/saml/status, /api/auth/saml/metadata, /api/auth/saml/logout
-    console.log('[CONFIG] Registering SAML routes...');
+    logger.info('[CONFIG] Registering SAML routes...');
     app.use('/api/auth/saml', saml);
-    console.log('[CONFIG] SAML routes registered successfully');
+    logger.info('[CONFIG] SAML routes registered successfully');
 
     // 认证路由必须在 validateApiKey 之前定义
     app.use('/api/auth', auth);

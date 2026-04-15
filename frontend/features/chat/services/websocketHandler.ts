@@ -17,6 +17,7 @@ import { filterMemoryContext } from '@/shared/utils';
 import { convertSessionMessages } from '../utils/messageConversion';
 import type { ChatMessage } from '../types';
 import type { WebSocketMessage } from '@/shared/types';
+import { logger } from '@/shared/utils/logger';
 
 // Message ID counter to ensure unique IDs
 let messageIdCounter = 0;
@@ -91,14 +92,14 @@ const safeLocalStorage = {
     try {
       localStorage.setItem(key, value);
     } catch (e) {
-      console.warn(`${translate('websocket.error.localStorageSetFailed')}:`, e);
+      logger.warn(`${translate('websocket.error.localStorageSetFailed')}:`, e);
     }
   },
   removeItem: (key: string): void => {
     try {
       localStorage.removeItem(key);
     } catch (e) {
-      console.warn(`${translate('websocket.error.localStorageRemoveFailed')}:`, e);
+      logger.warn(`${translate('websocket.error.localStorageRemoveFailed')}:`, e);
     }
   }
 };
@@ -127,14 +128,14 @@ export function handleWebSocketMessage(
 
   // For new sessions (currentSessionId is null), allow messages through
   if (!isGlobalMessage && message.sessionId && currentSessionId && message.sessionId !== currentSessionId) {
-    console.log(`⏭️ ${translate('websocket.log.skippingMessage')}:`, message.sessionId, 'current:', currentSessionId);
+    logger.info(`⏭️ ${translate('websocket.log.skippingMessage')}:`, message.sessionId, 'current:', currentSessionId);
     return false;
   }
 
   switch (message.type) {
     case 'session-start':
       // Session initialization message - just acknowledge it
-      console.log(`📝 ${translate('websocket.log.sessionStarted')}:`, message.sessionId);
+      logger.info(`📝 ${translate('websocket.log.sessionStarted')}:`, message.sessionId);
       return true;
 
     case 'memory-context':
@@ -193,7 +194,7 @@ export function handleWebSocketMessage(
       return handleSessionAborted(message, callbacks, currentSessionId);
 
     default:
-      console.log('Unknown message type:', message.type);
+      logger.info('Unknown message type:', message.type);
       return false;
   }
 }
@@ -212,7 +213,7 @@ function handleSessionCreated(
   const isTemporarySession = !currentSessionId || currentSessionId.startsWith('temp-');
   
   if (message.sessionId && isTemporarySession) {
-    console.log('[WS] Session created:', message.sessionId, '(replacing:', currentSessionId, ')');
+    logger.info('[WS] Session created:', message.sessionId, '(replacing:', currentSessionId, ')');
 
     // Store to localStorage for persistence
     safeLocalStorage.setItem('pendingSessionId', message.sessionId);
@@ -249,7 +250,7 @@ function handleMemoryContext(message: WebSocketMessage, callbacks: MessageHandle
     // Memory context is NOT added to the chat messages
     callbacks.onMemoryContext(message.content, message.sessionId);
   }
-  console.log('[WS] Memory context received:', message.content?.length, 'chars');
+  logger.info('[WS] Memory context received:', message.content?.length, 'chars');
   return true;
 }
 
@@ -276,7 +277,7 @@ function handleTodoWrite(message: WebSocketMessage, callbacks: MessageHandlerCal
     callbacks.onSetTasks(tasks);
     return true;
   } catch (e) {
-    console.warn('Error handling TodoWrite message:', e);
+    logger.warn('Error handling TodoWrite message:', e);
     return false;
   }
 }
@@ -291,7 +292,7 @@ function handleClaudeResponse(message: WebSocketMessage, callbacks: MessageHandl
   const sdkType = message.data?.type;
   const dataType = messageData?.type;
   const dataRole = messageData?.role;
-  console.log('[WS] handleClaudeResponse -', {
+  logger.info('[WS] handleClaudeResponse -', {
     sdkType,
     dataType,
     dataRole,
@@ -476,20 +477,20 @@ function handleCursorSystem(
     if (cdata && cdata.type === 'system' && cdata.subtype === 'init' && cdata.session_id) {
       // Log the session detection but don't navigate
       if (currentSessionId && cdata.session_id !== currentSessionId) {
-        console.log('🔄 Cursor session switch detected:', { originalSession: currentSessionId, newSession: cdata.session_id });
+        logger.info('🔄 Cursor session switch detected:', { originalSession: currentSessionId, newSession: cdata.session_id });
         // Update internal state only (no navigation)
         callbacks.onSetSessionId(cdata.session_id);
         return true;
       }
       if (!currentSessionId) {
-        console.log('🔄 Cursor new session init detected:', { newSession: cdata.session_id });
+        logger.info('🔄 Cursor new session init detected:', { newSession: cdata.session_id });
         // Update internal state only (no navigation)
         callbacks.onSetSessionId(cdata.session_id);
         return true;
       }
     }
   } catch (e) {
-    console.warn('Error handling cursor-system message:', e);
+    logger.warn('Error handling cursor-system message:', e);
   }
   return false;
 }
@@ -559,7 +560,7 @@ function handleCursorResult(
         });
       }
     } catch (e) {
-      console.warn('Error handling cursor-result message:', e);
+      logger.warn('Error handling cursor-result message:', e);
     }
   }
 
@@ -606,7 +607,7 @@ function handleClaudeComplete(
   
   // Update UI state if this is the current session
   if (isCurrentSession) {
-    console.log('[WS] Completing stream for session:', completedSessionId, 'current:', currentSessionId);
+    logger.info('[WS] Completing stream for session:', completedSessionId, 'current:', currentSessionId);
     callbacks.onSetLoading(false);
     // Complete the streaming state
     callbacks.completeStream?.();
@@ -622,7 +623,7 @@ function handleClaudeComplete(
   if (pendingSessionId && !currentSessionId && message.exitCode === 0) {
     callbacks.onSetSessionId(pendingSessionId);
     safeLocalStorage.removeItem('pendingSessionId');
-    console.log('✅ New session complete, ID set to:', pendingSessionId);
+    logger.info('✅ New session complete, ID set to:', pendingSessionId);
   }
 
   // Clear persisted chat messages after successful completion

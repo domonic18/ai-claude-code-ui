@@ -18,6 +18,8 @@ import { Container, ContainerState } from './repositories/Container.repository.j
 import { Credential } from './repositories/Credential.repository.js';
 import { UserSettings } from './repositories/UserSettings.repository.js';
 import { McpServer } from './repositories/McpServer.repository.js';
+import { createLogger } from '../utils/logger.js';
+const logger = createLogger('database/db');
 
 /**
  * 初始化数据库
@@ -37,7 +39,7 @@ export function initializeDatabase() {
         // 标记为已初始化
         markDatabaseInitialized();
     } catch (error) {
-        console.error('初始化数据库错误:', error.message);
+        logger.error('初始化数据库错误:', error.message);
         throw error;
     }
 }

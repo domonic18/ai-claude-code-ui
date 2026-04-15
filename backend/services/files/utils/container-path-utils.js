@@ -8,6 +8,8 @@
 
 import containerManager from '../../container/core/index.js';
 import { CONTAINER } from '../../../config/config.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/files/utils/container-path-utils');
 
 /**
  * 在容器内执行命令并等待完成
@@ -108,21 +110,21 @@ export function hostPathToContainerPath(hostPath) {
 export function buildContainerPath(safePath, options = {}) {
   // 如果 safePath 已经是容器内的绝对路径，直接返回
   if (safePath.startsWith(CONTAINER.paths.projects) || safePath.startsWith(CONTAINER.paths.workspace)) {
-    console.log('[PathUtils] Path is already absolute container path:', safePath);
+    logger.info('[PathUtils] Path is already absolute container path:', safePath);
     return safePath;
   }
 
   const { projectPath = '', isContainerProject = false } = options;
 
-  console.log('[PathUtils] buildContainerPath - safePath:', safePath, 'projectPath:', projectPath, 'isContainerProject:', isContainerProject);
+  logger.info('[PathUtils] buildContainerPath - safePath:', safePath, 'projectPath:', projectPath, 'isContainerProject:', isContainerProject);
 
   // 验证 projectPath：如果是绝对路径（以 / 开头），这是错误的用法
   let normalizedProjectPath = projectPath;
   if (projectPath && projectPath.startsWith('/')) {
-    console.error('[PathUtils] ERROR: projectPath should not be an absolute path:', projectPath);
+    logger.error('[PathUtils] ERROR: projectPath should not be an absolute path:', projectPath);
     // 移除前导斜杠，只保留相对部分
     normalizedProjectPath = projectPath.substring(1);
-    console.log('[PathUtils] Normalized projectPath to:', normalizedProjectPath);
+    logger.info('[PathUtils] Normalized projectPath to:', normalizedProjectPath);
   }
 
   // 处理当前目录 '.' 的情况，移除它以避免路径中出现 /./
@@ -144,7 +146,7 @@ export function buildContainerPath(safePath, options = {}) {
     ? `${basePath}/${processedSafePath}`.replace(/\/+/g, '/')
     : basePath.replace(/\/+/g, '/');
 
-  console.log('[PathUtils] Final container path:', result);
+  logger.info('[PathUtils] Final container path:', result);
 
   return result;
 }

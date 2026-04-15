@@ -18,6 +18,8 @@ import os from 'os';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { loadEnvironment, DATABASE, SERVER, CLAUDE, c } from './config/config.js';
+import { createLogger } from './utils/logger.js';
+const logger = createLogger('cli');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -39,62 +41,62 @@ function getInstallDir() {
 
 // 显示状态命令
 function showStatus() {
-    console.log(`\n${c.bright('Claude Code UI - Status')}\n`);
-    console.log(c.dim('═'.repeat(60)));
+    logger.info(`\n${c.bright('Claude Code UI - Status')}\n`);
+    logger.info(c.dim('═'.repeat(60)));
 
     // 版本信息
-    console.log(`\n${c.info('[INFO]')} Version: ${c.bright(packageJson.version)}`);
+    logger.info(`\n${c.info('[INFO]')} Version: ${c.bright(packageJson.version)}`);
 
     // 安装位置
     const installDir = getInstallDir();
-    console.log(`\n${c.info('[INFO]')} Installation Directory:`);
-    console.log(`       ${c.dim(installDir)}`);
+    logger.info(`\n${c.info('[INFO]')} Installation Directory:`);
+    logger.info(`       ${c.dim(installDir)}`);
 
     // 数据库位置
     const dbPath = getDatabasePath();
     const dbExists = fs.existsSync(dbPath);
-    console.log(`\n${c.info('[INFO]')} Database Location:`);
-    console.log(`       ${c.dim(dbPath)}`);
-    console.log(`       Status: ${dbExists ? c.ok('[OK] Exists') : c.warn('[WARN] Not created yet (will be created on first run)')}`);
+    logger.info(`\n${c.info('[INFO]')} Database Location:`);
+    logger.info(`       ${c.dim(dbPath)}`);
+    logger.info(`       Status: ${dbExists ? c.ok('[OK] Exists') : c.warn('[WARN] Not created yet (will be created on first run)')}`);
 
     if (dbExists) {
         const stats = fs.statSync(dbPath);
-        console.log(`       Size: ${c.dim((stats.size / 1024).toFixed(2) + ' KB')}`);
-        console.log(`       Modified: ${c.dim(stats.mtime.toLocaleString())}`);
+        logger.info(`       Size: ${c.dim((stats.size / 1024).toFixed(2) + ' KB')}`);
+        logger.info(`       Modified: ${c.dim(stats.mtime.toLocaleString())}`);
     }
 
     // 环境变量
-    console.log(`\n${c.info('[INFO]')} Configuration:`);
-    console.log(`       PORT: ${c.bright(SERVER.port)} ${c.dim(process.env.PORT ? '' : '(default)')}`);
-    console.log(`       DATABASE_PATH: ${c.dim(DATABASE.path)}`);
-    console.log(`       CLAUDE_CLI_PATH: ${c.dim(CLAUDE.cliPath)}`);
-    console.log(`       CONTEXT_WINDOW: ${c.dim(CLAUDE.contextWindow)}`);
+    logger.info(`\n${c.info('[INFO]')} Configuration:`);
+    logger.info(`       PORT: ${c.bright(SERVER.port)} ${c.dim(process.env.PORT ? '' : '(default)')}`);
+    logger.info(`       DATABASE_PATH: ${c.dim(DATABASE.path)}`);
+    logger.info(`       CLAUDE_CLI_PATH: ${c.dim(CLAUDE.cliPath)}`);
+    logger.info(`       CONTEXT_WINDOW: ${c.dim(CLAUDE.contextWindow)}`);
 
     // Claude 项目文件夹
     const claudeProjectsPath = path.join(os.homedir(), '.claude', 'projects');
     const projectsExists = fs.existsSync(claudeProjectsPath);
-    console.log(`\n${c.info('[INFO]')} Claude Projects Folder:`);
-    console.log(`       ${c.dim(claudeProjectsPath)}`);
-    console.log(`       Status: ${projectsExists ? c.ok('[OK] Exists') : c.warn('[WARN] Not found')}`);
+    logger.info(`\n${c.info('[INFO]')} Claude Projects Folder:`);
+    logger.info(`       ${c.dim(claudeProjectsPath)}`);
+    logger.info(`       Status: ${projectsExists ? c.ok('[OK] Exists') : c.warn('[WARN] Not found')}`);
 
     // 配置文件位置
     const envFilePath = path.join(__dirname, '../.env');
     const envExists = fs.existsSync(envFilePath);
-    console.log(`\n${c.info('[INFO]')} Configuration File:`);
-    console.log(`       ${c.dim(envFilePath)}`);
-    console.log(`       Status: ${envExists ? c.ok('[OK] Exists') : c.warn('[WARN] Not found (using defaults)')}`);
+    logger.info(`\n${c.info('[INFO]')} Configuration File:`);
+    logger.info(`       ${c.dim(envFilePath)}`);
+    logger.info(`       Status: ${envExists ? c.ok('[OK] Exists') : c.warn('[WARN] Not found (using defaults)')}`);
 
-    console.log('\n' + c.dim('═'.repeat(60)));
-    console.log(`\n${c.tip('[TIP]')} Hints:`);
-    console.log(`      ${c.dim('>')} Use ${c.bright('cloudcli --port 8080')} to run on a custom port`);
-    console.log(`      ${c.dim('>')} Use ${c.bright('cloudcli --database-path /path/to/db')} for custom database`);
-    console.log(`      ${c.dim('>')} Run ${c.bright('cloudcli help')} for all options`);
-    console.log(`      ${c.dim('>')} Access the UI at http://localhost:${SERVER.port}\n`);
+    logger.info('\n' + c.dim('═'.repeat(60)));
+    logger.info(`\n${c.tip('[TIP]')} Hints:`);
+    logger.info(`      ${c.dim('>')} Use ${c.bright('cloudcli --port 8080')} to run on a custom port`);
+    logger.info(`      ${c.dim('>')} Use ${c.bright('cloudcli --database-path /path/to/db')} for custom database`);
+    logger.info(`      ${c.dim('>')} Run ${c.bright('cloudcli help')} for all options`);
+    logger.info(`      ${c.dim('>')} Access the UI at http://localhost:${SERVER.port}\n`);
 }
 
 // 显示帮助
 function showHelp() {
-    console.log(`
+    logger.info(`
 ╔═══════════════════════════════════════════════════════════════╗
 ║              Claude Code UI - Command Line Tool               ║
 ╚═══════════════════════════════════════════════════════════════╝
@@ -139,7 +141,7 @@ Report Issues:
 
 // 显示版本
 function showVersion() {
-    console.log(`${packageJson.version}`);
+    logger.info(`${packageJson.version}`);
 }
 
 // 比较语义化版本，如果 v1 > v2 则返回 true
@@ -161,16 +163,16 @@ async function checkForUpdates(silent = false) {
         const currentVersion = packageJson.version;
 
         if (isNewerVersion(latestVersion, currentVersion)) {
-            console.log(`\n${c.warn('[UPDATE]')} New version available: ${c.bright(latestVersion)} (current: ${currentVersion})`);
-            console.log(`         Run ${c.bright('cloudcli update')} to update\n`);
+            logger.info(`\n${c.warn('[UPDATE]')} New version available: ${c.bright(latestVersion)} (current: ${currentVersion})`);
+            logger.info(`         Run ${c.bright('cloudcli update')} to update\n`);
             return { hasUpdate: true, latestVersion, currentVersion };
         } else if (!silent) {
-            console.log(`${c.ok('[OK]')} You are on the latest version (${currentVersion})`);
+            logger.info(`${c.ok('[OK]')} You are on the latest version (${currentVersion})`);
         }
         return { hasUpdate: false, latestVersion, currentVersion };
     } catch (e) {
         if (!silent) {
-            console.log(`${c.warn('[WARN]')} Could not check for updates`);
+            logger.info(`${c.warn('[WARN]')} Could not check for updates`);
         }
         return { hasUpdate: false, error: e.message };
     }
@@ -180,21 +182,21 @@ async function checkForUpdates(silent = false) {
 async function updatePackage() {
     try {
         const { execSync } = await import('child_process');
-        console.log(`${c.info('[INFO]')} Checking for updates...`);
+        logger.info(`${c.info('[INFO]')} Checking for updates...`);
 
         const { hasUpdate, latestVersion, currentVersion } = await checkForUpdates(true);
 
         if (!hasUpdate) {
-            console.log(`${c.ok('[OK]')} Already on the latest version (${currentVersion})`);
+            logger.info(`${c.ok('[OK]')} Already on the latest version (${currentVersion})`);
             return;
         }
 
-        console.log(`${c.info('[INFO]')} Updating from ${currentVersion} to ${latestVersion}...`);
+        logger.info(`${c.info('[INFO]')} Updating from ${currentVersion} to ${latestVersion}...`);
         execSync('npm update -g @domonic18/ai-claude-code-ui', { stdio: 'inherit' });
-        console.log(`${c.ok('[OK]')} Update complete! Restart cloudcli to use the new version.`);
+        logger.info(`${c.ok('[OK]')} Update complete! Restart cloudcli to use the new version.`);
     } catch (e) {
-        console.error(`${c.error('[ERROR]')} Update failed: ${e.message}`);
-        console.log(`${c.tip('[TIP]')} Try running manually: npm update -g @domonic18/ai-claude-code-ui`);
+        logger.error(`${c.error('[ERROR]')} Update failed: ${e.message}`);
+        logger.info(`${c.tip('[TIP]')} Try running manually: npm update -g @domonic18/ai-claude-code-ui`);
     }
 }
 
@@ -270,14 +272,14 @@ async function main() {
             await updatePackage();
             break;
         default:
-            console.error(`\n❌ Unknown command: ${command}`);
-            console.log('   Run "cloudcli help" for usage information.\n');
+            logger.error(`\n❌ Unknown command: ${command}`);
+            logger.info('   Run "cloudcli help" for usage information.\n');
             process.exit(1);
     }
 }
 
 // 运行 CLI
 main().catch(error => {
-    console.error('\n❌ Error:', error.message);
+    logger.error('\n❌ Error:', error.message);
     process.exit(1);
 });

@@ -12,6 +12,8 @@
 import express from 'express';
 import path from 'path';
 import os from 'os';
+import { createLogger } from '../../utils/logger.js';
+const logger = createLogger('routes/tools/uploads');
 
 const router = express.Router();
 
@@ -153,19 +155,19 @@ Agent instructions:`;
           }
 
         } catch (gptError) {
-          console.error('GPT processing error:', gptError);
+          logger.error('GPT processing error:', gptError);
           // 如果 GPT 失败，回退到原始转录
         }
 
         res.json({ text: transcribedText });
 
       } catch (error) {
-        console.error('Transcription error:', error);
+        logger.error('Transcription error:', error);
         res.status(500).json({ error: error.message });
       }
     });
   } catch (error) {
-    console.error('Endpoint error:', error);
+    logger.error('Endpoint error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -246,14 +248,14 @@ router.post('/:projectName/upload-images', async (req, res) => {
 
         res.json({ images: processedImages });
       } catch (error) {
-        console.error('Error processing images:', error);
+        logger.error('Error processing images:', error);
         // 清理剩余的文件
         await Promise.all(req.files.map(f => fs.unlink(f.path).catch(() => { })));
         res.status(500).json({ error: 'Failed to process images' });
       }
     });
   } catch (error) {
-    console.error('Error in image upload endpoint:', error);
+    logger.error('Error in image upload endpoint:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

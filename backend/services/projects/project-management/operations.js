@@ -15,6 +15,8 @@ import { deleteSessionInContainer, getSessionsInContainer } from '../../sessions
 import containerManager from '../../container/core/index.js';
 import { CONTAINER, FILE_TIMEOUTS } from '../../../config/config.js';
 import { readStreamOutput } from '../../files/utils/file-utils.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/projects/project-management/operations');
 
 /**
  * 重命名项目的显示名称
@@ -50,7 +52,7 @@ async function deleteSession(userId, projectName, sessionId) {
   try {
     return await deleteSessionInContainer(userId, projectName, sessionId);
   } catch (error) {
-    console.error(`Error deleting session ${sessionId} from project ${projectName}:`, error);
+    logger.error(`Error deleting session ${sessionId} from project ${projectName}:`, error);
     throw error;
   }
 }
@@ -66,7 +68,7 @@ async function isProjectEmpty(userId, projectName) {
     const sessionsResult = await getSessionsInContainer(userId, projectName, 1, 0);
     return sessionsResult.total === 0;
   } catch (error) {
-    console.error(`Error checking if project ${projectName} is empty:`, error);
+    logger.error(`Error checking if project ${projectName} is empty:`, error);
     return false;
   }
 }
@@ -78,7 +80,7 @@ async function isProjectEmpty(userId, projectName) {
  * @returns {Promise<boolean>} 是否成功
  */
 async function deleteProject(userId, projectName) {
-  console.log(`[deleteProject] Attempting to delete project "${projectName}" for user ${userId}`);
+  logger.info(`[deleteProject] Attempting to delete project "${projectName}" for user ${userId}`);
 
   try {
     // First check if the project is empty
@@ -98,11 +100,11 @@ async function deleteProject(userId, projectName) {
 
     await new Promise((resolve, reject) => {
       stream.on('error', (err) => {
-        console.error(`[deleteProject] Error removing directory:`, err);
+        logger.error(`[deleteProject] Error removing directory:`, err);
         reject(err);
       });
       stream.on('end', () => {
-        console.log(`[deleteProject] Project directory removed: ${projectPath}`);
+        logger.info(`[deleteProject] Project directory removed: ${projectPath}`);
         resolve();
       });
     });
@@ -112,10 +114,10 @@ async function deleteProject(userId, projectName) {
     delete config[projectName];
     await saveProjectConfig(config);
 
-    console.log(`[deleteProject] Project "${projectName}" deleted successfully`);
+    logger.info(`[deleteProject] Project "${projectName}" deleted successfully`);
     return true;
   } catch (error) {
-    console.error(`[deleteProject] Failed to delete project "${projectName}":`, error);
+    logger.error(`[deleteProject] Failed to delete project "${projectName}":`, error);
     throw error;
   }
 }
@@ -171,7 +173,7 @@ async function addProjectManually(userId, projectName, displayName = null) {
       sessions: []
     };
   } catch (error) {
-    console.error(`Error adding project "${projectName}":`, error);
+    logger.error(`Error adding project "${projectName}":`, error);
     throw error;
   }
 }

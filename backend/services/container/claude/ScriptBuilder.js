@@ -7,6 +7,9 @@
 import { UserSettingsService } from '../../settings/UserSettingsService.js';
 import { loadAgentsForSDK } from '../../../services/extensions/extension-sync.js';
 import { randomUUID } from 'crypto';
+import { createLogger } from '../../../utils/logger.js';
+
+const logger = createLogger('container/claude/ScriptBuilder');
 
 /**
  * 过滤 SDK 选项，移除不需要传给 SDK 的字段
@@ -21,9 +24,9 @@ async function filterSDKOptions(options, userId) {
   let userSettings = null;
   try {
     userSettings = await UserSettingsService.getSettings(userId, 'claude');
-    console.log('[ScriptBuilder] Loaded user settings for user:', userId);
+    logger.debug({ userId }, 'Loaded user settings for user');
   } catch (error) {
-    console.warn('[ScriptBuilder] Failed to load user settings, using defaults:', error.message);
+    logger.warn({ error: error.message }, 'Failed to load user settings, using defaults');
   }
 
   // 合并用户设置和前端传入的设置
@@ -35,17 +38,17 @@ async function filterSDKOptions(options, userId) {
     // allowedTools: 只有在前端没有传入时才使用用户设置
     if (!settings.allowedTools && userSettings.allowed_tools && userSettings.allowed_tools.length > 0) {
       sdkOptions.allowedTools = userSettings.allowed_tools;
-      console.log('[ScriptBuilder] Using user settings for allowedTools:', userSettings.allowed_tools);
+      logger.debug({ allowedTools: userSettings.allowed_tools }, 'Using user settings for allowedTools');
     }
     // disallowedTools: 只有在前端没有传入时才使用用户设置
     if (!settings.disallowedTools && userSettings.disallowed_tools && userSettings.disallowed_tools.length > 0) {
       sdkOptions.disallowedTools = userSettings.disallowed_tools;
-      console.log('[ScriptBuilder] Using user settings for disallowedTools:', userSettings.disallowed_tools);
+      logger.debug({ disallowedTools: userSettings.disallowed_tools }, 'Using user settings for disallowedTools');
     }
     // skipPermissions: 只有在前端没有传入时才使用用户设置
     if (settings.skipPermissions === undefined && userSettings.skip_permissions !== undefined) {
       settings.skipPermissions = userSettings.skip_permissions;
-      console.log('[ScriptBuilder] Using user settings for skipPermissions:', userSettings.skip_permissions);
+      logger.debug({ skipPermissions: userSettings.skip_permissions }, 'Using user settings for skipPermissions');
     }
   }
 
@@ -90,7 +93,7 @@ async function filterSDKOptions(options, userId) {
       'WebSearch',
       'Skill'           // 关键修复：启用 Skill 工具，否则 SDK 不会加载 Skills
     ];
-    console.log('[ScriptBuilder] Setting default allowedTools');
+    logger.debug('Setting default allowedTools');
   }
 
   // 关键修复：设置 settingSources 以从文件系统加载扩展
@@ -107,7 +110,7 @@ async function filterSDKOptions(options, userId) {
   // - hooks/ (钩子目录)
   // - knowledge/ (知识目录)
   sdkOptions.settingSources = ['user', 'project'];
-  console.log('[ScriptBuilder] Setting settingSources: user, project');
+  logger.debug('Setting settingSources: user, project');
 
   // 动态加载 agents 和配置 plugins（从 extensions/.claude/ 目录）
   // 注意：skills 不能通过 sdkOptions.skills 传递给子 agents
@@ -116,7 +119,7 @@ async function filterSDKOptions(options, userId) {
     try {
       // 动态加载 agents（从 .md 文件读取）
       sdkOptions.agents = await loadAgentsForSDK();
-      console.log('[ScriptBuilder] Loaded agents:', Object.keys(sdkOptions.agents));
+      logger.debug({ agents: Object.keys(sdkOptions.agents) }, 'Loaded agents');
 
       // 配置 plugins 指向 skills 目录
       // SDK 会自动扫描 plugins 目录下的 skills，主对话和子 agents 都能使用
@@ -126,9 +129,9 @@ async function filterSDKOptions(options, userId) {
           path: '/workspace/.claude'
         }
       ];
-      console.log('[ScriptBuilder] Configured plugins for skills scanning');
+      logger.debug('Configured plugins for skills scanning');
     } catch (error) {
-      console.error('[ScriptBuilder] Failed to load extensions:', error);
+      logger.error({ error }, 'Failed to load extensions');
       // 如果加载失败，设置为空
       sdkOptions.agents = {};
       sdkOptions.plugins = [];
@@ -161,27 +164,25 @@ async function filterSDKOptions(options, userId) {
   if (sdkOptions.permissionMode) {
     // 如果前端要求 bypassPermissions 但存在用户设置的禁止工具，发出警告
     if (sdkOptions.permissionMode === 'bypassPermissions' && hasUserDisallowedTools) {
-      console.warn('[ScriptBuilder] WARNING: bypassPermissions mode will disable user-set disallowedTools:', userDisallowedTools);
+      logger.warn({ disallowedTools: userDisallowedTools }, 'WARNING: bypassPermissions mode will disable user-set disallowedTools');
     }
-    console.log('[ScriptBuilder] Using frontend permissionMode:', sdkOptions.permissionMode);
+    logger.debug({ permissionMode: sdkOptions.permissionMode }, 'Using frontend permissionMode');
   }
   // 如果用户设置 skipPermissions 为 true，且没有用户设置的禁止工具，则使用 bypassPermissions
   else if (settings.skipPermissions && !hasUserDisallowedTools) {
     sdkOptions.permissionMode = 'bypassPermissions';
-    console.log('[ScriptBuilder] Setting permissionMode: bypassPermissions (reason: skipPermissions=true, no user disallowedTools)');
+    logger.debug('Setting permissionMode: bypassPermissions (reason: skipPermissions=true, no user disallowedTools)');
   }
   // 新增：如果使用默认工具列表且没有用户设置的禁止工具，则使用 bypassPermissions
   // 这样新用户可以直接使用所有预配置的工具（包括 PDF 转换等）
   else if (usingDefaultTools && !hasUserDisallowedTools) {
     sdkOptions.permissionMode = 'bypassPermissions';
-    console.log('[ScriptBuilder] Setting permissionMode: bypassPermissions (reason: using default tools, no user disallowedTools)');
+    logger.debug('Setting permissionMode: bypassPermissions (reason: using default tools, no user disallowedTools)');
   }
   // 其他情况（包括有用户设置禁止工具的情况），使用 default 模式
   else {
     sdkOptions.permissionMode = 'default';
-    console.log('[ScriptBuilder] Setting permissionMode: default (reason: ',
-      hasUserDisallowedTools ? 'has user disallowedTools' : 'default fallback',
-      ')');
+    logger.debug({ reason: hasUserDisallowedTools ? 'has user disallowedTools' : 'default fallback' }, 'Setting permissionMode: default');
   }
 
   // 处理 resume 参数：
@@ -197,9 +198,9 @@ async function filterSDKOptions(options, userId) {
   // 合并系统级和用户级的 disallowedTools
   // 用户设置的禁止工具优先保留，然后添加系统级禁用工具
   sdkOptions.disallowedTools = [...userDisallowedTools, ...interactivePlanningTools];
-  console.log('[ScriptBuilder] Disallowed interactive planning tools:', interactivePlanningTools);
+  logger.debug({ interactivePlanningTools }, 'Disallowed interactive planning tools');
   if (userDisallowedTools.length > 0) {
-    console.log('[ScriptBuilder] User disallowed tools:', userDisallowedTools);
+    logger.debug({ userDisallowedTools }, 'User disallowed tools');
   }
 
   // 移除 sessionId（SDK 不需要这个参数）
@@ -211,7 +212,7 @@ async function filterSDKOptions(options, userId) {
   }
 
   // 调试：检查返回前的 sdkOptions keys
-  console.log('[ScriptBuilder] Returning sdkOptions keys:', Object.keys(sdkOptions));
+  logger.debug({ keys: Object.keys(sdkOptions) }, 'Returning sdkOptions keys');
 
   return sdkOptions;
 }
@@ -229,15 +230,15 @@ export async function buildSDKScript(command, options, userId) {
 
   // 提取图片路径（已由 DockerExecutor 复制到容器内）
   const imagePaths = options.imagePaths || [];
-  console.log('[ScriptBuilder] Image paths received:', imagePaths);
+  logger.debug({ imagePaths }, 'Image paths received');
 
   // 过滤并处理 options（现在是异步的）
   const sdkOptions = await filterSDKOptions(options, userId);
 
   // 调试：打印 options 摘要
-  console.log('[ScriptBuilder] Original sdkOptions.model:', sdkOptions.model);
+  logger.debug({ model: sdkOptions.model }, 'Original sdkOptions.model');
   const optionsJsonLength = JSON.stringify(sdkOptions).length;
-  console.log(`[ScriptBuilder] optionsJson size: ${optionsJsonLength} bytes`);
+  logger.debug({ size: optionsJsonLength }, 'optionsJson size');
 
   // 使用 base64 编码来避免转义问题
   const optionsBase64 = Buffer.from(JSON.stringify(sdkOptions)).toString('base64');

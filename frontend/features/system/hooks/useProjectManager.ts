@@ -23,6 +23,7 @@ import type {
   Session,
   ProjectManagerConfig
 } from '../types/projectManagement.types';
+import { logger } from '@/shared/utils/logger';
 
 /**
  * Hook return type
@@ -153,7 +154,7 @@ export function useProjectManager(
     };
 
     const sessionTitle = enrichedSession.summary || enrichedSession.title || session.id;
-    console.log('[useProjectManager] Selecting session:', enrichedSession.id, 'title:', sessionTitle);
+    logger.info('[useProjectManager] Selecting session:', enrichedSession.id, 'title:', sessionTitle);
 
     // Update state
     setSelectedSession(enrichedSession);
@@ -183,7 +184,7 @@ export function useProjectManager(
     const lastSessionId = localStorage.getItem('lastSessionId');
 
     if (!lastSessionId) {
-      console.log('[useProjectManager] No saved session to restore');
+      logger.info('[useProjectManager] No saved session to restore');
       return false;
     }
 
@@ -191,7 +192,7 @@ export function useProjectManager(
     const found = findSessionInProjects(loadedProjects, lastSessionId);
 
     if (found) {
-      console.log('[useProjectManager] Restoring session:', lastSessionId);
+      logger.info('[useProjectManager] Restoring session:', lastSessionId);
       setSelectedProject(found.project);
       setSelectedSession({
         ...found.session,
@@ -204,7 +205,7 @@ export function useProjectManager(
     }
 
     // Session not found, clear localStorage
-    console.log('[useProjectManager] Saved session not found, clearing');
+    logger.info('[useProjectManager] Saved session not found, clearing');
     localStorage.removeItem('lastSessionId');
     localStorage.removeItem('lastProjectName');
     return false;
@@ -227,13 +228,13 @@ export function useProjectManager(
         const response = await api.projects();
 
         if (!response.ok) {
-          console.error('Failed to fetch projects:', response.status, response.statusText);
+          logger.error('Failed to fetch projects:', response.status, response.statusText);
           setProjects([]);
           // Retry on network errors
           if (retryCount < 10) {
             shouldKeepLoading = true;
             setTimeout(() => {
-              console.log(`[useProjectManager] Retry ${retryCount + 1}/10 due to network error...`);
+              logger.info(`[useProjectManager] Retry ${retryCount + 1}/10 due to network error...`);
               fetchProjects(true, retryCount + 1);
             }, 2000);
           }
@@ -257,14 +258,14 @@ export function useProjectManager(
         if (data.length === 0 && user) {
           if (retryCount < 6) {
             shouldKeepLoading = true;
-            console.log(`[useProjectManager] No projects found (retry ${retryCount + 1}/6), container may be initializing...`);
+            logger.info(`[useProjectManager] No projects found (retry ${retryCount + 1}/6), container may be initializing...`);
             setTimeout(() => {
-              console.log('[useProjectManager] Retrying project fetch...');
+              logger.info('[useProjectManager] Retrying project fetch...');
               fetchProjects(true, retryCount + 1);
             }, 2000);
             return;
           } else {
-            console.log('[useProjectManager] Max retries reached, giving up');
+            logger.info('[useProjectManager] Max retries reached, giving up');
             // Let finally block set loading to false
             return;
           }
@@ -282,7 +283,7 @@ export function useProjectManager(
               }
             }
           } catch (error) {
-            console.error(`Error fetching Cursor sessions for project ${project.name}:`, error);
+            logger.error(`Error fetching Cursor sessions for project ${project.name}:`, error);
           }
         }));
 
@@ -306,7 +307,7 @@ export function useProjectManager(
                                 (firstProject as any).cursorSessions?.[0] ||
                                 (firstProject as any).codexSessions?.[0];
 
-            console.log('[useProjectManager] No saved session, selecting first project:', firstProject.name);
+            logger.info('[useProjectManager] No saved session, selecting first project:', firstProject.name);
 
             // Always select the first project
             setSelectedProject(firstProject);
@@ -324,13 +325,13 @@ export function useProjectManager(
               // If no sessions exist, clear selectedSession and increment counter to start fresh
               setSelectedSession(null);
               setNewSessionCounter(prev => prev + 1);
-              console.log('[useProjectManager] No sessions in project, ready for new session');
+              logger.info('[useProjectManager] No sessions in project, ready for new session');
             }
           }
         }
 
       } catch (error) {
-        console.error('Error fetching projects:', error);
+        logger.error('Error fetching projects:', error);
       } finally {
         // Only set loading to false if we're not still retrying
         if (!shouldKeepLoading) {
@@ -348,7 +349,7 @@ export function useProjectManager(
    * @param preventAutoSession - Whether to skip auto-selecting the first session (default: false)
    */
   const handleProjectSelect = useCallback((project: Project, _shouldNavigate = true, preventAutoSession = false) => {
-    console.log('[useProjectManager] Project selected:', project.name, 'preventAutoSession:', preventAutoSession);
+    logger.info('[useProjectManager] Project selected:', project.name, 'preventAutoSession:', preventAutoSession);
     setSelectedProject(project);
 
     if (!preventAutoSession) {
@@ -477,7 +478,7 @@ export function useProjectManager(
         const response = await api.projects();
 
         if (!response.ok) {
-          console.error('Failed to refresh projects:', response.status, response.statusText);
+          logger.error('Failed to refresh projects:', response.status, response.statusText);
           return;
         }
 
@@ -535,7 +536,7 @@ export function useProjectManager(
           }
         }
       } catch (error) {
-        console.error('Error refreshing sidebar:', error);
+        logger.error('Error refreshing sidebar:', error);
       }
     });
   }, []);
@@ -594,14 +595,14 @@ export function useProjectManager(
 
     // Reset fetch state when user changes
     if (prevUserIdRef.current !== currentUserId) {
-      console.log('[useProjectManager] User changed, resetting fetch state');
+      logger.info('[useProjectManager] User changed, resetting fetch state');
       hasFetchedRef.current = false;
       hasInitialSyncRef.current = false;
       prevUserIdRef.current = currentUserId;
     }
 
     if (user && !hasFetchedRef.current) {
-      console.log('[useProjectManager] User logged in, fetching projects...');
+      logger.info('[useProjectManager] User logged in, fetching projects...');
       hasFetchedRef.current = true;
       fetchProjects();
     }

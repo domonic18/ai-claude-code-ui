@@ -13,6 +13,8 @@ import readline from 'readline';
 import path from 'path';
 import os from 'os';
 import { BaseDiscovery } from './BaseDiscovery.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/projects/discovery/CodexDiscovery');
 
 /**
  * Codex 项目发现器
@@ -87,7 +89,7 @@ export class CodexDiscovery extends BaseDiscovery {
             }
           }
         } catch (error) {
-          console.warn(`Could not parse Codex session file ${filePath}:`, error.message);
+          logger.warn(`Could not parse Codex session file ${filePath}:`, error.message);
         }
       }
 
@@ -156,7 +158,7 @@ export class CodexDiscovery extends BaseDiscovery {
             }));
           }
         } catch (error) {
-          console.warn(`Could not parse Codex session file ${filePath}:`, error.message);
+          logger.warn(`Could not parse Codex session file ${filePath}:`, error.message);
         }
       }
 
@@ -303,7 +305,7 @@ export class CodexDiscovery extends BaseDiscovery {
       return null;
 
     } catch (error) {
-      console.error('Error parsing Codex session file:', error);
+      logger.error('Error parsing Codex session file:', error);
       return null;
     }
   }

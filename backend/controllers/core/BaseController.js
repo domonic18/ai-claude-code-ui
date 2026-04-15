@@ -1,3 +1,6 @@
+import { createLogger } from '../../utils/logger.js';
+const logger = createLogger('controllers/core/BaseController');
+
 /**
  * BaseController.js
  *
@@ -142,7 +145,7 @@ export class BaseController {
     }
 
     // 记录错误
-    console.error(`[${this.constructor.name}] Error:`, error);
+    logger.error(`[${this.constructor.name}] Error:`, error);
 
     // 传递给错误处理中间件
     next(error);

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Button } from '@/shared/components/ui/Button';
 import { X } from 'lucide-react';
 import { authenticatedFetch } from '@/shared/services';
+import { logger } from '@/shared/utils/logger';
 
 export interface ImageViewerFile {
   name: string;
@@ -46,7 +47,7 @@ function ImageViewer({ file, onClose }: ImageViewerProps) {
         if (err.name === 'AbortError') {
           return;
         }
-        console.error('Error loading image:', err);
+        logger.error('Error loading image:', err);
         setError('Unable to load image');
       } finally {
         setLoading(false);

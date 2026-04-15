@@ -9,6 +9,8 @@
 
 import { repositories } from '../../../database/db.js';
 import { CONTAINER_TIMEOUTS } from '../../../config/config.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/container/core/ContainerCleanup');
 
 const { Container } = repositories;
 
@@ -46,7 +48,7 @@ export class ContainerCleanupManager {
           await this.destroyContainer(userId, false);
           cleanedCount++;
         } catch (error) {
-          console.error(`[ContainerCleanup] Failed to cleanup container for user ${userId}:`, error.message);
+          logger.error(`[ContainerCleanup] Failed to cleanup container for user ${userId}:`, error.message);
         }
       }
     }
@@ -80,7 +82,7 @@ export class ContainerCleanupManager {
 
         if (!dbRecord) {
           // 容器在 Docker 中存在但数据库中不存在 - 它是孤立的
-          console.warn(`[ContainerCleanup] Found orphaned container: ${containerName} (${containerId}), cleaning up`);
+          logger.warn(`[ContainerCleanup] Found orphaned container: ${containerName} (${containerId}), cleaning up`);
 
           try {
             const container = this.docker.getContainer(containerId);
@@ -92,20 +94,20 @@ export class ContainerCleanupManager {
             await container.remove();
 
             cleanedCount++;
-            console.log(`[ContainerCleanup] Cleaned up orphaned container: ${containerName}`);
+            logger.info(`[ContainerCleanup] Cleaned up orphaned container: ${containerName}`);
           } catch (cleanupErr) {
-            console.error(`[ContainerCleanup] Failed to clean up orphaned container ${containerName}:`, cleanupErr.message);
+            logger.error(`[ContainerCleanup] Failed to clean up orphaned container ${containerName}:`, cleanupErr.message);
           }
         }
       }
 
       if (cleanedCount > 0) {
-        console.log(`[ContainerCleanup] Cleaned up ${cleanedCount} orphaned container(s)`);
+        logger.info(`[ContainerCleanup] Cleaned up ${cleanedCount} orphaned container(s)`);
       }
 
       return cleanedCount;
     } catch (error) {
-      console.error('[ContainerCleanup] Error during orphaned container cleanup:', error.message);
+      logger.error('[ContainerCleanup] Error during orphaned container cleanup:', error.message);
       return cleanedCount;
     }
   }
@@ -126,14 +128,14 @@ export class ContainerCleanupManager {
         const totalCount = idleCount + orphanedCount;
 
         if (totalCount > 0) {
-          console.log(`[ContainerCleanup] Cleaned up ${totalCount} containers (${idleCount} idle, ${orphanedCount} orphaned)`);
+          logger.info(`[ContainerCleanup] Cleaned up ${totalCount} containers (${idleCount} idle, ${orphanedCount} orphaned)`);
         }
       } catch (error) {
-        console.error('[ContainerCleanup] Error during cleanup:', error.message);
+        logger.error('[ContainerCleanup] Error during cleanup:', error.message);
       }
     }, interval);
 
-    console.log(`[ContainerCleanup] Started cleanup interval (${interval}ms)`);
+    logger.info(`[ContainerCleanup] Started cleanup interval (${interval}ms)`);
   }
 
   /**
@@ -143,7 +145,7 @@ export class ContainerCleanupManager {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
-      console.log('[ContainerCleanup] Stopped cleanup interval');
+      logger.info('[ContainerCleanup] Stopped cleanup interval');
     }
   }
 
@@ -152,7 +154,7 @@ export class ContainerCleanupManager {
    * @returns {Promise<object>} 清理结果统计
    */
   async runManualCleanup() {
-    console.log('[ContainerCleanup] Running manual cleanup...');
+    logger.info('[ContainerCleanup] Running manual cleanup...');
     const idleCount = await this.cleanupIdleContainers();
     const orphanedCount = await this.cleanupOrphanedContainers();
 

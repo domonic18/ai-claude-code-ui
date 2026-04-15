@@ -14,6 +14,8 @@ import containerManager from '../../container/core/index.js';
 import { executeInContainer } from '../../container/claude/DockerExecutor.js';
 import { createSession, updateSession } from '../../container/claude/SessionManager.js';
 import { CONTAINER } from '../../../config/config.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/execution/engines/ExecutionEngine');
 
 /**
  * 执行引擎
@@ -171,7 +173,7 @@ export class ExecutionEngine extends BaseExecutionEngine {
 
       return true;
     } catch (error) {
-      console.error(`Error aborting session ${sessionId}:`, error);
+      logger.error(`Error aborting session ${sessionId}:`, error);
       return false;
     }
   }

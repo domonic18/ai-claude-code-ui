@@ -11,6 +11,8 @@ import containerManager from '../core/index.js';
 import { CONTAINER } from '../../../config/config.js';
 import { PathValidator } from '../../core/utils/path-utils.js';
 import {
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/container/adapters/FileAdapter');
   cleanFileName,
   isValidFileName,
   isHiddenFile,
@@ -354,7 +356,7 @@ export class FileAdapter {
 
       // 验证每个部分是否有效
       if (parts.some(part => part === '' || !isValidFileName(part))) {
-        console.log('[FileAdapter] Skipping invalid path:', relativePath, '->', parts);
+        logger.info('[FileAdapter] Skipping invalid path:', relativePath, '->', parts);
         continue;
       }
 

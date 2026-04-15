@@ -57,6 +57,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, authenticatedFetch } from '@/shared/services';
 import { queryKeys } from '../queryKeys';
 import type { Project } from '@/features/sidebar/types/sidebar.types';
+import { logger } from '@/shared/utils/logger';
 
 /**
  * 获取项目列表（包括 Cursor sessions）
@@ -95,7 +96,7 @@ async function fetchProjects(): Promise<Project[]> {
           (project as any).cursorSessions = [];
         }
       } catch (error) {
-        console.error(`Error fetching Cursor sessions for project ${project.name}:`, error);
+        logger.error(`Error fetching Cursor sessions for project ${project.name}:`, error);
         (project as any).cursorSessions = [];
       }
     })

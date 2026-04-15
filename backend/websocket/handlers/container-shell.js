@@ -10,6 +10,9 @@
 import { WebSocket } from 'ws';
 import { PTY_SESSION_TIMEOUT } from './shell-constants.js';
 import containerManager from '../../services/container/core/index.js';
+import { createLogger } from '../../utils/logger.js';
+
+const logger = createLogger('websocket/handlers/container-shell');
 
 /**
  * 处理容器模式下的 shell WebSocket 连接
@@ -37,13 +40,13 @@ export async function handleContainerShell(ws, data, ptySessionsMap) {
     // authenticateWebSocket returns { userId, username }, not { id, username }
     const userId = ws.user?.userId || ws.user?.id;
 
-    console.log('[Container Shell] Function called, userId:', userId);
-    console.log('[Container Shell] Project path:', projectPath);
-    console.log('[Container Shell] Provider:', provider);
-    console.log('[Container Shell] SessionId:', sessionId);
+    logger.debug('[Container Shell] Function called, userId:', userId);
+    logger.debug('[Container Shell] Project path:', projectPath);
+    logger.debug('[Container Shell] Provider:', provider);
+    logger.debug('[Container Shell] SessionId:', sessionId);
 
     if (!userId) {
-        console.log('[Container Shell] No userId, closing connection');
+        logger.info('[Container Shell] No userId, closing connection');
         ws.send(JSON.stringify({
             type: 'output',
             data: `\r\n\x1b[31mError: User authentication required\x1b[0m\r\n`
@@ -58,11 +61,11 @@ export async function handleContainerShell(ws, data, ptySessionsMap) {
         : '';
     const ptySessionKey = `container_${userId}_${projectPath}_${sessionId || 'default'}${commandSuffix}`;
 
-    console.log('[Container Shell] Project:', projectPath);
-    console.log('[Container Shell] Session key:', ptySessionKey);
-    console.log('[Container Shell] Provider:', provider);
-    console.log('[Container Shell] Initial command:', initialCommand || 'none');
-    console.log('[Container Shell] Terminal size:', cols, 'x', rows);
+    logger.debug('[Container Shell] Project:', projectPath);
+    logger.debug('[Container Shell] Session key:', ptySessionKey);
+    logger.debug('[Container Shell] Provider:', provider);
+    logger.debug('[Container Shell] Initial command:', initialCommand || 'none');
+    logger.debug('[Container Shell] Terminal size:', cols, 'x', rows);
 
     // 欢迎消息
     let welcomeMsg;
@@ -104,7 +107,7 @@ export async function handleContainerShell(ws, data, ptySessionsMap) {
         }
     }
 
-    console.log('[Container Shell] Executing command:', shellCommand);
+    logger.debug('[Container Shell] Executing command:', shellCommand);
 
     try {
         // 使用 attach 方法获取可写的 Duplex 流
@@ -115,7 +118,7 @@ export async function handleContainerShell(ws, data, ptySessionsMap) {
         });
 
         const stream = attachResult.stream;
-        console.log('[Container Shell] Attached to container, stream type:', stream?.constructor?.name, 'writable:', stream?.writable);
+        logger.debug('[Container Shell] Attached to container, stream type:', stream?.constructor?.name, 'writable:', stream?.writable);
 
         // 注意：hijack: true 返回的是原始双向流，不使用 Docker 多路复用格式
         // 所以直接从 stream 读取，不需要使用 demuxStream
@@ -124,11 +127,11 @@ export async function handleContainerShell(ws, data, ptySessionsMap) {
         // 容器的主进程是 shell，所以我们可以直接发送命令
         // 使用 cd 和 && 来在项目目录中执行命令
         const initialCmd = `${shellCommand}\n`;
-        console.log('[Container Shell] Sending initial command to shell:', initialCmd.trim());
+        logger.debug('[Container Shell] Sending initial command to shell:', initialCmd.trim());
         if (stream.writable) {
             stream.write(initialCmd);
         } else {
-            console.error('[Container Shell] Stream is not writable, cannot send initial command');
+            logger.error('[Container Shell] Stream is not writable, cannot send initial command');
         }
 
         // 会话对象
@@ -144,9 +147,9 @@ export async function handleContainerShell(ws, data, ptySessionsMap) {
                 try {
                     // container.attach() 不支持动态调整 TTY 大小
                     // TTY 大小在 attach 时确定，后续无法更改
-                    console.log('[Container Shell] Resize requested (not supported with attach):', newCols, 'x', newRows);
+                    logger.debug('[Container Shell] Resize requested (not supported with attach):', newCols, 'x', newRows);
                 } catch (err) {
-                    console.error('[Container Shell] Resize error:', err);
+                    logger.error('[Container Shell] Resize error:', err);
                 }
             },
             write: async (inputData) => {
@@ -157,7 +160,7 @@ export async function handleContainerShell(ws, data, ptySessionsMap) {
                         stream.write(inputData);
                     }
                 } catch (err) {
-                    console.error('[Container Shell] Write error:', err);
+                    logger.error('[Container Shell] Write error:', err);
                 }
             },
             kill: async () => {
@@ -167,7 +170,7 @@ export async function handleContainerShell(ws, data, ptySessionsMap) {
                         stream.destroy();
                     }
                 } catch (err) {
-                    console.error('[Container Shell] Kill error:', err);
+                    logger.error('[Container Shell] Kill error:', err);
                 }
             }
         };
@@ -199,7 +202,7 @@ export async function handleContainerShell(ws, data, ptySessionsMap) {
 
         // 处理流结束
         stream.on('end', () => {
-            console.log('[Container Shell] Process ended');
+            logger.info('[Container Shell] Process ended');
             if (ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({
                     type: 'output',
@@ -210,7 +213,7 @@ export async function handleContainerShell(ws, data, ptySessionsMap) {
         });
 
         stream.on('error', (err) => {
-            console.error('[Container Shell] Stream error:', err);
+            logger.error('[Container Shell] Stream error:', err);
             if (ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({
                     type: 'output',
@@ -228,11 +231,11 @@ export async function handleContainerShell(ws, data, ptySessionsMap) {
 
         // 处理 WebSocket 关闭 - 保持会话存活以支持重连
         ws.on('close', () => {
-            console.log('[Container Shell] WebSocket closed, keeping session alive');
+            logger.info('[Container Shell] WebSocket closed, keeping session alive');
             // 设置超时以在一段时间后清理会话
             if (!currentSession.timeoutId) {
                 currentSession.timeoutId = setTimeout(() => {
-                    console.log('[Container Shell] Session timeout, cleaning up:', ptySessionKey);
+                    logger.info('[Container Shell] Session timeout, cleaning up:', ptySessionKey);
                     if (currentSession.kill) {
                         currentSession.kill();
                     }
@@ -245,7 +248,7 @@ export async function handleContainerShell(ws, data, ptySessionsMap) {
         return ptySessionKey;
 
     } catch (error) {
-        console.error('[Container Shell] Error:', error);
+        logger.error('[Container Shell] Error:', error);
         ws.send(JSON.stringify({
             type: 'output',
             data: `\r\n\x1b[31mError: ${error.message}\x1b[0m\r\n`

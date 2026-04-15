@@ -8,6 +8,8 @@
  */
 
 import { IExecutionEngine } from '../../core/interfaces/IExecutionEngine.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/execution/engines/BaseExecutionEngine');
 
 /**
  * 抽象执行引擎基类
@@ -139,7 +141,7 @@ export class BaseExecutionEngine extends IExecutionEngine {
       try {
         await this.abort(sessionId);
       } catch (error) {
-        console.error(`Error cleaning up session ${sessionId}:`, error);
+        logger.error(`Error cleaning up session ${sessionId}:`, error);
       }
     }
   }

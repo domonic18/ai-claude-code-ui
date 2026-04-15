@@ -17,6 +17,8 @@ import { authenticateToken } from '../../middleware/auth.js';
 import containerManager from '../../services/container/core/index.js';
 import { FILE_TIMEOUTS } from '../../config/config.js';
 import { readStreamOutput } from '../../services/files/utils/file-utils.js';
+import { createLogger } from '../../utils/logger.js';
+const logger = createLogger('routes/tools/system');
 
 const router = express.Router();
 
@@ -32,7 +34,7 @@ router.post('/update', authenticateToken, async (req, res) => {
         // 获取项目根目录（server 目录的父目录）
         const projectRoot = path.join(__dirname, '..');
 
-        console.log('Starting system update from directory:', projectRoot);
+        logger.info('Starting system update from directory:', projectRoot);
 
         // 运行更新命令
         const updateCommand = 'git checkout main && git pull && npm install';
@@ -48,13 +50,13 @@ router.post('/update', authenticateToken, async (req, res) => {
         child.stdout.on('data', (data) => {
             const text = data.toString();
             output += text;
-            console.log('Update output:', text);
+            logger.info('Update output:', text);
         });
 
         child.stderr.on('data', (data) => {
             const text = data.toString();
             errorOutput += text;
-            console.error('Update error:', text);
+            logger.error('Update error:', text);
         });
 
         child.on('close', (code) => {
@@ -75,7 +77,7 @@ router.post('/update', authenticateToken, async (req, res) => {
         });
 
         child.on('error', (error) => {
-            console.error('Update process error:', error);
+            logger.error('Update process error:', error);
             res.status(500).json({
                 success: false,
                 error: error.message
@@ -83,7 +85,7 @@ router.post('/update', authenticateToken, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('System update error:', error);
+        logger.error('System update error:', error);
         res.status(500).json({
             success: false,
             error: error.message
@@ -157,7 +159,7 @@ router.get('/browse-filesystem', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[browse-filesystem] Error:', error);
+    logger.error('[browse-filesystem] Error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to browse filesystem'

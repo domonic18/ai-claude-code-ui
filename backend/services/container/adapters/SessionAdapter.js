@@ -11,6 +11,8 @@ import containerManager from '../core/index.js';
 import { CONTAINER } from '../../../config/config.js';
 import { JsonlParser } from '../../core/utils/jsonl-parser.js';
 import { PathUtils } from '../../core/utils/path-utils.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/container/adapters/SessionAdapter');
 
 /**
  * 容器会话适配器
@@ -65,7 +67,7 @@ export class SessionAdapter {
           const sessions = await this._parseSessionFile(file);
           allSessions.push(...sessions);
         } catch (error) {
-          console.warn(`Failed to parse session file ${file}:`, error.message);
+          logger.warn(`Failed to parse session file ${file}:`, error.message);
         }
       }
 
@@ -126,7 +128,7 @@ export class SessionAdapter {
           const fileMessages = await this._parseSessionFileMessages(file, sessionId);
           messages.push(...fileMessages);
         } catch (error) {
-          console.warn(`Failed to parse messages from ${file}:`, error.message);
+          logger.warn(`Failed to parse messages from ${file}:`, error.message);
         }
       }
 

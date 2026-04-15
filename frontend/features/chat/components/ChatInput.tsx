@@ -16,6 +16,7 @@ import type { SlashCommand } from '../hooks/useSlashCommands';
 import type { FileReference } from '../hooks/useFileReferences';
 import type { ChatInputProps, FileAttachment } from '../types';
 import { MAX_FILE_SIZE, STORAGE_KEYS } from '../constants';
+import { logger } from '@/shared/utils/logger';
 
 interface ChatInputComponentProps extends Omit<ChatInputProps, 'files' | 'onAddFile' | 'onRemoveFile'> {
   /** Attached files */
@@ -188,7 +189,7 @@ export function ChatInput({
    */
   const handleFileUpload = useCallback(async (file: File, attachment: FileAttachment) => {
     if (!authenticatedFetch) {
-      console.error('[handleFileUpload] authenticatedFetch not available');
+      logger.error('[handleFileUpload] authenticatedFetch not available');
       attachment.error = 'Upload service unavailable';
       onAddFile?.(attachment);
       return;
@@ -212,7 +213,7 @@ export function ChatInput({
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[handleFileUpload] Upload failed:', response.status, errorText);
+        logger.error('[handleFileUpload] Upload failed:', response.status, errorText);
         throw new Error(`Upload failed: ${response.status} ${errorText}`);
       }
 
@@ -222,7 +223,7 @@ export function ChatInput({
       // Update the existing file instead of adding a duplicate
       onAddFile?.(attachment);
     } catch (error) {
-      console.error('[handleFileUpload] File upload error:', error);
+      logger.error('[handleFileUpload] File upload error:', error);
       attachment.error = error instanceof Error ? error.message : 'Upload failed';
       // Update the existing file with error state
       onAddFile?.(attachment);
@@ -235,7 +236,7 @@ export function ChatInput({
   const onDrop = useCallback((acceptedFiles: File[]) => {
     acceptedFiles.forEach(file => {
       if (file.size > maxFileSize) {
-        console.error(`File ${file.name} exceeds maximum size of ${maxFileSize} bytes`);
+        logger.error(`File ${file.name} exceeds maximum size of ${maxFileSize} bytes`);
         return;
       }
 

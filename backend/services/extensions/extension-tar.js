@@ -13,6 +13,8 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { Readable } from 'stream';
 import { finished } from 'stream';
+import { createLogger } from '../../utils/logger.js';
+const logger = createLogger('services/extensions/extension-tar');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -131,7 +133,7 @@ async function copyDirectoryIfExists(dirName, targetDir) {
     await copyDirectory(sourceDir, path.join(targetDir, dirName));
   } catch (error) {
     // Directory doesn't exist, skip
-    console.log(`[ExtensionTar] Directory ${dirName} not found, skipping`);
+    logger.info(`[ExtensionTar] Directory ${dirName} not found, skipping`);
   }
 }
 
@@ -151,7 +153,7 @@ async function copyConfigFiles(targetDir) {
       await fs.promises.copyFile(sourcePath, targetPath);
     } catch (error) {
       // File doesn't exist, skip
-      console.log(`[ExtensionTar] Config file ${filename} not found, skipping`);
+      logger.info(`[ExtensionTar] Config file ${filename} not found, skipping`);
     }
   }
 }
@@ -258,7 +260,7 @@ export async function getExtensionStats() {
 
     return stats;
   } catch (error) {
-    console.error('[ExtensionTar] Failed to get extension stats:', error);
+    logger.error('[ExtensionTar] Failed to get extension stats:', error);
     return stats;
   }
 }

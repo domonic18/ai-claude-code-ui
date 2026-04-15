@@ -12,6 +12,8 @@ import { executeInContainer } from './DockerExecutor.js';
 import { createSession, updateSession } from './SessionManager.js';
 import { CONTAINER } from '../../../config/config.js';
 import { memoryService } from '../../memory/index.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/container/claude/ClaudeQuery');
 
 // Memory markers used to wrap memory context in commands
 const MEMORY_START = '--- Memory Context ---';
@@ -61,7 +63,7 @@ async function loadMemoryContext(userId, options) {
     }
   } catch (error) {
     // 如果读取记忆失败，记录警告但继续执行
-    console.warn('[ClaudeQuery] Failed to load memory context:', error.message);
+    logger.warn('[ClaudeQuery] Failed to load memory context:', error.message);
   }
   return null;
 }
@@ -74,8 +76,8 @@ async function loadMemoryContext(userId, options) {
  * @returns {Promise<string>} 会话 ID
  */
 export async function queryClaudeSDKInContainer(command, options = {}, writer) {
-  console.log('[ClaudeQuery] Query started');
-  console.log('[ClaudeQuery] Command:', command);
+  logger.info('[ClaudeQuery] Query started');
+  logger.info('[ClaudeQuery] Command:', command);
 
   const {
     userId,
@@ -87,26 +89,26 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
     ...sdkOptions
   } = options;
 
-  console.log('[ClaudeQuery] userId:', userId, 'sessionId:', sessionId);
-  console.log('[ClaudeQuery] isContainerProject:', isContainerProject, 'projectPath:', projectPath);
+  logger.info('[ClaudeQuery] userId:', userId, 'sessionId:', sessionId);
+  logger.info('[ClaudeQuery] isContainerProject:', isContainerProject, 'projectPath:', projectPath);
 
   try {
     // 1. 加载记忆上下文
     const memoryContext = await loadMemoryContext(userId, {
       containerMode: options.containerMode
     });
-    console.log('[ClaudeQuery] Memory context loaded:', memoryContext ? `${memoryContext.length} chars` : 'none');
+    logger.info('[ClaudeQuery] Memory context loaded:', memoryContext ? `${memoryContext.length} chars` : 'none');
 
     // 2. 获取或创建用户容器
-    console.log('[ClaudeQuery] Getting container for user:', userId);
+    logger.info('[ClaudeQuery] Getting container for user:', userId);
     const container = await containerManager.getOrCreateContainer(userId, {
       tier: userTier
     });
-    console.log('[ClaudeQuery] Container obtained:', container.name);
+    logger.info('[ClaudeQuery] Container obtained:', container.name);
 
     // 3. 映射工作目录
     const workingDir = mapWorkingDirectory(isContainerProject, projectPath, cwd);
-    console.log('[ClaudeQuery] Working directory (mapped):', workingDir);
+    logger.info('[ClaudeQuery] Working directory (mapped):', workingDir);
 
     // 传递 cwd 给 SDK，但 SDK 脚本会使用它来设置 HOME 环境变量
     // 这样 SDK 会在正确的项目目录下创建会话文件，而不会影响子进程的模块查找
@@ -124,11 +126,11 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
       command: command,
       options: mappedOptions
     });
-    console.log('[ClaudeQuery] Session created:', sessionId);
+    logger.info('[ClaudeQuery] Session created:', sessionId);
 
     // 5. 发送记忆上下文消息（如果有）
     if (writer && memoryContext) {
-      console.log('[ClaudeQuery] Sending memory-context');
+      logger.info('[ClaudeQuery] Sending memory-context');
       writer.send({
         type: 'memory-context',
         sessionId,
@@ -138,7 +140,7 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
 
     // 6. 发送初始消息
     if (writer) {
-      console.log('[ClaudeQuery] Sending session_start');
+      logger.info('[ClaudeQuery] Sending session_start');
       writer.send({
         type: 'session_start',
         sessionId,
@@ -153,7 +155,7 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
       // Add memory to command at execution time
       enhancedCommand = `${command}${MEMORY_SEPARATOR}${MEMORY_SEPARATOR}${MEMORY_START}${MEMORY_SEPARATOR}${memoryContext}${MEMORY_SEPARATOR}${MEMORY_END}${MEMORY_SEPARATOR}${MEMORY_SEPARATOR}`;
     }
-    console.log('[ClaudeQuery] Executing in container...');
+    logger.info('[ClaudeQuery] Executing in container...');
     await executeInContainer(
       userId,
       enhancedCommand,
@@ -161,7 +163,7 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
       writer,
       sessionId
     );
-    console.log('[ClaudeQuery] Execution completed');
+    logger.info('[ClaudeQuery] Execution completed');
 
     // 8. 更新会话状态
     updateSession(sessionId, {

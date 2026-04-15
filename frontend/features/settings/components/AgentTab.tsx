@@ -24,6 +24,7 @@ import McpServerList from './mcp/McpServerList';
 import { CategoryTabs, CategoryType } from './common/CategoryTabs';
 import { OpenCodePlaceholder } from './common/OpenCodePlaceholder';
 import { McpServer } from '../types/settings.types';
+import { logger } from '@/shared/utils/logger';
 
 interface AgentTabProps {
   // Props passed from parent Settings if needed
@@ -107,7 +108,7 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((_props, ref) 
       // Load MCP servers
       loadMcpServers();
     } catch (error) {
-      console.error('[AgentTab] Error loading agent settings:', error);
+      logger.error('[AgentTab] Error loading agent settings:', error);
     }
   };
 
@@ -118,7 +119,7 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((_props, ref) 
       const servers = await service.getMcpServers();
       setMcpServers(servers);
     } catch (error) {
-      console.error('[AgentTab] Error loading MCP servers:', error);
+      logger.error('[AgentTab] Error loading MCP servers:', error);
       setMcpServers([]);
     }
   };
@@ -138,12 +139,12 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((_props, ref) 
       });
 
       if (result.success) {
-        console.log('[AgentTab] Permissions saved successfully:', result.message);
+        logger.info('[AgentTab] Permissions saved successfully:', result.message);
       } else {
-        console.error('[AgentTab] Failed to save permissions');
+        logger.error('[AgentTab] Failed to save permissions');
       }
     } catch (error) {
-      console.error('[AgentTab] Error saving permissions:', error);
+      logger.error('[AgentTab] Error saving permissions:', error);
     }
   };
 
@@ -249,7 +250,7 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((_props, ref) 
         }
       }
     } catch (error: any) {
-      console.error('[AgentTab] Error saving MCP server:', error);
+      logger.error('[AgentTab] Error saving MCP server:', error);
       throw error;
     }
   };
@@ -294,10 +295,10 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((_props, ref) 
       if (result.success) {
         await loadMcpServers();
       } else {
-        console.error('[AgentTab] Failed to delete server:', result.error);
+        logger.error('[AgentTab] Failed to delete server:', result.error);
       }
     } catch (error) {
-      console.error('[AgentTab] Error deleting MCP server:', error);
+      logger.error('[AgentTab] Error deleting MCP server:', error);
     }
   };
 
@@ -311,7 +312,7 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((_props, ref) 
         [`${scope}-${serverId}`]: result
       }));
     } catch (error) {
-      console.error('[AgentTab] Error testing MCP server:', error);
+      logger.error('[AgentTab] Error testing MCP server:', error);
     }
   };
 
@@ -328,7 +329,7 @@ export const AgentTab = forwardRef<AgentTabHandle, AgentTabProps>((_props, ref) 
         }));
       }
     } catch (error) {
-      console.error('[AgentTab] Error discovering MCP tools:', error);
+      logger.error('[AgentTab] Error discovering MCP tools:', error);
     } finally {
       setMcpToolsLoading(prev => ({ ...prev, [`${scope}-${serverId}`]: false }));
     }

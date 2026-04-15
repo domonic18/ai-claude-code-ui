@@ -15,6 +15,8 @@
 
 import { Codex } from '@openai/codex-sdk';
 import { CODEX_TIMEOUTS } from '../../../config/config.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/execution/codex/CodexExecutor');
 
 // 跟踪活动会话
 const activeCodexSessions = new Map();
@@ -286,7 +288,7 @@ export async function queryCodex(command, options = {}, ws) {
     });
 
   } catch (error) {
-    console.error('[Codex] Error:', error);
+    logger.error('[Codex] Error:', error);
 
     sendMessage(ws, {
       type: 'codex-error',
@@ -370,7 +372,7 @@ function sendMessage(ws, data) {
       ws.send(JSON.stringify(data));
     }
   } catch (error) {
-    console.error('[Codex] Error sending message:', error);
+    logger.error('[Codex] Error sending message:', error);
   }
 }
 

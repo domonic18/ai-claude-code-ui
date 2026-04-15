@@ -1,6 +1,8 @@
 import jwt from 'jsonwebtoken';
 import { repositories } from '../database/db.js';
 import { AUTH, SERVER } from '../config/config.js';
+import { createLogger } from '../utils/logger.js';
+const logger = createLogger('middleware/auth');
 
 const { User } = repositories;
 
@@ -34,7 +36,7 @@ const authenticateToken = async (req, res, next) => {
       };
       return next();
     } catch (error) {
-      console.error('Platform mode error:', error);
+      logger.error('Platform mode error:', error);
       return res.status(500).json({ error: 'Platform mode: Failed to fetch user' });
     }
   }
@@ -70,7 +72,7 @@ const authenticateToken = async (req, res, next) => {
     };
     next();
   } catch (error) {
-    console.error('Token verification error:', error);
+    logger.error('Token verification error:', error);
     return res.status(403).json({ error: 'Invalid token' });
   }
 };
@@ -98,7 +100,7 @@ const authenticateWebSocket = (token) => {
       }
       return null;
     } catch (error) {
-      console.error('Platform mode WebSocket error:', error);
+      logger.error('Platform mode WebSocket error:', error);
       return null;
     }
   }
@@ -114,14 +116,14 @@ const authenticateWebSocket = (token) => {
     // 验证用户仍然存在于数据库中
     const user = User.getById(decoded.userId);
     if (!user) {
-      console.warn(`[WS AUTH] Failed: User ${decoded.userId} not found in database`);
+      logger.warn(`[WS AUTH] Failed: User ${decoded.userId} not found in database`);
       return null;
     }
 
-    console.log(`[WS AUTH] Success: User ${decoded.userId} (${decoded.username}) verified from database`);
+    logger.info(`[WS AUTH] Success: User ${decoded.userId} (${decoded.username}) verified from database`);
     return decoded;
   } catch (error) {
-    console.error('[WS AUTH] Token verification error:', error.message);
+    logger.error('[WS AUTH] Token verification error:', error.message);
     return null;
   }
 };

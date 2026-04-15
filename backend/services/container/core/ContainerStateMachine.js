@@ -46,6 +46,8 @@
  */
 
 import { EventEmitter } from 'events';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/container/core/ContainerStateMachine');
 
 /**
  * 容器状态枚举
@@ -270,7 +272,7 @@ export class ContainerStateMachine extends EventEmitter {
   forceReset() {
     // 如果正在创建中，不允许强制重置
     if (this.isCreating()) {
-      console.log(`[StateMachine] Skipping force reset for user ${this.userId}: container creation is in progress`);
+      logger.info(`[StateMachine] Skipping force reset for user ${this.userId}: container creation is in progress`);
       return false;
     }
 
@@ -281,7 +283,7 @@ export class ContainerStateMachine extends EventEmitter {
     this.lastTransitionTime = new Date();
     this.error = null;
 
-    console.log(`[StateMachine] Force reset state from ${previousState} to NON_EXISTENT for user ${this.userId}`);
+    logger.info(`[StateMachine] Force reset state from ${previousState} to NON_EXISTENT for user ${this.userId}`);
 
     // 触发状态变化事件
     this.emit('stateChanged', {
@@ -436,14 +438,14 @@ export class ContainerStateMachine extends EventEmitter {
       const matchingWaiters = waiters.filter(w => w.targetStates.includes(newState));
 
       if (matchingWaiters.length > 0) {
-        console.log(`[StateMachine] Notifying ${matchingWaiters.length} waiters from state ${state} for new state ${newState}`);
+        logger.info(`[StateMachine] Notifying ${matchingWaiters.length} waiters from state ${state} for new state ${newState}`);
 
         // 通知匹配的等待者
         matchingWaiters.forEach(waiter => {
           try {
             waiter.callback(newState);
           } catch (error) {
-            console.error('[StateMachine] Error in state waiter callback:', error);
+            logger.error('[StateMachine] Error in state waiter callback:', error);
           }
         });
       }
@@ -521,7 +523,7 @@ export class ContainerStateMachine extends EventEmitter {
     }
 
     if (initialState !== data.currentState) {
-      console.log(`[StateMachine] Reset stale state from ${data.currentState} to ${initialState} for user ${data.userId}`);
+      logger.info(`[StateMachine] Reset stale state from ${data.currentState} to ${initialState} for user ${data.userId}`);
     }
 
     return machine;

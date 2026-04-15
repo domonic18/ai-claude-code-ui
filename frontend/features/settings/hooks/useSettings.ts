@@ -8,6 +8,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { getSettingsService, type ClaudePermissions } from '../services/settingsService';
 import type { McpServer } from '../types/settings.types';
+import { logger } from '@/shared/utils/logger';
 
 export interface SettingsState {
   permissions: ClaudePermissions;
@@ -61,7 +62,7 @@ export function useSettings(): UseSettingsReturn {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load permissions';
       setError(message);
-      console.error('[useSettings] Error loading permissions:', err);
+      logger.error('[useSettings] Error loading permissions:', err);
     } finally {
       setLoading(false);
     }
@@ -80,7 +81,7 @@ export function useSettings(): UseSettingsReturn {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update permissions';
       setError(message);
-      console.error('[useSettings] Error updating permissions:', err);
+      logger.error('[useSettings] Error updating permissions:', err);
       return { success: false };
     } finally {
       setLoading(false);
@@ -97,7 +98,7 @@ export function useSettings(): UseSettingsReturn {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load MCP servers';
       setError(message);
-      console.error('[useSettings] Error loading MCP servers:', err);
+      logger.error('[useSettings] Error loading MCP servers:', err);
     } finally {
       setLoading(false);
     }
@@ -116,7 +117,7 @@ export function useSettings(): UseSettingsReturn {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create MCP server';
       setError(message);
-      console.error('[useSettings] Error creating MCP server:', err);
+      logger.error('[useSettings] Error creating MCP server:', err);
       return { success: false, error: message };
     } finally {
       setLoading(false);
@@ -136,7 +137,7 @@ export function useSettings(): UseSettingsReturn {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update MCP server';
       setError(message);
-      console.error('[useSettings] Error updating MCP server:', err);
+      logger.error('[useSettings] Error updating MCP server:', err);
       return { success: false, error: message };
     } finally {
       setLoading(false);
@@ -156,7 +157,7 @@ export function useSettings(): UseSettingsReturn {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to delete MCP server';
       setError(message);
-      console.error('[useSettings] Error deleting MCP server:', err);
+      logger.error('[useSettings] Error deleting MCP server:', err);
       return { success: false, error: message };
     } finally {
       setLoading(false);
@@ -171,7 +172,7 @@ export function useSettings(): UseSettingsReturn {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to test MCP server';
       setError(message);
-      console.error('[useSettings] Error testing MCP server:', err);
+      logger.error('[useSettings] Error testing MCP server:', err);
       return { success: false, message };
     }
   }, [service]);
@@ -184,7 +185,7 @@ export function useSettings(): UseSettingsReturn {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to discover MCP tools';
       setError(message);
-      console.error('[useSettings] Error discovering MCP tools:', err);
+      logger.error('[useSettings] Error discovering MCP tools:', err);
       return { success: false, error: message };
     }
   }, [service]);

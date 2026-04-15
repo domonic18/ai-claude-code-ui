@@ -3,6 +3,8 @@ import { spawn } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import { createLogger } from '../utils/logger.js';
+const logger = createLogger('routes/cli-auth');
 
 const router = express.Router();
 
@@ -25,7 +27,7 @@ router.get('/claude/status', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error checking Claude auth status:', error);
+    logger.error('Error checking Claude auth status:', error);
     res.status(500).json({
       authenticated: false,
       email: null,
@@ -45,7 +47,7 @@ router.get('/cursor/status', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error checking Cursor auth status:', error);
+    logger.error('Error checking Cursor auth status:', error);
     res.status(500).json({
       authenticated: false,
       email: null,
@@ -65,7 +67,7 @@ router.get('/codex/status', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error checking Codex auth status:', error);
+    logger.error('Error checking Codex auth status:', error);
     res.status(500).json({
       authenticated: false,
       email: null,

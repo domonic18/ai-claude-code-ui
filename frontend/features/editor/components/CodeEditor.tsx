@@ -18,6 +18,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { api } from '@/shared/services';
 import type { CodeEditorComponentProps, EditorFile, EditorLanguage } from '../types/editor.types';
+import { logger } from '@/shared/utils/logger';
 
 // Extend Window interface
 declare global {
@@ -357,7 +358,7 @@ function CodeEditor({
         const data = responseData.data ?? responseData;
         setContent(data.content || '');
       } catch (error) {
-        console.error('Error loading file:', error);
+        logger.error('Error loading file:', error);
         setContent(`// Error loading file: ${error.message}\n// File: ${file.name}\n// Path: ${file.path}`);
       } finally {
         setLoading(false);

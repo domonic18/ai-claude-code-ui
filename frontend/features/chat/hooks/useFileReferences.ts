@@ -12,6 +12,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
+import { logger } from '@/shared/utils/logger';
 
 export interface FileReference {
   /** File path */
@@ -140,7 +141,7 @@ export function useFileReferences({
 
       setFiles(fileList);
     } catch (error) {
-      console.error('Failed to load files:', error);
+      logger.error('Failed to load files:', error);
       setFiles([]);
     } finally {
       setIsLoading(false);

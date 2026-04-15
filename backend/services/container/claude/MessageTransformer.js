@@ -1,3 +1,6 @@
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/container/claude/MessageTransformer');
+
 /**
  * Claude SDK 消息转换器
  * 
@@ -73,7 +76,7 @@ export function processOutputLine(line, writer, sessionId, state) {
     const isTemporarySession = !sessionId || sessionId.startsWith('temp-');
     if (sdkMessage.session_id && !state.sessionCreatedSent && isTemporarySession) {
       state.sessionCreatedSent = true;
-      console.log('[MessageTransformer] Sending session-created:', sdkMessage.session_id);
+      logger.info('[MessageTransformer] Sending session-created:', sdkMessage.session_id);
       writer.send({
         type: 'session-created',
         sessionId: sdkMessage.session_id
@@ -88,7 +91,7 @@ export function processOutputLine(line, writer, sessionId, state) {
     // 根据 sdkMessage 类型分别处理，避免 result 消息重复发送内容
     if (sdkMessage.type === 'assistant') {
       // assistant 消息：发送完整的响应内容
-      console.log('[MessageTransformer] Sending claude-response, type: assistant');
+      logger.info('[MessageTransformer] Sending claude-response, type: assistant');
       writer.send({
         type: 'claude-response',
         data: sdkMessage
@@ -108,7 +111,7 @@ export function processOutputLine(line, writer, sessionId, state) {
       const isError = sdkMessage.result &&
         /^(Unknown skill|Error:|Failed:)/i.test(sdkMessage.result);
       if (isError) {
-        console.error('[MessageTransformer] Sending claude-error from result:', sdkMessage.result);
+        logger.error('[MessageTransformer] Sending claude-error from result:', sdkMessage.result);
         writer.send({
           type: 'claude-error',
           error: sdkMessage.result
@@ -116,7 +119,7 @@ export function processOutputLine(line, writer, sessionId, state) {
       }
     } else {
       // 其他类型（system、thinking 等）：发送 claude-response
-      console.log('[MessageTransformer] Sending claude-response, type:', sdkMessage.type);
+      logger.info('[MessageTransformer] Sending claude-response, type:', sdkMessage.type);
       writer.send({
         type: 'claude-response',
         data: sdkMessage
@@ -125,7 +128,7 @@ export function processOutputLine(line, writer, sessionId, state) {
   } 
   // 处理 done 消息
   else if (jsonData.type === 'done') {
-    console.log('[MessageTransformer] Sending claude-complete');
+    logger.info('[MessageTransformer] Sending claude-complete');
     writer.send({
       type: 'claude-complete',
       sessionId: jsonData.sessionId || sessionId,
@@ -134,7 +137,7 @@ export function processOutputLine(line, writer, sessionId, state) {
   } 
   // 处理 error 消息
   else if (jsonData.type === 'error') {
-    console.error('[MessageTransformer] Sending claude-error:', jsonData.error);
+    logger.error('[MessageTransformer] Sending claude-error:', jsonData.error);
     writer.send({
       type: 'claude-error',
       error: jsonData.error
@@ -151,7 +154,7 @@ export function processOutputLine(line, writer, sessionId, state) {
  */
 export function processOutput(output, writer, sessionId, state) {
   const lines = output.split('\n').filter(line => line.trim());
-  console.log(`[MessageTransformer] Processing ${lines.length} lines`);
+  logger.info(`[MessageTransformer] Processing ${lines.length} lines`);
   
   for (const line of lines) {
     processOutputLine(line, writer, sessionId, state);

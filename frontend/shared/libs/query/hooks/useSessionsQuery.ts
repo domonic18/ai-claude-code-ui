@@ -130,10 +130,10 @@ export interface RenameSessionMutationParams {
  *     { projectName: 'my-project', sessionId: 'abc-123', summary: 'New Name' },
  *     {
  *       onSuccess: () => {
- *         console.log('Session renamed successfully');
+ *         logger.info('Session renamed successfully');
  *       },
  *       onError: (error) => {
- *         console.error('Failed to rename session:', error);
+ *         logger.error('Failed to rename session:', error);
  *       },
  *     }
  *   );
@@ -183,7 +183,7 @@ export interface DeleteSessionMutationParams {
  *       { projectName: 'my-project', sessionId: 'abc-123' },
  *       {
  *         onSuccess: () => {
- *           console.log('Session deleted successfully');
+ *           logger.info('Session deleted successfully');
  *         },
  *       }
  *     );

@@ -12,6 +12,8 @@ import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { createLogger } from '../../utils/logger.js';
+const logger = createLogger('services/extensions/extension-sync');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -64,12 +66,12 @@ export async function syncExtensions(targetDir, options = {}) {
     const totalSynced = results.agents.synced + results.commands.synced + results.skills.synced +
                        results.hooks.synced + results.knowledge.synced + results.config.synced;
     if (totalSynced > 0) {
-      console.log(`[ExtensionSync] Synced ${totalSynced} extensions (${results.agents.synced} agents, ${results.commands.synced} commands, ${results.skills.synced} skills, ${results.hooks.synced} hooks, ${results.knowledge.synced} knowledge, ${results.config.synced} config)`);
+      logger.info(`[ExtensionSync] Synced ${totalSynced} extensions (${results.agents.synced} agents, ${results.commands.synced} commands, ${results.skills.synced} skills, ${results.hooks.synced} hooks, ${results.knowledge.synced} knowledge, ${results.config.synced} config)`);
     }
 
     return results;
   } catch (error) {
-    console.error('[ExtensionSync] Failed to sync extensions:', error);
+    logger.error('[ExtensionSync] Failed to sync extensions:', error);
     throw error;
   }
 }
@@ -88,7 +90,7 @@ async function syncResourceType(type, targetDir, results, overwrite) {
   const targetSubDir = path.join(targetDir, type);
 
   if (!await directoryExists(sourceDir)) {
-    console.log(`[ExtensionSync] Source directory not found: ${sourceDir}, skipping ${type}`);
+    logger.info(`[ExtensionSync] Source directory not found: ${sourceDir}, skipping ${type}`);
     return;
   }
 
@@ -117,7 +119,7 @@ async function syncResourceType(type, targetDir, results, overwrite) {
 
           // Check if target exists and skip if not overwriting
           if (!overwrite && await directoryExists(targetPath)) {
-            console.log(`[ExtensionSync] Skipping existing skill: ${entry.name}`);
+            logger.info(`[ExtensionSync] Skipping existing skill: ${entry.name}`);
             continue;
           }
 
@@ -135,7 +137,7 @@ async function syncResourceType(type, targetDir, results, overwrite) {
             const targetPath = path.join(targetSubDir, entry.name);
 
             if (!overwrite && await fileExists(targetPath)) {
-              console.log(`[ExtensionSync] Skipping existing ${type.slice(0, -1)}: ${entry.name}`);
+              logger.info(`[ExtensionSync] Skipping existing ${type.slice(0, -1)}: ${entry.name}`);
               continue;
             }
 
@@ -148,7 +150,7 @@ async function syncResourceType(type, targetDir, results, overwrite) {
           const targetPath = path.join(targetSubDir, entry.name);
 
           if (!overwrite && await directoryExists(targetPath)) {
-            console.log(`[ExtensionSync] Skipping existing directory: ${entry.name}`);
+            logger.info(`[ExtensionSync] Skipping existing directory: ${entry.name}`);
             continue;
           }
 
@@ -163,7 +165,7 @@ async function syncResourceType(type, targetDir, results, overwrite) {
 
           // Check if target exists and skip if not overwriting
           if (!overwrite && await fileExists(targetPath)) {
-            console.log(`[ExtensionSync] Skipping existing ${type.slice(0, -1)}: ${entry.name}`);
+            logger.info(`[ExtensionSync] Skipping existing ${type.slice(0, -1)}: ${entry.name}`);
             continue;
           }
 
@@ -174,7 +176,7 @@ async function syncResourceType(type, targetDir, results, overwrite) {
     } catch (error) {
       const errorMsg = `${entry.name}: ${error.message}`;
       results.errors.push({ resource: entry.name, error: error.message });
-      console.error(`[ExtensionSync] Failed to sync ${entry.name}:`, error.message);
+      logger.error(`[ExtensionSync] Failed to sync ${entry.name}:`, error.message);
     }
   }
 }
@@ -197,13 +199,13 @@ async function syncConfigFiles(targetDir, results, overwrite) {
     try {
       // Check if source file exists
       if (!(await fileExists(sourcePath))) {
-        console.log(`[ExtensionSync] Config file not found: ${filename}, skipping`);
+        logger.info(`[ExtensionSync] Config file not found: ${filename}, skipping`);
         continue;
       }
 
       // Check if target exists and skip if not overwriting
       if (!overwrite && await fileExists(targetPath)) {
-        console.log(`[ExtensionSync] Skipping existing config file: ${filename}`);
+        logger.info(`[ExtensionSync] Skipping existing config file: ${filename}`);
         continue;
       }
 
@@ -213,7 +215,7 @@ async function syncConfigFiles(targetDir, results, overwrite) {
     } catch (error) {
       const errorMsg = `${filename}: ${error.message}`;
       results.errors.push({ resource: filename, error: error.message });
-      console.error(`[ExtensionSync] Failed to sync ${filename}:`, error.message);
+      logger.error(`[ExtensionSync] Failed to sync ${filename}:`, error.message);
     }
   }
 }
@@ -248,11 +250,11 @@ export async function syncToAllUsers(options = {}) {
       const claudeDir = path.join(workspaceDir, 'users', `user_${user.id}`, 'data', '.claude');
       await syncExtensions(claudeDir, { overwriteUserFiles });
       results.synced++;
-      console.log(`[ExtensionSync] Synced extensions for user ${user.id} (${user.username})`);
+      logger.info(`[ExtensionSync] Synced extensions for user ${user.id} (${user.username})`);
     } catch (error) {
       results.failed++;
       results.errors.push({ userId: user.id, username: user.username, error: error.message });
-      console.error(`[ExtensionSync] Failed to sync for user ${user.id}:`, error.message);
+      logger.error(`[ExtensionSync] Failed to sync for user ${user.id}:`, error.message);
     }
   }
 
@@ -547,7 +549,7 @@ export async function loadAgentsForSDK() {
   const agentsDir = path.join(EXTENSIONS_DIR, 'agents');
 
   if (!await directoryExists(agentsDir)) {
-    console.warn('[ExtensionSync] Agents directory not found:', agentsDir);
+    logger.warn('[ExtensionSync] Agents directory not found:', agentsDir);
     return {};
   }
 
@@ -556,7 +558,7 @@ export async function loadAgentsForSDK() {
 
   // 预加载所有 skills 名称，用于添加到 agents 中
   const skillNames = await loadSkillsForSDK();
-  console.log(`[ExtensionSync] Preloaded ${skillNames.length} skills for agents`);
+  logger.info(`[ExtensionSync] Preloaded ${skillNames.length} skills for agents`);
 
   for (const entry of entries) {
     // 跳过非 .md 文件、隐藏文件和 README
@@ -594,13 +596,13 @@ export async function loadAgentsForSDK() {
 
       agents[name] = agentDef;
 
-      console.log(`[ExtensionSync] Loaded agent: ${name} with ${skillNames.length} skills`);
+      logger.info(`[ExtensionSync] Loaded agent: ${name} with ${skillNames.length} skills`);
     } catch (error) {
-      console.error(`[ExtensionSync] Failed to load agent ${entry.name}:`, error.message);
+      logger.error(`[ExtensionSync] Failed to load agent ${entry.name}:`, error.message);
     }
   }
 
-  console.log(`[ExtensionSync] Loaded ${Object.keys(agents).length} agents for SDK`);
+  logger.info(`[ExtensionSync] Loaded ${Object.keys(agents).length} agents for SDK`);
   return agents;
 }
 
@@ -618,7 +620,7 @@ export async function loadSkillsForSDK() {
   const skillsDir = path.join(EXTENSIONS_DIR, 'skills');
 
   if (!await directoryExists(skillsDir)) {
-    console.warn('[ExtensionSync] Skills directory not found:', skillsDir);
+    logger.warn('[ExtensionSync] Skills directory not found:', skillsDir);
     return [];
   }
 
@@ -638,7 +640,7 @@ export async function loadSkillsForSDK() {
     }
   }
 
-  console.log(`[ExtensionSync] Loaded ${skills.length} skills for SDK`);
+  logger.info(`[ExtensionSync] Loaded ${skills.length} skills for SDK`);
   return skills;
 }
 

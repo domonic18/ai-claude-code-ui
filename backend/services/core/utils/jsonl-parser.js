@@ -8,6 +8,8 @@
  */
 
 import { MESSAGE_CONSTANTS } from '../types/message-types.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/core/utils/jsonl-parser');
 
 /**
  * 系统消息前缀列表（与 message-types.js 保持一致）
@@ -99,7 +101,7 @@ export class JsonlParser {
         stats,
       };
     } catch (error) {
-      console.error('[JsonlParser] Error parsing JSONL content:', error);
+      logger.error('[JsonlParser] Error parsing JSONL content:', error);
       return {
         sessions: [],
         entries: [],
@@ -278,7 +280,7 @@ export class JsonlParser {
     try {
       return JSON.parse(line);
     } catch (error) {
-      console.warn('[JsonlParser] Failed to parse line:', error.message);
+      logger.warn('[JsonlParser] Failed to parse line:', error.message);
       return null;
     }
   }

@@ -13,6 +13,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { StarredProjects } from '../types';
 import { STORAGE_KEYS } from '../constants';
+import { logger } from '@/shared/utils/logger';
 
 /**
  * Load starred projects from localStorage
@@ -22,7 +23,7 @@ function loadStarredProjectsFromStorage(): StarredProjects {
     const saved = localStorage.getItem(STORAGE_KEYS.STARRED_PROJECTS);
     return saved ? new Set(JSON.parse(saved)) : new Set();
   } catch (error) {
-    console.error('Error loading starred projects:', error);
+    logger.error('Error loading starred projects:', error);
     return new Set();
   }
 }
@@ -37,7 +38,7 @@ function saveStarredProjectsToStorage(starredProjects: StarredProjects): void {
       JSON.stringify(Array.from(starredProjects))
     );
   } catch (error) {
-    console.error('Error saving starred projects:', error);
+    logger.error('Error saving starred projects:', error);
   }
 }
 

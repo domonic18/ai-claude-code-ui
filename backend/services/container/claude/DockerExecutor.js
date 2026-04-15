@@ -13,6 +13,8 @@ import { processOutput } from './MessageTransformer.js';
 import { setSessionStream, getSession } from './SessionManager.js';
 import { SDK } from '../../../config/config.js';
 import { writeFileViaPutArchive } from '../utils/containerFileWriter.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/container/claude/DockerExecutor');
 
 /**
  * 检查 stderr 是否包含真正的错误
@@ -54,7 +56,7 @@ async function copyImagesToContainer(container, images, cwd) {
       const image = images[i];
       const matches = image.data.match(/^data:([^;]+);base64,(.+)$/);
       if (!matches) {
-        console.error('[DockerExecutor] Invalid image data format for image', i);
+        logger.error('[DockerExecutor] Invalid image data format for image', i);
         continue;
       }
 
@@ -130,7 +132,7 @@ async function copyImagesToContainer(container, images, cwd) {
       });
     });
 
-    console.log('[DockerExecutor] Copied', imagePaths.length, 'images to container');
+    logger.info('[DockerExecutor] Copied', imagePaths.length, 'images to container');
 
     // 清理本地临时文件
     await fs.rm(tempDir, { recursive: true, force: true });
@@ -138,7 +140,7 @@ async function copyImagesToContainer(container, images, cwd) {
     return imagePaths.map(p => p.containerPath);
 
   } catch (error) {
-    console.error('[DockerExecutor] Error copying images to container:', error);
+    logger.error('[DockerExecutor] Error copying images to container:', error);
     // 清理临时文件
     try {
       await fs.rm(tempDir, { recursive: true, force: true });
@@ -159,10 +161,10 @@ async function copyImagesToContainer(container, images, cwd) {
  * @returns {Promise<object>} 执行结果 { output, sessionId }
  */
 export async function executeInContainer(userId, command, options, writer, sessionId) {
-  console.log('[DockerExecutor] Starting execution');
-  console.log('[DockerExecutor] userId:', userId);
-  console.log('[DockerExecutor] command:', command);
-  console.log('[DockerExecutor] cwd:', options.cwd);
+  logger.info('[DockerExecutor] Starting execution');
+  logger.info('[DockerExecutor] userId:', userId);
+  logger.info('[DockerExecutor] command:', command);
+  logger.info('[DockerExecutor] cwd:', options.cwd);
 
   try {
     // 获取容器信息
@@ -178,9 +180,9 @@ export async function executeInContainer(userId, command, options, writer, sessi
     // 处理图片：复制到容器内
     let imagePaths = [];
     if (options.images && options.images.length > 0) {
-      console.log('[DockerExecutor] Copying', options.images.length, 'images to container...');
+      logger.info('[DockerExecutor] Copying', options.images.length, 'images to container...');
       imagePaths = await copyImagesToContainer(container, options.images, options.cwd || '/workspace/my-workspace');
-      console.log('[DockerExecutor] Image paths in container:', imagePaths);
+      logger.info('[DockerExecutor] Image paths in container:', imagePaths);
     }
 
     // 构建 SDK 脚本（传递图片路径而非数据）
@@ -218,7 +220,7 @@ export async function executeInContainer(userId, command, options, writer, sessi
     // 保存 stream 对象到会话，以便后续可以终止进程
     setSessionStream(sessionId, stream);
 
-    console.log('[DockerExecutor] Execution started, stream:', !!stream, 'exec:', !!exec);
+    logger.info('[DockerExecutor] Execution started, stream:', !!stream, 'exec:', !!exec);
 
     // 收集输出
     const stdoutChunks = [];
@@ -248,16 +250,16 @@ export async function executeInContainer(userId, command, options, writer, sessi
 
       if (timeoutMs > 0) {
         const timeoutMinutes = Math.round(timeoutMs / 60000);
-        console.log(`[DockerExecutor] Setting execution timeout: ${timeoutMinutes} minutes`);
+        logger.info(`[DockerExecutor] Setting execution timeout: ${timeoutMinutes} minutes`);
         timeoutHandle = setTimeout(() => {
-          console.error(`[DockerExecutor] Execution timeout after ${timeoutMinutes} minutes`);
+          logger.error(`[DockerExecutor] Execution timeout after ${timeoutMinutes} minutes`);
           stdout.destroy();
           stderr.destroy();
           stream.destroy();
           settle(reject, new Error(`SDK execution timeout (${timeoutMinutes} minutes)`));
         }, timeoutMs);
       } else {
-        console.log('[DockerExecutor] Execution timeout disabled (SDK_EXECUTION_TIMEOUT=0)');
+        logger.info('[DockerExecutor] Execution timeout disabled (SDK_EXECUTION_TIMEOUT=0)');
       }
 
       // 用于追踪会话创建
@@ -274,10 +276,10 @@ export async function executeInContainer(userId, command, options, writer, sessi
           try {
             processOutput(output, writer, sessionId, state);
           } catch (e) {
-            console.error('[DockerExecutor] Error processing output:', e);
+            logger.error('[DockerExecutor] Error processing output:', e);
           }
         } else {
-          console.warn('[DockerExecutor] Writer not available');
+          logger.warn('[DockerExecutor] Writer not available');
         }
       });
 
@@ -286,7 +288,7 @@ export async function executeInContainer(userId, command, options, writer, sessi
         const errorMsg = chunk.toString();
         // 只输出可打印的调试日志，避免输出二进制数据污染日志
         if (errorMsg.startsWith('[SDK]') || errorMsg.includes('Error') || errorMsg.includes('Exception')) {
-          console.error('[DockerExecutor] STDERR:', errorMsg.substring(0, 500));
+          logger.error('[DockerExecutor] STDERR:', errorMsg.substring(0, 500));
         }
         stderrChunks.push(errorMsg);
       });
@@ -301,7 +303,7 @@ export async function executeInContainer(userId, command, options, writer, sessi
         const session = getSession(sessionId);
         if (!session && dataCount > 0) {
           // 如果会话在 Map 中找不到，且已经有数据产生，可能是被 abortSession 删除了
-          console.log(`[DockerExecutor] Stream ended for session ${sessionId}, session seems to have been aborted`);
+          logger.info(`[DockerExecutor] Stream ended for session ${sessionId}, session seems to have been aborted`);
           settle(resolve, { output: stdoutChunks.join(''), sessionId, aborted: true });
           return;
         }
@@ -309,16 +311,16 @@ export async function executeInContainer(userId, command, options, writer, sessi
         const stdoutOutput = stdoutChunks.join('');
         const stderrOutput = stderrChunks.join('');
 
-        console.log('[DockerExecutor] Stream ended. Total chunks:', dataCount);
-        console.log('[DockerExecutor] STDOUT length:', stdoutOutput.length);
-        console.log('[DockerExecutor] STDERR length:', stderrOutput.length);
+        logger.info('[DockerExecutor] Stream ended. Total chunks:', dataCount);
+        logger.info('[DockerExecutor] STDOUT length:', stdoutOutput.length);
+        logger.info('[DockerExecutor] STDERR length:', stderrOutput.length);
 
         // 检查是否有真正的错误
         if (hasRealError(stderrOutput)) {
-          console.error('[DockerExecutor] Execution failed:', stderrOutput);
+          logger.error('[DockerExecutor] Execution failed:', stderrOutput);
           settle(reject, new Error(`SDK execution error: ${stderrOutput}`));
         } else {
-          console.log('[DockerExecutor] Execution completed successfully');
+          logger.info('[DockerExecutor] Execution completed successfully');
           settle(resolve, { output: stdoutOutput, sessionId });
         }
       });
@@ -327,13 +329,13 @@ export async function executeInContainer(userId, command, options, writer, sessi
         if (timeoutHandle) {
           clearTimeout(timeoutHandle);
         }
-        console.error('[DockerExecutor] Stream error:', err);
+        logger.error('[DockerExecutor] Stream error:', err);
         settle(reject, err);
       });
     });
 
   } catch (error) {
-    console.error('[DockerExecutor] Exception:', error);
+    logger.error('[DockerExecutor] Exception:', error);
     throw new Error(`在容器中执行 SDK 失败：${error.message}`);
   }
 }

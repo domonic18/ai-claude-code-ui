@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { api } from '@/shared/services';
 import type { FileNode } from '../types/file-explorer.types';
 import { extractRelativePath } from '../utils/fileTreeHelpers';
+import { logger } from '@/shared/utils/logger';
 
 interface UseDragAndDropProps {
   selectedProject: { name: string; path: string };
@@ -147,7 +148,7 @@ export function useDragAndDrop({
 
       await fetchFiles();
     } catch (error) {
-      console.error('[FileExplorer] Move error:', error);
+      logger.error('[FileExplorer] Move error:', error);
       alert(t('fileExplorer.move.error.generic', { message: error instanceof Error ? error.message : 'Unknown error' }));
     } finally {
       setIsMoving(false);

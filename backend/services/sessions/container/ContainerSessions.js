@@ -14,6 +14,8 @@ import containerManager from '../../container/core/index.js';
 import { CONTAINER } from '../../../config/config.js';
 import { filterMemoryContext } from '../../../utils/memoryUtils.js';
 import { writeFileViaPutArchive as writeFileToContainerArchive, writeFileViaShell as writeShell, validateFilePath } from '../../container/utils/containerFileWriter.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/sessions/container/ContainerSessions');
 
 /**
  * 编码项目名称为容器内存储格式
@@ -148,7 +150,7 @@ function parseJsonlContent(content) {
               // 过滤记忆上下文内容
               const filteredTextContent = filterMemoryContext(textContent);
               if (filteredTextContent !== textContent) {
-                console.log('[ContainerSessions] Filtered memory context from user message');
+                logger.info('[ContainerSessions] Filtered memory context from user message');
               }
 
               const isSystemMessage = typeof filteredTextContent === 'string' && (
@@ -231,7 +233,7 @@ function parseJsonlContent(content) {
     };
 
   } catch (error) {
-    console.error('Error parsing JSONL content:', error);
+    logger.error('Error parsing JSONL content:', error);
     return { sessions: [], entries: [] };
   }
 }
@@ -363,7 +365,7 @@ async function getSessionsInContainer(userId, projectName, limit = 5, offset = 0
 
         allEntries.push(...result.entries);
       } catch (error) {
-        console.warn(`[ContainerSessions] Failed to read session file ${fileName}:`, error.message);
+        logger.warn(`[ContainerSessions] Failed to read session file ${fileName}:`, error.message);
       }
     }
 
@@ -434,7 +436,7 @@ async function getSessionsInContainer(userId, projectName, limit = 5, offset = 0
     };
 
   } catch (error) {
-    console.error(`[ContainerSessions] Error getting sessions for project ${projectName}:`, error);
+    logger.error(`[ContainerSessions] Error getting sessions for project ${projectName}:`, error);
     return { sessions: [], hasMore: false, total: 0 };
   }
 }
@@ -472,7 +474,7 @@ async function getSessionFilesInfo(userId, projectName) {
 
       stderr.on('data', (chunk) => {
         errorOutput += chunk.toString();
-        console.log(`[ContainerSessions] STDERR while getting files info:`, chunk.toString());
+        logger.info(`[ContainerSessions] STDERR while getting files info:`, chunk.toString());
       });
 
       stream.on('error', () => {
@@ -484,7 +486,7 @@ async function getSessionFilesInfo(userId, projectName) {
       });
     });
   } catch (error) {
-    console.error(`[ContainerSessions] Error getting session files info:`, error);
+    logger.error(`[ContainerSessions] Error getting session files info:`, error);
     return '';
   }
 }
@@ -533,7 +535,7 @@ async function getSessionMessagesInContainer(userId, projectName, sessionId, lim
           }
         }
       } catch (error) {
-        console.warn(`[ContainerSessions] Failed to read session file ${fileName}:`, error.message);
+        logger.warn(`[ContainerSessions] Failed to read session file ${fileName}:`, error.message);
       }
     }
 
@@ -599,7 +601,7 @@ async function getSessionMessagesInContainer(userId, projectName, sessionId, lim
       };
     }
   } catch (error) {
-    console.error(`[ContainerSessions] Error getting session messages:`, error);
+    logger.error(`[ContainerSessions] Error getting session messages:`, error);
     return { messages: [], total: 0, hasMore: false };
   }
 }
@@ -679,14 +681,14 @@ async function updateSessionSummaryInContainer(userId, projectName, sessionId, n
           return true;
         }
       } catch (error) {
-        console.warn(`[ContainerSessions] Failed to process session file ${fileName}:`, error.message);
+        logger.warn(`[ContainerSessions] Failed to process session file ${fileName}:`, error.message);
       }
     }
 
-    console.warn(`[ContainerSessions] Session ${sessionId} not found`);
+    logger.warn(`[ContainerSessions] Session ${sessionId} not found`);
     return false;
   } catch (error) {
-    console.error(`[ContainerSessions] Error updating session summary:`, error);
+    logger.error(`[ContainerSessions] Error updating session summary:`, error);
     return false;
   }
 }
@@ -746,14 +748,14 @@ async function deleteSessionInContainer(userId, projectName, sessionId) {
           return true;
         }
       } catch (error) {
-        console.warn(`[ContainerSessions] Failed to process session file ${fileName}:`, error.message);
+        logger.warn(`[ContainerSessions] Failed to process session file ${fileName}:`, error.message);
       }
     }
 
-    console.warn(`[ContainerSessions] Session ${sessionId} not found`);
+    logger.warn(`[ContainerSessions] Session ${sessionId} not found`);
     return false;
   } catch (error) {
-    console.error(`[ContainerSessions] Error deleting session:`, error);
+    logger.error(`[ContainerSessions] Error deleting session:`, error);
     return false;
   }
 }

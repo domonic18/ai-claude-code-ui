@@ -5,6 +5,8 @@ import path from 'path';
 import os from 'os';
 import TOML from '@iarna/toml';
 import { getCodexSessions, getCodexSessionMessages, deleteCodexSession } from '../../../services/execution/codex/index.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('routes/integrations/ai-providers/codex');
 
 const router = express.Router();
 
@@ -44,7 +46,7 @@ router.get('/config', async (req, res) => {
         }
       });
     } else {
-      console.error('Error reading Codex config:', error);
+      logger.error('Error reading Codex config:', error);
       res.status(500).json({ success: false, error: error.message });
     }
   }
@@ -61,7 +63,7 @@ router.get('/sessions', async (req, res) => {
     const sessions = await getCodexSessions(projectPath);
     res.json({ success: true, sessions });
   } catch (error) {
-    console.error('Error fetching Codex sessions:', error);
+    logger.error('Error fetching Codex sessions:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -79,7 +81,7 @@ router.get('/sessions/:sessionId/messages', async (req, res) => {
 
     res.json({ success: true, ...result });
   } catch (error) {
-    console.error('Error fetching Codex session messages:', error);
+    logger.error('Error fetching Codex session messages:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -90,7 +92,7 @@ router.delete('/sessions/:sessionId', async (req, res) => {
     await deleteCodexSession(sessionId);
     res.json({ success: true });
   } catch (error) {
-    console.error(`Error deleting Codex session ${req.params.sessionId}:`, error);
+    logger.error(`Error deleting Codex session ${req.params.sessionId}:`, error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
