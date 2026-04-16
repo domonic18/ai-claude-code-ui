@@ -29,16 +29,12 @@
  */
 
 import WebSocket from 'ws';
-import {
-  TestResults, assert, createTestExecutor,
-  printSummary, checkServerRunning, uniqueId
-} from './helpers/index.js';
-
+import { describe, it, before } from 'node:test';
+import assert from 'node:assert/strict';
+import { checkServerRunning, uniqueId } from './helpers/index.js';
 import { AuthHelper } from './helpers/auth-helper.js';
 import { ContainerHelper } from './helpers/container-helper.js';
 
-const results = new TestResults();
-const test = createTestExecutor(results);
 const auth = new AuthHelper();
 const container = new ContainerHelper();
 
@@ -157,37 +153,52 @@ function safeClose(ws) {
   }
 }
 
+// ─── Test Setup ─────────────────────────────────────────────────
+
+before(async () => {
+  console.log('\n=== Chat with Images Integration Tests ===\n');
+  console.log('NOTE: Requires server running on port 3001');
+  console.log('NOTE: Tests verify WebSocket pipeline, not real Claude SDK responses\n');
+
+  const serverOk = await checkServerRunning();
+  if (!serverOk) {
+    console.error('Error: Server not running on port 3001.');
+    console.error('Start with: docker-compose up -d');
+    process.exit(1);
+  }
+
+  // Setup: register test user
+  console.log('Setting up test user...');
+  await auth.registerUser(TEST_USERNAME, TEST_PASSWORD);
+  console.log(`User: ${TEST_USERNAME}\n`);
+});
+
 // ─── Test Groups ───────────────────────────────────────────────
 
-/**
- * Group 1: WebSocket Connection Tests
- */
-async function testWebSocketConnection() {
-  console.log('\n=== Group 1: WebSocket Connection ===');
-
-  const token = auth.getBearerToken(TEST_USERNAME);
-
-  await test('Connect to WebSocket with valid token', async () => {
+describe('WebSocket Connection', () => {
+  it('Connect to WebSocket with valid token', async () => {
+    const token = auth.getBearerToken(TEST_USERNAME);
     const ws = await connectWebSocket(token);
-    assert.equal(ws.readyState, WebSocket.OPEN, 'WebSocket should be open');
+    assert.strictEqual(ws.readyState, WebSocket.OPEN, 'WebSocket should be open');
     safeClose(ws);
   });
 
-  await test('Reject WebSocket without token', async () => {
+  it('Reject WebSocket without token', async () => {
     try {
       const ws = await connectWebSocket('');
       safeClose(ws);
       // If connection succeeded, server might be in platform mode
       console.log('    (Note: Server accepted unauthenticated WS - may be platform mode)');
     } catch (err) {
-      assert.truthy(
+      assert.ok(
         err.message.includes('error') || err.message.includes('timeout') || err.message.includes('401'),
         'Should reject connection without token'
       );
     }
   });
 
-  await test('Receive messages after connection', async () => {
+  it('Receive messages after connection', async () => {
+    const token = auth.getBearerToken(TEST_USERNAME);
     const ws = await connectWebSocket(token);
 
     // Send a ping or simple message to verify bidirectional communication
@@ -198,21 +209,15 @@ async function testWebSocketConnection() {
     }, 5000);
 
     // Should get some response (even if session doesn't exist)
-    assert.truthy(responses.length > 0, 'Should receive at least one response');
+    assert.ok(responses.length > 0, 'Should receive at least one response');
 
     safeClose(ws);
   });
-}
+});
 
-/**
- * Group 2: Text-Only Chat Tests
- */
-async function testTextOnlyChat() {
-  console.log('\n=== Group 2: Text-Only Chat ===');
-
-  const token = auth.getBearerToken(TEST_USERNAME);
-
-  await test('Send text message via WebSocket', async () => {
+describe('Text-Only Chat', () => {
+  it('Send text message via WebSocket', async () => {
+    const token = auth.getBearerToken(TEST_USERNAME);
     const ws = await connectWebSocket(token);
 
     const responses = await sendAndCollect(ws, {
@@ -226,7 +231,7 @@ async function testTextOnlyChat() {
 
     // We expect at least an initial response or error
     // (Will fail at SDK level if no API key, but the pipeline should respond)
-    assert.truthy(responses.length > 0, 'Should receive responses');
+    assert.ok(responses.length > 0, 'Should receive responses');
 
     // Check that we got some kind of message (could be error if no API key)
     const types = responses.map(r => r.type);
@@ -234,12 +239,13 @@ async function testTextOnlyChat() {
       t === 'start' || t === 'output' || t === 'error' ||
       t === 'done' || t === 'session-start' || t === 'assistant'
     );
-    assert.truthy(hasValidType, `Should receive valid message type, got: ${types.join(', ')}`);
+    assert.ok(hasValidType, `Should receive valid message type, got: ${types.join(', ')}`);
 
     safeClose(ws);
   });
 
-  await test('Message without attachments works', async () => {
+  it('Message without attachments works', async () => {
+    const token = auth.getBearerToken(TEST_USERNAME);
     const ws = await connectWebSocket(token);
 
     const responses = await sendAndCollect(ws, {
@@ -252,20 +258,14 @@ async function testTextOnlyChat() {
       }
     }, 10000);
 
-    assert.truthy(responses.length > 0, 'Should receive responses for text-only message');
+    assert.ok(responses.length > 0, 'Should receive responses for text-only message');
     safeClose(ws);
   });
-}
+});
 
-/**
- * Group 3: Chat with Image Attachments
- */
-async function testChatWithImages() {
-  console.log('\n=== Group 3: Chat with Image Attachments ===');
-
-  const token = auth.getBearerToken(TEST_USERNAME);
-
-  await test('Send message with single image attachment', async () => {
+describe('Chat with Image Attachments', () => {
+  it('Send message with single image attachment', async () => {
+    const token = auth.getBearerToken(TEST_USERNAME);
     const ws = await connectWebSocket(token);
 
     const imageData = createBase64Image();
@@ -287,11 +287,11 @@ async function testChatWithImages() {
     }, 15000);
 
     // Should receive responses - even if SDK fails, the image processing pipeline should run
-    assert.truthy(responses.length > 0, 'Should receive responses for image message');
+    assert.ok(responses.length > 0, 'Should receive responses for image message');
 
     // Check that we didn't get a generic connection error
     const firstMsg = responses[0];
-    assert.truthy(
+    assert.ok(
       firstMsg.type !== undefined,
       'Response should have a type field'
     );
@@ -299,7 +299,8 @@ async function testChatWithImages() {
     safeClose(ws);
   });
 
-  await test('Send message with multiple image attachments', async () => {
+  it('Send message with multiple image attachments', async () => {
+    const token = auth.getBearerToken(TEST_USERNAME);
     const ws = await connectWebSocket(token);
 
     const image1 = createBase64Image();
@@ -318,12 +319,13 @@ async function testChatWithImages() {
       }
     }, 15000);
 
-    assert.truthy(responses.length > 0, 'Should receive responses for multi-image message');
+    assert.ok(responses.length > 0, 'Should receive responses for multi-image message');
 
     safeClose(ws);
   });
 
-  await test('Image-only message (no text command)', async () => {
+  it('Image-only message (no text command)', async () => {
+    const token = auth.getBearerToken(TEST_USERNAME);
     const ws = await connectWebSocket(token);
 
     const imageData = createBase64Image();
@@ -341,23 +343,14 @@ async function testChatWithImages() {
     }, 10000);
 
     // Should handle empty command with images
-    assert.truthy(responses.length > 0, 'Should handle image-only message');
+    assert.ok(responses.length > 0, 'Should handle image-only message');
     safeClose(ws);
   });
-}
+});
 
-/**
- * Group 4: Large Image Handling
- *
- * Tests with images that approach the size limits
- * and verify the container write path is used correctly.
- */
-async function testLargeImageHandling() {
-  console.log('\n=== Group 4: Large Image Handling ===');
-
-  const token = auth.getBearerToken(TEST_USERNAME);
-
-  await test('Send message with large image (near 5MB)', async () => {
+describe('Large Image Handling', () => {
+  it('Send message with large image (near 5MB)', async () => {
+    const token = auth.getBearerToken(TEST_USERNAME);
     const ws = await connectWebSocket(token);
 
     // Create a ~4MB image (base64 will be larger, but still within 5MB raw limit)
@@ -376,27 +369,20 @@ async function testLargeImageHandling() {
     }, 20000);
 
     // Should process without crashing
-    assert.truthy(responses.length > 0, 'Should handle large image');
+    assert.ok(responses.length > 0, 'Should handle large image');
     safeClose(ws);
   });
-}
+});
 
-/**
- * Group 5: Container Verification for Image Files
- *
- * Verify that images are correctly written to the sandbox container.
- */
-async function testContainerImageVerification() {
-  console.log('\n=== Group 5: Container Image Verification ===');
+describe('Container Image Verification', () => {
+  it('Image temp directory structure exists in container', async () => {
+    const userData = auth.getToken(TEST_USERNAME);
 
-  const userData = auth.getToken(TEST_USERNAME);
+    if (!userData.userId) {
+      console.log('  (Skipped: No userId for container verification)');
+      return;
+    }
 
-  if (!userData.userId) {
-    console.log('  (Skipped: No userId for container verification)');
-    return;
-  }
-
-  await test('Image temp directory structure exists in container', async () => {
     try {
       await container.init();
 
@@ -408,24 +394,16 @@ async function testContainerImageVerification() {
       );
 
       // Just verify we can exec in the container
-      assert.truthy(typeof output === 'string', 'Should be able to exec in container');
+      assert.ok(typeof output === 'string', 'Should be able to exec in container');
     } catch (err) {
       console.log(`    (Skipped: Container access error - ${err.message})`);
     }
   });
-}
+});
 
-/**
- * Group 6: Document Attachment Tests
- *
- * Tests for document file attachments (with path property).
- */
-async function testDocumentAttachments() {
-  console.log('\n=== Group 6: Document Attachments ===');
-
-  const token = auth.getBearerToken(TEST_USERNAME);
-
-  await test('Send message with document attachment (path-based)', async () => {
+describe('Document Attachments', () => {
+  it('Send message with document attachment (path-based)', async () => {
+    const token = auth.getBearerToken(TEST_USERNAME);
     const ws = await connectWebSocket(token);
 
     const responses = await sendAndCollect(ws, {
@@ -445,11 +423,12 @@ async function testDocumentAttachments() {
     }, 10000);
 
     // Should process the attachment reference
-    assert.truthy(responses.length > 0, 'Should handle document attachment');
+    assert.ok(responses.length > 0, 'Should handle document attachment');
     safeClose(ws);
   });
 
-  await test('Mixed image and document attachments', async () => {
+  it('Mixed image and document attachments', async () => {
+    const token = auth.getBearerToken(TEST_USERNAME);
     const ws = await connectWebSocket(token);
 
     const imageData = createBase64Image();
@@ -475,18 +454,13 @@ async function testDocumentAttachments() {
       }
     }, 10000);
 
-    assert.truthy(responses.length > 0, 'Should handle mixed attachments');
+    assert.ok(responses.length > 0, 'Should handle mixed attachments');
     safeClose(ws);
   });
-}
+});
 
-/**
- * Group 7: Error Handling
- */
-async function testErrorHandling() {
-  console.log('\n=== Group 7: Error Handling ===');
-
-  await test('Invalid message type returns error', async () => {
+describe('Error Handling', () => {
+  it('Invalid message type returns error', async () => {
     const token = auth.getBearerToken(TEST_USERNAME);
     const ws = await connectWebSocket(token);
 
@@ -500,14 +474,14 @@ async function testErrorHandling() {
     safeClose(ws);
 
     // If we got here without exceptions, the server handled it
-    assert.truthy(true, 'Server handled invalid message type without crashing');
+    assert.ok(true, 'Server handled invalid message type without crashing');
   });
 
-  await test('Malformed JSON in WebSocket message', async () => {
+  it('Malformed JSON in WebSocket message', async () => {
     const token = auth.getBearerToken(TEST_USERNAME);
     const ws = await connectWebSocket(token);
 
-    return new Promise((resolve) => {
+    await new Promise((resolve) => {
       const timer = setTimeout(() => {
         safeClose(ws);
         resolve();
@@ -521,12 +495,12 @@ async function testErrorHandling() {
       });
 
       ws.send('not valid json {{{{');
-    }).then(() => {
-      assert.truthy(true, 'Server handled malformed JSON without crashing');
     });
+
+    assert.ok(true, 'Server handled malformed JSON without crashing');
   });
 
-  await test('Empty command with no attachments', async () => {
+  it('Empty command with no attachments', async () => {
     const token = auth.getBearerToken(TEST_USERNAME);
     const ws = await connectWebSocket(token);
 
@@ -540,20 +514,14 @@ async function testErrorHandling() {
     }, 5000);
 
     // Should handle gracefully (may return error or proceed)
-    assert.truthy(responses.length > 0 || responses.length === 0, 'Server handled empty command');
+    assert.ok(responses.length > 0 || responses.length === 0, 'Server handled empty command');
     safeClose(ws);
   });
-}
+});
 
-/**
- * Group 8: Abort Session Tests
- */
-async function testAbortSession() {
-  console.log('\n=== Group 8: Abort Session ===');
-
-  const token = auth.getBearerToken(TEST_USERNAME);
-
-  await test('Send abort for non-existent session', async () => {
+describe('Abort Session', () => {
+  it('Send abort for non-existent session', async () => {
+    const token = auth.getBearerToken(TEST_USERNAME);
     const ws = await connectWebSocket(token);
 
     const responses = await sendAndCollect(ws, {
@@ -562,51 +530,14 @@ async function testAbortSession() {
       provider: 'claude'
     }, 5000);
 
-    assert.truthy(responses.length > 0, 'Should receive abort response');
+    assert.ok(responses.length > 0, 'Should receive abort response');
 
     const abortResponse = responses.find(r => r.type === 'session-aborted');
-    assert.truthy(abortResponse, 'Should receive session-aborted event');
+    assert.ok(abortResponse, 'Should receive session-aborted event');
     if (abortResponse) {
-      assert.equal(abortResponse.sessionId, 'nonexistent-session-xyz', 'SessionId should match');
+      assert.strictEqual(abortResponse.sessionId, 'nonexistent-session-xyz', 'SessionId should match');
     }
 
     safeClose(ws);
   });
-}
-
-// ─── Main Runner ───────────────────────────────────────────────
-
-async function runAllTests() {
-  console.log('\n=== Chat with Images Integration Tests ===\n');
-  console.log('NOTE: Requires server running on port 3001');
-  console.log('NOTE: Tests verify WebSocket pipeline, not real Claude SDK responses\n');
-
-  const serverOk = await checkServerRunning();
-  if (!serverOk) {
-    console.error('Error: Server not running on port 3001.');
-    console.error('Start with: docker-compose up -d');
-    process.exit(1);
-  }
-
-  // Setup: register test user
-  console.log('Setting up test user...');
-  await auth.registerUser(TEST_USERNAME, TEST_PASSWORD);
-  console.log(`User: ${TEST_USERNAME}\n`);
-
-  // Run test groups
-  await testWebSocketConnection();
-  await testTextOnlyChat();
-  await testChatWithImages();
-  await testLargeImageHandling();
-  await testContainerImageVerification();
-  await testDocumentAttachments();
-  await testErrorHandling();
-  await testAbortSession();
-
-  printSummary(results, 'Chat with Images');
-}
-
-runAllTests().catch((error) => {
-  console.error('Fatal error:', error);
-  process.exit(1);
 });

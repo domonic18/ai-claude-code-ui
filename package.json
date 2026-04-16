@@ -30,20 +30,12 @@
     "preview": "vite preview",
     "start": "npm run build && npm run server",
     "release": "./scripts/release.sh",
-    "test": "npm run test:imports && npm run test:database && npm run test:user-settings-mcp && npm run test:api-endpoints && npm run test:container && npm run test:docker && npm run test:fileops && npm run test:sdk && npm run test:new",
-    "test:new": "npm run test:upload && npm run test:sessions && npm run test:tour && npm run test:chat-images",
-    "test:imports": "node backend/tests/unit/module-imports.test.js",
-    "test:database": "node backend/tests/unit/database.test.js",
-    "test:user-settings-mcp": "node backend/tests/unit/user-settings-mcp.test.js",
-    "test:api-endpoints": "node backend/tests/integration/api-endpoints.test.js",
-    "test:container": "node backend/tests/integration/container.test.js",
-    "test:docker": "node backend/tests/integration/docker-container.test.js",
-    "test:fileops": "node backend/tests/integration/file-operations.test.js",
-    "test:sdk": "node backend/tests/integration/claude-sdk-invocation.test.js",
-    "test:upload": "node backend/tests/integration/file-upload.test.js",
-    "test:sessions": "node backend/tests/integration/session-operations.test.js",
-    "test:tour": "node backend/tests/integration/product-tour.test.js",
-    "test:chat-images": "node backend/tests/integration/chat-with-images.test.js"
+    "test": "npm run test:unit && npm run test:services && npm run test:integration",
+    "test:unit": "node --test 'backend/tests/unit/*.test.js'",
+    "test:services": "node --test 'backend/services/**/__tests__/*.test.js' 'backend/controllers/**/__tests__/*.test.js' 'backend/middleware/**/__tests__/*.test.js'",
+    "test:integration": "node --test backend/tests/integration/",
+    "test:frontend": "npx vitest run",
+    "test:watch": "npx vitest"
   },
   "keywords": [
     "claude coode",
@@ -118,6 +110,8 @@
     "ws": "^8.14.2"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^25.0.8",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
@@ -125,6 +119,7 @@
     "auto-changelog": "^2.5.0",
     "autoprefixer": "^10.4.16",
     "concurrently": "^8.2.2",
+    "jsdom": "^27.0.1",
     "node-gyp": "^10.0.0",
     "postcss": "^8.4.32",
     "release-it": "^19.0.5",
@@ -132,6 +127,7 @@
     "tailwindcss": "^3.4.0",
     "terser": "^5.46.1",
     "typescript": "^5.9.3",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "vitest": "^3.2.4"
   }
 }

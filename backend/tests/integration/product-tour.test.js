@@ -14,16 +14,11 @@
  * @module tests/integration/product-tour
  */
 
-import {
-  TestResults, assert, createTestExecutor,
-  makeRequest, parseJson, printSummary,
-  checkServerRunning, uniqueId
-} from './helpers/index.js';
-
+import { describe, it, before } from 'node:test';
+import assert from 'node:assert/strict';
+import { makeRequest, parseJson, checkServerRunning, uniqueId } from './helpers/index.js';
 import { AuthHelper } from './helpers/auth-helper.js';
 
-const results = new TestResults();
-const test = createTestExecutor(results);
 const auth = new AuthHelper();
 
 // Test users
@@ -31,217 +26,9 @@ const USER_A = uniqueId('tour_user_a');
 const USER_B = uniqueId('tour_user_b');
 const PASSWORD = 'testpass123';
 
-// ─── Test Groups ───────────────────────────────────────────────
+// ─── Setup ────────────────────────────────────────────────────────
 
-/**
- * Group 1: Onboarding Status - Initial State
- */
-async function testInitialStatus() {
-  console.log('\n=== Group 1: Initial Onboarding Status ===');
-
-  const tokenA = auth.getBearerToken(USER_A);
-
-  await test('New user has not completed onboarding', async () => {
-    const response = await makeRequest(
-      'GET',
-      '/api/users/onboarding-status',
-      null,
-      tokenA
-    );
-
-    assert.equal(response.statusCode, 200, 'Should return 200');
-    const body = parseJson(response.body);
-    assert.hasProperty(body, 'data', 'Response should have data');
-    assert.hasProperty(body.data, 'hasCompletedOnboarding', 'Should have hasCompletedOnboarding');
-    // New user should NOT have completed onboarding
-    assert.equal(body.data.hasCompletedOnboarding, false, 'New user should not have completed onboarding');
-  });
-
-  await test('Unauthenticated request rejected for status', async () => {
-    const response = await makeRequest('GET', '/api/users/onboarding-status');
-
-    assert.equal(response.statusCode, 401, 'Should return 401 for unauthenticated request');
-  });
-}
-
-/**
- * Group 2: Complete Onboarding
- */
-async function testCompleteOnboarding() {
-  console.log('\n=== Group 2: Complete Onboarding ===');
-
-  const tokenA = auth.getBearerToken(USER_A);
-
-  await test('Complete onboarding successfully', async () => {
-    const response = await makeRequest(
-      'POST',
-      '/api/users/complete-onboarding',
-      null,
-      tokenA
-    );
-
-    assert.equal(response.statusCode, 200, 'Should return 200');
-    const body = parseJson(response.body);
-    assert.hasProperty(body, 'data', 'Response should have data');
-    assert.hasProperty(body.data, 'message', 'Response should have message');
-    assert.contains(body.data.message, 'Onboarding completed', 'Message should confirm completion');
-  });
-
-  await test('Status changes to completed after completing', async () => {
-    const response = await makeRequest(
-      'GET',
-      '/api/users/onboarding-status',
-      null,
-      tokenA
-    );
-
-    assert.equal(response.statusCode, 200, 'Should return 200');
-    const body = parseJson(response.body);
-    assert.equal(body.data.hasCompletedOnboarding, true, 'Should show completed after onboarding');
-  });
-
-  await test('Complete onboarding is idempotent (second call)', async () => {
-    const response = await makeRequest(
-      'POST',
-      '/api/users/complete-onboarding',
-      null,
-      tokenA
-    );
-
-    assert.equal(response.statusCode, 200, 'Should return 200 on second completion');
-    const body = parseJson(response.body);
-    assert.hasProperty(body.data, 'message', 'Should still return success message');
-  });
-
-  await test('Status remains completed after second call', async () => {
-    const response = await makeRequest(
-      'GET',
-      '/api/users/onboarding-status',
-      null,
-      tokenA
-    );
-
-    assert.equal(response.statusCode, 200, 'Should return 200');
-    const body = parseJson(response.body);
-    assert.equal(body.data.hasCompletedOnboarding, true, 'Should remain completed');
-  });
-
-  await test('Unauthenticated request rejected for complete', async () => {
-    const response = await makeRequest('POST', '/api/users/complete-onboarding');
-
-    assert.equal(response.statusCode, 401, 'Should return 401 for unauthenticated request');
-  });
-}
-
-/**
- * Group 3: Multi-User Isolation
- *
- * Verify that onboarding state is per-user and does not leak.
- */
-async function testMultiUserIsolation() {
-  console.log('\n=== Group 3: Multi-User Isolation ===');
-
-  const tokenB = auth.getBearerToken(USER_B);
-
-  // User A completed onboarding in Group 2
-  // User B has NOT completed onboarding
-
-  await test('User B has not completed onboarding (independent from User A)', async () => {
-    const response = await makeRequest(
-      'GET',
-      '/api/users/onboarding-status',
-      null,
-      tokenB
-    );
-
-    assert.equal(response.statusCode, 200, 'Should return 200');
-    const body = parseJson(response.body);
-    assert.equal(body.data.hasCompletedOnboarding, false, 'User B should not be affected by User A');
-  });
-
-  await test('User B completes onboarding independently', async () => {
-    const response = await makeRequest(
-      'POST',
-      '/api/users/complete-onboarding',
-      null,
-      tokenB
-    );
-
-    assert.equal(response.statusCode, 200, 'Should return 200');
-  });
-
-  await test('User B status is now completed', async () => {
-    const response = await makeRequest(
-      'GET',
-      '/api/users/onboarding-status',
-      null,
-      tokenB
-    );
-
-    assert.equal(response.statusCode, 200, 'Should return 200');
-    const body = parseJson(response.body);
-    assert.equal(body.data.hasCompletedOnboarding, true, 'User B should now be completed');
-  });
-
-  await test('User A status unchanged after User B completes', async () => {
-    const tokenA = auth.getBearerToken(USER_A);
-    const response = await makeRequest(
-      'GET',
-      '/api/users/onboarding-status',
-      null,
-      tokenA
-    );
-
-    assert.equal(response.statusCode, 200, 'Should return 200');
-    const body = parseJson(response.body);
-    assert.equal(body.data.hasCompletedOnboarding, true, 'User A should still be completed');
-  });
-}
-
-/**
- * Group 4: Response Format Validation
- */
-async function testResponseFormat() {
-  console.log('\n=== Group 4: Response Format ===');
-
-  const tokenA = auth.getBearerToken(USER_A);
-
-  await test('Onboarding status response has correct structure', async () => {
-    const response = await makeRequest(
-      'GET',
-      '/api/users/onboarding-status',
-      null,
-      tokenA
-    );
-
-    const body = parseJson(response.body);
-    assert.hasProperty(body, 'success', 'Should have success field');
-    assert.equal(body.success, true, 'success should be true');
-    assert.hasProperty(body, 'data', 'Should have data field');
-    assert.hasProperty(body.data, 'hasCompletedOnboarding', 'data should have hasCompletedOnboarding');
-    assert.equal(typeof body.data.hasCompletedOnboarding, 'boolean', 'hasCompletedOnboarding should be boolean');
-  });
-
-  await test('Complete onboarding response has correct structure', async () => {
-    const response = await makeRequest(
-      'POST',
-      '/api/users/complete-onboarding',
-      null,
-      tokenA
-    );
-
-    const body = parseJson(response.body);
-    assert.hasProperty(body, 'success', 'Should have success field');
-    assert.equal(body.success, true, 'success should be true');
-    assert.hasProperty(body, 'data', 'Should have data field');
-    assert.hasProperty(body.data, 'message', 'data should have message');
-    assert.equal(typeof body.data.message, 'string', 'message should be string');
-  });
-}
-
-// ─── Main Runner ───────────────────────────────────────────────
-
-async function runAllTests() {
+before(async () => {
   console.log('\n=== Product Tour Integration Tests ===\n');
   console.log('NOTE: Requires server running on port 3001\n');
 
@@ -258,17 +45,203 @@ async function runAllTests() {
   await auth.registerUser(USER_B, PASSWORD);
   console.log(`User A: ${USER_A}`);
   console.log(`User B: ${USER_B}\n`);
+});
 
-  // Run test groups
-  await testInitialStatus();
-  await testCompleteOnboarding();
-  await testMultiUserIsolation();
-  await testResponseFormat();
+// ─── Test Groups ───────────────────────────────────────────────
 
-  printSummary(results, 'Product Tour');
-}
+/**
+ * Group 1: Onboarding Status - Initial State
+ */
+describe('Initial Onboarding Status', () => {
+  it('New user has not completed onboarding', async () => {
+    const tokenA = auth.getBearerToken(USER_A);
+    const response = await makeRequest(
+      'GET',
+      '/api/users/onboarding-status',
+      null,
+      tokenA
+    );
 
-runAllTests().catch((error) => {
-  console.error('Fatal error:', error);
-  process.exit(1);
+    assert.strictEqual(response.statusCode, 200, 'Should return 200');
+    const body = parseJson(response.body);
+    assert.ok('data' in body, 'Response should have data');
+    assert.ok('hasCompletedOnboarding' in body.data, 'Should have hasCompletedOnboarding');
+    // New user should NOT have completed onboarding
+    assert.strictEqual(body.data.hasCompletedOnboarding, false, 'New user should not have completed onboarding');
+  });
+
+  it('Unauthenticated request rejected for status', async () => {
+    const response = await makeRequest('GET', '/api/users/onboarding-status');
+
+    assert.strictEqual(response.statusCode, 401, 'Should return 401 for unauthenticated request');
+  });
+});
+
+/**
+ * Group 2: Complete Onboarding
+ */
+describe('Complete Onboarding', () => {
+  it('Complete onboarding successfully', async () => {
+    const tokenA = auth.getBearerToken(USER_A);
+    const response = await makeRequest(
+      'POST',
+      '/api/users/complete-onboarding',
+      null,
+      tokenA
+    );
+
+    assert.strictEqual(response.statusCode, 200, 'Should return 200');
+    const body = parseJson(response.body);
+    assert.ok('data' in body, 'Response should have data');
+    assert.ok('message' in body.data, 'Response should have message');
+    assert.ok(body.data.message.includes('Onboarding completed'), 'Message should confirm completion');
+  });
+
+  it('Status changes to completed after completing', async () => {
+    const tokenA = auth.getBearerToken(USER_A);
+    const response = await makeRequest(
+      'GET',
+      '/api/users/onboarding-status',
+      null,
+      tokenA
+    );
+
+    assert.strictEqual(response.statusCode, 200, 'Should return 200');
+    const body = parseJson(response.body);
+    assert.strictEqual(body.data.hasCompletedOnboarding, true, 'Should show completed after onboarding');
+  });
+
+  it('Complete onboarding is idempotent (second call)', async () => {
+    const tokenA = auth.getBearerToken(USER_A);
+    const response = await makeRequest(
+      'POST',
+      '/api/users/complete-onboarding',
+      null,
+      tokenA
+    );
+
+    assert.strictEqual(response.statusCode, 200, 'Should return 200 on second completion');
+    const body = parseJson(response.body);
+    assert.ok('message' in body.data, 'Should still return success message');
+  });
+
+  it('Status remains completed after second call', async () => {
+    const tokenA = auth.getBearerToken(USER_A);
+    const response = await makeRequest(
+      'GET',
+      '/api/users/onboarding-status',
+      null,
+      tokenA
+    );
+
+    assert.strictEqual(response.statusCode, 200, 'Should return 200');
+    const body = parseJson(response.body);
+    assert.strictEqual(body.data.hasCompletedOnboarding, true, 'Should remain completed');
+  });
+
+  it('Unauthenticated request rejected for complete', async () => {
+    const response = await makeRequest('POST', '/api/users/complete-onboarding');
+
+    assert.strictEqual(response.statusCode, 401, 'Should return 401 for unauthenticated request');
+  });
+});
+
+/**
+ * Group 3: Multi-User Isolation
+ *
+ * Verify that onboarding state is per-user and does not leak.
+ */
+describe('Multi-User Isolation', () => {
+  it('User B has not completed onboarding (independent from User A)', async () => {
+    const tokenB = auth.getBearerToken(USER_B);
+    const response = await makeRequest(
+      'GET',
+      '/api/users/onboarding-status',
+      null,
+      tokenB
+    );
+
+    assert.strictEqual(response.statusCode, 200, 'Should return 200');
+    const body = parseJson(response.body);
+    assert.strictEqual(body.data.hasCompletedOnboarding, false, 'User B should not be affected by User A');
+  });
+
+  it('User B completes onboarding independently', async () => {
+    const tokenB = auth.getBearerToken(USER_B);
+    const response = await makeRequest(
+      'POST',
+      '/api/users/complete-onboarding',
+      null,
+      tokenB
+    );
+
+    assert.strictEqual(response.statusCode, 200, 'Should return 200');
+  });
+
+  it('User B status is now completed', async () => {
+    const tokenB = auth.getBearerToken(USER_B);
+    const response = await makeRequest(
+      'GET',
+      '/api/users/onboarding-status',
+      null,
+      tokenB
+    );
+
+    assert.strictEqual(response.statusCode, 200, 'Should return 200');
+    const body = parseJson(response.body);
+    assert.strictEqual(body.data.hasCompletedOnboarding, true, 'User B should now be completed');
+  });
+
+  it('User A status unchanged after User B completes', async () => {
+    const tokenA = auth.getBearerToken(USER_A);
+    const response = await makeRequest(
+      'GET',
+      '/api/users/onboarding-status',
+      null,
+      tokenA
+    );
+
+    assert.strictEqual(response.statusCode, 200, 'Should return 200');
+    const body = parseJson(response.body);
+    assert.strictEqual(body.data.hasCompletedOnboarding, true, 'User A should still be completed');
+  });
+});
+
+/**
+ * Group 4: Response Format Validation
+ */
+describe('Response Format', () => {
+  it('Onboarding status response has correct structure', async () => {
+    const tokenA = auth.getBearerToken(USER_A);
+    const response = await makeRequest(
+      'GET',
+      '/api/users/onboarding-status',
+      null,
+      tokenA
+    );
+
+    const body = parseJson(response.body);
+    assert.ok('success' in body, 'Should have success field');
+    assert.strictEqual(body.success, true, 'success should be true');
+    assert.ok('data' in body, 'Should have data field');
+    assert.ok('hasCompletedOnboarding' in body.data, 'data should have hasCompletedOnboarding');
+    assert.strictEqual(typeof body.data.hasCompletedOnboarding, 'boolean', 'hasCompletedOnboarding should be boolean');
+  });
+
+  it('Complete onboarding response has correct structure', async () => {
+    const tokenA = auth.getBearerToken(USER_A);
+    const response = await makeRequest(
+      'POST',
+      '/api/users/complete-onboarding',
+      null,
+      tokenA
+    );
+
+    const body = parseJson(response.body);
+    assert.ok('success' in body, 'Should have success field');
+    assert.strictEqual(body.success, true, 'success should be true');
+    assert.ok('data' in body, 'Should have data field');
+    assert.ok('message' in body.data, 'data should have message');
+    assert.strictEqual(typeof body.data.message, 'string', 'message should be string');
+  });
 });

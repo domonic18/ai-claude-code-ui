@@ -1,19 +1,17 @@
 /**
  * Test Helpers Index
  *
- * Re-exports all test helper modules.
+ * Re-exports HTTP utilities and test helpers for integration tests.
+ * Test framework (TestResults, assert, createTestExecutor) has been
+ * removed — all tests now use node:test + node:assert/strict.
  *
  * @module tests/integration/helpers
  */
 
 export {
-  TestResults,
-  assert,
-  createTestExecutor,
   makeRequest,
   makeMultipartRequest,
   parseJson,
-  printSummary,
   checkServerRunning,
   uniqueId
 } from './test-runner.js';

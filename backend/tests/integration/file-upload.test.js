@@ -12,17 +12,12 @@
  * @module tests/integration/file-upload
  */
 
-import {
-  TestResults, assert, createTestExecutor,
-  makeRequest, makeMultipartRequest, parseJson,
-  printSummary, checkServerRunning, uniqueId
-} from './helpers/index.js';
-
+import { describe, it, before } from 'node:test';
+import assert from 'node:assert/strict';
+import { makeRequest, makeMultipartRequest, parseJson, checkServerRunning, uniqueId } from './helpers/index.js';
 import { AuthHelper } from './helpers/auth-helper.js';
 import { ContainerHelper } from './helpers/container-helper.js';
 
-const results = new TestResults();
-const test = createTestExecutor(results);
 const auth = new AuthHelper();
 const container = new ContainerHelper();
 
@@ -38,12 +33,26 @@ const TEST_PROJECT = 'default';
  *
  * POST /api/files/upload - multipart form-data with single file field
  */
-async function testDocumentUpload() {
-  console.log('\n=== Group 1: Document Upload ===');
+describe('Document Upload', () => {
+  let token;
 
-  const token = auth.getBearerToken(TEST_USERNAME);
+  before(async () => {
+    const serverOk = await checkServerRunning();
+    if (!serverOk) {
+      console.error('Error: Server not running on port 3001.');
+      console.error('Start with: docker-compose up -d');
+      process.exit(1);
+    }
 
-  await test('Upload .txt file successfully', async () => {
+    // Setup: register test user
+    console.log('Setting up test user...');
+    await auth.registerUser(TEST_USERNAME, TEST_PASSWORD);
+    console.log(`User: ${TEST_USERNAME}\n`);
+
+    token = auth.getBearerToken(TEST_USERNAME);
+  });
+
+  it('Upload .txt file successfully', async () => {
     const content = Buffer.from('Hello, this is a test text file for upload.');
     const response = await makeMultipartRequest(
       'POST', '/api/files/upload',
@@ -52,16 +61,16 @@ async function testDocumentUpload() {
       token
     );
 
-    assert.equal(response.statusCode, 200, 'Should return 200');
+    assert.strictEqual(response.statusCode, 200, 'Should return 200');
     const body = parseJson(response.body);
-    assert.hasProperty(body, 'data', 'Response should have data');
-    assert.hasProperty(body.data, 'path', 'Response should have file path');
-    assert.hasProperty(body.data, 'displayName', 'Response should have displayName');
-    assert.equal(body.data.displayName, 'test-upload.txt', 'displayName should match');
-    assert.truthy(body.data.path.includes('/uploads/'), 'Path should contain /uploads/');
+    assert.ok('data' in body, 'Response should have data');
+    assert.ok('path' in body.data, 'Response should have file path');
+    assert.ok('displayName' in body.data, 'Response should have displayName');
+    assert.strictEqual(body.data.displayName, 'test-upload.txt', 'displayName should match');
+    assert.ok(body.data.path.includes('/uploads/'), 'Path should contain /uploads/');
   });
 
-  await test('Upload .md file successfully', async () => {
+  it('Upload .md file successfully', async () => {
     const content = Buffer.from('# Test Markdown\n\nThis is a **test** markdown file.');
     const response = await makeMultipartRequest(
       'POST', '/api/files/upload',
@@ -70,12 +79,12 @@ async function testDocumentUpload() {
       token
     );
 
-    assert.equal(response.statusCode, 200, 'Should return 200');
+    assert.strictEqual(response.statusCode, 200, 'Should return 200');
     const body = parseJson(response.body);
-    assert.hasProperty(body.data, 'path', 'Response should have file path');
+    assert.ok('path' in body.data, 'Response should have file path');
   });
 
-  await test('Upload .json file successfully', async () => {
+  it('Upload .json file successfully', async () => {
     const content = Buffer.from('{"test": true, "value": 42}');
     const response = await makeMultipartRequest(
       'POST', '/api/files/upload',
@@ -84,12 +93,12 @@ async function testDocumentUpload() {
       token
     );
 
-    assert.equal(response.statusCode, 200, 'Should return 200');
+    assert.strictEqual(response.statusCode, 200, 'Should return 200');
     const body = parseJson(response.body);
-    assert.hasProperty(body.data, 'path', 'Response should have file path');
+    assert.ok('path' in body.data, 'Response should have file path');
   });
 
-  await test('Upload .csv file successfully', async () => {
+  it('Upload .csv file successfully', async () => {
     const content = Buffer.from('name,value\ntest,42\nfoo,bar');
     const response = await makeMultipartRequest(
       'POST', '/api/files/upload',
@@ -98,12 +107,12 @@ async function testDocumentUpload() {
       token
     );
 
-    assert.equal(response.statusCode, 200, 'Should return 200');
+    assert.strictEqual(response.statusCode, 200, 'Should return 200');
     const body = parseJson(response.body);
-    assert.hasProperty(body.data, 'path', 'Response should have file path');
+    assert.ok('path' in body.data, 'Response should have file path');
   });
 
-  await test('Reject disallowed file type (.exe)', async () => {
+  it('Reject disallowed file type (.exe)', async () => {
     const content = Buffer.from('binary content');
     const response = await makeMultipartRequest(
       'POST', '/api/files/upload',
@@ -112,13 +121,13 @@ async function testDocumentUpload() {
       token
     );
 
-    assert.truthy(
+    assert.ok(
       response.statusCode === 400 || response.statusCode === 500,
       'Should reject .exe file (400 or 500)'
     );
   });
 
-  await test('Reject disallowed file type (.sh)', async () => {
+  it('Reject disallowed file type (.sh)', async () => {
     const content = Buffer.from('#!/bin/bash\necho hello');
     const response = await makeMultipartRequest(
       'POST', '/api/files/upload',
@@ -127,13 +136,13 @@ async function testDocumentUpload() {
       token
     );
 
-    assert.truthy(
+    assert.ok(
       response.statusCode === 400 || response.statusCode === 500,
       'Should reject .sh file'
     );
   });
 
-  await test('Reject upload without authentication', async () => {
+  it('Reject upload without authentication', async () => {
     const content = Buffer.from('unauthorized upload');
     const response = await makeMultipartRequest(
       'POST', '/api/files/upload',
@@ -142,10 +151,10 @@ async function testDocumentUpload() {
       null // No token
     );
 
-    assert.equal(response.statusCode, 401, 'Should return 401 Unauthorized');
+    assert.strictEqual(response.statusCode, 401, 'Should return 401 Unauthorized');
   });
 
-  await test('Reject upload with no file', async () => {
+  it('Reject upload with no file', async () => {
     const response = await makeMultipartRequest(
       'POST', '/api/files/upload',
       { project: TEST_PROJECT },
@@ -153,24 +162,26 @@ async function testDocumentUpload() {
       token
     );
 
-    assert.truthy(
+    assert.ok(
       response.statusCode === 400 || response.statusCode === 500,
       'Should reject request with no file'
     );
   });
-}
+});
 
 /**
  * Group 2: Image Upload Tests
  *
  * POST /api/uploads/:projectName/upload-images - multipart with images[] array
  */
-async function testImageUpload() {
-  console.log('\n=== Group 2: Image Upload ===');
+describe('Image Upload', () => {
+  let token;
 
-  const token = auth.getBearerToken(TEST_USERNAME);
+  before(async () => {
+    token = auth.getBearerToken(TEST_USERNAME);
+  });
 
-  await test('Upload single PNG image successfully', async () => {
+  it('Upload single PNG image successfully', async () => {
     // Create a minimal valid PNG (1x1 transparent pixel)
     const pngBuffer = createMinimalPng();
 
@@ -193,22 +204,22 @@ async function testImageUpload() {
       return;
     }
 
-    assert.equal(response.statusCode, 200, 'Should return 200');
+    assert.strictEqual(response.statusCode, 200, 'Should return 200');
     const body = parseJson(response.body);
-    assert.hasProperty(body, 'images', 'Response should have images array');
-    assert.isArray(body.images, 'images should be an array');
-    assert.lengthOf(body.images, 1, 'Should have exactly 1 image');
+    assert.ok('images' in body, 'Response should have images array');
+    assert.ok(Array.isArray(body.images), 'images should be an array');
+    assert.strictEqual(body.images.length, 1, 'Should have exactly 1 image');
 
     // Validate base64 data URI format
     const img = body.images[0];
-    assert.hasProperty(img, 'data', 'Image should have data property');
-    assert.hasProperty(img, 'name', 'Image should have name property');
-    assert.hasProperty(img, 'mimeType', 'Image should have mimeType property');
-    assert.contains(img.data, 'data:image/png;base64,', 'Data should be PNG data URI');
-    assert.equal(img.mimeType, 'image/png', 'MIME type should be image/png');
+    assert.ok('data' in img, 'Image should have data property');
+    assert.ok('name' in img, 'Image should have name property');
+    assert.ok('mimeType' in img, 'Image should have mimeType property');
+    assert.ok(img.data.includes('data:image/png;base64,'), 'Data should be PNG data URI');
+    assert.strictEqual(img.mimeType, 'image/png', 'MIME type should be image/png');
   });
 
-  await test('Upload JPEG image successfully', async () => {
+  it('Upload JPEG image successfully', async () => {
     // Create a minimal valid JPEG
     const jpegBuffer = createMinimalJpeg();
 
@@ -224,15 +235,15 @@ async function testImageUpload() {
       return;
     }
 
-    assert.equal(response.statusCode, 200, 'Should return 200');
+    assert.strictEqual(response.statusCode, 200, 'Should return 200');
     const body = parseJson(response.body);
-    assert.hasProperty(body, 'images', 'Response should have images array');
+    assert.ok('images' in body, 'Response should have images array');
     if (body.images && body.images.length > 0) {
-      assert.equal(body.images[0].mimeType, 'image/jpeg', 'MIME type should be image/jpeg');
+      assert.strictEqual(body.images[0].mimeType, 'image/jpeg', 'MIME type should be image/jpeg');
     }
   });
 
-  await test('Upload multiple images (3 files)', async () => {
+  it('Upload multiple images (3 files)', async () => {
     const pngBuffer = createMinimalPng();
 
     const response = await makeMultipartRequest(
@@ -251,14 +262,14 @@ async function testImageUpload() {
       return;
     }
 
-    assert.equal(response.statusCode, 200, 'Should return 200');
+    assert.strictEqual(response.statusCode, 200, 'Should return 200');
     const body = parseJson(response.body);
     if (body.images) {
-      assert.lengthOf(body.images, 3, 'Should have exactly 3 images');
+      assert.strictEqual(body.images.length, 3, 'Should have exactly 3 images');
     }
   });
 
-  await test('Reject non-image file type', async () => {
+  it('Reject non-image file type', async () => {
     const textBuffer = Buffer.from('This is not an image');
 
     const response = await makeMultipartRequest(
@@ -269,13 +280,13 @@ async function testImageUpload() {
     );
 
     // Should be rejected by multer fileFilter or return error
-    assert.truthy(
+    assert.ok(
       response.statusCode !== 200,
       'Should reject non-image file'
     );
   });
 
-  await test('Reject upload with no images', async () => {
+  it('Reject upload with no images', async () => {
     const response = await makeMultipartRequest(
       'POST', `/api/uploads/${TEST_PROJECT}/upload-images`,
       {},
@@ -284,22 +295,24 @@ async function testImageUpload() {
     );
 
     // With no files, multer won't trigger, so it depends on endpoint logic
-    assert.truthy(
+    assert.ok(
       response.statusCode !== 200 || response.body.includes('error'),
       'Should reject request with no images'
     );
   });
-}
+});
 
 /**
  * Group 3: Upload Size Limit Tests
  */
-async function testUploadSizeLimits() {
-  console.log('\n=== Group 3: Upload Size Limits ===');
+describe('Upload Size Limits', () => {
+  let token;
 
-  const token = auth.getBearerToken(TEST_USERNAME);
+  before(async () => {
+    token = auth.getBearerToken(TEST_USERNAME);
+  });
 
-  await test('Reject document file exceeding 10MB', async () => {
+  it('Reject document file exceeding 10MB', async () => {
     // Create a buffer that exceeds 10MB
     const oversizedBuffer = Buffer.alloc(11 * 1024 * 1024, 'A');
 
@@ -310,13 +323,13 @@ async function testUploadSizeLimits() {
       token
     );
 
-    assert.truthy(
+    assert.ok(
       response.statusCode === 400 || response.statusCode === 413 || response.statusCode === 500,
       'Should reject file exceeding size limit'
     );
   });
 
-  await test('Reject image exceeding 5MB', async () => {
+  it('Reject image exceeding 5MB', async () => {
     // Create a buffer that exceeds 5MB
     const oversizedImage = Buffer.alloc(6 * 1024 * 1024, 'x');
 
@@ -327,31 +340,34 @@ async function testUploadSizeLimits() {
       token
     );
 
-    assert.truthy(
+    assert.ok(
       response.statusCode === 400 || response.statusCode === 413 || response.statusCode === 500,
       'Should reject image exceeding 5MB limit'
     );
   });
-}
+});
 
 /**
  * Group 4: Container Verification Tests
  *
  * Verify that uploaded files are actually present in the sandbox container.
  */
-async function testContainerVerification() {
-  console.log('\n=== Group 4: Container Verification ===');
+describe('Container Verification', () => {
+  let token;
+  let userData;
 
-  const token = auth.getBearerToken(TEST_USERNAME);
-  const userData = auth.getToken(TEST_USERNAME);
+  before(async () => {
+    token = auth.getBearerToken(TEST_USERNAME);
+    userData = auth.getToken(TEST_USERNAME);
+  });
 
-  // Only run if we have userId and Docker access
-  if (!userData.userId) {
-    console.log('  (Skipped: No userId available for container checks)');
-    return;
-  }
+  it('Uploaded file exists in container', async () => {
+    // Only run if we have userId and Docker access
+    if (!userData.userId) {
+      console.log('  (Skipped: No userId available for container checks)');
+      return;
+    }
 
-  await test('Uploaded file exists in container', async () => {
     // First upload a file
     const content = Buffer.from('Container verification test content');
     const uploadResponse = await makeMultipartRequest(
@@ -378,13 +394,13 @@ async function testContainerVerification() {
     try {
       await container.init();
       const exists = await container.fileExists(userData.userId, containerPath);
-      assert.truthy(exists, `File should exist in container at ${containerPath}`);
+      assert.ok(exists, `File should exist in container at ${containerPath}`);
     } catch (err) {
       console.log(`    (Skipped: Container access error - ${err.message})`);
     }
   });
 
-  await test('Upload goes to correct date-based directory', async () => {
+  it('Upload goes to correct date-based directory', async () => {
     const content = Buffer.from('Date path verification');
     const uploadResponse = await makeMultipartRequest(
       'POST', '/api/files/upload',
@@ -400,9 +416,9 @@ async function testContainerVerification() {
 
     const body = parseJson(uploadResponse.body);
     const today = new Date().toISOString().split('T')[0];
-    assert.contains(body.data.path, today, `Path should contain today's date ${today}`);
+    assert.ok(body.data.path.includes(today), `Path should contain today's date ${today}`);
   });
-}
+});
 
 // ─── Helper Functions ──────────────────────────────────────────
 
@@ -480,35 +496,3 @@ function createMinimalJpeg() {
     0x00, 0x00, 0x00, 0x00, 0xFF, 0xD9
   ]);
 }
-
-// ─── Main Runner ───────────────────────────────────────────────
-
-async function runAllTests() {
-  console.log('\n=== File Upload Integration Tests ===\n');
-  console.log('NOTE: Requires server running on port 3001\n');
-
-  const serverOk = await checkServerRunning();
-  if (!serverOk) {
-    console.error('Error: Server not running on port 3001.');
-    console.error('Start with: docker-compose up -d');
-    process.exit(1);
-  }
-
-  // Setup: register test user
-  console.log('Setting up test user...');
-  await auth.registerUser(TEST_USERNAME, TEST_PASSWORD);
-  console.log(`User: ${TEST_USERNAME}\n`);
-
-  // Run test groups
-  await testDocumentUpload();
-  await testImageUpload();
-  await testUploadSizeLimits();
-  await testContainerVerification();
-
-  printSummary(results, 'File Upload');
-}
-
-runAllTests().catch((error) => {
-  console.error('Fatal error:', error);
-  process.exit(1);
-});
