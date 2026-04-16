@@ -18,6 +18,41 @@ const logger = createLogger('routes/tools/uploads');
 const router = express.Router();
 
 /**
+ * 验证并返回 Whisper API URL
+ * 仅允许 https:// 协议，防止 SSRF
+ * @returns {string} 合法的 API URL
+ */
+function getValidatedWhisperUrl() {
+  const url = process.env.WHISPER_API_URL || 'https://api.openai.com/v1/audio/transcriptions';
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:') {
+      throw new Error(`WHISPER_API_URL must use https protocol, got: ${parsed.protocol}`);
+    }
+    return url;
+  } catch (e) {
+    throw new Error(`Invalid WHISPER_API_URL: ${e.message}`);
+  }
+}
+
+/**
+ * 验证模型名称（仅允许字母、数字、连字符、点号）
+ * @param {string} envVar - 环境变量名
+ * @param {string} defaultValue - 默认值
+ * @returns {string} 合法的模型名称
+ */
+function getValidatedModelName(envVar, defaultValue) {
+  const value = process.env[envVar] || defaultValue;
+  if (!/^[a-zA-Z0-9.\-]+$/.test(value)) {
+    throw new Error(`Invalid ${envVar}: must contain only alphanumeric characters, dots, and hyphens`);
+  }
+  if (value.length > 128) {
+    throw new Error(`Invalid ${envVar}: exceeds maximum length of 128`);
+  }
+  return value;
+}
+
+/**
  * POST /api/transcribe
  * 使用 OpenAI Whisper API 将音频文件转录为文本
  */
@@ -51,12 +86,12 @@ router.post('/transcribe', async (req, res) => {
           filename: req.file.originalname,
           contentType: req.file.mimetype
         });
-        formData.append('model', process.env.WHISPER_MODEL || 'whisper-1');
+        formData.append('model', getValidatedModelName('WHISPER_MODEL', 'whisper-1'));
         formData.append('response_format', 'json');
         formData.append('language', 'en');
 
-        // 向 OpenAI 兼容 API 发出请求
-        const whisperApiUrl = process.env.WHISPER_API_URL || 'https://api.openai.com/v1/audio/transcriptions';
+        // 向 OpenAI 兼容 API 发出请求（URL 经过 https 校验）
+        const whisperApiUrl = getValidatedWhisperUrl();
         const fetch = (await import('node-fetch')).default;
         const response = await fetch(whisperApiUrl, {
           method: 'POST',
@@ -143,7 +178,7 @@ Agent instructions:`;
           // 仅在有提示时调用 GPT
           if (prompt) {
             const completion = await openai.chat.completions.create({
-              model: process.env.OPENAI_ENHANCE_MODEL || 'gpt-4o-mini',
+              model: getValidatedModelName('OPENAI_ENHANCE_MODEL', 'gpt-4o-mini'),
               messages: [
                 { role: 'system', content: systemMessage },
                 { role: 'user', content: prompt }

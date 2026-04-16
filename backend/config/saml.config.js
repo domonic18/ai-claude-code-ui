@@ -146,6 +146,7 @@ export const samlConfig = {
 
 /**
  * 验证 SAML 配置是否完整
+ * SAML_ENABLED=true 时会校验所有必要参数，缺失则阻止启动
  * @returns {Object} 验证结果 { valid: boolean, errors: string[] }
  */
 export function validateSamlConfig() {
@@ -161,6 +162,26 @@ export function validateSamlConfig() {
 
   if (!samlConfig.sso_url) {
     errors.push('SAML_SSO_URL is required');
+  } else {
+    try {
+      const parsed = new URL(samlConfig.sso_url);
+      if (parsed.protocol !== 'https:') {
+        errors.push('SAML_SSO_URL must use https protocol');
+      }
+    } catch {
+      errors.push('SAML_SSO_URL is not a valid URL');
+    }
+  }
+
+  if (samlConfig.slo_url) {
+    try {
+      const parsed = new URL(samlConfig.slo_url);
+      if (parsed.protocol !== 'https:') {
+        errors.push('SAML_SLO_URL must use https protocol');
+      }
+    } catch {
+      errors.push('SAML_SLO_URL is not a valid URL');
+    }
   }
 
   if (!samlConfig.certificate || samlConfig.certificate.length < 100) {

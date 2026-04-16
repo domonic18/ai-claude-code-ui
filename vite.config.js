@@ -22,7 +22,13 @@ export default defineConfig(({ command, mode }) => {
     },
     server: {
       port: parseInt(env.VITE_PORT) || 5173,
-      allowedHosts: env.VITE_ALLOWED_HOSTS ? env.VITE_ALLOWED_HOSTS.split(',').map(h => h.trim()).filter(Boolean) : [],
+      // allowedHosts: comma-separated domains for Vite dev server.
+      // Empty/unset defaults to ['localhost'] — safe default, not "allow all".
+      allowedHosts: (() => {
+        if (!env.VITE_ALLOWED_HOSTS) return ['localhost'];
+        const hosts = env.VITE_ALLOWED_HOSTS.split(',').map(h => h.trim()).filter(Boolean);
+        return hosts.length > 0 ? hosts : ['localhost'];
+      })(),
       proxy: {
         '/api': {
           target: `http://localhost:${env.PORT || 3001}`,
