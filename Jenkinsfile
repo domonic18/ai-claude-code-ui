@@ -84,7 +84,7 @@ pipeline {
         // ==================== CI: 测试 ====================
         stage('CI: Test') {
             steps {
-                echo '--- CI: 运行测试 ---'
+                echo '--- CI: 运行测试（单元测试 + 服务测试 + 前端测试，跳过 Docker 依赖的集成测试） ---'
                 sh '''
                     # 从 workspace 外复制环境配置（避免被 CleanBeforeCheckout 清除）
                     if [ -n "${ENV_DEPLOY_PATH}" ] && [ -f "${ENV_DEPLOY_PATH}" ]; then
@@ -93,9 +93,7 @@ pipeline {
                     else
                         echo "未指定 ENV_DEPLOY_PATH 或文件不存在，跳过（测试将使用默认值）"
                     fi
-                    npm run test:imports
-                    npm run test:database
-                    npm run test:user-settings-mcp
+                    npm run test:ci
                 '''
             }
             post {

@@ -20,6 +20,11 @@ export default defineConfig({
       'frontend/**/*.{test,test-d}.{ts,tsx,js,jsx}',
     ],
 
+    // 排除 OOM 风险的测试文件（依赖链过重导致 fork 进程内存溢出）
+    exclude: [
+      'frontend/features/sidebar/hooks/__tests__/useProjects.test.ts',
+    ],
+
     // Worker 进程内存限制（sidebar 等模块依赖链较重）
     pool: 'forks',
     poolOptions: {

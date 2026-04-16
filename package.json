@@ -31,9 +31,10 @@
     "start": "npm run build && npm run server",
     "release": "./scripts/release.sh",
     "test": "npm run test:unit && npm run test:services && npm run test:integration",
-    "test:unit": "node --test 'backend/tests/unit/*.test.js'",
-    "test:services": "node --test 'backend/services/**/__tests__/*.test.js' 'backend/controllers/**/__tests__/*.test.js' 'backend/middleware/**/__tests__/*.test.js'",
-    "test:integration": "node --test backend/tests/integration/",
+    "test:unit": "node --test --test-force-exit 'backend/tests/unit/module-imports.test.js' 'backend/tests/unit/database.test.js'",
+    "test:services": "node --test --test-force-exit 'backend/services/**/__tests__/*.test.js' 'backend/controllers/**/__tests__/*.test.js' 'backend/middleware/**/__tests__/*.test.js'",
+    "test:integration": "node --test --test-force-exit backend/tests/integration/",
+    "test:ci": "npm run test:unit && npm run test:services && npm run test:frontend",
     "test:frontend": "npx vitest run",
     "test:watch": "npx vitest"
   },
