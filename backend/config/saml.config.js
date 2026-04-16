@@ -2,7 +2,7 @@
  * SAML Configuration
  *
  * SAML 单点登录配置
- * 基于公司统一身份认证系统 (guanghua.53jy.net)
+ * 所有 SAML 参数必须通过环境变量配置（SAML_ENABLED=true 时由 validateSamlConfig() 校验完整性）
  *
  * @module config/saml.config
  */
@@ -84,17 +84,17 @@ function formatPrivateKey(key) {
 
 export const samlConfig = {
   // ═════════════════════════════════════════════════════════════
-  // IdP (Identity Provider) 配置 - 从 Metadata 提取
+  // IdP (Identity Provider) 配置 - 必须通过环境变量提供
   // ═════════════════════════════════════════════════════════════
 
-  // IdP Entity ID (Issuer)
-  entity_id: process.env.SAML_ENTITY_ID || 'https://guanghua.53jy.net/idp/metadata',
+  // IdP Entity ID (Issuer) - 必须配置 SAML_ENTITY_ID
+  entity_id: process.env.SAML_ENTITY_ID || '',
 
-  // SSO URL - 用户登录时的跳转地址
-  sso_url: process.env.SAML_SSO_URL || 'https://guanghua.53jy.net/idp/login',
+  // SSO URL - 用户登录时的跳转地址 - 必须配置 SAML_SSO_URL
+  sso_url: process.env.SAML_SSO_URL || '',
 
-  // SLO URL - 用户登出时的地址（可选）
-  slo_url: process.env.SAML_SLO_URL || 'https://guanghua.53jy.net/idp/logout',
+  // SLO URL - 用户登出时的地址（可选） - 可配置 SAML_SLO_URL
+  slo_url: process.env.SAML_SLO_URL || '',
 
   // IdP X.509 Certificate - 用于验证 SAML Response 签名
   // 自动格式化证书（添加换行）

@@ -9,12 +9,12 @@
  * Application metadata
  */
 export const APP_CONFIG = {
-  name: 'Synapse Core',
+  name: import.meta.env.VITE_APP_NAME || 'Synapse Core',
   version: import.meta.env.VITE_APP_VERSION || '1.13.6',
-  description: 'AI Agent Platform Empowering Enterprises with WebUI',
-  repository: 'https://github.com/domonic18/ai-claude-code-ui',
-  author: 'domonic18',
-} as const;
+  description: import.meta.env.VITE_APP_DESCRIPTION || 'AI Agent Platform Empowering Enterprises with WebUI',
+  repository: import.meta.env.VITE_APP_REPOSITORY || 'https://github.com/domonic18/ai-claude-code-ui',
+  author: import.meta.env.VITE_APP_AUTHOR || 'domonic18',
+};
 
 /**
  * Feature flags

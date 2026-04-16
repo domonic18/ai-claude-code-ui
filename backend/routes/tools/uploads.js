@@ -51,13 +51,14 @@ router.post('/transcribe', async (req, res) => {
           filename: req.file.originalname,
           contentType: req.file.mimetype
         });
-        formData.append('model', 'whisper-1');
+        formData.append('model', process.env.WHISPER_MODEL || 'whisper-1');
         formData.append('response_format', 'json');
         formData.append('language', 'en');
 
-        // 向 OpenAI 发出请求
+        // 向 OpenAI 兼容 API 发出请求
+        const whisperApiUrl = process.env.WHISPER_API_URL || 'https://api.openai.com/v1/audio/transcriptions';
         const fetch = (await import('node-fetch')).default;
-        const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        const response = await fetch(whisperApiUrl, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${apiKey}`,
@@ -142,7 +143,7 @@ Agent instructions:`;
           // 仅在有提示时调用 GPT
           if (prompt) {
             const completion = await openai.chat.completions.create({
-              model: 'gpt-4o-mini',
+              model: process.env.OPENAI_ENHANCE_MODEL || 'gpt-4o-mini',
               messages: [
                 { role: 'system', content: systemMessage },
                 { role: 'user', content: prompt }

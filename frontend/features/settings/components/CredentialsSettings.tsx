@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
 import { Key, Plus, Trash2, Copy, Check, ExternalLink } from 'lucide-react';
-import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
+import { APP_CONFIG } from '@/config/app.config';
 import { authenticatedFetch } from '@/shared/services';
 import { logger } from '@/shared/utils/logger';
 
@@ -19,8 +19,7 @@ function CredentialsSettings() {
   const [copiedKey, setCopiedKey] = useState(null);
   const [newlyCreatedKey, setNewlyCreatedKey] = useState(null);
 
-  // Version check hook
-  const { updateAvailable, latestVersion, releaseInfo } = useVersionCheck('siteboon', 'claudecodeui');
+  // Version check disabled - fork project does not track upstream releases
 
   useEffect(() => {
     fetchData();
@@ -244,24 +243,13 @@ function CredentialsSettings() {
       <div className="pt-6 border-t border-border/50">
         <div className="flex items-center justify-between text-xs italic text-muted-foreground/60">
           <a
-            href={releaseInfo?.htmlUrl || 'https://github.com/domonic18/ai-claude-code-ui/releases'}
+            href={`${APP_CONFIG.repository}/releases`}
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-muted-foreground transition-colors"
           >
             v{APP_VERSION}
           </a>
-          {updateAvailable && latestVersion && (
-            <a
-              href={releaseInfo?.htmlUrl || 'https://github.com/domonic18/ai-claude-code-ui/releases'}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-2 py-0.5 bg-green-500/10 text-green-600 dark:text-green-400 rounded-full hover:bg-green-500/20 transition-colors not-italic font-medium"
-            >
-              <span className="text-[10px]">{t('credentials.updateAvailable')}: v{latestVersion}</span>
-              <ExternalLink className="h-2.5 w-2.5" />
-            </a>
-          )}
         </div>
       </div>
     </div>

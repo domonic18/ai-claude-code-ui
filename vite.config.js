@@ -22,7 +22,7 @@ export default defineConfig(({ command, mode }) => {
     },
     server: {
       port: parseInt(env.VITE_PORT) || 5173,
-      allowedHosts: ['brain.bj33smarter.com'],
+      allowedHosts: env.VITE_ALLOWED_HOSTS ? env.VITE_ALLOWED_HOSTS.split(',').map(h => h.trim()).filter(Boolean) : [],
       proxy: {
         '/api': {
           target: `http://localhost:${env.PORT || 3001}`,
