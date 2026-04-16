@@ -34,7 +34,8 @@
     "test:unit": "node --test --test-force-exit 'backend/tests/unit/module-imports.test.js' 'backend/tests/unit/database.test.js'",
     "test:services": "node --test --test-force-exit 'backend/services/**/__tests__/*.test.js' 'backend/controllers/**/__tests__/*.test.js' 'backend/middleware/**/__tests__/*.test.js'",
     "test:integration": "node --test --test-force-exit backend/tests/integration/",
-    "test:ci": "npm run test:unit && npm run test:services && npm run test:frontend",
+    "test:imports": "node scripts/check-imports.cjs",
+    "test:ci": "npm run test:imports && npm run test:unit && npm run test:services && npm run test:frontend",
     "test:frontend": "npx vitest run",
     "test:watch": "npx vitest"
   },
