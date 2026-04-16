@@ -26,3 +26,18 @@ export {
     stripDiffHeaders,
     cleanCommitMessage
 } from './GitService.js';
+
+export {
+    normalizeGitHubUrl,
+    parseGitHubUrl,
+    autogenerateBranchName,
+    validateBranchName,
+    getGitRemoteUrl,
+    getCommitMessages,
+    cloneGitHubRepo,
+    createAndPushBranch,
+    createGitHubBranch,
+    createGitHubPR,
+    executeGitHubWorkflow,
+    cleanupProject
+} from './GitHubService.js';

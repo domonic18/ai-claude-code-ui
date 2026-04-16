@@ -1,13 +1,17 @@
 /**
  * useMessageSender Hook
  *
- * Handles message sending logic.
+ * 处理聊天消息发送逻辑：构建用户消息、管理附件、
+ * 通过 WebSocket 发送指令到后端。
  *
  * 注意：模型名称直接使用后端 API 返回的格式，无需转换
  */
 
 import { useCallback } from 'react';
 import type { ChatMessage, FileAttachment } from '../types';
+import { STORAGE_KEYS } from '../constants';
+
+export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
 
 export interface UseMessageSenderOptions {
   /** Current input value */
@@ -42,6 +46,8 @@ export interface UseMessageSenderOptions {
   onSessionActive?: (sessionId: string) => void;
   /** Session processing callback */
   onSessionProcessing?: (sessionId: string) => void;
+  /** Permission mode */
+  permissionMode: PermissionMode;
 }
 
 export interface UseMessageSenderResult {
@@ -72,6 +78,7 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
     onSetAttachedFiles,
     onSessionActive,
     onSessionProcessing,
+    permissionMode,
   } = options;
 
   /**
@@ -87,6 +94,12 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
     onSetInput('');
     onSetAttachedFiles([]);
 
+    // Clear draft from localStorage to prevent it from being restored on refresh/session switch
+    if (selectedProject?.name) {
+      const draftKey = STORAGE_KEYS.DRAFT_INPUT(selectedProject.name);
+      localStorage.removeItem(draftKey);
+    }
+
     // Mark session as active
     if (currentSessionId) {
       onSessionActive?.(currentSessionId);
@@ -95,13 +108,26 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
     onSetLoading(true);
     onStartStream();
 
+    // Convert image files to images array for display in UserMessage
+    const images = files
+      .filter(f => f.type?.startsWith('image/'))
+      .map(f => ({
+        name: f.name,
+        data: f.data || '',
+        type: f.type
+      }));
+
+    // Non-image files keep as files array
+    const documentFiles = files.filter(f => !f.type?.startsWith('image/'));
+
     // Add user message
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       type: 'user',
       content,
       timestamp: Date.now(),
-      files: files.length > 0 ? files : undefined,
+      images: images.length > 0 ? images : undefined,
+      files: documentFiles.length > 0 ? documentFiles : undefined,
     };
 
     onAddMessage(userMessage);
@@ -115,12 +141,13 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
       sendMessage({
         type: 'claude-command',
         command: content,
-        attachments: files.length > 0 ? files : undefined, // Include attached files
+        attachments: files.length > 0 ? files : undefined,
         options: {
           projectPath: selectedProject?.name,
           sessionId,
-          model: selectedModel, // Directly use the selected model name (backend format)
+          model: selectedModel,
           resume: !!currentSessionId,
+          permissionMode,
         },
       });
 
@@ -142,6 +169,7 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
     onSetAttachedFiles,
     onSessionActive,
     onSessionProcessing,
+    permissionMode,
   ]);
 
   return {
