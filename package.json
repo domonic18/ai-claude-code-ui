@@ -30,7 +30,8 @@
     "preview": "vite preview",
     "start": "npm run build && npm run server",
     "release": "./scripts/release.sh",
-    "test": "npm run test:imports && npm run test:database && npm run test:user-settings-mcp && npm run test:api-endpoints && npm run test:container && npm run test:docker && npm run test:fileops && npm run test:sdk",
+    "test": "npm run test:imports && npm run test:database && npm run test:user-settings-mcp && npm run test:api-endpoints && npm run test:container && npm run test:docker && npm run test:fileops && npm run test:sdk && npm run test:new",
+    "test:new": "npm run test:upload && npm run test:sessions && npm run test:tour && npm run test:chat-images",
     "test:imports": "node backend/tests/unit/module-imports.test.js",
     "test:database": "node backend/tests/unit/database.test.js",
     "test:user-settings-mcp": "node backend/tests/unit/user-settings-mcp.test.js",
@@ -38,7 +39,11 @@
     "test:container": "node backend/tests/integration/container.test.js",
     "test:docker": "node backend/tests/integration/docker-container.test.js",
     "test:fileops": "node backend/tests/integration/file-operations.test.js",
-    "test:sdk": "node backend/tests/integration/claude-sdk-invocation.test.js"
+    "test:sdk": "node backend/tests/integration/claude-sdk-invocation.test.js",
+    "test:upload": "node backend/tests/integration/file-upload.test.js",
+    "test:sessions": "node backend/tests/integration/session-operations.test.js",
+    "test:tour": "node backend/tests/integration/product-tour.test.js",
+    "test:chat-images": "node backend/tests/integration/chat-with-images.test.js"
   },
   "keywords": [
     "claude coode",
