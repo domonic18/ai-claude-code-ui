@@ -99,8 +99,9 @@ export const IS_PLATFORM = import.meta.env.VITE_IS_PLATFORM === 'true';
 
 /**
  * Platform dashboard URL
+ * Configured via VITE_PLATFORM_DASHBOARD_URL, defaults to cloudcli.ai
  */
-export const PLATFORM_DASHBOARD_URL = 'https://cloudcli.ai/dashboard';
+export const PLATFORM_DASHBOARD_URL = import.meta.env.VITE_PLATFORM_DASHBOARD_URL || 'https://cloudcli.ai/dashboard';
 
 /**
  * Touch/Click handling

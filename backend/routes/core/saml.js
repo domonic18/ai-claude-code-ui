@@ -7,7 +7,7 @@
  */
 
 import { Router } from 'express';
-import { samlConfig } from '../../config/saml.config.js';
+import { samlConfig, validateSamlConfig } from '../../config/saml.config.js';
 import { generateToken } from '../../middleware/auth.middleware.js';
 import containerManager from '../../services/container/core/index.js';
 import { repositories } from '../../database/db.js';
@@ -24,6 +24,12 @@ const router = Router();
 function createSamlInstances() {
   if (!samlConfig.enabled) {
     return null;
+  }
+
+  // Fail-fast: SAML 启用时校验配置完整性，缺失则阻止路由初始化
+  const validation = validateSamlConfig();
+  if (!validation.valid) {
+    throw new Error(`SAML configuration invalid: ${validation.errors.join('; ')}`);
   }
 
   try {

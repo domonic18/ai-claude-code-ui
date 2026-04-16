@@ -18,6 +18,65 @@ const logger = createLogger('routes/tools/uploads');
 const router = express.Router();
 
 /**
+ * 允许的音频 MIME 类型白名单
+ */
+const ALLOWED_AUDIO_MIMETYPES = [
+  'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/webm',
+  'audio/ogg', 'audio/flac', 'audio/mp4', 'audio/x-m4a',
+];
+
+/**
+ * 验证并返回 Whisper API URL
+ * 强制 https 协议 + 阻止私有网段/链路本地地址（SSRF 防护）
+ * @returns {string} 合法的 API URL
+ */
+function getValidatedWhisperUrl() {
+  const url = process.env.WHISPER_API_URL || 'https://api.openai.com/v1/audio/transcriptions';
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch (e) {
+    throw new Error(`Invalid WHISPER_API_URL: ${e.message}`);
+  }
+
+  if (parsed.protocol !== 'https:') {
+    throw new Error(`WHISPER_API_URL must use https protocol, got: ${parsed.protocol}`);
+  }
+
+  // SSRF 防护：阻止解析后的 hostname 指向私有网段或链路本地地址
+  const hostname = parsed.hostname;
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
+    throw new Error('WHISPER_API_URL must not point to localhost');
+  }
+  if (hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.startsWith('169.254.')) {
+    throw new Error('WHISPER_API_URL must not point to a private/link-local address');
+  }
+  // 172.16.0.0/12 范围检查
+  if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)) {
+    throw new Error('WHISPER_API_URL must not point to a private address');
+  }
+
+  return url;
+}
+
+/**
+ * 验证模型名称（仅允许字母、数字、连字符、点号）
+ * @param {string} envVar - 环境变量名
+ * @param {string} defaultValue - 默认值
+ * @returns {string} 合法的模型名称
+ */
+function getValidatedModelName(envVar, defaultValue) {
+  const value = process.env[envVar] || defaultValue;
+  if (!/^[a-zA-Z0-9.\-]+$/.test(value)) {
+    throw new Error(`Invalid ${envVar}: must contain only alphanumeric characters, dots, and hyphens`);
+  }
+  if (value.length > 128) {
+    throw new Error(`Invalid ${envVar}: exceeds maximum length of 128`);
+  }
+  return value;
+}
+
+/**
  * POST /api/transcribe
  * 使用 OpenAI Whisper API 将音频文件转录为文本
  */
@@ -44,20 +103,29 @@ router.post('/transcribe', async (req, res) => {
       }
 
       try {
+        // 校验音频文件 mimetype，防止伪造 content-type
+        const fileMimetype = req.file.mimetype || 'application/octet-stream';
+        if (!ALLOWED_AUDIO_MIMETYPES.includes(fileMimetype)) {
+          return res.status(400).json({
+            error: `Unsupported audio format: ${fileMimetype}. Allowed: ${ALLOWED_AUDIO_MIMETYPES.join(', ')}`
+          });
+        }
+
         // 为 OpenAI 创建表单数据
         const FormData = (await import('form-data')).default;
         const formData = new FormData();
         formData.append('file', req.file.buffer, {
           filename: req.file.originalname,
-          contentType: req.file.mimetype
+          contentType: fileMimetype
         });
-        formData.append('model', 'whisper-1');
+        formData.append('model', getValidatedModelName('WHISPER_MODEL', 'whisper-1'));
         formData.append('response_format', 'json');
         formData.append('language', 'en');
 
-        // 向 OpenAI 发出请求
+        // 向 OpenAI 兼容 API 发出请求（URL 经过 https 校验）
+        const whisperApiUrl = getValidatedWhisperUrl();
         const fetch = (await import('node-fetch')).default;
-        const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        const response = await fetch(whisperApiUrl, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${apiKey}`,
@@ -142,7 +210,7 @@ Agent instructions:`;
           // 仅在有提示时调用 GPT
           if (prompt) {
             const completion = await openai.chat.completions.create({
-              model: 'gpt-4o-mini',
+              model: getValidatedModelName('OPENAI_ENHANCE_MODEL', 'gpt-4o-mini'),
               messages: [
                 { role: 'system', content: systemMessage },
                 { role: 'user', content: prompt }

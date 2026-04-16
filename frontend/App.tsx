@@ -20,13 +20,13 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
-import { Settings as SettingsIcon, Sparkles, MessageSquare } from 'lucide-react';
+import { Settings as SettingsIcon, MessageSquare } from 'lucide-react';
 import { Sidebar } from './features/sidebar/components';
 import MainContent from '@/shared/components/layout/MainContent';
 import MobileNav from '@/shared/components/layout/MobileNav';
 import { Settings } from './features/settings/components';
 import { QuickSettingsPanel } from '@/features/settings';
-import { VersionUpgradeModal, useProjectManager, useSessionProtection } from './features/system';
+import { useProjectManager, useSessionProtection } from './features/system';
 
 import { ThemeProvider } from '@/shared/contexts/ThemeContext';
 import { AuthProvider, useAuth } from '@/shared/contexts/AuthContext';
@@ -34,7 +34,6 @@ import { WebSocketProvider, useWebSocketContext } from '@/shared/contexts/WebSoc
 import { TourContext } from '@/shared/contexts/TourContext';
 import { QueryClientProvider, queryClient } from '@/shared/libs/query';
 import { ProtectedRoute } from '@/router';
-import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import useLocalStorage from '@/shared/hooks/useLocalStorage';
 import { useProductTour } from '@/shared/hooks/useProductTour';
 import { ProductTour } from '@/shared/components/tour';
@@ -61,12 +60,6 @@ interface ApiSession {
 // Type alias for Session - use ApiSession internally but cast to SidebarSession when passing to Sidebar
 type Session = ApiSession;
 
-interface ReleaseInfo {
-  title: string;
-  body: string;
-  htmlUrl: string;
-}
-
 interface WebSocketMessage {
   type: string;
   projects?: Project[];
@@ -84,8 +77,7 @@ function AppContent() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const { updateAvailable, latestVersion, currentVersion, releaseInfo } = useVersionCheck('siteboon', 'claudecodeui');
-  const [showVersionModal, setShowVersionModal] = useState(false);
+  // Version check disabled - fork project does not track upstream releases
 
   // Local state for UI (not in hooks)
   const [activeTab, setActiveTab] = useState<string>('chat');
@@ -327,18 +319,6 @@ function AppContent() {
                 >
                   <SettingsIcon className="w-5 h-5 text-muted-foreground hover:text-foreground transition-colors" />
                 </button>
-
-                {updateAvailable && (
-                  <button
-                    onClick={() => setShowVersionModal(true)}
-                    className="relative p-2 hover:bg-accent rounded-md transition-colors duration-200"
-                    aria-label="Update available"
-                    title="Update available"
-                  >
-                    <Sparkles className="w-5 h-5 text-blue-500" />
-                    <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                  </button>
-                )}
               </div>
             )}
           </div>
@@ -456,16 +436,6 @@ function AppContent() {
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
         initialTab={settingsInitialTab}
-      />
-
-      {/* Version Upgrade Modal */}
-      <VersionUpgradeModal
-        isOpen={showVersionModal}
-        onClose={() => setShowVersionModal(false)}
-        updateAvailable={updateAvailable}
-        latestVersion={latestVersion}
-        currentVersion={currentVersion}
-        releaseInfo={releaseInfo}
       />
 
       {/* Product Tour */}
