@@ -20,6 +20,14 @@ export default defineConfig({
       'frontend/**/*.{test,test-d}.{ts,tsx,js,jsx}',
     ],
 
+    // Worker 进程内存限制（sidebar 等模块依赖链较重）
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        execArgv: ['--max-old-space-size=8192'],
+      },
+    },
+
     // 覆盖率配置
     coverage: {
       provider: 'v8',
