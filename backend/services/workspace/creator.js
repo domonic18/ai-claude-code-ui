@@ -12,12 +12,13 @@ import {
   validateExistingWorkspace,
   validateNewWorkspace
 } from './path-validator.js';
-import {
 import { createLogger } from '../../utils/logger.js';
-const logger = createLogger('services/workspace/creator');
+import {
   cloneGitHubRepository,
   getGithubTokenById
 } from './github-service.js';
+
+const logger = createLogger('services/workspace/creator');
 
 /**
  * 创建工作空间选项

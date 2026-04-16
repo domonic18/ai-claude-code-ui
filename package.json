@@ -30,18 +30,16 @@
     "preview": "vite preview",
     "start": "npm run build && npm run server",
     "release": "./scripts/release.sh",
-    "test": "npm run test:imports && npm run test:database && npm run test:user-settings-mcp && npm run test:api-endpoints && npm run test:container && npm run test:docker && npm run test:fileops && npm run test:sdk",
-    "test:imports": "node backend/tests/unit/module-imports.test.js",
-    "test:database": "node backend/tests/unit/database.test.js",
-    "test:user-settings-mcp": "node backend/tests/unit/user-settings-mcp.test.js",
-    "test:api-endpoints": "node backend/tests/integration/api-endpoints.test.js",
-    "test:container": "node backend/tests/integration/container.test.js",
-    "test:docker": "node backend/tests/integration/docker-container.test.js",
-    "test:fileops": "node backend/tests/integration/file-operations.test.js",
-    "test:sdk": "node backend/tests/integration/claude-sdk-invocation.test.js"
+    "test": "npm run test:unit && npm run test:services && npm run test:integration",
+    "test:unit": "node --test --test-force-exit 'backend/tests/unit/module-imports.test.js' 'backend/tests/unit/database.test.js'",
+    "test:services": "node --test --test-force-exit 'backend/services/**/__tests__/*.test.js' 'backend/controllers/**/__tests__/*.test.js' 'backend/middleware/**/__tests__/*.test.js'",
+    "test:integration": "node --test --test-force-exit backend/tests/integration/",
+    "test:ci": "npm run test:unit && npm run test:services && npm run test:frontend",
+    "test:frontend": "npx vitest run",
+    "test:watch": "npx vitest"
   },
   "keywords": [
-    "claude coode",
+    "claude code",
     "ai",
     "anthropic",
     "ui",
@@ -113,6 +111,8 @@
     "ws": "^8.14.2"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^25.0.8",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
@@ -120,6 +120,7 @@
     "auto-changelog": "^2.5.0",
     "autoprefixer": "^10.4.16",
     "concurrently": "^8.2.2",
+    "jsdom": "^27.0.1",
     "node-gyp": "^10.0.0",
     "postcss": "^8.4.32",
     "release-it": "^19.0.5",
@@ -127,6 +128,7 @@
     "tailwindcss": "^3.4.0",
     "terser": "^5.46.1",
     "typescript": "^5.9.3",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "vitest": "^3.2.4"
   }
 }

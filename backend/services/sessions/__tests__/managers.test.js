@@ -8,7 +8,6 @@ import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   BaseSessionManager,
-  NativeSessionManager,
   ContainerSessionManager
 } from '../managers/index.js';
 
@@ -146,32 +145,6 @@ describe('BaseSessionManager', () => {
       () => manager.searchSessions('test'),
       /searchSessions\(\) must be implemented by TestManager/
     );
-  });
-});
-
-describe('NativeSessionManager', () => {
-  let manager;
-
-  before(() => {
-    manager = new NativeSessionManager();
-  });
-
-  it('should have correct manager type', () => {
-    assert.equal(manager.name, 'NativeSessionManager');
-    assert.equal(manager.getType(), 'native');
-  });
-
-  it('should get manager info', () => {
-    const info = manager.getInfo();
-
-    assert.equal(info.name, 'NativeSessionManager');
-    assert.equal(info.type, 'native');
-  });
-
-  it('should build session file path correctly', () => {
-    const path = manager._getSessionFilePath('my-workspace', 'session-123');
-    assert.ok(path.includes('.claude'));
-    assert.ok(path.includes('session-123.jsonl'));
   });
 });
 

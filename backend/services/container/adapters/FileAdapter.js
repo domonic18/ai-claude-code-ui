@@ -10,9 +10,8 @@
 import containerManager from '../core/index.js';
 import { CONTAINER } from '../../../config/config.js';
 import { PathValidator } from '../../core/utils/path-utils.js';
-import {
 import { createLogger } from '../../../utils/logger.js';
-const logger = createLogger('services/container/adapters/FileAdapter');
+import {
   cleanFileName,
   isValidFileName,
   isHiddenFile,
@@ -20,6 +19,9 @@ const logger = createLogger('services/container/adapters/FileAdapter');
   readStreamOutput,
   standardizeError
 } from '../../files/utils/file-utils.js';
+import { writeFileViaShell } from '../utils/containerFileWriter.js';
+
+const logger = createLogger('services/container/adapters/FileAdapter');
 
 /**
  * 容器文件适配器
@@ -113,17 +115,12 @@ export class FileAdapter {
         }
       }
 
-      // 写入文件
-      if (base64) {
-        // 使用 base64 解码并写入
-        const command = `printf '%s' "${content}" | base64 -d > "${containerPath}"`;
-        await this.containerManager.execInContainer(this.userId, command);
-      } else {
-        // 转义特殊字符并写入
-        const escapedContent = this._escapeShellContent(content);
-        const command = `printf '%s' '${escapedContent}' > "${containerPath}"`;
-        await this.containerManager.execInContainer(this.userId, command);
-      }
+      // 使用数组格式 Cmd 传递 base64 编码内容，彻底避免 shell 拼接注入风险
+      // writeFileViaShell 内部通过 $1/$2 位置参数传递路径和内容，不经过 shell 字符串拼接
+      const textContent = base64
+        ? Buffer.from(content, 'base64').toString('utf8')
+        : content;
+      await writeFileViaShell(this.containerManager, this.userId, containerPath, textContent);
 
       return {
         success: true,

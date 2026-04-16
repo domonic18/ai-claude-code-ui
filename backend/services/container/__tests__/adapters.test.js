@@ -167,9 +167,9 @@ describe('FileAdapter', () => {
     const error = new Error('Test error');
     const standardized = adapter._standardizeError(error, 'testOperation');
 
-    assert.equal(standardized.type, 'container_file_error');
+    assert.equal(standardized.context.type, 'container_file_error');
     assert.equal(standardized.operation, 'testOperation');
-    assert.equal(standardized.userId, 1);
+    assert.equal(standardized.context.userId, 1);
     assert.ok(standardized.timestamp);
   });
 });
