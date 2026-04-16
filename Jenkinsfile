@@ -56,6 +56,11 @@ pipeline {
                     def repoUrl = params.GIT_REPO_URL ?: env.GIT_URL ?: ''
                     def credId = params.GIT_CREDENTIALS_ID ?: env.GIT_CREDENTIALS_ID ?: ''
 
+                    // 安全校验：限制 GIT_REPO_URL 只能为 github.com 的仓库地址，防止供应链攻击
+                    if (repoUrl && !(repoUrl ==~ /(git@github\.com:|https:\/\/github\.com\/).*/)) {
+                        error "安全校验失败：GIT_REPO_URL 必须指向 github.com 仓库，当前值：${repoUrl}"
+                    }
+
                     def checkoutConfig = [
                         $class: 'GitSCM',
                         branches: [[name: '*/develop']],

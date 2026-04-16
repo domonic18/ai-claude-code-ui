@@ -19,6 +19,7 @@ import {
   readStreamOutput,
   standardizeError
 } from '../../files/utils/file-utils.js';
+import { writeFileViaShell } from '../utils/containerFileWriter.js';
 
 const logger = createLogger('services/container/adapters/FileAdapter');
 
@@ -114,16 +115,12 @@ export class FileAdapter {
         }
       }
 
-      // 写入文件：路径使用单引号包裹防止注入，内容通过 heredoc 传递避免 shell 解释
-      if (base64) {
-        // base64 内容通过 heredoc 传递给 base64 -d，单引号界定的 heredoc 不会进行 shell 变量展开
-        const command = `base64 -d > '${containerPath}' <<'BASE64_EOF'\n${content}\nBASE64_EOF`;
-        await this.containerManager.execInContainer(this.userId, command);
-      } else {
-        // 文本内容通过 heredoc 传递，单引号界定的 heredoc 不会进行 shell 变量展开
-        const command = `cat > '${containerPath}' <<'CONTENT_EOF'\n${content}\nCONTENT_EOF`;
-        await this.containerManager.execInContainer(this.userId, command);
-      }
+      // 使用数组格式 Cmd 传递 base64 编码内容，彻底避免 shell 拼接注入风险
+      // writeFileViaShell 内部通过 $1/$2 位置参数传递路径和内容，不经过 shell 字符串拼接
+      const textContent = base64
+        ? Buffer.from(content, 'base64').toString('utf8')
+        : content;
+      await writeFileViaShell(this.containerManager, this.userId, containerPath, textContent);
 
       return {
         success: true,
