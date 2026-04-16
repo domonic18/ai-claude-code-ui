@@ -12,6 +12,8 @@ import { generateToken } from '../../middleware/auth.middleware.js';
 import containerManager from '../../services/container/core/index.js';
 import { repositories } from '../../database/db.js';
 import saml2 from 'saml2-js';
+import { createLogger } from '../../utils/logger.js';
+const logger = createLogger('routes/core/saml');
 
 const { User } = repositories;
 const { ServiceProvider: Saml, IdentityProvider: IdP } = saml2;
@@ -71,7 +73,7 @@ function createSamlInstances() {
 
     return { sp, idp };
   } catch (error) {
-    console.error('[SAML] Failed to create SAML instances:', error);
+    logger.error('[SAML] Failed to create SAML instances:', error);
     return null;
   }
 }
@@ -146,7 +148,7 @@ router.get('/sso-login', async (req, res) => {
 
     return res.redirect(url);
   } catch (error) {
-    console.error('[SAML] Error creating login request:', error);
+    logger.error('[SAML] Error creating login request:', error);
     return res.status(500).json({
       error: 'Failed to create SAML login request',
       message: error.message
@@ -254,7 +256,7 @@ router.post('/callback', async (req, res) => {
           display_name: displayName,
         });
       } catch (dbError) {
-        console.error('[SAML] Failed to create user:', dbError);
+        logger.error('[SAML] Failed to create user:', dbError);
         return res.status(500).json({
           error: 'Failed to create user',
           code: 'USER_CREATION_FAILED',
@@ -287,11 +289,11 @@ router.post('/callback', async (req, res) => {
     // 容器创建失败不会阻止登录，但会记录错误以便后续调试
     containerManager.getOrCreateContainer(user.id)
       .then(() => {
-        console.log(`[SAML] Container ready for user ${user.id}`);
+        logger.info(`[SAML] Container ready for user ${user.id}`);
       })
       .catch(err => {
         // 容器创建失败不应阻止登录，但需要记录以便排查
-        console.error(`[SAML] Failed to create container for user ${user.id}:`, err.message);
+        logger.error(`[SAML] Failed to create container for user ${user.id}:`, err.message);
         // 可以考虑发送通知或设置标记让用户知道容器状态
       });
 
@@ -302,7 +304,7 @@ router.post('/callback', async (req, res) => {
     return res.redirect(redirectUrl.toString());
 
   } catch (error) {
-    console.error('[SAML] Error during callback processing:', error);
+    logger.error('[SAML] Error during callback processing:', error);
     return res.status(500).json({
       error: 'SAML callback processing failed',
       message: error.message,

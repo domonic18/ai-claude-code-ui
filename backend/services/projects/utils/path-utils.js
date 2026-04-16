@@ -10,6 +10,8 @@ import fsSync from 'fs';
 import path from 'path';
 import os from 'os';
 import { hasInCache, setCache } from '../config/index.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/projects/utils/path-utils');
 
 /**
  * 从 JSONL 会话文件中提取实际项目目录（带缓存）
@@ -123,7 +125,7 @@ async function extractProjectDirectory(projectName) {
     if (error.code === 'ENOENT') {
       extractedPath = projectName.replace(/-/g, '/');
     } else {
-      console.error(`Error extracting project directory for ${projectName}:`, error);
+      logger.error(`Error extracting project directory for ${projectName}:`, error);
       // Fall back to decoded project name for other errors
       extractedPath = projectName.replace(/-/g, '/');
     }

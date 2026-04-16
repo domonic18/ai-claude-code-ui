@@ -11,6 +11,8 @@ import crypto from 'crypto';
 import os from 'os';
 import { open } from 'sqlite';
 import sqlite3 from 'sqlite3';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/execution/cursor/sessions');
 
 /**
  * 获取项目的 Cursor 会话列表
@@ -111,7 +113,7 @@ async function getCursorSessions(projectPath) {
         });
 
       } catch (error) {
-        console.warn(`Could not read Cursor session ${sessionId}:`, error.message);
+        logger.warn(`Could not read Cursor session ${sessionId}:`, error.message);
       }
     }
 
@@ -122,7 +124,7 @@ async function getCursorSessions(projectPath) {
     return sessions.slice(0, 5);
 
   } catch (error) {
-    console.error('Error fetching Cursor sessions:', error);
+    logger.error('Error fetching Cursor sessions:', error);
     return [];
   }
 }

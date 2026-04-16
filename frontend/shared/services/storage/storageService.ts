@@ -12,6 +12,7 @@ import type {
 } from './types';
 
 import { StorageErrorType, StorageError } from './types';
+import { logger } from '@/shared/utils/logger';
 
 /**
  * Abstract storage service with common functionality
@@ -59,7 +60,7 @@ export abstract class BaseStorageService implements IStorageService {
           err
         );
       }
-      console.error('[Storage] Failed to parse item:', error);
+      logger.error('[Storage] Failed to parse item:', error);
       return null;
     }
   }
@@ -106,7 +107,7 @@ export abstract class BaseStorageService implements IStorageService {
       throw error;
     }
 
-    console.error(`[Storage] ${context}:`, err);
+    logger.error(`[Storage] ${context}:`, err);
   }
 
   // Abstract methods to be implemented by subclasses

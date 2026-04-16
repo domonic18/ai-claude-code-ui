@@ -9,6 +9,7 @@
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { logger } from '@/shared/utils/logger';
 
 // Safe localStorage wrapper
 const safeLocalStorage = {
@@ -23,7 +24,7 @@ const safeLocalStorage = {
     try {
       localStorage.setItem(key, value);
     } catch (e) {
-      console.warn('Failed to set localStorage item:', e);
+      logger.warn('Failed to set localStorage item:', e);
     }
   }
 };
@@ -133,7 +134,7 @@ export function useSlashCommands({
             });
             setCommands(sortedCommands);
           } catch (e) {
-            console.error('Error parsing command history:', e);
+            logger.error('Error parsing command history:', e);
             setCommands(allCommands);
           }
         } else {
@@ -144,7 +145,7 @@ export function useSlashCommands({
         updateFrequentCommands(allCommands, selectedProject.name);
 
       } catch (error) {
-        console.error('Error fetching slash commands:', error);
+        logger.error('Error fetching slash commands:', error);
         setCommands([]);
       } finally {
         setIsLoading(false);
@@ -178,7 +179,7 @@ export function useSlashCommands({
 
       setFrequentCommands(commandsWithUsage);
     } catch (e) {
-      console.error('Error parsing command history:', e);
+      logger.error('Error parsing command history:', e);
       setFrequentCommands([]);
     }
   }, []);
@@ -216,7 +217,7 @@ export function useSlashCommands({
     try {
       parsedHistory = history ? JSON.parse(history) : {};
     } catch (e) {
-      console.error('Error parsing command history:', e);
+      logger.error('Error parsing command history:', e);
     }
 
     parsedHistory[command.name] = (parsedHistory[command.name] || 0) + 1;

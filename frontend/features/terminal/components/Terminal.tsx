@@ -5,6 +5,7 @@ import { WebglAddon } from '@xterm/addon-webgl';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 import type { ShellProps } from '../types/terminal.types';
+import { logger } from '@/shared/utils/logger';
 
 const xtermStyles = `
   .xterm .xterm-screen {
@@ -87,30 +88,30 @@ function Shell({
         // 获取 WebSocket token（从 cookie 复制）
         let token;
         try {
-          console.log('[Shell] Fetching ws-token from /api/auth/ws-token');
+          logger.info('[Shell] Fetching ws-token from /api/auth/ws-token');
           const response = await fetch('/api/auth/ws-token', {
             credentials: 'include' // 发送 cookie
           });
-          console.log('[Shell] ws-token response status:', response.status);
+          logger.info('[Shell] ws-token response status:', response.status);
           if (response.ok) {
             const data = await response.json();
             // 后端返回 {success: true, data: {token: "..."}}
             token = data.data?.token;
-            console.log('[Shell] Got token, length:', token?.length);
+            logger.info('[Shell] Got token, length:', token?.length);
           } else {
-            console.log('[Shell] ws-token response not ok:', response.status);
+            logger.info('[Shell] ws-token response not ok:', response.status);
             const errorText = await response.text();
-            console.log('[Shell] Error response:', errorText);
+            logger.info('[Shell] Error response:', errorText);
           }
         } catch (error) {
-          console.error('[Shell] Error fetching ws-token:', error);
+          logger.error('[Shell] Error fetching ws-token:', error);
           setIsConnecting(false);
           isConnectingRef.current = false;
           return;
         }
 
         if (!token) {
-          console.log('[Shell] No token available, aborting connection');
+          logger.info('[Shell] No token available, aborting connection');
           setIsConnecting(false);
           isConnectingRef.current = false;
           return;
@@ -118,14 +119,14 @@ function Shell({
 
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         wsUrl = `${protocol}//${window.location.host}/shell?token=${encodeURIComponent(token)}`;
-        console.log('[Shell] Non-platform mode, wsUrl:', wsUrl.substring(0, 50) + '...');
+        logger.info('[Shell] Non-platform mode, wsUrl:', wsUrl.substring(0, 50) + '...');
       }
 
-      console.log('[Shell] Creating WebSocket with URL:', wsUrl.substring(0, 80) + '...');
+      logger.info('[Shell] Creating WebSocket with URL:', wsUrl.substring(0, 80) + '...');
       ws.current = new WebSocket(wsUrl);
 
       ws.current.onopen = () => {
-        console.log('[Shell] WebSocket opened');
+        logger.info('[Shell] WebSocket opened');
         setIsConnected(true);
         setIsConnecting(false);
         isConnectingRef.current = false;
@@ -175,12 +176,12 @@ function Shell({
             window.open(data.url, '_blank');
           }
         } catch (error) {
-          console.error('[Shell] Error handling WebSocket message:', error, event.data);
+          logger.error('[Shell] Error handling WebSocket message:', error, event.data);
         }
       };
 
       ws.current.onclose = (event) => {
-        console.log('[Shell] WebSocket closed:', event.code, event.reason);
+        logger.info('[Shell] WebSocket closed:', event.code, event.reason);
         setIsConnected(false);
         setIsConnecting(false);
         isConnectingRef.current = false;
@@ -192,7 +193,7 @@ function Shell({
       };
 
       ws.current.onerror = (error) => {
-        console.error('[Shell] WebSocket error:', error);
+        logger.error('[Shell] WebSocket error:', error);
         setIsConnected(false);
         setIsConnecting(false);
         isConnectingRef.current = false;
@@ -340,7 +341,7 @@ function Shell({
     try {
       terminal.current.loadAddon(webglAddon);
     } catch (error) {
-      console.warn('[Shell] WebGL renderer unavailable, using Canvas fallback');
+      logger.warn('[Shell] WebGL renderer unavailable, using Canvas fallback');
     }
 
     terminal.current.open(terminalRef.current);

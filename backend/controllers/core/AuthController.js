@@ -14,6 +14,8 @@ import { generateToken } from '../../middleware/auth.middleware.js';
 import containerManager from '../../services/container/core/index.js';
 import { NotFoundError, UnauthorizedError, ValidationError } from '../../middleware/error-handler.middleware.js';
 import { SESSION_TIMEOUTS } from '../../config/config.js';
+import { createLogger } from '../../utils/logger.js';
+const logger = createLogger('controllers/core/AuthController');
 
 const { User } = repositories;
 
@@ -88,7 +90,7 @@ export class AuthController extends BaseController {
 
       // 在后台为用户创建容器
       containerManager.getOrCreateContainer(user.id).catch(err => {
-        console.error(`[AuthController] Failed to create container for user ${user.id}:`, err.message);
+        logger.error(`[AuthController] Failed to create container for user ${user.id}:`, err.message);
       });
 
       // 设置 httpOnly cookie（行业最佳实践）
@@ -108,7 +110,7 @@ export class AuthController extends BaseController {
           db().prepare('ROLLBACK').run();
         } catch (rollbackError) {
           // Ignore rollback errors (transaction may already be closed)
-          console.error('[AuthController] Rollback error:', rollbackError.message);
+          logger.error('[AuthController] Rollback error:', rollbackError.message);
         }
       }
       this._handleError(error, req, res, next);
@@ -152,7 +154,7 @@ export class AuthController extends BaseController {
 
       // 为用户创建容器（如果不存在）
       containerManager.getOrCreateContainer(user.id).catch(err => {
-        console.error(`[AuthController] Failed to create container for user ${user.id}:`, err.message);
+        logger.error(`[AuthController] Failed to create container for user ${user.id}:`, err.message);
       });
 
       // 设置 httpOnly cookie（行业最佳实践）

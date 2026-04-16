@@ -11,6 +11,8 @@
 
 import { repositories } from '../../../database/db.js';
 import { ContainerStateMachine } from './ContainerStateMachine.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/container/core/ContainerStateStore');
 
 const { ContainerState: ContainerStateModel } = repositories;
 
@@ -50,7 +52,7 @@ export class ContainerStateStore {
 
       // 保存操作静默进行（由 Lifecycle 状态转换日志覆盖）
     } catch (error) {
-      console.error(`[StateStore] Failed to save state for user ${userId}:`, error.message);
+      logger.error(`[StateStore] Failed to save state for user ${userId}:`, error.message);
       throw error;
     }
   }
@@ -65,7 +67,7 @@ export class ContainerStateStore {
       // 先检查缓存
       const cached = this.cache.get(userId);
       if (cached && Date.now() - cached.timestamp < this.ttl) {
-        console.log(`[StateStore] Loaded cached state for user ${userId}`);
+        logger.info(`[StateStore] Loaded cached state for user ${userId}`);
         return cached.machine;
       }
 
@@ -73,7 +75,7 @@ export class ContainerStateStore {
       const record = ContainerStateModel.getByUserId(userId);
 
       if (!record) {
-        console.log(`[StateStore] No saved state found for user ${userId}`);
+        logger.info(`[StateStore] No saved state found for user ${userId}`);
         return null;
       }
 
@@ -87,15 +89,15 @@ export class ContainerStateStore {
         timestamp: Date.now()
       });
 
-      console.log(`[StateStore] Loaded state for user ${userId} from database: ${stateMachine.getState()}`);
+      logger.info(`[StateStore] Loaded state for user ${userId} from database: ${stateMachine.getState()}`);
 
       return stateMachine;
     } catch (error) {
-      console.error(`[StateStore] Failed to load state for user ${userId}:`, error.message);
+      logger.error(`[StateStore] Failed to load state for user ${userId}:`, error.message);
 
       // 如果数据库损坏，返回 null 让调用者创建新状态机
       if (error.message.includes('JSON')) {
-        console.warn(`[StateStore] Corrupted state data for user ${userId}, will create new state machine`);
+        logger.warn(`[StateStore] Corrupted state data for user ${userId}, will create new state machine`);
         return null;
       }
 
@@ -116,9 +118,9 @@ export class ContainerStateStore {
       // 从缓存删除
       this.cache.delete(userId);
 
-      console.log(`[StateStore] Deleted state for user ${userId}`);
+      logger.info(`[StateStore] Deleted state for user ${userId}`);
     } catch (error) {
-      console.error(`[StateStore] Failed to delete state for user ${userId}:`, error.message);
+      logger.error(`[StateStore] Failed to delete state for user ${userId}:`, error.message);
       throw error;
     }
   }
@@ -142,7 +144,7 @@ export class ContainerStateStore {
       });
 
       await this.save(stateMachine);
-      console.log(`[StateStore] Created new state machine for user ${userId}`);
+      logger.info(`[StateStore] Created new state machine for user ${userId}`);
     }
 
     return stateMachine;
@@ -157,7 +159,7 @@ export class ContainerStateStore {
     try {
       return ContainerStateModel.getUsersByState(state);
     } catch (error) {
-      console.error(`[StateStore] Failed to query users by state ${state}:`, error.message);
+      logger.error(`[StateStore] Failed to query users by state ${state}:`, error.message);
       return [];
     }
   }
@@ -170,7 +172,7 @@ export class ContainerStateStore {
     for (const [userId, entry] of this.cache.entries()) {
       if (now - entry.timestamp > this.ttl) {
         this.cache.delete(userId);
-        console.log(`[StateStore] Cleaned expired cache entry for user ${userId}`);
+        logger.info(`[StateStore] Cleaned expired cache entry for user ${userId}`);
       }
     }
   }

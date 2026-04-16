@@ -8,6 +8,8 @@
 
 import fs from 'fs';
 import path from 'path';
+import { createLogger } from './utils/logger.js';
+const logger = createLogger('container-entrypoint');
 
 // 配置
 const WORKSPACE = '/workspace';
@@ -33,12 +35,12 @@ function initializeContainer() {
   [CLAUDE_DIR, PROJECTS_DIR].forEach(dir => {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
-      console.log(`[INIT] Created directory: ${dir}`);
+      logger.info(`[INIT] Created directory: ${dir}`);
     }
   });
 
-  console.log('[INIT] Container initialized');
-  console.log('[INIT] Container info:', JSON.stringify(containerInfo, null, 2));
+  logger.info('[INIT] Container initialized');
+  logger.info('[INIT] Container info:', JSON.stringify(containerInfo, null, 2));
 }
 
 /**
@@ -46,7 +48,7 @@ function initializeContainer() {
  */
 function setupSignalHandlers() {
   const shutdown = (signal) => {
-    console.log(`\n[SHUTDOWN] Received ${signal}, shutting down gracefully...`);
+    logger.info(`\n[SHUTDOWN] Received ${signal}, shutting down gracefully...`);
     process.exit(0);
   };
 
@@ -55,13 +57,13 @@ function setupSignalHandlers() {
 
   // 处理未捕获的异常
   process.on('uncaughtException', (error) => {
-    console.error('[ERROR] Uncaught exception:', error);
+    logger.error('[ERROR] Uncaught exception:', error);
     process.exit(1);
   });
 
   // 处理未处理的 Promise 拒绝
   process.on('unhandledRejection', (reason, promise) => {
-    console.error('[ERROR] Unhandled rejection at:', promise, 'reason:', reason);
+    logger.error('[ERROR] Unhandled rejection at:', promise, 'reason:', reason);
   });
 }
 
@@ -69,22 +71,22 @@ function setupSignalHandlers() {
  * 主入口点
  */
 async function main() {
-  console.log('═══════════════════════════════════════════════════════════');
-  console.log('  Claude Code Runtime Container');
-  console.log('═══════════════════════════════════════════════════════════');
-  console.log('');
+  logger.info('═══════════════════════════════════════════════════════════');
+  logger.info('  Claude Code Runtime Container');
+  logger.info('═══════════════════════════════════════════════════════════');
+  logger.info('');
 
   // 初始化容器
   initializeContainer();
-  console.log('');
+  logger.info('');
 
   // 设置信号处理程序
   setupSignalHandlers();
 
-  console.log('[READY] Container is running.');
-  console.log('[READY] Waiting for signals...');
-  console.log('═══════════════════════════════════════════════════════════');
-  console.log('');
+  logger.info('[READY] Container is running.');
+  logger.info('[READY] Waiting for signals...');
+  logger.info('═══════════════════════════════════════════════════════════');
+  logger.info('');
 
   // 保持容器运行 - 等待信号
   // 进程将持续运行，直到收到 SIGTERM 或 SIGINT 信号

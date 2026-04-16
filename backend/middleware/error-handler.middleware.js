@@ -1,3 +1,6 @@
+import { createLogger } from '../utils/logger.js';
+const logger = createLogger('middleware/error-handler.middleware');
+
 /**
  * error-handler.middleware.js
  *
@@ -208,7 +211,7 @@ function errorHandler(err, req, res, next) {
   }
 
   // 处理未知错误
-  console.error('Unhandled error:', err);
+  logger.error('Unhandled error:', err);
   res.status(500).json({
     error: process.env.NODE_ENV === 'production'
       ? 'Internal server error'
@@ -267,11 +270,11 @@ function _logError(err, req) {
 
   // 根据错误级别选择日志输出
   if (err.statusCode >= 500) {
-    console.error('[ERROR]', JSON.stringify(logData));
+    logger.error('[ERROR]', JSON.stringify(logData));
   } else if (err.statusCode >= 400) {
-    console.warn('[WARN]', JSON.stringify(logData));
+    logger.warn('[WARN]', JSON.stringify(logData));
   } else {
-    console.log('[INFO]', JSON.stringify(logData));
+    logger.info('[INFO]', JSON.stringify(logData));
   }
 }
 

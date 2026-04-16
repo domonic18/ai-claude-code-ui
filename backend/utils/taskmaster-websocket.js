@@ -1,3 +1,6 @@
+import { createLogger } from './logger.js';
+const logger = createLogger('utils/taskmaster-websocket');
+
 /**
  * TASKMASTER WEBSOCKET 工具
  * ==============================
@@ -14,7 +17,7 @@
  */
 export function broadcastTaskMasterProjectUpdate(wss, projectName, taskMasterData) {
     if (!wss || !projectName) {
-        console.warn('TaskMaster WebSocket 广播: 缺少 wss 或 projectName');
+        logger.warn('TaskMaster WebSocket 广播: 缺少 wss 或 projectName');
         return;
     }
 
@@ -31,7 +34,7 @@ export function broadcastTaskMasterProjectUpdate(wss, projectName, taskMasterDat
             try {
                 client.send(JSON.stringify(message));
             } catch (error) {
-                console.error('发送 TaskMaster 项目更新时出错:', error);
+                logger.error('发送 TaskMaster 项目更新时出错:', error);
             }
         }
     });
@@ -45,7 +48,7 @@ export function broadcastTaskMasterProjectUpdate(wss, projectName, taskMasterDat
  */
 export function broadcastTaskMasterTasksUpdate(wss, projectName, tasksData) {
     if (!wss || !projectName) {
-        console.warn('TaskMaster WebSocket 广播: 缺少 wss 或 projectName');
+        logger.warn('TaskMaster WebSocket 广播: 缺少 wss 或 projectName');
         return;
     }
 
@@ -62,7 +65,7 @@ export function broadcastTaskMasterTasksUpdate(wss, projectName, tasksData) {
             try {
                 client.send(JSON.stringify(message));
             } catch (error) {
-                console.error('发送 TaskMaster 任务更新时出错:', error);
+                logger.error('发送 TaskMaster 任务更新时出错:', error);
             }
         }
     });
@@ -75,7 +78,7 @@ export function broadcastTaskMasterTasksUpdate(wss, projectName, tasksData) {
  */
 export function broadcastMCPStatusChange(wss, mcpStatus) {
     if (!wss) {
-        console.warn('TaskMaster WebSocket 广播: 缺少 wss');
+        logger.warn('TaskMaster WebSocket 广播: 缺少 wss');
         return;
     }
 
@@ -91,7 +94,7 @@ export function broadcastMCPStatusChange(wss, mcpStatus) {
             try {
                 client.send(JSON.stringify(message));
             } catch (error) {
-                console.error('发送 TaskMaster MCP 状态更新时出错:', error);
+                logger.error('发送 TaskMaster MCP 状态更新时出错:', error);
             }
         }
     });
@@ -105,7 +108,7 @@ export function broadcastMCPStatusChange(wss, mcpStatus) {
  */
 export function broadcastTaskMasterUpdate(wss, updateType, data = {}) {
     if (!wss || !updateType) {
-        console.warn('TaskMaster WebSocket 广播: 缺少 wss 或 updateType');
+        logger.warn('TaskMaster WebSocket 广播: 缺少 wss 或 updateType');
         return;
     }
 
@@ -122,7 +125,7 @@ export function broadcastTaskMasterUpdate(wss, updateType, data = {}) {
             try {
                 client.send(JSON.stringify(message));
             } catch (error) {
-                console.error('发送 TaskMaster 更新时出错:', error);
+                logger.error('发送 TaskMaster 更新时出错:', error);
             }
         }
     });

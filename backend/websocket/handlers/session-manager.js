@@ -8,6 +8,9 @@
 
 import { WebSocket } from 'ws';
 import { PTY_SESSION_TIMEOUT } from './shell-constants.js';
+import { createLogger } from '../../utils/logger.js';
+
+const logger = createLogger('websocket/handlers/session-manager');
 
 /**
  * 重连到现有会话
@@ -23,7 +26,7 @@ export function reconnectToSession(ptySessionsMap, sessionKey, ws) {
         return false;
     }
 
-    console.log('♻️  Reconnecting to existing session:', sessionKey);
+    logger.info('♻️  Reconnecting to existing session:', sessionKey);
 
     // 清除超时定时器
     if (existingSession.timeoutId) {
@@ -42,7 +45,7 @@ export function reconnectToSession(ptySessionsMap, sessionKey, ws) {
 
     // 发送缓冲的历史输出
     if (existingSession.buffer && existingSession.buffer.length > 0) {
-        console.log(`📜 Sending ${existingSession.buffer.length} buffered messages`);
+        logger.info(`📜 Sending ${existingSession.buffer.length} buffered messages`);
         existingSession.buffer.forEach(bufferedData => {
             ws.send(JSON.stringify({
                 type: 'output',
@@ -63,7 +66,7 @@ export function reconnectToSession(ptySessionsMap, sessionKey, ws) {
 export function cleanupExistingSession(ptySessionsMap, sessionKey) {
     const oldSession = ptySessionsMap.get(sessionKey);
     if (oldSession) {
-        console.log('🧹 Cleaning up existing session:', sessionKey);
+        logger.info('🧹 Cleaning up existing session:', sessionKey);
         if (oldSession.timeoutId) clearTimeout(oldSession.timeoutId);
         if (oldSession.kill) {
             oldSession.kill();
@@ -108,7 +111,7 @@ export function generateSessionKey({ projectPath, sessionId, initialCommand, isP
  */
 export function setupSessionTimeout(session, sessionKey, ptySessionsMap, timeout = PTY_SESSION_TIMEOUT) {
     session.timeoutId = setTimeout(() => {
-        console.log('⏰ Session timeout, killing process:', sessionKey);
+        logger.info('⏰ Session timeout, killing process:', sessionKey);
         if (session.kill) {
             session.kill();
         } else if (session.pty && session.pty.kill) {
@@ -131,7 +134,7 @@ export function handleWebSocketClose(ptySessionsMap, sessionKey, timeout = PTY_S
         return;
     }
 
-    console.log('⏳ Session kept alive, will timeout in 30 minutes:', sessionKey);
+    logger.info('⏳ Session kept alive, will timeout in 30 minutes:', sessionKey);
     session.ws = null;
 
     setupSessionTimeout(session, sessionKey, ptySessionsMap, timeout);
@@ -156,7 +159,7 @@ export async function sendInputToSession(ptySessionsMap, sessionKey, data) {
             await session.write(data);
             return true;
         } catch (error) {
-            console.error('Error writing to session:', error);
+            logger.error('Error writing to session:', error);
             return false;
         }
     } else if (session.pty && session.pty.write) {
@@ -164,7 +167,7 @@ export async function sendInputToSession(ptySessionsMap, sessionKey, data) {
             session.pty.write(data);
             return true;
         } catch (error) {
-            console.error('Error writing to PTY:', error);
+            logger.error('Error writing to PTY:', error);
             return false;
         }
     }
@@ -192,7 +195,7 @@ export async function resizeSessionTerminal(ptySessionsMap, sessionKey, cols, ro
             await session.resize(cols, rows);
             return true;
         } catch (error) {
-            console.error('Error resizing terminal:', error);
+            logger.error('Error resizing terminal:', error);
             return false;
         }
     } else if (session.pty && session.pty.resize) {
@@ -200,7 +203,7 @@ export async function resizeSessionTerminal(ptySessionsMap, sessionKey, cols, ro
             session.pty.resize(cols, rows);
             return true;
         } catch (error) {
-            console.error('Error resizing PTY:', error);
+            logger.error('Error resizing PTY:', error);
             return false;
         }
     }

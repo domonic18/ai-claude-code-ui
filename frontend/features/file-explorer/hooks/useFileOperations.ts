@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { api } from '@/shared/services';
 import type { FileNode } from '../types/file-explorer.types';
 import { findFileByPath, extractRelativePath } from '../utils/fileTreeHelpers';
+import { logger } from '@/shared/utils/logger';
 
 /** Request timeout in milliseconds */
 const REQUEST_TIMEOUT_MS = 10000;
@@ -64,7 +65,7 @@ export function useFileOperations({
     try {
       const response = await api.getFiles(selectedProject.name);
       if (!response.ok) {
-        console.error('[FileExplorer] fetchFiles failed:', response.status);
+        logger.error('[FileExplorer] fetchFiles failed:', response.status);
         setFiles([]);
         return;
       }
@@ -74,7 +75,7 @@ export function useFileOperations({
       const filesArray = Array.isArray(data) ? data : [];
       setFiles(filesArray);
     } catch (error) {
-      console.error('[FileExplorer] fetchFiles error:', error);
+      logger.error('[FileExplorer] fetchFiles error:', error);
       setFiles([]);
     }
   }, [selectedProject.name, setFiles]);
@@ -159,7 +160,7 @@ export function useFileOperations({
       setEditingName('');
       await fetchFiles();
     } catch (error) {
-      console.error('[FileExplorer] Rename error:', error);
+      logger.error('[FileExplorer] Rename error:', error);
       alert(t('fileExplorer.rename.error', { message: error instanceof Error ? error.message : 'Unknown error' }));
       setRenamingFile(null);
       setEditingName('');
@@ -219,7 +220,7 @@ export function useFileOperations({
       setSelectedFolder(null);
       await fetchFiles();
     } catch (error) {
-      console.error('[FileExplorer] New item error:', error);
+      logger.error('[FileExplorer] New item error:', error);
       alert(t('fileExplorer.new.error', { message: error instanceof Error ? error.message : 'Unknown error' }));
     } finally {
       setIsCreating(false);

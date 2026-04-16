@@ -12,6 +12,7 @@ import type {
   AuthResponse,
   AuthSession,
 } from '../types';
+import { logger } from '@/shared/utils/logger';
 
 /**
  * Auth service class
@@ -64,7 +65,7 @@ export class AuthService {
 
       return authResponse;
     } catch (error) {
-      console.error('Login error:', error);
+      logger.error('Login error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : translate('auth.error.networkError'),
@@ -112,7 +113,7 @@ export class AuthService {
 
       return authResponse;
     } catch (error) {
-      console.error('Registration error:', error);
+      logger.error('Registration error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : translate('auth.error.networkError'),
@@ -136,7 +137,7 @@ export class AuthService {
         });
       }
     } catch (error) {
-      console.error('Logout error:', error);
+      logger.error('Logout error:', error);
     } finally {
       // Clear session regardless of API call result
       this.clearSession();
@@ -178,7 +179,7 @@ export class AuthService {
 
       return user;
     } catch (error) {
-      console.error('Refresh user error:', error);
+      logger.error('Refresh user error:', error);
       return null;
     }
   }
@@ -211,7 +212,7 @@ export class AuthService {
 
       return updatedUser;
     } catch (error) {
-      console.error('Update user error:', error);
+      logger.error('Update user error:', error);
       return null;
     }
   }
@@ -237,7 +238,7 @@ export class AuthService {
 
       return response.ok;
     } catch (error) {
-      console.error('Change password error:', error);
+      logger.error('Change password error:', error);
       return false;
     }
   }
@@ -257,7 +258,7 @@ export class AuthService {
 
       return response.ok;
     } catch (error) {
-      console.error('Request password reset error:', error);
+      logger.error('Request password reset error:', error);
       return false;
     }
   }
@@ -277,7 +278,7 @@ export class AuthService {
 
       return response.ok;
     } catch (error) {
-      console.error('Confirm password reset error:', error);
+      logger.error('Confirm password reset error:', error);
       return false;
     }
   }
@@ -322,7 +323,7 @@ export class AuthService {
 
       localStorage.setItem(this.storageKey, JSON.stringify(sessionWithExpiry));
     } catch (error) {
-      console.error('Store session error:', error);
+      logger.error('Store session error:', error);
     }
   }
 
@@ -333,7 +334,7 @@ export class AuthService {
     try {
       localStorage.removeItem(this.storageKey);
     } catch (error) {
-      console.error('Clear session error:', error);
+      logger.error('Clear session error:', error);
     }
   }
 
@@ -359,7 +360,7 @@ export class AuthService {
         localStorage.setItem(this.storageKey, JSON.stringify(updatedSession));
       }
     } catch (error) {
-      console.error('Update session user error:', error);
+      logger.error('Update session user error:', error);
     }
   }
 

@@ -8,6 +8,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
+import { logger } from '@/shared/utils/logger';
 
 // 支持图片识别的模型列表（硬编码）
 const IMAGE_SUPPORTED_MODELS = ['kimi-k2.5', 'kimi-k2.5-turbo'];
@@ -59,7 +60,7 @@ export function useModelSelection(options: UseModelSelectionOptions = {}): UseMo
     if (availableModels.length > 0 && !selectedModel) {
       // 没有选择任何模型，自动选择第一个
       const firstModel = availableModels[0].name;
-      console.log('[useModelSelection] Auto-selecting first model:', firstModel, '(no previous selection)');
+      logger.info('[useModelSelection] Auto-selecting first model:', firstModel, '(no previous selection)');
       setSelectedModel(firstModel);
       localStorage.setItem('selected-model', firstModel);
     } else if (availableModels.length > 0 && selectedModel) {
@@ -68,7 +69,7 @@ export function useModelSelection(options: UseModelSelectionOptions = {}): UseMo
       if (!modelExists) {
         // 选择的模型不在列表中，选择第一个
         const firstModel = availableModels[0].name;
-        console.log('[useModelSelection] Selected model not in list, selecting first:', firstModel);
+        logger.info('[useModelSelection] Selected model not in list, selecting first:', firstModel);
         setSelectedModel(firstModel);
         localStorage.setItem('selected-model', firstModel);
       }
@@ -84,7 +85,7 @@ export function useModelSelection(options: UseModelSelectionOptions = {}): UseMo
         // 查找第一个支持图片的模型（从可用模型列表中查找）
         const imageSupportedModel = availableModels.find(m => IMAGE_SUPPORTED_MODELS.includes(m.name));
         if (imageSupportedModel && imageSupportedModel.name !== selectedModel) {
-          console.log('[useModelSelection] Auto-switching to image-capable model:', imageSupportedModel.name);
+          logger.info('[useModelSelection] Auto-switching to image-capable model:', imageSupportedModel.name);
           setSelectedModel(imageSupportedModel.name);
           localStorage.setItem('selected-model', imageSupportedModel.name);
 

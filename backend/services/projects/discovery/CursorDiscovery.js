@@ -14,6 +14,8 @@ import crypto from 'crypto';
 import { BaseDiscovery } from './BaseDiscovery.js';
 import { open } from 'sqlite';
 import sqlite3 from 'sqlite3';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/projects/discovery/CursorDiscovery');
 
 /**
  * Cursor 项目发现器
@@ -218,7 +220,7 @@ export class CursorDiscovery extends BaseDiscovery {
       });
 
     } catch (error) {
-      console.warn(`Failed to load Cursor project from hash ${hashDir}:`, error.message);
+      logger.warn(`Failed to load Cursor project from hash ${hashDir}:`, error.message);
       return null;
     }
   }
@@ -302,7 +304,7 @@ export class CursorDiscovery extends BaseDiscovery {
       };
 
     } catch (error) {
-      console.warn(`Could not read Cursor session ${sessionId}:`, error.message);
+      logger.warn(`Could not read Cursor session ${sessionId}:`, error.message);
       return null;
     }
   }

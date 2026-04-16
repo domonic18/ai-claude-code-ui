@@ -5,6 +5,7 @@ import { Input } from '@/shared/components/ui/Input';
 import { Key, Plus, Trash2, Copy, Check, ExternalLink } from 'lucide-react';
 import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import { authenticatedFetch } from '@/shared/services';
+import { logger } from '@/shared/utils/logger';
 
 // Version - will be displayed in UI
 const APP_VERSION = '1.13.6';
@@ -37,15 +38,15 @@ function CredentialsSettings() {
           const apiKeysData = await apiKeysRes.json();
           setApiKeys(apiKeysData.apiKeys || []);
         } else {
-          console.warn('[CredentialsSettings] API keys endpoint returned non-JSON response');
+          logger.warn('[CredentialsSettings] API keys endpoint returned non-JSON response');
           setApiKeys([]);
         }
       } else {
-        console.warn(`[CredentialsSettings] API keys endpoint returned status: ${apiKeysRes.status}`);
+        logger.warn(`[CredentialsSettings] API keys endpoint returned status: ${apiKeysRes.status}`);
         setApiKeys([]);
       }
     } catch (error) {
-      console.error('Error fetching settings:', error);
+      logger.error('Error fetching settings:', error);
       setApiKeys([]);
     } finally {
       setLoading(false);
@@ -70,10 +71,10 @@ function CredentialsSettings() {
           fetchData();
         }
       } else {
-        console.error(`Error creating API key: ${res.status}`);
+        logger.error(`Error creating API key: ${res.status}`);
       }
     } catch (error) {
-      console.error('Error creating API key:', error);
+      logger.error('Error creating API key:', error);
     }
   };
 
@@ -87,10 +88,10 @@ function CredentialsSettings() {
       if (res.ok) {
         fetchData();
       } else {
-        console.error(`Error deleting API key: ${res.status}`);
+        logger.error(`Error deleting API key: ${res.status}`);
       }
     } catch (error) {
-      console.error('Error deleting API key:', error);
+      logger.error('Error deleting API key:', error);
     }
   };
 
@@ -103,10 +104,10 @@ function CredentialsSettings() {
       if (res.ok) {
         fetchData();
       } else {
-        console.error(`Error toggling API key: ${res.status}`);
+        logger.error(`Error toggling API key: ${res.status}`);
       }
     } catch (error) {
-      console.error('Error toggling API key:', error);
+      logger.error('Error toggling API key:', error);
     }
   };
 

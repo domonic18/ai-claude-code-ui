@@ -11,6 +11,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { getDatabase } from './connection.js';
+import { createLogger } from '../utils/logger.js';
+const logger = createLogger('database/migrations');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -46,7 +48,7 @@ export function runMigrations() {
 
         for (const migration of userMigrations) {
             if (!columnNames.includes(migration.column)) {
-                console.log(`运行迁移: 添加 ${migration.column} 列`);
+                logger.info(`运行迁移: 添加 ${migration.column} 列`);
                 database.exec(migration.sql);
             }
         }
@@ -60,9 +62,9 @@ export function runMigrations() {
         // 创建用户设置和 MCP 服务表
         runUserSettingsMigrations(database);
 
-        console.log('数据库迁移成功完成');
+        logger.info('数据库迁移成功完成');
     } catch (error) {
-        console.error('运行迁移错误:', error.message);
+        logger.error('运行迁移错误:', error.message);
         throw error;
     }
 }
@@ -82,7 +84,7 @@ function runSSOIndexMigrations(database) {
 
     for (const index of ssoIndexes) {
         if (!indexNames.includes(index.name)) {
-            console.log(`运行迁移: 创建索引 ${index.name}`);
+            logger.info(`运行迁移: 创建索引 ${index.name}`);
             database.exec(index.sql);
         }
     }
@@ -95,7 +97,7 @@ function runSSOIndexMigrations(database) {
 function runContainerMigrations(database) {
     const userContainersTable = database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='user_containers'").get();
     if (!userContainersTable) {
-        console.log('运行迁移: 创建 user_containers 表');
+        logger.info('运行迁移: 创建 user_containers 表');
         database.exec(`
             CREATE TABLE IF NOT EXISTS user_containers (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -116,7 +118,7 @@ function runContainerMigrations(database) {
 
     const containerMetricsTable = database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='container_metrics'").get();
     if (!containerMetricsTable) {
-        console.log('运行迁移: 创建 container_metrics 表');
+        logger.info('运行迁移: 创建 container_metrics 表');
         database.exec(`
             CREATE TABLE IF NOT EXISTS container_metrics (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -139,7 +141,7 @@ function runContainerMigrations(database) {
     // 创建容器状态表（用于状态机持久化）
     const containerStatesTable = database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='container_states'").get();
     if (!containerStatesTable) {
-        console.log('运行迁移: 创建 container_states 表');
+        logger.info('运行迁移: 创建 container_states 表');
         database.exec(`
             CREATE TABLE IF NOT EXISTS container_states (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -162,15 +164,15 @@ function runUserSettingsMigrations(database) {
     // 检查 user_settings 表是否存在
     const userSettingsTable = database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='user_settings'").get();
     if (!userSettingsTable) {
-        console.log('运行迁移: 创建 user_settings 和 user_mcp_servers 表');
+        logger.info('运行迁移: 创建 user_settings 和 user_mcp_servers 表');
 
         // 执行迁移脚本
         const migrationSQL = fs.readFileSync(path.join(__dirname, 'migrations/005_add_user_settings_and_mcp.sql'), 'utf8');
         database.exec(migrationSQL);
 
-        console.log('迁移 005 执行完成: 用户设置和 MCP 服务表已创建');
+        logger.info('迁移 005 执行完成: 用户设置和 MCP 服务表已创建');
     } else {
-        console.log('user_settings 表已存在，跳过迁移 005');
+        logger.info('user_settings 表已存在，跳过迁移 005');
     }
 }
 
@@ -181,5 +183,5 @@ export function initializeSchema() {
     const database = getDatabase();
     const initSQL = fs.readFileSync(INIT_SQL_PATH, 'utf8');
     database.exec(initSQL);
-    console.log('数据库初始化成功');
+    logger.info('数据库初始化成功');
 }

@@ -1,3 +1,6 @@
+import { createLogger } from './logger.js';
+const logger = createLogger('utils/project-watcher');
+
 /**
  * 项目监视器模块
  *
@@ -17,6 +20,6 @@
 export async function setupProjectsWatcher(connectedClients) {
   // 项目现在完全在 Docker 容器内管理
   // 主机文件监视器不再使用
-  console.log('[INFO] 项目在容器内管理，主机文件监视器已禁用');
+  logger.info('[INFO] 项目在容器内管理，主机文件监视器已禁用');
   return null;
 }

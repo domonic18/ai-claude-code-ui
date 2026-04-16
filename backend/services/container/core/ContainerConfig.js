@@ -9,6 +9,8 @@
 
 import { RESOURCE_LIMITS, CONTAINER } from '../../../config/config.js';
 import fs from 'fs';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/container/core/ContainerConfig');
 
 /**
  * 容器配置构建器类
@@ -92,7 +94,7 @@ export class ContainerConfigBuilder {
       const content = fs.readFileSync(seccompPath, 'utf8');
       return JSON.parse(content);
     } catch (error) {
-      console.warn(`[ContainerConfig] Failed to load seccomp profile: ${error.message}`);
+      logger.warn(`[ContainerConfig] Failed to load seccomp profile: ${error.message}`);
       // 返回 undefined 将使用 Docker 默认 seccomp profile
       return undefined;
     }

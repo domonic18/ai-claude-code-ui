@@ -16,6 +16,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
 import { api } from '@/shared/services';
 import type { ProjectCreationWizardProps } from '../types/sidebar.types';
+import { logger } from '@/shared/utils/logger';
 
 // Default project name - will be set from translation in component
 
@@ -41,12 +42,12 @@ async function checkNameAvailability(projectName: string): Promise<NameAvailabil
     const response = await api.browseFilesystem('/workspace');
 
     if (!response.ok) {
-      console.warn('[checkNameAvailability] API response not OK:', response.status);
+      logger.warn('[checkNameAvailability] API response not OK:', response.status);
       return 'error';
     }
 
     const data = await response.json();
-    console.log('[checkNameAvailability] API response:', data);
+    logger.info('[checkNameAvailability] API response:', data);
 
     // Check if the project name already exists in suggestions
     if (data.data?.suggestions && Array.isArray(data.data.suggestions)) {
@@ -58,15 +59,15 @@ async function checkNameAvailability(projectName: string): Promise<NameAvailabil
           return item.type === 'directory' && (pathMatch || nameMatch);
         }
       );
-      console.log('[checkNameAvailability] Project exists:', projectName, exists);
+      logger.info('[checkNameAvailability] Project exists:', projectName, exists);
       return exists ? 'unavailable' : 'available';
     }
 
     // If we can't determine, assume available
-    console.warn('[checkNameAvailability] No suggestions in response, assuming available');
+    logger.warn('[checkNameAvailability] No suggestions in response, assuming available');
     return 'available';
   } catch (error) {
-    console.error('[checkNameAvailability] Error:', error);
+    logger.error('[checkNameAvailability] Error:', error);
     return 'error';
   }
 }
@@ -185,19 +186,19 @@ const ProjectCreationWizard = ({
       // Default workspace path for user projects
       const workspacePath = `/workspace/${projectName}`;
 
-      console.log('[ProjectCreationWizard] Creating project:', workspacePath);
+      logger.info('[ProjectCreationWizard] Creating project:', workspacePath);
 
       const response = await api.createProject(workspacePath);
 
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
-        console.error('[ProjectCreationWizard] Non-JSON response:', text);
+        logger.error('[ProjectCreationWizard] Non-JSON response:', text);
         throw new Error('Server returned an unexpected response');
       }
 
       const data = await response.json();
-      console.log('[ProjectCreationWizard] Response:', data);
+      logger.info('[ProjectCreationWizard] Response:', data);
 
       if (!response.ok) {
         throw new Error(data.error || data.message || 'Failed to create project');
@@ -211,7 +212,7 @@ const ProjectCreationWizard = ({
       onClose();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create project';
-      console.error('[ProjectCreationWizard] Error:', err);
+      logger.error('[ProjectCreationWizard] Error:', err);
       setError(errorMessage);
     } finally {
       setIsCreating(false);

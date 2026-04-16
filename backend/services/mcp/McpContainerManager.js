@@ -9,6 +9,8 @@
  */
 
 import { McpService } from './McpService.js';
+import { createLogger } from '../../utils/logger.js';
+const logger = createLogger('services/mcp/McpContainerManager');
 
 /**
  * MCP 容器管理器类
@@ -22,7 +24,7 @@ export class McpContainerManager {
   static async getUserMcpConfig(userId) {
     try {
       const servers = await McpService.getEnabledServers(userId);
-      console.log(`[McpContainerManager] Generated MCP config for user ${userId}:`, servers.map(s => s.name));
+      logger.info(`[McpContainerManager] Generated MCP config for user ${userId}:`, servers.map(s => s.name));
 
       // 返回包含servers数组的对象
       return {
@@ -34,7 +36,7 @@ export class McpContainerManager {
         }))
       };
     } catch (error) {
-      console.error(`[McpContainerManager] Error getting MCP config for user ${userId}:`, error);
+      logger.error(`[McpContainerManager] Error getting MCP config for user ${userId}:`, error);
       // 返回空配置而不是抛出错误，允许系统在没有 MCP 的情况下继续运行
       return { servers: [] };
     }
@@ -56,10 +58,10 @@ export class McpContainerManager {
         envVars.MCP_SERVERS = JSON.stringify(config.servers);
       }
 
-      console.log(`[McpContainerManager] Generated MCP env vars for user ${userId}`);
+      logger.info(`[McpContainerManager] Generated MCP env vars for user ${userId}`);
       return envVars;
     } catch (error) {
-      console.error(`[McpContainerManager] Error getting MCP env vars for user ${userId}:`, error);
+      logger.error(`[McpContainerManager] Error getting MCP env vars for user ${userId}:`, error);
       return {};
     }
   }
@@ -74,7 +76,7 @@ export class McpContainerManager {
       const servers = await McpService.getEnabledServers(userId);
       return servers.length > 0;
     } catch (error) {
-      console.error(`[McpContainerManager] Error checking enabled servers for user ${userId}:`, error);
+      logger.error(`[McpContainerManager] Error checking enabled servers for user ${userId}:`, error);
       return false;
     }
   }
@@ -105,7 +107,7 @@ export class McpContainerManager {
         }))
       };
     } catch (error) {
-      console.error(`[McpContainerManager] Error getting summary for user ${userId}:`, error);
+      logger.error(`[McpContainerManager] Error getting summary for user ${userId}:`, error);
       return {
         totalCount: 0,
         enabledCount: 0,

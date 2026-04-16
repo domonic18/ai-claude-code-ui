@@ -11,6 +11,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import fs from 'fs';
+import { createLogger } from '../utils/logger.js';
+const logger = createLogger('config/config');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -46,7 +48,7 @@ export function loadEnvironment() {
         envPath = explicitPath;
         envFileName = process.env.ENV_FILE;
       } else {
-        console.log(`[CONFIG] ENV_FILE specified but not found: ${explicitPath}`);
+        logger.info(`[CONFIG] ENV_FILE specified but not found: ${explicitPath}`);
       }
     }
 
@@ -63,11 +65,11 @@ export function loadEnvironment() {
     }
 
     if (!envPath) {
-      console.log('[CONFIG] No environment file found (tried: .env, .env.deploy)');
+      logger.info('[CONFIG] No environment file found (tried: .env, .env.deploy)');
       return;
     }
 
-    console.log(`[CONFIG] Loading environment from: ${envPath}`);
+    logger.info(`[CONFIG] Loading environment from: ${envPath}`);
 
     const envFile = fs.readFileSync(envPath, 'utf8');
     let loadedCount = 0;
@@ -83,17 +85,17 @@ export function loadEnvironment() {
             process.env[key] = value;
             loadedCount++;
           } else {
-            console.log(`[CONFIG] Skipping ${key} (already set in environment)`);
+            logger.info(`[CONFIG] Skipping ${key} (already set in environment)`);
           }
         }
       }
     });
 
-    console.log(`[CONFIG] Loaded ${loadedCount} environment variables from ${envFileName}`);
+    logger.info(`[CONFIG] Loaded ${loadedCount} environment variables from ${envFileName}`);
 
     // 关键变量检查
     const criticalVars = ['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'AVAILABLE_MODELS'];
-    console.log('[CONFIG] Critical environment variables status:');
+    logger.info('[CONFIG] Critical environment variables status:');
     criticalVars.forEach(varName => {
       const isSet = !!process.env[varName];
       const value = isSet ? (varName.includes('TOKEN') || varName.includes('KEY')
@@ -102,10 +104,10 @@ export function loadEnvironment() {
         ? `${process.env[varName].substring(0, 50)}...`
         : process.env[varName])
         : 'NOT SET';
-      console.log(`[CONFIG] - ${varName}: ${value}`);
+      logger.info(`[CONFIG] - ${varName}: ${value}`);
     });
   } catch (e) {
-    console.error(`[CONFIG] Error loading .env file: ${e.message}`);
+    logger.error(`[CONFIG] Error loading .env file: ${e.message}`);
     // 继续执行，使用默认值
   }
 }
@@ -307,7 +309,7 @@ export const MODELS = {
         throw new Error('AVAILABLE_MODELS must contain at least one model');
       }
 
-      console.log(`[MODELS] Loaded ${models.length} models from AVAILABLE_MODELS`);
+      logger.info(`[MODELS] Loaded ${models.length} models from AVAILABLE_MODELS`);
       return models;
     } catch (error) {
       if (error.message.startsWith('AVAILABLE_MODELS') ||
@@ -608,19 +610,19 @@ export const c = {
  * 记录配置状态到控制台
  */
 export function logConfigStatus() {
-  console.log(`${c.info('[CONFIG]')} ===== 配置状态 =====`);
-  console.log(`${c.info('[CONFIG]')} 模式: ${c.bright(SERVER.isPlatform ? 'PLATFORM (单用户)' : 'STANDARD (多用户)')}`);
-  console.log(`${c.info('[CONFIG]')} 容器模式: ${c.ok('启用 (容器化架构)')}`);
-  console.log(`${c.info('[CONFIG]')} 数据库: ${c.dim(DATABASE.path)}`);
-  console.log(`${c.info('[CONFIG]')} 端口: ${c.bright(SERVER.port)}`);
+  logger.info(`${c.info('[CONFIG]')} ===== 配置状态 =====`);
+  logger.info(`${c.info('[CONFIG]')} 模式: ${c.bright(SERVER.isPlatform ? 'PLATFORM (单用户)' : 'STANDARD (多用户)')}`);
+  logger.info(`${c.info('[CONFIG]')} 容器模式: ${c.ok('启用 (容器化架构)')}`);
+  logger.info(`${c.info('[CONFIG]')} 数据库: ${c.dim(DATABASE.path)}`);
+  logger.info(`${c.info('[CONFIG]')} 端口: ${c.bright(SERVER.port)}`);
 
   if (SERVER.env === 'production') {
     if (AUTH.jwtSecret === 'claude-ui-dev-secret-change-in-production') {
-      console.log(`${c.warn('[WARN]')} 使用默认 JWT 密钥，请在生产环境中设置 JWT_SECRET`);
+      logger.info(`${c.warn('[WARN]')} 使用默认 JWT 密钥，请在生产环境中设置 JWT_SECRET`);
     }
   }
 
-  console.log(`${c.info('[CONFIG]')} ====================`);
+  logger.info(`${c.info('[CONFIG]')} ====================`);
 }
 
 // 默认导出所有配置

@@ -10,6 +10,8 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/execution/claude/McpConfigLoader');
 
 /**
  * 从 ~/.claude.json 加载 MCP 服务器配置
@@ -25,7 +27,7 @@ export async function loadMcpConfig(cwd) {
       await fs.access(claudeConfigPath);
     } catch (error) {
       // 文件不存在，返回 null
-      console.log('No ~/.claude.json found, proceeding without MCP servers');
+      logger.info('No ~/.claude.json found, proceeding without MCP servers');
       return null;
     }
 
@@ -35,7 +37,7 @@ export async function loadMcpConfig(cwd) {
       const configContent = await fs.readFile(claudeConfigPath, 'utf8');
       claudeConfig = JSON.parse(configContent);
     } catch (error) {
-      console.error('Failed to parse ~/.claude.json:', error.message);
+      logger.error('Failed to parse ~/.claude.json:', error.message);
       return null;
     }
 
@@ -45,7 +47,7 @@ export async function loadMcpConfig(cwd) {
     // 添加全局 MCP 服务器
     if (claudeConfig.mcpServers && typeof claudeConfig.mcpServers === 'object') {
       mcpServers = { ...claudeConfig.mcpServers };
-      console.log(`Loaded ${Object.keys(mcpServers).length} global MCP servers`);
+      logger.info(`Loaded ${Object.keys(mcpServers).length} global MCP servers`);
     }
 
     // 添加/覆盖项目特定的 MCP 服务器
@@ -53,20 +55,20 @@ export async function loadMcpConfig(cwd) {
       const projectConfig = claudeConfig.claudeProjects[cwd];
       if (projectConfig && projectConfig.mcpServers && typeof projectConfig.mcpServers === 'object') {
         mcpServers = { ...mcpServers, ...projectConfig.mcpServers };
-        console.log(`Loaded ${Object.keys(projectConfig.mcpServers).length} project-specific MCP servers`);
+        logger.info(`Loaded ${Object.keys(projectConfig.mcpServers).length} project-specific MCP servers`);
       }
     }
 
     // 如果未找到服务器，返回 null
     if (Object.keys(mcpServers).length === 0) {
-      console.log('No MCP servers configured');
+      logger.info('No MCP servers configured');
       return null;
     }
 
-    console.log(`Total MCP servers loaded: ${Object.keys(mcpServers).length}`);
+    logger.info(`Total MCP servers loaded: ${Object.keys(mcpServers).length}`);
     return mcpServers;
   } catch (error) {
-    console.error('Error loading MCP config:', error.message);
+    logger.error('Error loading MCP config:', error.message);
     return null;
   }
 }

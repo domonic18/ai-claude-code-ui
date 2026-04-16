@@ -15,6 +15,7 @@ import { useState, useCallback } from 'react';
 import { getSidebarService } from '../services';
 import { SESSION_PAGINATION } from '../constants/sidebar.constants';
 import type { Session, SessionProvider, PaginatedSessionsResponse } from '../types';
+import { logger } from '@/shared/utils/logger';
 
 /**
  * Hook return type
@@ -86,7 +87,7 @@ export function useSessions(): UseSessionsReturn {
         setHasMore(prev => ({ ...prev, [projectName]: result.hasMore || false }));
       }
     } catch (err) {
-      console.error(`Error loading more sessions for ${projectName}:`, err);
+      logger.error(`Error loading more sessions for ${projectName}:`, err);
       throw err;
     } finally {
       setLoadingSessions(prev => ({ ...prev, [projectName]: false }));
@@ -128,7 +129,7 @@ export function useSessions(): UseSessionsReturn {
         [projectName]: prev[projectName] ? updateSessionArray(prev[projectName]) : [],
       }));
     } catch (err) {
-      console.error(`Error renaming session ${sessionId}:`, err);
+      logger.error(`Error renaming session ${sessionId}:`, err);
       throw err;
     }
   }, [service]);
@@ -158,7 +159,7 @@ export function useSessions(): UseSessionsReturn {
         [projectName]: prev[projectName] ? filterSession(prev[projectName]) : [],
       }));
     } catch (err) {
-      console.error(`Error deleting session ${sessionId}:`, err);
+      logger.error(`Error deleting session ${sessionId}:`, err);
       throw err;
     }
   }, [service]);

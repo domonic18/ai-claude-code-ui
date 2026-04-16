@@ -8,6 +8,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { getSettingsService } from '../services/settingsService';
 import type { AgentType, PermissionSettings, McpServer } from '../types/settings.types';
+import { logger } from '@/shared/utils/logger';
 
 export interface UseAgentSettingsParams {
   /** Selected agent type */
@@ -98,7 +99,7 @@ export function useAgentSettings(params: UseAgentSettingsParams): UseAgentSettin
       const servers = await settingsService.getMcpServers();
       setMcpServers(servers);
     } catch (error) {
-      console.error(`[useAgentSettings] Error loading settings for ${agentType}:`, error);
+      logger.error(`[useAgentSettings] Error loading settings for ${agentType}:`, error);
     } finally {
       setIsLoading(false);
     }
@@ -124,7 +125,7 @@ export function useAgentSettings(params: UseAgentSettingsParams): UseAgentSettin
         setSaveStatus('error');
       }
     } catch (error) {
-      console.error('[useAgentSettings] Error saving permissions:', error);
+      logger.error('[useAgentSettings] Error saving permissions:', error);
       setSaveStatus('error');
     } finally {
       setIsSaving(false);

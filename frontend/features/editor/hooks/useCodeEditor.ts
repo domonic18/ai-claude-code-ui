@@ -12,6 +12,7 @@ import type {
   EditorTheme,
   EditorFile
 } from '../types';
+import { logger } from '@/shared/utils/logger';
 
 /**
  * Hook for code editor functionality
@@ -241,7 +242,7 @@ export function useCodeEditor(options: UseCodeEditorOptions = {}): UseCodeEditor
       await onSave(content);
       setSaveSuccess(true);
     } catch (error) {
-      console.error('Failed to save file:', error);
+      logger.error('Failed to save file:', error);
       throw error;
     } finally {
       setIsSaving(false);

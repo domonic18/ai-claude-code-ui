@@ -10,6 +10,8 @@
 import jwt from 'jsonwebtoken';
 import { repositories } from '../database/db.js';
 import { AUTH, SERVER } from '../config/config.js';
+import { createLogger } from '../utils/logger.js';
+const logger = createLogger('middleware/auth.middleware');
 
 const { User, ApiKey } = repositories;
 
@@ -68,7 +70,7 @@ function authenticate(options = {}) {
         };
         return next();
       } catch (error) {
-        console.error('Platform mode error:', error);
+        logger.error('Platform mode error:', error);
         if (optional) {
           return next();
         }

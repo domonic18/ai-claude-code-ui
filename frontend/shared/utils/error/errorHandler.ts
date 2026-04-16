@@ -1,3 +1,4 @@
+import { logger } from '@/shared/utils/logger';
 /**
  * Error Handler Utility
  *
@@ -59,17 +60,17 @@ export function handleError(
   let errorCode = 'UNKNOWN_ERROR';
 
   if (error instanceof AppError) {
-    console.error(`[${context}] ${error.code}:`, error.message, error.context);
+    logger.error(`[${context}] ${error.code}:`, error.message, error.context);
     errorMessage = error.message;
     errorCode = error.code;
   } else if (error instanceof Error) {
-    console.error(`[${context}]:`, error.message, error.stack);
+    logger.error(`[${context}]:`, error.message, error.stack);
     errorMessage = error.message;
   } else if (typeof error === 'string') {
-    console.error(`[${context}]:`, error);
+    logger.error(`[${context}]:`, error);
     errorMessage = error;
   } else {
-    console.error(`[${context}]:`, error);
+    logger.error(`[${context}]:`, error);
   }
 
   if (showToast) {

@@ -35,6 +35,7 @@ import { handleWebSocketMessage } from '../services/websocketHandler';
 import type { ChatMessage, FileAttachment } from '../types';
 import { calculateDiff } from '../utils/diffUtils';
 import { STORAGE_KEYS } from '../constants';
+import { logger } from '@/shared/utils/logger';
 
 // Stable empty array reference to prevent unnecessary effect triggers
 const EMPTY_WS_MESSAGES: any[] = [];
@@ -159,7 +160,7 @@ export function ChatInterface({
         }
       })
       .catch(error => {
-        console.error('[ChatInterface] Error loading models:', error);
+        logger.error('[ChatInterface] Error loading models:', error);
       });
   }, []);
 
@@ -423,7 +424,7 @@ export function ChatInterface({
         onMemoryContext: (content, sessionId) => {
           // Memory context is received but not displayed in chat
           // Used for debugging/monitoring purposes only
-          console.log('[ChatInterface] Memory context received:', content?.length, 'chars for session:', sessionId);
+          logger.info('[ChatInterface] Memory context received:', content?.length, 'chars for session:', sessionId);
         },
         getCurrentSessionId: () => currentSessionId,
         getSelectedProjectName: () => selectedProject?.name,

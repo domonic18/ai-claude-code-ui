@@ -7,6 +7,8 @@
 
 import { promises as fs } from 'fs';
 import path from 'path';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/projects/taskmaster/detector');
 
 /**
  * 检测项目中的 TaskMaster 文件夹
@@ -118,7 +120,7 @@ async function detectTaskMasterFolder(projectPath) {
           lastModified: (await fs.stat(tasksPath)).mtime.toISOString()
         };
       } catch (parseError) {
-        console.warn('Failed to parse tasks.json:', parseError.message);
+        logger.warn('Failed to parse tasks.json:', parseError.message);
         taskMetadata = { error: 'Failed to parse tasks.json' };
       }
     }
@@ -132,7 +134,7 @@ async function detectTaskMasterFolder(projectPath) {
     };
 
   } catch (error) {
-    console.error('Error detecting TaskMaster folder:', error);
+    logger.error('Error detecting TaskMaster folder:', error);
     return {
       hasTaskmaster: false,
       reason: `Error checking directory: ${error.message}`

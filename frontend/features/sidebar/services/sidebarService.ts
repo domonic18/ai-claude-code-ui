@@ -7,6 +7,7 @@
 
 import { api } from '@/shared/services';
 import type { Project, Session, SessionMeta, SessionProvider, PaginatedSessionsResponse } from '../types/sidebar.types';
+import { logger } from '@/shared/utils/logger';
 
 /**
  * Error class for Sidebar service errors
@@ -75,7 +76,7 @@ export class SidebarService {
     offset: number = 0
   ): Promise<PaginatedSessionsResponse> {
     try {
-      console.log('[SidebarService] Fetching sessions:', { projectName, limit, offset });
+      logger.info('[SidebarService] Fetching sessions:', { projectName, limit, offset });
       const response = await api.sessions(projectName, limit, offset);
 
       if (!response.ok) {
@@ -87,7 +88,7 @@ export class SidebarService {
       }
 
       const result = await response.json();
-      console.log('[SidebarService] Received response:', result);
+      logger.info('[SidebarService] Received response:', result);
 
       // Handle different response formats
       // API returns: {success: true, data: [...], meta: {pagination: {...}}}
@@ -98,7 +99,7 @@ export class SidebarService {
         ? result.hasMore
         : undefined;
 
-      console.log('[SidebarService] Parsed result:', { sessions, hasMore, sessionCount: sessions.length });
+      logger.info('[SidebarService] Parsed result:', { sessions, hasMore, sessionCount: sessions.length });
 
       return {
         sessions,

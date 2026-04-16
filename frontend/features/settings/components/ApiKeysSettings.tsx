@@ -4,6 +4,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
 import { Key, Plus, Trash2, Eye, EyeOff, Copy, Check, Github } from 'lucide-react';
 import { authenticatedFetch } from '@/shared/services';
+import { logger } from '@/shared/utils/logger';
 
 function ApiKeysSettings() {
   const { t } = useTranslation();
@@ -37,7 +38,7 @@ function ApiKeysSettings() {
       const githubData = await githubRes.json();
       setGithubTokens(githubData.credentials || []);
     } catch (error) {
-      console.error('Error fetching settings:', error);
+      logger.error('Error fetching settings:', error);
     } finally {
       setLoading(false);
     }
@@ -60,7 +61,7 @@ function ApiKeysSettings() {
         fetchData();
       }
     } catch (error) {
-      console.error('Error creating API key:', error);
+      logger.error('Error creating API key:', error);
     }
   };
 
@@ -73,7 +74,7 @@ function ApiKeysSettings() {
       });
       fetchData();
     } catch (error) {
-      console.error('Error deleting API key:', error);
+      logger.error('Error deleting API key:', error);
     }
   };
 
@@ -85,7 +86,7 @@ function ApiKeysSettings() {
       });
       fetchData();
     } catch (error) {
-      console.error('Error toggling API key:', error);
+      logger.error('Error toggling API key:', error);
     }
   };
 
@@ -110,7 +111,7 @@ function ApiKeysSettings() {
         fetchData();
       }
     } catch (error) {
-      console.error('Error creating GitHub token:', error);
+      logger.error('Error creating GitHub token:', error);
     }
   };
 
@@ -123,7 +124,7 @@ function ApiKeysSettings() {
       });
       fetchData();
     } catch (error) {
-      console.error('Error deleting GitHub token:', error);
+      logger.error('Error deleting GitHub token:', error);
     }
   };
 
@@ -135,7 +136,7 @@ function ApiKeysSettings() {
       });
       fetchData();
     } catch (error) {
-      console.error('Error toggling GitHub token:', error);
+      logger.error('Error toggling GitHub token:', error);
     }
   };
 

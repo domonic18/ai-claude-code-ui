@@ -15,6 +15,8 @@ import containerManager from './core/index.js';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import { PTY_TIMEOUTS } from '../../config/config.js';
+import { createLogger } from '../../utils/logger.js';
+const logger = createLogger('services/container/PtyContainer');
 
 // PTY 会话存储：sessionId -> sessionInfo
 const ptySessions = new Map();
@@ -181,7 +183,7 @@ function setupStreamHandlers(sessionId, stream, ws) {
 
   // 处理流错误
   stream.on('error', (error) => {
-    console.error(`PTY stream error for session ${sessionId}:`, error.message);
+    logger.error(`PTY stream error for session ${sessionId}:`, error.message);
 
     if (ws.readyState === 1) {
       ws.send(JSON.stringify({
@@ -201,7 +203,7 @@ function setupStreamHandlers(sessionId, stream, ws) {
 
   // 处理流结束
   stream.on('end', () => {
-    console.log(`PTY stream ended for session ${sessionId}`);
+    logger.info(`PTY stream ended for session ${sessionId}`);
 
     if (ws.readyState === 1) {
       ws.send(JSON.stringify({
@@ -308,7 +310,7 @@ async function cleanupPtySession(sessionId) {
         stream.destroy();
       }
     } catch (error) {
-      console.error(`Error closing stream for session ${sessionId}:`, error.message);
+      logger.error(`Error closing stream for session ${sessionId}:`, error.message);
     }
 
     // 从流映射中移除
@@ -369,7 +371,7 @@ export async function endAllPtySessionsForUser(userId) {
       await cleanupPtySession(session.sessionId);
       count++;
     } catch (error) {
-      console.error(`Failed to end session ${session.sessionId}:`, error.message);
+      logger.error(`Failed to end session ${session.sessionId}:`, error.message);
     }
   }
 
@@ -416,6 +418,6 @@ export function cleanupIdlePtySessions(idleTime = PTY_TIMEOUTS.idleCleanup) {
 setInterval(() => {
   const count = cleanupIdlePtySessions();
   if (count > 0) {
-    console.log(`Cleaned up ${count} idle PTY sessions`);
+    logger.info(`Cleaned up ${count} idle PTY sessions`);
   }
 }, PTY_TIMEOUTS.cleanupInterval); // 使用配置的清理间隔

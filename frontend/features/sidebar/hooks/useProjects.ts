@@ -26,6 +26,7 @@ import { requestDeduplicator } from '@/shared/utils';
 import type { Project } from '../types';
 import { STORAGE_KEYS } from '../constants';
 import type { ProjectSortOrder, StarredProjects } from '../types';
+import { logger } from '@/shared/utils/logger';
 
 /**
  * Hook return type
@@ -66,7 +67,7 @@ function loadSortOrder(): ProjectSortOrder {
       return settings.projectSortOrder || 'name';
     }
   } catch (error) {
-    console.error('Error loading sort order:', error);
+    logger.error('Error loading sort order:', error);
   }
   return 'name';
 }
@@ -81,7 +82,7 @@ function saveSortOrder(order: ProjectSortOrder): void {
     settings.projectSortOrder = order;
     localStorage.setItem(STORAGE_KEYS.CLAUDE_SETTINGS, JSON.stringify(settings));
   } catch (error) {
-    console.error('Error saving sort order:', error);
+    logger.error('Error saving sort order:', error);
   }
 }
 
@@ -111,7 +112,7 @@ export function useProjects(initialProjects?: Project[] | null): UseProjectsRetu
       const newProjects = Array.isArray(initialProjects) ? initialProjects : [];
       // Only update if the array reference actually changed (not just a re-render with same data)
       if (initialProjects !== prevProjectsRef.current) {
-        console.log('[useProjects] Syncing projects from props:', newProjects);
+        logger.info('[useProjects] Syncing projects from props:', newProjects);
         setProjects(newProjects);
         prevProjectsRef.current = newProjects;
       }
@@ -143,7 +144,7 @@ export function useProjects(initialProjects?: Project[] | null): UseProjectsRetu
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to fetch projects';
         setError(errorMessage);
-        console.error('Error fetching projects:', err);
+        logger.error('Error fetching projects:', err);
       } finally {
         setIsLoading(false);
       }

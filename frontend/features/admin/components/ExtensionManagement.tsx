@@ -9,6 +9,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { RefreshCw, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { logger } from '@/shared/utils/logger';
 
 /**
  * Extension data types
@@ -86,7 +87,7 @@ export function ExtensionManagement() {
       setExtensions(data.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
-      console.error('Failed to fetch extensions:', err);
+      logger.error('Failed to fetch extensions:', err);
     } finally {
       setLoading(false);
     }
@@ -119,7 +120,7 @@ export function ExtensionManagement() {
       await fetchExtensions();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
-      console.error('Failed to sync extensions:', err);
+      logger.error('Failed to sync extensions:', err);
     } finally {
       setSyncing(false);
     }

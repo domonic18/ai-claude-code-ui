@@ -13,8 +13,8 @@ export default defineConfig(({ command, mode }) => {
       alias: {
         '@': path.resolve(__dirname, './frontend'),
         '@/features': path.resolve(__dirname, './frontend/features'),
-        '@/shared': path.resolve(__dirname, './shared'),
         '@/shared-frontend': path.resolve(__dirname, './frontend/shared'),
+        '@/shared': path.resolve(__dirname, './shared'),
         '@/config': path.resolve(__dirname, './frontend/config'),
         '@/lib': path.resolve(__dirname, './frontend/lib'),
       },
@@ -47,6 +47,13 @@ export default defineConfig(({ command, mode }) => {
       chunkSizeWarningLimit: 500,
       cssMinify: false,
       sourcemap: true, // 启用 source map，方便调试
+      minify: 'terser',
+      terserOptions: {
+        compress: {
+          drop_console: true, // 生产构建移除所有 console.* 调用
+          drop_debugger: true,
+        },
+      },
       rollupOptions: {
         output: {
           manualChunks: {

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { logger } from '@/shared/utils/logger';
 
 export interface ReleaseInfo {
   title: string;
@@ -52,7 +53,7 @@ export function useVersionCheck(owner: string, repo: string): UseVersionCheckRes
           setReleaseInfo(null);
         }
       } catch (error) {
-        console.error('Version check failed:', error);
+        logger.error('Version check failed:', error);
         setUpdateAvailable(false);
         setLatestVersion(null);
         setReleaseInfo(null);

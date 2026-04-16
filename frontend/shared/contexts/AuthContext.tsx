@@ -17,6 +17,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { api } from '@/shared/services';
 import { requestDeduplicator } from '@/shared/utils';
 import type { User } from '@/shared/types';
+import { logger } from '@/shared/utils/logger';
 
 export interface AuthResult {
   success: boolean;
@@ -128,7 +129,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setUser(null);
         }
       } catch (err) {
-        console.error('Auth status check failed:', err);
+        logger.error('Auth status check failed:', err);
         setError('Failed to check authentication status');
       } finally {
         setIsLoading(false);
@@ -159,7 +160,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return { success: false, error: data.error || 'Login failed' };
       }
     } catch (err) {
-      console.error('Login error:', err);
+      logger.error('Login error:', err);
       const errorMessage = 'Network error. Please try again.';
       setError(errorMessage);
       return { success: false, error: errorMessage };
@@ -182,7 +183,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return { success: false, error: data.error || 'Registration failed' };
       }
     } catch (err) {
-      console.error('Registration error:', err);
+      logger.error('Registration error:', err);
       const errorMessage = 'Network error. Please try again.';
       setError(errorMessage);
       return { success: false, error: errorMessage };
@@ -194,7 +195,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       await api.auth.logout();
     } catch (err) {
-      console.error('Logout endpoint error:', err);
+      logger.error('Logout endpoint error:', err);
     }
   }, []);
 

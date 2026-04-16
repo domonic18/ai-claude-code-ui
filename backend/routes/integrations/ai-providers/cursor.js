@@ -7,6 +7,8 @@ import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
 import crypto from 'crypto';
 import { CURSOR_MODELS } from '../../../../shared/modelConstants.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('routes/integrations/ai-providers/cursor');
 
 const router = express.Router();
 
@@ -26,7 +28,7 @@ router.get('/config', async (req, res) => {
       });
     } catch (error) {
       // 配置不存在或无效
-      console.log('Cursor config not found or invalid:', error.message);
+      logger.info('Cursor config not found or invalid:', error.message);
 
       // 返回默认配置
       res.json({
@@ -46,7 +48,7 @@ router.get('/config', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Error reading Cursor config:', error);
+    logger.error('Error reading Cursor config:', error);
     res.status(500).json({ 
       error: 'Failed to read Cursor configuration', 
       details: error.message 
@@ -79,7 +81,7 @@ router.post('/config', async (req, res) => {
       config = JSON.parse(existing);
     } catch (error) {
       // 配置不存在，使用默认值
-      console.log('Creating new Cursor config');
+      logger.info('Creating new Cursor config');
     }
 
     // 如果提供了权限，则更新
@@ -109,7 +111,7 @@ router.post('/config', async (req, res) => {
       message: 'Cursor configuration updated successfully'
     });
   } catch (error) {
-    console.error('Error updating Cursor config:', error);
+    logger.error('Error updating Cursor config:', error);
     res.status(500).json({ 
       error: 'Failed to update Cursor configuration', 
       details: error.message 
@@ -162,7 +164,7 @@ router.get('/mcp', async (req, res) => {
       });
     } catch (error) {
       // MCP 配置不存在
-      console.log('Cursor MCP config not found:', error.message);
+      logger.info('Cursor MCP config not found:', error.message);
       res.json({
         success: true,
         servers: [],
@@ -170,7 +172,7 @@ router.get('/mcp', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Error reading Cursor MCP config:', error);
+    logger.error('Error reading Cursor MCP config:', error);
     res.status(500).json({ 
       error: 'Failed to read Cursor MCP configuration', 
       details: error.message 
@@ -184,7 +186,7 @@ router.post('/mcp/add', async (req, res) => {
     const { name, type = 'stdio', command, args = [], url, headers = {}, env = {} } = req.body;
     const mcpPath = path.join(os.homedir(), '.cursor', 'mcp.json');
 
-    console.log(`➕ Adding MCP server to Cursor config: ${name}`);
+    logger.info(`➕ Adding MCP server to Cursor config: ${name}`);
 
     // 读取现有配置或创建新配置
     let mcpConfig = { mcpServers: {} };
@@ -196,7 +198,7 @@ router.post('/mcp/add', async (req, res) => {
         mcpConfig.mcpServers = {};
       }
     } catch (error) {
-      console.log('Creating new Cursor MCP config');
+      logger.info('Creating new Cursor MCP config');
     }
 
     // 根据类型构建服务器配置
@@ -232,7 +234,7 @@ router.post('/mcp/add', async (req, res) => {
       config: mcpConfig
     });
   } catch (error) {
-    console.error('Error adding MCP server to Cursor:', error);
+    logger.error('Error adding MCP server to Cursor:', error);
     res.status(500).json({ 
       error: 'Failed to add MCP server', 
       details: error.message 
@@ -246,7 +248,7 @@ router.delete('/mcp/:name', async (req, res) => {
     const { name } = req.params;
     const mcpPath = path.join(os.homedir(), '.cursor', 'mcp.json');
 
-    console.log(`🗑️ Removing MCP server from Cursor config: ${name}`);
+    logger.info(`🗑️ Removing MCP server from Cursor config: ${name}`);
 
     // 读取现有配置
     let mcpConfig = { mcpServers: {} };
@@ -279,7 +281,7 @@ router.delete('/mcp/:name', async (req, res) => {
       config: mcpConfig
     });
   } catch (error) {
-    console.error('Error removing MCP server from Cursor:', error);
+    logger.error('Error removing MCP server from Cursor:', error);
     res.status(500).json({ 
       error: 'Failed to remove MCP server', 
       details: error.message 
@@ -293,7 +295,7 @@ router.post('/mcp/add-json', async (req, res) => {
     const { name, jsonConfig } = req.body;
     const mcpPath = path.join(os.homedir(), '.cursor', 'mcp.json');
 
-    console.log(`➕ Adding MCP server to Cursor config via JSON: ${name}`);
+    logger.info(`➕ Adding MCP server to Cursor config via JSON: ${name}`);
 
     // 验证并解析 JSON 配置
     let parsedConfig;
@@ -316,7 +318,7 @@ router.post('/mcp/add-json', async (req, res) => {
         mcpConfig.mcpServers = {};
       }
     } catch (error) {
-      console.log('Creating new Cursor MCP config');
+      logger.info('Creating new Cursor MCP config');
     }
 
     // 将服务器添加到配置
@@ -335,7 +337,7 @@ router.post('/mcp/add-json', async (req, res) => {
       config: mcpConfig
     });
   } catch (error) {
-    console.error('Error adding MCP server to Cursor via JSON:', error);
+    logger.error('Error adding MCP server to Cursor via JSON:', error);
     res.status(500).json({ 
       error: 'Failed to add MCP server', 
       details: error.message 
@@ -450,7 +452,7 @@ router.get('/sessions', async (req, res) => {
                 }
               }
             } catch (e) {
-              console.log(`Could not parse meta value for key ${row.key}:`, e.message);
+              logger.info(`Could not parse meta value for key ${row.key}:`, e.message);
             }
           }
         }
@@ -518,11 +520,11 @@ router.get('/sessions', async (req, res) => {
                 sessionData.lastMessage = preview.substring(0, 100) + (preview.length > 100 ? '...' : '');
               }
             } catch (e) {
-              console.log('Could not parse blob data:', e.message);
+              logger.info('Could not parse blob data:', e.message);
             }
           }
         } catch (e) {
-          console.log('Could not read blobs:', e.message);
+          logger.info('Could not read blobs:', e.message);
         }
 
         await db.close();
@@ -537,7 +539,7 @@ router.get('/sessions', async (req, res) => {
         sessions.push(sessionData);
         
       } catch (error) {
-        console.log(`Could not read session ${sessionId}:`, error.message);
+        logger.info(`Could not read session ${sessionId}:`, error.message);
       }
     }
 
@@ -568,7 +570,7 @@ router.get('/sessions', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error reading Cursor sessions:', error);
+    logger.error('Error reading Cursor sessions:', error);
     res.status(500).json({ 
       error: 'Failed to read Cursor sessions', 
       details: error.message 
@@ -614,7 +616,7 @@ router.get('/sessions/:sessionId', async (req, res) => {
           const parsed = JSON.parse(blob.data.toString('utf8'));
           jsonBlobs.push({ ...blob, parsed });
         } catch (e) {
-          console.log('Failed to parse JSON blob:', blob.rowid);
+          logger.info('Failed to parse JSON blob:', blob.rowid);
         }
       } else if (blob.data) { // Protobuf blob - 提取父引用
         const parents = [];
@@ -766,7 +768,7 @@ router.get('/sessions/:sessionId', async (req, res) => {
         }
       } catch (e) {
         // 跳过导致错误的 blob
-        console.log(`Skipping blob ${blob.id}: ${e.message}`);
+        logger.info(`Skipping blob ${blob.id}: ${e.message}`);
       }
     }
     
@@ -784,7 +786,7 @@ router.get('/sessions/:sessionId', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error reading Cursor session:', error);
+    logger.error('Error reading Cursor session:', error);
     res.status(500).json({ 
       error: 'Failed to read Cursor session', 
       details: error.message 

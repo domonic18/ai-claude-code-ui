@@ -7,6 +7,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { convertSessionMessages } from '../utils/messageConversion';
 import type { ChatMessage } from '../types';
+import { logger } from '@/shared/utils/logger';
 
 export interface UseSessionLoaderOptions {
   /** Selected project */
@@ -61,20 +62,20 @@ export function useSessionLoader(options: UseSessionLoaderOptions): void {
       }
 
       try {
-        console.log(`[useSessionLoader] Loading messages for session ${selectedSession.id}...`);
+        logger.info(`[useSessionLoader] Loading messages for session ${selectedSession.id}...`);
 
         const response = await authenticatedFetch(
           `/api/projects/${selectedProject.name}/sessions/${selectedSession.id}/messages`
         );
         if (!response.ok) {
-          console.error('Failed to load session messages:', response.status);
+          logger.error('Failed to load session messages:', response.status);
           return;
         }
 
         const responseData = await response.json();
         const rawMessages = responseData.data?.messages || [];
 
-        console.log(`[useSessionLoader] Raw messages from API:`, rawMessages.length, rawMessages);
+        logger.info(`[useSessionLoader] Raw messages from API:`, rawMessages.length, rawMessages);
 
         // Convert API messages to ChatMessage format using the conversion utility
         // This handles tool result attachment, HTML entity decoding, and message filtering
@@ -82,9 +83,9 @@ export function useSessionLoader(options: UseSessionLoaderOptions): void {
 
         onSetMessages(convertedMessages);
         loadedSessionRef.current = selectedSession.id;
-        console.log(`[useSessionLoader] Loaded ${convertedMessages.length} messages for session ${selectedSession.id}`);
+        logger.info(`[useSessionLoader] Loaded ${convertedMessages.length} messages for session ${selectedSession.id}`);
       } catch (error) {
-        console.error('Error loading session messages:', error);
+        logger.error('Error loading session messages:', error);
       }
     };
 

@@ -6,6 +6,8 @@ import { promises as fs } from 'fs';
 import { extractProjectDirectory } from '../../services/projects/index.js';
 import { queryClaudeSDK } from '../../services/execution/claude/index.js';
 import { spawnCursor } from '../../services/execution/cursor/index.js';
+import { createLogger, sanitizePreview } from '../../utils/logger.js';
+const logger = createLogger('routes/api/git');
 
 const router = express.Router();
 const execAsync = promisify(exec);
@@ -15,7 +17,7 @@ async function getActualProjectPath(projectName) {
   try {
     return await extractProjectDirectory(projectName);
   } catch (error) {
-    console.error(`Error extracting project directory for ${projectName}:`, error);
+    logger.error(`Error extracting project directory for ${projectName}:`, error);
     // 回退到旧方法
     return projectName.replace(/-/g, '/');
   }
@@ -141,7 +143,7 @@ router.get('/status', async (req, res) => {
       untracked
     });
   } catch (error) {
-    console.error('Git status error:', error);
+    logger.error('Git status error:', error);
     res.json({
       error: error.message.includes('not a git repository') || error.message.includes('Project directory is not a git repository')
         ? error.message
@@ -210,7 +212,7 @@ router.get('/diff', async (req, res) => {
 
     res.json({ diff });
   } catch (error) {
-    console.error('Git diff error:', error);
+    logger.error('Git diff error:', error);
     res.json({ error: error.message });
   }
 });
@@ -273,7 +275,7 @@ router.get('/file-with-diff', async (req, res) => {
       isUntracked
     });
   } catch (error) {
-    console.error('Git file-with-diff error:', error);
+    logger.error('Git file-with-diff error:', error);
     res.json({ error: error.message });
   }
 });
@@ -308,7 +310,7 @@ router.post('/initial-commit', async (req, res) => {
 
     res.json({ success: true, output: stdout, message: 'Initial commit created successfully' });
   } catch (error) {
-    console.error('Git initial commit error:', error);
+    logger.error('Git initial commit error:', error);
 
     // 处理没有任何内容可提交的情况
     if (error.message.includes('nothing to commit')) {
@@ -346,7 +348,7 @@ router.post('/commit', async (req, res) => {
     
     res.json({ success: true, output: stdout });
   } catch (error) {
-    console.error('Git commit error:', error);
+    logger.error('Git commit error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -388,7 +390,7 @@ router.get('/branches', async (req, res) => {
     
     res.json({ branches });
   } catch (error) {
-    console.error('Git branches error:', error);
+    logger.error('Git branches error:', error);
     res.json({ error: error.message });
   }
 });
@@ -409,7 +411,7 @@ router.post('/checkout', async (req, res) => {
     
     res.json({ success: true, output: stdout });
   } catch (error) {
-    console.error('Git checkout error:', error);
+    logger.error('Git checkout error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -430,7 +432,7 @@ router.post('/create-branch', async (req, res) => {
     
     res.json({ success: true, output: stdout });
   } catch (error) {
-    console.error('Git create branch error:', error);
+    logger.error('Git create branch error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -481,7 +483,7 @@ router.get('/commits', async (req, res) => {
     
     res.json({ commits });
   } catch (error) {
-    console.error('Git commits error:', error);
+    logger.error('Git commits error:', error);
     res.json({ error: error.message });
   }
 });
@@ -505,7 +507,7 @@ router.get('/commit-diff', async (req, res) => {
     
     res.json({ diff: stdout });
   } catch (error) {
-    console.error('Git commit diff error:', error);
+    logger.error('Git commit diff error:', error);
     res.json({ error: error.message });
   }
 });
@@ -538,7 +540,7 @@ router.post('/generate-commit-message', async (req, res) => {
           diffContext += `\n--- ${file} ---\n${stdout}`;
         }
       } catch (error) {
-        console.error(`Error getting diff for ${file}:`, error);
+        logger.error(`Error getting diff for ${file}:`, error);
       }
     }
 
@@ -557,7 +559,7 @@ router.post('/generate-commit-message', async (req, res) => {
             diffContext += `\n--- ${file} (new directory) ---\n`;
           }
         } catch (error) {
-          console.error(`Error reading file ${file}:`, error);
+          logger.error(`Error reading file ${file}:`, error);
         }
       }
     }
@@ -567,7 +569,7 @@ router.post('/generate-commit-message', async (req, res) => {
 
     res.json({ message });
   } catch (error) {
-    console.error('Generate commit message error:', error);
+    logger.error('Generate commit message error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -608,18 +610,16 @@ Generate the commit message:`;
       send: (data) => {
         try {
           const parsed = typeof data === 'string' ? JSON.parse(data) : data;
-          console.log('🔍 Writer received message type:', parsed.type);
+          logger.debug({ messageType: parsed.type }, '[git] Writer received message');
 
           // 处理来自 Claude SDK 和 Cursor CLI 的不同消息格式
           // Claude SDK 发送: {type: 'claude-response', data: {message: {content: [...]}}}
           if (parsed.type === 'claude-response' && parsed.data) {
             const message = parsed.data.message || parsed.data;
-            console.log('📦 Claude response message:', JSON.stringify(message, null, 2).substring(0, 500));
             if (message.content && Array.isArray(message.content)) {
               // 从内容数组中提取文本
               for (const item of message.content) {
                 if (item.type === 'text' && item.text) {
-                  console.log('✅ Extracted text chunk:', item.text.substring(0, 100));
                   responseText += item.text;
                 }
               }
@@ -627,24 +627,21 @@ Generate the commit message:`;
           }
           // Cursor CLI 发送: {type: 'cursor-output', output: '...'}
           else if (parsed.type === 'cursor-output' && parsed.output) {
-            console.log('✅ Cursor output:', parsed.output.substring(0, 100));
             responseText += parsed.output;
           }
           // 同时处理直接文本消息
           else if (parsed.type === 'text' && parsed.text) {
-            console.log('✅ Direct text:', parsed.text.substring(0, 100));
             responseText += parsed.text;
           }
         } catch (e) {
           // 忽略解析错误
-          console.error('Error parsing writer data:', e);
+          logger.debug({ err: e }, '[git] Error parsing writer data');
         }
       },
       setSessionId: () => {}, // 此用例的无操作
     };
 
-    console.log('🚀 Calling AI agent with provider:', provider);
-    console.log('📝 Prompt length:', prompt.length);
+    logger.info({ provider, promptLength: prompt.length }, '[git] Calling AI agent for commit message');
 
     // 调用相应的代理
     if (provider === 'claude') {
@@ -660,16 +657,16 @@ Generate the commit message:`;
       }, writer);
     }
 
-    console.log('📊 Total response text collected:', responseText.length, 'characters');
-    console.log('📄 Response preview:', responseText.substring(0, 200));
+    logger.info({ responseLength: responseText.length }, '[git] AI response collected');
+    logger.debug({ preview: sanitizePreview(responseText, 100), totalLength: responseText.length }, '[git] Response preview');
 
     // 清理响应
     const cleanedMessage = cleanCommitMessage(responseText);
-    console.log('🧹 Cleaned message:', cleanedMessage.substring(0, 200));
+    logger.debug({ preview: sanitizePreview(cleanedMessage, 100) }, '[git] Cleaned commit message');
 
     return cleanedMessage || 'chore: update files';
   } catch (error) {
-    console.error('Error generating commit message with AI:', error);
+    logger.error({ err: error }, '[git] Error generating commit message with AI');
     // 回退到简单消息
     return `chore: update ${files.length} file${files.length !== 1 ? 's' : ''}`;
   }
@@ -777,7 +774,7 @@ router.get('/remote-status', async (req, res) => {
       isUpToDate: ahead === 0 && behind === 0
     });
   } catch (error) {
-    console.error('Git remote status error:', error);
+    logger.error('Git remote status error:', error);
     res.json({ error: error.message });
   }
 });
@@ -804,14 +801,14 @@ router.post('/fetch', async (req, res) => {
       remoteName = stdout.trim().split('/')[0]; // 提取远程名称
     } catch (error) {
       // 没有上游，尝试从 origin 获取
-      console.log('No upstream configured, using origin as fallback');
+      logger.info('No upstream configured, using origin as fallback');
     }
 
     const { stdout } = await execAsync(`git fetch ${remoteName}`, { cwd: projectPath });
     
     res.json({ success: true, output: stdout || 'Fetch completed successfully', remoteName });
   } catch (error) {
-    console.error('Git fetch error:', error);
+    logger.error('Git fetch error:', error);
     res.status(500).json({ 
       error: 'Fetch failed', 
       details: error.message.includes('Could not resolve hostname') 
@@ -848,7 +845,7 @@ router.post('/pull', async (req, res) => {
       remoteBranch = tracking.split('/').slice(1).join('/'); // 提取分支名称
     } catch (error) {
       // 没有上游，使用回退
-      console.log('No upstream configured, using origin/branch as fallback');
+      logger.info('No upstream configured, using origin/branch as fallback');
     }
 
     const { stdout } = await execAsync(`git pull ${remoteName} ${remoteBranch}`, { cwd: projectPath });
@@ -860,7 +857,7 @@ router.post('/pull', async (req, res) => {
       remoteBranch
     });
   } catch (error) {
-    console.error('Git pull error:', error);
+    logger.error('Git pull error:', error);
 
     // 针对常见拉取场景的增强错误处理
     let errorMessage = 'Pull failed';
@@ -915,7 +912,7 @@ router.post('/push', async (req, res) => {
       remoteBranch = tracking.split('/').slice(1).join('/'); // 提取分支名称
     } catch (error) {
       // 没有上游，使用回退
-      console.log('No upstream configured, using origin/branch as fallback');
+      logger.info('No upstream configured, using origin/branch as fallback');
     }
 
     const { stdout } = await execAsync(`git push ${remoteName} ${remoteBranch}`, { cwd: projectPath });
@@ -927,7 +924,7 @@ router.post('/push', async (req, res) => {
       remoteBranch
     });
   } catch (error) {
-    console.error('Git push error:', error);
+    logger.error('Git push error:', error);
 
     // 针对常见推送场景的增强错误处理
     let errorMessage = 'Push failed';
@@ -1009,7 +1006,7 @@ router.post('/publish', async (req, res) => {
       branch
     });
   } catch (error) {
-    console.error('Git publish error:', error);
+    logger.error('Git publish error:', error);
 
     // 针对常见发布场景的增强错误处理
     let errorMessage = 'Publish failed';
@@ -1077,7 +1074,7 @@ router.post('/discard', async (req, res) => {
     
     res.json({ success: true, message: `Changes discarded for ${file}` });
   } catch (error) {
-    console.error('Git discard error:', error);
+    logger.error('Git discard error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1120,7 +1117,7 @@ router.post('/delete-untracked', async (req, res) => {
       res.json({ success: true, message: `Untracked file ${file} deleted successfully` });
     }
   } catch (error) {
-    console.error('Git delete untracked error:', error);
+    logger.error('Git delete untracked error:', error);
     res.status(500).json({ error: error.message });
   }
 });

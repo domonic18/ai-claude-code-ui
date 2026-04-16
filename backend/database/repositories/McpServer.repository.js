@@ -9,6 +9,8 @@
  */
 
 import { getDatabase } from '../connection.js';
+import { createLogger } from '../../utils/logger.js';
+const logger = createLogger('database/repositories/McpServer.repository');
 
 /**
  * MCP 服务器数据仓库类
@@ -30,7 +32,7 @@ export class McpServer {
 
       return rows.map(row => this._rowToObject(row));
     } catch (error) {
-      console.error(`[McpServer] Error getting servers for user ${userId}:`, error);
+      logger.error(`[McpServer] Error getting servers for user ${userId}:`, error);
       throw new Error(`Failed to get MCP servers: ${error.message}`);
     }
   }
@@ -53,7 +55,7 @@ export class McpServer {
 
       return this._rowToObject(row);
     } catch (error) {
-      console.error(`[McpServer] Error getting server ${id}:`, error);
+      logger.error(`[McpServer] Error getting server ${id}:`, error);
       throw new Error(`Failed to get MCP server: ${error.message}`);
     }
   }
@@ -78,7 +80,7 @@ export class McpServer {
 
       return this._rowToObject(row);
     } catch (error) {
-      console.error(`[McpServer] Error getting server ${name} for user ${userId}:`, error);
+      logger.error(`[McpServer] Error getting server ${name} for user ${userId}:`, error);
       throw new Error(`Failed to get MCP server by name: ${error.message}`);
     }
   }
@@ -110,14 +112,14 @@ export class McpServer {
       );
 
       const id = this.lastInsertRowId();
-      console.log(`[McpServer] Created server "${data.name}" for user ${userId} with id ${id}`);
+      logger.info(`[McpServer] Created server "${data.name}" for user ${userId} with id ${id}`);
 
       return await this.getById(id);
     } catch (error) {
       if (error.message && error.message.includes('UNIQUE constraint')) {
         throw new Error(`MCP server with name "${data.name}" already exists`);
       }
-      console.error(`[McpServer] Error creating server for user ${userId}:`, error);
+      logger.error(`[McpServer] Error creating server for user ${userId}:`, error);
       throw new Error(`Failed to create MCP server: ${error.message}`);
     }
   }
@@ -173,13 +175,13 @@ export class McpServer {
         throw new Error('MCP server not found');
       }
 
-      console.log(`[McpServer] Updated server ${id}`);
+      logger.info(`[McpServer] Updated server ${id}`);
       return await this.getById(id);
     } catch (error) {
       if (error.message && error.message.includes('UNIQUE constraint')) {
         throw new Error(`MCP server with name "${data.name}" already exists`);
       }
-      console.error(`[McpServer] Error updating server ${id}:`, error);
+      logger.error(`[McpServer] Error updating server ${id}:`, error);
       throw new Error(`Failed to update MCP server: ${error.message}`);
     }
   }
@@ -199,13 +201,13 @@ export class McpServer {
       const result = stmt.run(id);
 
       if (result.changes > 0) {
-        console.log(`[McpServer] Deleted server ${id}`);
+        logger.info(`[McpServer] Deleted server ${id}`);
         return true;
       }
 
       return false;
     } catch (error) {
-      console.error(`[McpServer] Error deleting server ${id}:`, error);
+      logger.error(`[McpServer] Error deleting server ${id}:`, error);
       throw new Error(`Failed to delete MCP server: ${error.message}`);
     }
   }
@@ -226,7 +228,7 @@ export class McpServer {
 
       return !!row;
     } catch (error) {
-      console.error(`[McpServer] Error checking ownership for server ${id}:`, error);
+      logger.error(`[McpServer] Error checking ownership for server ${id}:`, error);
       return false;
     }
   }
@@ -247,7 +249,7 @@ export class McpServer {
 
       return rows.map(row => this._rowToObject(row));
     } catch (error) {
-      console.error(`[McpServer] Error getting enabled servers for user ${userId}:`, error);
+      logger.error(`[McpServer] Error getting enabled servers for user ${userId}:`, error);
       throw new Error(`Failed to get enabled MCP servers: ${error.message}`);
     }
   }
@@ -277,10 +279,10 @@ export class McpServer {
         WHERE id = ?
       `).run(newEnabled, now, id);
 
-      console.log(`[McpServer] Toggled server ${id} enabled to ${newEnabled}`);
+      logger.info(`[McpServer] Toggled server ${id} enabled to ${newEnabled}`);
       return await this.getById(id);
     } catch (error) {
-      console.error(`[McpServer] Error toggling server ${id}:`, error);
+      logger.error(`[McpServer] Error toggling server ${id}:`, error);
       throw new Error(`Failed to toggle MCP server: ${error.message}`);
     }
   }
@@ -330,7 +332,7 @@ export class McpServer {
     try {
       return JSON.parse(jsonString);
     } catch (error) {
-      console.error('[McpServer] Error parsing JSON:', error);
+      logger.error('[McpServer] Error parsing JSON:', error);
       return defaultValue;
     }
   }

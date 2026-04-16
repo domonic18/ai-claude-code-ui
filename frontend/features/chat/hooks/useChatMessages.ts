@@ -10,6 +10,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import type { ChatMessage } from '../types';
 import { MAX_STORED_MESSAGES, MIN_STORED_MESSAGES } from '../constants';
+import { logger } from '@/shared/utils/logger';
 
 /**
  * Safe localStorage utility to handle quota exceeded errors
@@ -23,19 +24,19 @@ const safeLocalStorage = {
           const parsed = JSON.parse(value);
           // Limit to last MAX_STORED_MESSAGES to prevent storage bloat
           if (Array.isArray(parsed) && parsed.length > MAX_STORED_MESSAGES) {
-            console.warn(`Truncating chat history for ${key} from ${parsed.length} to ${MAX_STORED_MESSAGES} messages`);
+            logger.warn(`Truncating chat history for ${key} from ${parsed.length} to ${MAX_STORED_MESSAGES} messages`);
             const truncated = parsed.slice(-MAX_STORED_MESSAGES);
             value = JSON.stringify(truncated);
           }
         } catch (parseError) {
-          console.warn('Could not parse chat messages for truncation:', parseError);
+          logger.warn('Could not parse chat messages for truncation:', parseError);
         }
       }
 
       localStorage.setItem(key, value);
     } catch (error) {
       if (error instanceof Error && error.name === 'QuotaExceededError') {
-        console.warn('localStorage quota exceeded, clearing old data');
+        logger.warn('localStorage quota exceeded, clearing old data');
         // Clear old chat messages to free up space
         const keys = Object.keys(localStorage);
         const chatKeys = keys.filter(k => k.startsWith('chat_messages_')).sort();
@@ -44,7 +45,7 @@ const safeLocalStorage = {
         if (chatKeys.length > 3) {
           chatKeys.slice(0, chatKeys.length - 3).forEach(k => {
             localStorage.removeItem(k);
-            console.log(`Removed old chat data: ${k}`);
+            logger.info(`Removed old chat data: ${k}`);
           });
         }
 
@@ -58,7 +59,7 @@ const safeLocalStorage = {
         try {
           localStorage.setItem(key, value);
         } catch (retryError) {
-          console.error('Failed to save to localStorage even after cleanup:', retryError);
+          logger.error('Failed to save to localStorage even after cleanup:', retryError);
           // Last resort: Try to save just the last MIN_STORED_MESSAGES
           if (key.startsWith('chat_messages_') && typeof value === 'string') {
             try {
@@ -66,15 +67,15 @@ const safeLocalStorage = {
               if (Array.isArray(parsed) && parsed.length > MIN_STORED_MESSAGES) {
                 const minimal = parsed.slice(-MIN_STORED_MESSAGES);
                 localStorage.setItem(key, JSON.stringify(minimal));
-                console.warn(`Saved only last ${MIN_STORED_MESSAGES} messages due to quota constraints`);
+                logger.warn(`Saved only last ${MIN_STORED_MESSAGES} messages due to quota constraints`);
               }
             } catch (finalError) {
-              console.error('Final save attempt failed:', finalError);
+              logger.error('Final save attempt failed:', finalError);
             }
           }
         }
       } else {
-        console.error('localStorage error:', error);
+        logger.error('localStorage error:', error);
       }
     }
   },
@@ -82,7 +83,7 @@ const safeLocalStorage = {
     try {
       return localStorage.getItem(key);
     } catch (error) {
-      console.error('localStorage getItem error:', error);
+      logger.error('localStorage getItem error:', error);
       return null;
     }
   },
@@ -90,7 +91,7 @@ const safeLocalStorage = {
     try {
       localStorage.removeItem(key);
     } catch (error) {
-      console.error('localStorage removeItem error:', error);
+      logger.error('localStorage removeItem error:', error);
     }
   }
 };
@@ -145,7 +146,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
         try {
           return JSON.parse(saved);
         } catch (e) {
-          console.error('Error parsing saved messages:', e);
+          logger.error('Error parsing saved messages:', e);
         }
       }
     }
@@ -171,7 +172,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
           setMessages(parsed);
           return;
         } catch (e) {
-          console.error('Error parsing saved messages on project change:', e);
+          logger.error('Error parsing saved messages on project change:', e);
         }
       }
     }

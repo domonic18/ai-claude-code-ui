@@ -12,6 +12,8 @@ import { ContainerSessionManager } from '../../sessions/managers/index.js';
 import { CONTAINER } from '../../../config/config.js';
 import { loadProjectConfig } from '../config/index.js';
 import { getProjectsInContainer } from '../managers/ContainerProjectManager.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/projects/discovery/ClaudeDiscovery');
 
 /**
  * Claude 项目发现器
@@ -43,14 +45,14 @@ export class ClaudeDiscovery extends BaseDiscovery {
   async getProjects(options = {}) {
     const { userId } = options;
 
-    console.log(`[ClaudeDiscovery] getProjects - userId: ${userId}`);
+    logger.info(`[ClaudeDiscovery] getProjects - userId: ${userId}`);
 
     try {
       // 容器模式：使用容器的项目发现服务
       if (!userId) {
         throw new Error('userId is required');
       }
-      console.log(`[ClaudeDiscovery] Using container mode for user ${userId}`);
+      logger.info(`[ClaudeDiscovery] Using container mode for user ${userId}`);
       return await getProjectsInContainer(userId);
 
     } catch (error) {

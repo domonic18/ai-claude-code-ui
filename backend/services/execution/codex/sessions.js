@@ -9,6 +9,8 @@ import { promises as fs } from 'fs';
 import readline from 'readline';
 import path from 'path';
 import os from 'os';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/execution/codex/sessions');
 
 /**
  * 解析 Codex 会话 JSONL 文件以提取元数据
@@ -81,7 +83,7 @@ async function parseCodexSessionFile(filePath) {
     return null;
 
   } catch (error) {
-    console.error('Error parsing Codex session file:', error);
+    logger.error('Error parsing Codex session file:', error);
     return null;
   }
 }
@@ -149,7 +151,7 @@ async function getCodexSessions(projectPath) {
           });
         }
       } catch (error) {
-        console.warn(`Could not parse Codex session file ${filePath}:`, error.message);
+        logger.warn(`Could not parse Codex session file ${filePath}:`, error.message);
       }
     }
 
@@ -160,7 +162,7 @@ async function getCodexSessions(projectPath) {
     return sessions.slice(0, 5);
 
   } catch (error) {
-    console.error('Error fetching Codex sessions:', error);
+    logger.error('Error fetching Codex sessions:', error);
     return [];
   }
 }
@@ -202,7 +204,7 @@ async function deleteCodexSession(sessionId) {
 
     throw new Error(`Codex session file not found for session ${sessionId}`);
   } catch (error) {
-    console.error(`Error deleting Codex session ${sessionId}:`, error);
+    logger.error(`Error deleting Codex session ${sessionId}:`, error);
     throw error;
   }
 }

@@ -7,6 +7,8 @@
 
 import { promises as fsPromises } from 'fs';
 import path from 'path';
+import { createLogger } from './logger.js';
+const logger = createLogger('utils/file-tree');
 
 /**
  * 将权限位转换为 rwx 格式
@@ -85,7 +87,7 @@ export async function getFileTree(dirPath, maxDepth = 3, currentDepth = 0, showH
   } catch (error) {
     // 仅记录非权限错误以避免垃圾信息
     if (error.code !== 'EACCES' && error.code !== 'EPERM') {
-      console.error('读取目录错误:', error);
+      logger.error('读取目录错误:', error);
     }
   }
 

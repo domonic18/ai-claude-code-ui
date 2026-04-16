@@ -12,6 +12,9 @@ import { authenticateWebSocket } from '../middleware/auth.js';
 import { handleChatConnection } from './handlers/chat.js';
 import { handleShellConnection } from './handlers/shell.js';
 import { SERVER } from '../config/config.js';
+import { createLogger } from '../utils/logger.js';
+
+const logger = createLogger('websocket/server');
 
 /**
  * 创建并配置 WebSocket 服务器
@@ -25,17 +28,17 @@ export function createWebSocketServer(server, connectedClients, ptySessionsMap) 
     const wss = new WebSocketServer({
         server,
         verifyClient: (info) => {
-            console.log('WebSocket connection attempt to:', info.req.url);
+            logger.debug('WebSocket connection attempt to:', info.req.url);
 
             // 平台模式：始终允许连接
             if (SERVER.isPlatform) {
                 const user = authenticateWebSocket(null); // 将返回第一个用户
                 if (!user) {
-                    console.log('[WARN] Platform mode: No user found in database');
+                    logger.warn('[WARN] Platform mode: No user found in database');
                     return false;
                 }
                 info.req.user = user;
-                console.log('[OK] Platform mode WebSocket authenticated for user:', user.username);
+                logger.info('[OK] Platform mode WebSocket authenticated for user:', user.username);
                 return true;
             }
 
@@ -48,13 +51,13 @@ export function createWebSocketServer(server, connectedClients, ptySessionsMap) 
             // 验证令牌
             const user = authenticateWebSocket(token);
             if (!user) {
-                console.log('[WARN] WebSocket authentication failed');
+                logger.warn('[WARN] WebSocket authentication failed');
                 return false;
             }
 
             // 在请求中存储用户信息供后续使用
             info.req.user = user;
-            console.log('[OK] WebSocket authenticated for user:', user.username);
+            logger.info('[OK] WebSocket authenticated for user:', user.username);
             return true;
         }
     });
@@ -62,7 +65,7 @@ export function createWebSocketServer(server, connectedClients, ptySessionsMap) 
     // 基于 URL 路径设置连接路由
     wss.on('connection', (ws, request) => {
         const url = request.url;
-        console.log('[INFO] Client connected to:', url);
+        logger.info('[INFO] Client connected to:', url);
 
         // 将用户信息从请求传递到 WebSocket 对象
         ws.user = request.user;
@@ -76,7 +79,7 @@ export function createWebSocketServer(server, connectedClients, ptySessionsMap) 
         } else if (pathname === '/ws') {
             handleChatConnection(ws, connectedClients);
         } else {
-            console.log('[WARN] Unknown WebSocket path:', pathname);
+            logger.warn('[WARN] Unknown WebSocket path:', pathname);
             ws.close();
         }
     });

@@ -9,6 +9,8 @@
  */
 
 import { McpServer } from '../../database/repositories/McpServer.repository.js';
+import { createLogger } from '../../utils/logger.js';
+const logger = createLogger('services/mcp/McpService');
 
 /**
  * MCP 服务类
@@ -22,10 +24,10 @@ export class McpService {
   static async getServers(userId) {
     try {
       const servers = await McpServer.getByUserId(userId);
-      console.log(`[McpService] Retrieved ${servers.length} servers for user ${userId}`);
+      logger.info(`[McpService] Retrieved ${servers.length} servers for user ${userId}`);
       return servers;
     } catch (error) {
-      console.error(`[McpService] Error getting servers for user ${userId}:`, error);
+      logger.error(`[McpService] Error getting servers for user ${userId}:`, error);
       throw new Error(`Failed to get MCP servers: ${error.message}`);
     }
   }
@@ -38,10 +40,10 @@ export class McpService {
   static async getEnabledServers(userId) {
     try {
       const servers = await McpServer.getEnabled(userId);
-      console.log(`[McpService] Retrieved ${servers.length} enabled servers for user ${userId}`);
+      logger.info(`[McpService] Retrieved ${servers.length} enabled servers for user ${userId}`);
       return servers;
     } catch (error) {
-      console.error(`[McpService] Error getting enabled servers for user ${userId}:`, error);
+      logger.error(`[McpService] Error getting enabled servers for user ${userId}:`, error);
       throw new Error(`Failed to get enabled MCP servers: ${error.message}`);
     }
   }
@@ -84,10 +86,10 @@ export class McpService {
       }
 
       const server = await McpServer.create(userId, data);
-      console.log(`[McpService] Created MCP server "${data.name}" for user ${userId}`);
+      logger.info(`[McpService] Created MCP server "${data.name}" for user ${userId}`);
       return server;
     } catch (error) {
-      console.error(`[McpService] Error creating server for user ${userId}:`, error);
+      logger.error(`[McpService] Error creating server for user ${userId}:`, error);
       throw error;
     }
   }
@@ -119,10 +121,10 @@ export class McpService {
       this.validateConfig({ ...server, ...data });
 
       const updated = await McpServer.update(id, data);
-      console.log(`[McpService] Updated MCP server ${id} for user ${userId}`);
+      logger.info(`[McpService] Updated MCP server ${id} for user ${userId}`);
       return updated;
     } catch (error) {
-      console.error(`[McpService] Error updating server ${id} for user ${userId}:`, error);
+      logger.error(`[McpService] Error updating server ${id} for user ${userId}:`, error);
       throw error;
     }
   }
@@ -143,11 +145,11 @@ export class McpService {
 
       const success = await McpServer.delete(id);
       if (success) {
-        console.log(`[McpService] Deleted MCP server ${id} for user ${userId}`);
+        logger.info(`[McpService] Deleted MCP server ${id} for user ${userId}`);
       }
       return success;
     } catch (error) {
-      console.error(`[McpService] Error deleting server ${id} for user ${userId}:`, error);
+      logger.error(`[McpService] Error deleting server ${id} for user ${userId}:`, error);
       throw error;
     }
   }
@@ -162,7 +164,7 @@ export class McpService {
     try {
       const server = await this.getServer(id, userId);
 
-      console.log(`[McpService] Testing MCP server "${server.name}" (${server.type})`);
+      logger.info(`[McpService] Testing MCP server "${server.name}" (${server.type})`);
 
       // 动态导入McpClient
       const { McpClient } = await import('./McpClient.js');
@@ -170,11 +172,11 @@ export class McpService {
 
       const result = await client.test();
 
-      console.log(`[McpService] Test result for "${server.name}":`, result);
+      logger.info(`[McpService] Test result for "${server.name}":`, result);
 
       return result;
     } catch (error) {
-      console.error(`[McpService] Error testing server ${id}:`, error);
+      logger.error(`[McpService] Error testing server ${id}:`, error);
       return {
         success: false,
         status: 'failed',
@@ -193,7 +195,7 @@ export class McpService {
     try {
       const server = await this.getServer(id, userId);
 
-      console.log(`[McpService] Discovering tools for MCP server "${server.name}" (${server.type})`);
+      logger.info(`[McpService] Discovering tools for MCP server "${server.name}" (${server.type})`);
 
       // 动态导入McpClient
       const { McpClient } = await import('./McpClient.js');
@@ -201,11 +203,11 @@ export class McpService {
 
       const result = await client.discoverTools();
 
-      console.log(`[McpService] Discovery result for "${server.name}":`, result);
+      logger.info(`[McpService] Discovery result for "${server.name}":`, result);
 
       return result;
     } catch (error) {
-      console.error(`[McpService] Error discovering tools for server ${id}:`, error);
+      logger.error(`[McpService] Error discovering tools for server ${id}:`, error);
       return {
         success: false,
         error: error.message,
@@ -224,10 +226,10 @@ export class McpService {
     try {
       const server = await this.getServer(id, userId);
       const updated = await McpServer.toggleEnabled(id);
-      console.log(`[McpService] Toggled MCP server "${server.name}" to ${updated.enabled ? 'enabled' : 'disabled'}`);
+      logger.info(`[McpService] Toggled MCP server "${server.name}" to ${updated.enabled ? 'enabled' : 'disabled'}`);
       return updated;
     } catch (error) {
-      console.error(`[McpService] Error toggling server ${id}:`, error);
+      logger.error(`[McpService] Error toggling server ${id}:`, error);
       throw error;
     }
   }
@@ -305,7 +307,7 @@ export class McpService {
       };
     }
 
-    console.log(`[McpService] Generated SDK config for user ${userId} with ${Object.keys(config).length} servers`);
+    logger.info(`[McpService] Generated SDK config for user ${userId} with ${Object.keys(config).length} servers`);
     return config;
   }
 }

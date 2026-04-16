@@ -20,7 +20,7 @@ sizes.forEach(size => {
   const pngPath = \`./icons/icon-\${size}x\${size}.png\`;
   if (fs.existsSync(svgPath)) {
     sharp(svgPath).png().toFile(pngPath);
-    console.log(\`Converted \${svgPath} to \${pngPath}\`);
+    logger.info(\`Converted \${svgPath} to \${pngPath}\`);
   }
 });
 "

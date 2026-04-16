@@ -4,6 +4,8 @@ import { authenticateToken } from '../../middleware/auth.js';
 import { getSystemGitConfig } from '../../utils/gitConfig.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { createLogger } from '../../utils/logger.js';
+const logger = createLogger('routes/core/users');
 
 const { User } = repositories;
 
@@ -23,7 +25,7 @@ router.get('/git-config', authenticateToken, async (req, res) => {
       if (systemConfig.git_name || systemConfig.git_email) {
         User.updateGitConfig(userId, systemConfig.git_name, systemConfig.git_email);
         gitConfig = systemConfig;
-        console.log(`Auto-populated git config from system for user ${userId}: ${systemConfig.git_name} <${systemConfig.git_email}>`);
+        logger.info(`Auto-populated git config from system for user ${userId}: ${systemConfig.git_name} <${systemConfig.git_email}>`);
       }
     }
 
@@ -36,7 +38,7 @@ router.get('/git-config', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error getting git config:', error);
+    logger.error('Error getting git config:', error);
     res.status(500).json({ error: 'Failed to get git configuration' });
   }
 });
@@ -62,9 +64,9 @@ router.post('/git-config', authenticateToken, async (req, res) => {
     try {
       await execAsync(`git config --global user.name "${gitName.replace(/"/g, '\\"')}"`);
       await execAsync(`git config --global user.email "${gitEmail.replace(/"/g, '\\"')}"`);
-      console.log(`Applied git config globally: ${gitName} <${gitEmail}>`);
+      logger.info(`Applied git config globally: ${gitName} <${gitEmail}>`);
     } catch (gitError) {
-      console.error('Error applying git config:', gitError);
+      logger.error('Error applying git config:', gitError);
     }
 
     // 标准响应格式：{success: true, data: {...}}
@@ -76,7 +78,7 @@ router.post('/git-config', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error updating git config:', error);
+    logger.error('Error updating git config:', error);
     res.status(500).json({ error: 'Failed to update git configuration' });
   }
 });
@@ -94,7 +96,7 @@ router.post('/complete-onboarding', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error completing onboarding:', error);
+    logger.error('Error completing onboarding:', error);
     res.status(500).json({ error: 'Failed to complete onboarding' });
   }
 });
@@ -112,7 +114,7 @@ router.get('/onboarding-status', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error checking onboarding status:', error);
+    logger.error('Error checking onboarding status:', error);
     res.status(500).json({ error: 'Failed to check onboarding status' });
   }
 });

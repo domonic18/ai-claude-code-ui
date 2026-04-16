@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, Save, Brain, Loader2, CheckCircle } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import { memoryService } from '@/shared/services/memoryService';
+import { logger } from '@/shared/utils/logger';
 
 interface MemoryData {
   content: string;
@@ -38,7 +39,7 @@ export function MemoryPage() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load memory';
       setError(errorMessage);
-      console.error('[MemoryPage] Error loading memory:', err);
+      logger.error('[MemoryPage] Error loading memory:', err);
     } finally {
       setIsLoading(false);
     }
@@ -59,7 +60,7 @@ export function MemoryPage() {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save memory';
       setError(errorMessage);
       setIsSaving(false);
-      console.error('[MemoryPage] Error saving memory:', err);
+      logger.error('[MemoryPage] Error saving memory:', err);
     }
   }, [content]);
 

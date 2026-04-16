@@ -13,6 +13,8 @@ import {
   validateNewWorkspace
 } from './path-validator.js';
 import {
+import { createLogger } from '../../utils/logger.js';
+const logger = createLogger('services/workspace/creator');
   cloneGitHubRepository,
   getGithubTokenById
 } from './github-service.js';
@@ -125,7 +127,7 @@ export async function createNewWorkspace(workspacePath, options) {
         try {
           await fs.rm(absolutePath, { recursive: true, force: true });
         } catch (cleanupError) {
-          console.error('Failed to clean up directory after clone failure:', cleanupError);
+          logger.error('Failed to clean up directory after clone failure:', cleanupError);
         }
         throw error;
       }

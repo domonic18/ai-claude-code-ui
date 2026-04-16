@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { logger } from '@/shared/utils/logger';
 
 export interface UseAudioRecorderResult {
   isRecording: boolean;
@@ -62,31 +63,31 @@ export function useAudioRecorder(): UseAudioRecorderResult {
       };
 
       recorder.onerror = (event: Event) => {
-        console.error('MediaRecorder error:', event);
+        logger.error('MediaRecorder error:', event);
         setError('Recording failed');
         setRecording(false);
       };
 
       recorder.start();
       setRecording(true);
-      console.log('Recording started');
+      logger.info('Recording started');
     } catch (err: any) {
-      console.error('Failed to start recording:', err);
+      logger.error('Failed to start recording:', err);
       setError(err.message || 'Failed to start recording');
       setRecording(false);
     }
   }, []);
 
   const stop = useCallback(() => {
-    console.log('Stop called, recorder state:', mediaRecorderRef.current?.state);
+    logger.info('Stop called, recorder state:', mediaRecorderRef.current?.state);
 
     try {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.stop();
-        console.log('Recording stopped');
+        logger.info('Recording stopped');
       }
     } catch (err) {
-      console.error('Error stopping recorder:', err);
+      logger.error('Error stopping recorder:', err);
     }
 
     setRecording(false);

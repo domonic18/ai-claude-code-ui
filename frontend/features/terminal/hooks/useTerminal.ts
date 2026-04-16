@@ -13,6 +13,7 @@ import type {
   TerminalOptions,
   TerminalTheme
 } from '../types';
+import { logger } from '@/shared/utils/logger';
 
 // Stable empty array reference to prevent unnecessary re-renders
 const EMPTY_ARGS: string[] = [];
@@ -153,7 +154,7 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
         data: input,
       }));
     } catch (err) {
-      console.error('Failed to write input:', err);
+      logger.error('Failed to write input:', err);
     }
   }, [isConnected]);
 
@@ -172,7 +173,7 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
         rows,
       }));
     } catch (err) {
-      console.error('Failed to resize terminal:', err);
+      logger.error('Failed to resize terminal:', err);
     }
   }, [isConnected]);
 
@@ -218,7 +219,7 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
         signal: 'SIGTERM',
       }));
     } catch (err) {
-      console.error('Failed to kill process:', err);
+      logger.error('Failed to kill process:', err);
     }
   }, [isConnected]);
 

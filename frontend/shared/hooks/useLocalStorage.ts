@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { logger } from '@/shared/utils/logger';
 
 /**
  * Custom hook to persist state in localStorage with TypeScript support.
@@ -17,7 +18,7 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val
       const item = window.localStorage.getItem(key);
       return item ? JSON.parse(item) : initialValue;
     } catch (error) {
-      console.log(error);
+      logger.info(error);
       return initialValue;
     }
   });
@@ -32,7 +33,7 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val
       window.localStorage.setItem(key, JSON.stringify(valueToStore));
       setStoredValue(valueToStore);
     } catch (error) {
-      console.log(error);
+      logger.info(error);
     }
   };
 

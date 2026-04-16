@@ -541,7 +541,7 @@ function checkStorageUsage() {
     const size = getDirSize(userPath);
     const sizeGB = (size / (1024 ** 3)).toFixed(2);
 
-    console.log(`${userDir}: ${sizeGB} GB`);
+    logger.info(`${userDir}: ${sizeGB} GB`);
 
     // 警告阈值
     if (size > 20 * (1024 ** 3)) {

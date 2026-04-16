@@ -9,6 +9,8 @@ import readline from 'readline';
 import path from 'path';
 import os from 'os';
 import { promises as fs } from 'fs';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/execution/codex/messages');
 
 /**
  * 获取特定 Codex 会话的消息（支持分页）
@@ -43,7 +45,7 @@ async function getCodexSessionMessages(sessionId, limit = null, offset = 0) {
     const sessionFilePath = await findSessionFile(codexSessionsDir);
 
     if (!sessionFilePath) {
-      console.warn(`Codex session file not found for session ${sessionId}`);
+      logger.warn(`Codex session file not found for session ${sessionId}`);
       return { messages: [], total: 0, hasMore: false };
     }
 
@@ -246,7 +248,7 @@ async function getCodexSessionMessages(sessionId, limit = null, offset = 0) {
     return { messages, tokenUsage };
 
   } catch (error) {
-    console.error(`Error reading Codex session messages for ${sessionId}:`, error);
+    logger.error(`Error reading Codex session messages for ${sessionId}:`, error);
     return { messages: [], total: 0, hasMore: false };
   }
 }

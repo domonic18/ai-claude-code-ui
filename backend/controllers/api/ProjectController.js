@@ -12,6 +12,8 @@ import { ClaudeDiscovery } from '../../services/projects/discovery/index.js';
 import { NotFoundError, ValidationError } from '../../middleware/error-handler.middleware.js';
 import { CONTAINER } from '../../config/config.js';
 import containerManager from '../../services/container/core/index.js';
+import { createLogger } from '../../utils/logger.js';
+const logger = createLogger('controllers/api/ProjectController');
 
 /**
  * 项目控制器
@@ -391,7 +393,7 @@ export class ProjectController extends BaseController {
             try {
               await containerManager.execInContainer(userId, ['rm', '-rf', containerPath]);
             } catch (cleanupError) {
-              console.error('Failed to clean up workspace:', cleanupError);
+              logger.error('Failed to clean up workspace:', cleanupError);
             }
             throw new ValidationError(`Failed to create workspace: ${error.message}`);
           }

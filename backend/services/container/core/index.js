@@ -20,6 +20,8 @@ import { ContainerResourceMonitor } from './ContainerStats.js';
 import { ContainerCleanupManager } from './ContainerCleanup.js';
 import { ContainerLifecycleManager } from './ContainerLifecycle.js';
 import { CONTAINER } from '../../../config/config.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/container/core/index');
 
 // 导出所有模块
 export { DockerConnectionManager } from './DockerConnection.js';
@@ -63,7 +65,7 @@ class ContainerManager {
 
     // 启动清理间隔
     this.lifecycleManager.loadContainersFromDatabase().catch(err => {
-      console.warn('[ContainerManager] Failed to load containers from database:', err.message);
+      logger.warn('[ContainerManager] Failed to load containers from database:', err.message);
     });
     this.cleanupManager.startCleanupInterval();
 

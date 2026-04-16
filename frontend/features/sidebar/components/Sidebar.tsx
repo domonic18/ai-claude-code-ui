@@ -24,6 +24,7 @@ import type { SidebarProps, ExpandedProjects, SessionProvider } from '../types/s
 import { useProjects } from '../hooks';
 import { useSessions } from '../hooks';
 import { useStarredProjects } from '../hooks';
+import { logger } from '@/shared/utils/logger';
 
 /**
  * Sidebar Component
@@ -206,7 +207,7 @@ export const Sidebar = memo(function Sidebar({
       setEditingProject(null);
       setEditingName('');
     } catch (error) {
-      console.error('Error renaming project:', error);
+      logger.error('Error renaming project:', error);
       // Don't clear editing state on error, allowing user to retry
     }
   }, [renameProject]);
@@ -269,13 +270,13 @@ export const Sidebar = memo(function Sidebar({
         provider: undefined,
       });
     } catch (error: unknown) {
-      console.error('[Sidebar] Error deleting session:', error);
+      logger.error('[Sidebar] Error deleting session:', error);
 
       // Keep dialog open on error to allow user to see what happened
       // You could add error state to the dialog here if needed
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete session. Please try again.';
       // For now, log the error - in a real app you might want to show this in the dialog
-      console.error(errorMessage);
+      logger.error(errorMessage);
     } finally {
       setIsDeleting(false);
     }
@@ -303,7 +304,7 @@ export const Sidebar = memo(function Sidebar({
       setEditingSession(null);
       setEditingSessionName('');
     } catch (error) {
-      console.error('Error updating session summary:', error);
+      logger.error('Error updating session summary:', error);
       // Don't close editing state on error, allowing user to retry
     }
   }, [renameSession, updateSessionSummary]);
@@ -312,7 +313,7 @@ export const Sidebar = memo(function Sidebar({
     // Find the original project from displayProjects (not merged)
     const originalProject = displayProjects.find(p => p.name === project.name);
     if (!originalProject) {
-      console.warn('[Sidebar] Project not found for loading more sessions:', project.name);
+      logger.warn('[Sidebar] Project not found for loading more sessions:', project.name);
       return;
     }
 
@@ -324,7 +325,7 @@ export const Sidebar = memo(function Sidebar({
     const currentSessionCount = baseSessionCount + additionalSessionCount;
     const offset = currentSessionCount;
 
-    console.log('[Sidebar] Loading more sessions:', {
+    logger.info('[Sidebar] Loading more sessions:', {
       projectName: project.name,
       baseSessionCount,
       additionalSessionCount,
@@ -360,7 +361,7 @@ export const Sidebar = memo(function Sidebar({
               }
               setShowNewProject(false);
             } catch (error) {
-              console.error('Error creating project:', error);
+              logger.error('Error creating project:', error);
             }
           }}
         />,

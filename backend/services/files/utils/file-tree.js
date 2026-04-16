@@ -10,6 +10,8 @@ import { PassThrough } from 'stream';
 import containerManager from '../../container/core/index.js';
 import { MAX_TREE_DEPTH } from '../constants.js';
 import { validatePath, buildContainerPath } from './container-path-utils.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/files/utils/file-tree');
 
 /**
  * 清理文件名中的控制字符和特殊字符
@@ -57,7 +59,7 @@ export async function getFileTreeInContainer(userId, dirPath = '.', options = {}
     isContainerProject = false
   } = options;
 
-  console.log('[FileTree] getFileTreeInContainer - userId:', userId, 'dirPath:', dirPath, 'projectPath:', projectPath, 'isContainerProject:', isContainerProject);
+  logger.info('[FileTree] getFileTreeInContainer - userId:', userId, 'dirPath:', dirPath, 'projectPath:', projectPath, 'isContainerProject:', isContainerProject);
 
   // 验证路径
   const { safePath, error } = validatePath(dirPath);
@@ -91,7 +93,7 @@ export async function getFileTreeInContainer(userId, dirPath = '.', options = {}
       });
 
       stderr.on('data', (chunk) => {
-        console.error('[FileTree] STDERR:', chunk.toString());
+        logger.error('[FileTree] STDERR:', chunk.toString());
       });
 
       stream.on('error', (err) => {
@@ -108,7 +110,7 @@ export async function getFileTreeInContainer(userId, dirPath = '.', options = {}
 
             const parts = line.split('|');
             if (parts.length < 4) {
-              console.warn('[FileTree] Skipping malformed line:', JSON.stringify(line));
+              logger.warn('[FileTree] Skipping malformed line:', JSON.stringify(line));
               continue;
             }
 
@@ -119,7 +121,7 @@ export async function getFileTreeInContainer(userId, dirPath = '.', options = {}
 
             // 跳过空文件名
             if (!name || name === '' || name === '.') {
-              console.warn('[FileTree] Skipping empty or invalid filename:', JSON.stringify(rawName));
+              logger.warn('[FileTree] Skipping empty or invalid filename:', JSON.stringify(rawName));
               continue;
             }
 
@@ -133,13 +135,13 @@ export async function getFileTreeInContainer(userId, dirPath = '.', options = {}
             const parsedMtime = parseFloat(mtime);
 
             if (isNaN(parsedSize) || isNaN(parsedMtime)) {
-              console.warn('[FileTree] Skipping line with invalid values:', JSON.stringify(line));
+              logger.warn('[FileTree] Skipping line with invalid values:', JSON.stringify(line));
               continue;
             }
 
             const dateObj = new Date(parsedMtime * 1000);
             if (isNaN(dateObj.getTime())) {
-              console.warn('[FileTree] Skipping line with invalid date:', JSON.stringify(line));
+              logger.warn('[FileTree] Skipping line with invalid date:', JSON.stringify(line));
               continue;
             }
 

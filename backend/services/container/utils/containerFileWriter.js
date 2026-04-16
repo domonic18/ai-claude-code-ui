@@ -12,6 +12,8 @@ import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import path from 'path';
 import tar from 'tar';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/container/utils/containerFileWriter');
 
 /** mkdir 操作超时时间（毫秒） */
 const MKDIR_TIMEOUT = 5000;
@@ -119,12 +121,12 @@ export async function writeFileViaPutArchive(container, containerFilePath, conte
       });
     });
 
-    console.log(`[${logLabel}] File written to container: ${containerFilePath} (${content.length} bytes)`);
+    logger.info(`[${logLabel}] File written to container: ${containerFilePath} (${content.length} bytes)`);
   } finally {
     try {
       await fs.rm(tmpDir, { recursive: true, force: true });
     } catch (e) {
-      console.warn(`[${logLabel}] Failed to clean temp dir: ${tmpDir}`, e.message);
+      logger.warn(`[${logLabel}] Failed to clean temp dir: ${tmpDir}`, e.message);
     }
   }
 }

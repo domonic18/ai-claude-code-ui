@@ -10,6 +10,7 @@
 
 import { api } from '@/shared/services';
 import type { McpServer } from '../types/settings.types';
+import { logger } from '@/shared/utils/logger';
 
 export interface ClaudePermissions {
   skipPermissions: boolean;
@@ -43,14 +44,14 @@ export class SettingsService {
     try {
       const response = await api.user.permissions.get();
       if (!response.ok) {
-        console.warn('[SettingsService] Failed to fetch permissions:', response.statusText);
+        logger.warn('[SettingsService] Failed to fetch permissions:', response.statusText);
         return { skipPermissions: false, allowedTools: [], disallowedTools: [] };
       }
 
       const result = await response.json();
       return result.data || { skipPermissions: false, allowedTools: [], disallowedTools: [] };
     } catch (error) {
-      console.error('[SettingsService] Error fetching permissions:', error);
+      logger.error('[SettingsService] Error fetching permissions:', error);
       return { skipPermissions: false, allowedTools: [], disallowedTools: [] };
     }
   }
@@ -68,7 +69,7 @@ export class SettingsService {
       const result = await response.json();
       return { success: result.success, message: result.message };
     } catch (error) {
-      console.error('[SettingsService] Error updating permissions:', error);
+      logger.error('[SettingsService] Error updating permissions:', error);
       return { success: false };
     }
   }
@@ -82,7 +83,7 @@ export class SettingsService {
     try {
       const response = await api.user.mcpServers.getAll();
       if (!response.ok) {
-        console.warn('[SettingsService] Failed to fetch MCP servers:', response.statusText);
+        logger.warn('[SettingsService] Failed to fetch MCP servers:', response.statusText);
         return [];
       }
 
@@ -93,7 +94,7 @@ export class SettingsService {
       }
       return [];
     } catch (error) {
-      console.error('[SettingsService] Error fetching MCP servers:', error);
+      logger.error('[SettingsService] Error fetching MCP servers:', error);
       return [];
     }
   }
@@ -112,7 +113,7 @@ export class SettingsService {
       const result = await response.json();
       return { success: result.success };
     } catch (error) {
-      console.error('[SettingsService] Error creating MCP server:', error);
+      logger.error('[SettingsService] Error creating MCP server:', error);
       return { success: false, error: error.message };
     }
   }
@@ -131,7 +132,7 @@ export class SettingsService {
       const result = await response.json();
       return { success: result.success };
     } catch (error) {
-      console.error('[SettingsService] Error updating MCP server:', error);
+      logger.error('[SettingsService] Error updating MCP server:', error);
       return { success: false, error: error.message };
     }
   }
@@ -150,7 +151,7 @@ export class SettingsService {
       const result = await response.json();
       return { success: result.success };
     } catch (error) {
-      console.error('[SettingsService] Error deleting MCP server:', error);
+      logger.error('[SettingsService] Error deleting MCP server:', error);
       return { success: false, error: error.message };
     }
   }
@@ -171,7 +172,7 @@ export class SettingsService {
       }
       return { success: false, message: 'No response from server' };
     } catch (error) {
-      console.error('[SettingsService] Error testing MCP server:', error);
+      logger.error('[SettingsService] Error testing MCP server:', error);
       return { success: false, message: error.message };
     }
   }
@@ -193,7 +194,7 @@ export class SettingsService {
       }
       return { success: false, error: 'Invalid response format' };
     } catch (error) {
-      console.error('[SettingsService] Error discovering MCP tools:', error);
+      logger.error('[SettingsService] Error discovering MCP tools:', error);
       return { success: false, error: error.message };
     }
   }
@@ -217,7 +218,7 @@ export class SettingsService {
       const result = await response.json();
       return { success: result.success };
     } catch (error) {
-      console.error('[SettingsService] Error validating MCP server:', error);
+      logger.error('[SettingsService] Error validating MCP server:', error);
       return { success: false, error: error.message };
     }
   }
@@ -232,7 +233,7 @@ export class SettingsService {
       const data = await response.json();
       return data.order || 'name';
     } catch (error) {
-      console.error('[SettingsService] Error fetching project sort order:', error);
+      logger.error('[SettingsService] Error fetching project sort order:', error);
       return 'name';
     }
   }
@@ -245,7 +246,7 @@ export class SettingsService {
       const response = await api.user.settings.update('claude', { projectSortOrder: order });
       return response.ok;
     } catch (error) {
-      console.error('[SettingsService] Error saving project sort order:', error);
+      logger.error('[SettingsService] Error saving project sort order:', error);
       return false;
     }
   }

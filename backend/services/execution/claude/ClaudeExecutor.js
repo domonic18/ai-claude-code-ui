@@ -11,6 +11,8 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import { mapCliOptionsToSDK } from './OptionsMapper.js';
 import { handleImages, cleanupTempFiles } from './ImageHandler.js';
 import { loadMcpConfig } from './McpConfigLoader.js';
+import { createLogger } from '../../../utils/logger.js';
+const logger = createLogger('services/execution/claude/ClaudeExecutor');
 
 /**
  * Claude 执行器类
@@ -68,7 +70,7 @@ export class ClaudeExecutor {
       }
 
       // 处理流式消息
-      console.log('Starting async generator loop for session:', capturedSessionId || 'NEW');
+      logger.info({ sessionId: capturedSessionId || 'NEW' }, '[ClaudeExecutor] Starting async generator loop');
       for await (const message of queryInstance) {
         // 从第一条消息捕获会话 ID
         if (message.session_id && !capturedSessionId) {
@@ -99,7 +101,7 @@ export class ClaudeExecutor {
         if (message.type === 'result') {
           const tokenBudget = this._extractTokenBudget(message);
           if (tokenBudget) {
-            console.log('Token budget from modelUsage:', tokenBudget);
+            logger.info({ sessionId: capturedSessionId, tokenBudget }, '[ClaudeExecutor] Token budget from modelUsage');
             writer.send({
               type: 'token-budget',
               data: tokenBudget
@@ -117,19 +119,18 @@ export class ClaudeExecutor {
       await cleanupTempFiles(tempImagePaths, tempDir);
 
       // 发送完成事件
-      console.log('Streaming complete, sending claude-complete event');
+      logger.info({ sessionId: capturedSessionId }, '[ClaudeExecutor] Streaming complete');
       writer.send({
         type: 'claude-complete',
         sessionId: capturedSessionId,
         exitCode: 0,
         isNewSession: !sessionId && !!command
       });
-      console.log('claude-complete event sent');
 
       return { sessionId: capturedSessionId };
 
     } catch (error) {
-      console.error('Claude executor error:', error);
+      logger.error({ sessionId: capturedSessionId, err: error }, '[ClaudeExecutor] Execution error');
 
       // 错误时清理会话
       if (capturedSessionId) {
@@ -158,12 +159,12 @@ export class ClaudeExecutor {
     const session = this._getSession(sessionId);
 
     if (!session) {
-      console.log(`Session ${sessionId} not found`);
+      logger.info({ sessionId }, '[ClaudeExecutor] Session not found');
       return false;
     }
 
     try {
-      console.log(`Aborting Claude session: ${sessionId}`);
+      logger.info({ sessionId }, '[ClaudeExecutor] Aborting session');
 
       // 在查询实例上调用 interrupt()
       await session.instance.interrupt();
@@ -179,7 +180,7 @@ export class ClaudeExecutor {
 
       return true;
     } catch (error) {
-      console.error(`Error aborting session ${sessionId}:`, error);
+      logger.error({ sessionId, err: error }, '[ClaudeExecutor] Error aborting session');
       return false;
     }
   }
@@ -265,7 +266,7 @@ export class ClaudeExecutor {
     const totalUsed = inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens;
     const contextWindow = parseInt(process.env.CONTEXT_WINDOW) || 200000;
 
-    console.log(`Token calculation: input=${inputTokens}, output=${outputTokens}, cache=${cacheReadTokens + cacheCreationTokens}, total=${totalUsed}/${contextWindow}`);
+    logger.debug({ inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, totalUsed, contextWindow }, '[ClaudeExecutor] Token calculation');
 
     return {
       used: totalUsed,

@@ -13,6 +13,7 @@ import type {
   ProjectFile,
   Session,
 } from '../types/sidebar.types';
+import { logger } from '@/shared/utils/logger';
 
 /**
  * Hook for project management functionality
@@ -57,7 +58,7 @@ export function useProject(): UseProjectReturn {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
-      console.error('Failed to refresh projects:', err);
+      logger.error('Failed to refresh projects:', err);
     } finally {
       setIsLoading(false);
     }
@@ -90,7 +91,7 @@ export function useProject(): UseProjectReturn {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
-      console.error('Failed to create project:', err);
+      logger.error('Failed to create project:', err);
       return null;
     } finally {
       setIsLoading(false);
@@ -119,7 +120,7 @@ export function useProject(): UseProjectReturn {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
-      console.error('Failed to delete project:', err);
+      logger.error('Failed to delete project:', err);
     } finally {
       setIsLoading(false);
     }
@@ -151,7 +152,7 @@ export function useProject(): UseProjectReturn {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
-      console.error('Failed to rename project:', err);
+      logger.error('Failed to rename project:', err);
     } finally {
       setIsLoading(false);
     }
@@ -169,7 +170,7 @@ export function useProject(): UseProjectReturn {
       }
       return [];
     } catch (err) {
-      console.error('Failed to get project files:', err);
+      logger.error('Failed to get project files:', err);
       return [];
     }
   }, []);
@@ -186,7 +187,7 @@ export function useProject(): UseProjectReturn {
       }
       return [];
     } catch (err) {
-      console.error('Failed to get project sessions:', err);
+      logger.error('Failed to get project sessions:', err);
       return [];
     }
   }, []);
@@ -250,7 +251,7 @@ export function useProjectFiles(project: Project | null): UseProjectFilesReturn 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
-      console.error('Failed to refresh files:', err);
+      logger.error('Failed to refresh files:', err);
     } finally {
       setIsLoading(false);
     }
@@ -271,7 +272,7 @@ export function useProjectFiles(project: Project | null): UseProjectFilesReturn 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
-      console.error('Failed to create file:', err);
+      logger.error('Failed to create file:', err);
     } finally {
       setIsLoading(false);
     }
@@ -292,7 +293,7 @@ export function useProjectFiles(project: Project | null): UseProjectFilesReturn 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
-      console.error('Failed to delete file:', err);
+      logger.error('Failed to delete file:', err);
     } finally {
       setIsLoading(false);
     }
@@ -313,7 +314,7 @@ export function useProjectFiles(project: Project | null): UseProjectFilesReturn 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
-      console.error('Failed to rename file:', err);
+      logger.error('Failed to rename file:', err);
     } finally {
       setIsLoading(false);
     }
@@ -358,7 +359,7 @@ export function useWorkspace(): UseWorkspaceReturn {
         throw new Error('Failed to add project to workspace');
       }
     } catch (err) {
-      console.error('Failed to add project to workspace:', err);
+      logger.error('Failed to add project to workspace:', err);
       throw err;
     }
   }, []);
@@ -370,7 +371,7 @@ export function useWorkspace(): UseWorkspaceReturn {
         throw new Error('Failed to remove project from workspace');
       }
     } catch (err) {
-      console.error('Failed to remove project from workspace:', err);
+      logger.error('Failed to remove project from workspace:', err);
       throw err;
     }
   }, []);
@@ -384,7 +385,7 @@ export function useWorkspace(): UseWorkspaceReturn {
       }
       return [];
     } catch (err) {
-      console.error('Failed to get workspace projects:', err);
+      logger.error('Failed to get workspace projects:', err);
       return [];
     }
   }, []);
@@ -433,7 +434,7 @@ export function useProjectSessions(project: Project | null): UseProjectSessionsR
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
-      console.error('Failed to refresh sessions:', err);
+      logger.error('Failed to refresh sessions:', err);
     } finally {
       setIsLoading(false);
     }
@@ -454,7 +455,7 @@ export function useProjectSessions(project: Project | null): UseProjectSessionsR
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
-      console.error('Failed to delete session:', err);
+      logger.error('Failed to delete session:', err);
     } finally {
       setIsLoading(false);
     }
@@ -466,7 +467,7 @@ export function useProjectSessions(project: Project | null): UseProjectSessionsR
     try {
       await api.projects.resumeSession(project.name, sessionId);
     } catch (err) {
-      console.error('Failed to resume session:', err);
+      logger.error('Failed to resume session:', err);
       throw err;
     }
   }, [project]);
