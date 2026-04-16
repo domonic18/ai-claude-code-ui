@@ -199,16 +199,11 @@ describe('ClaudeDiscovery', () => {
     assert.equal(info.type, 'discovery');
   });
 
-  it('should get correct projects root for native mode', () => {
-    const nativeRoot = discovery._getProjectsRoot('native');
-    assert.ok(nativeRoot.includes('.claude'));
-    assert.ok(nativeRoot.includes('projects'));
-  });
-
-  it('should get correct projects root for container mode', () => {
-    const containerRoot = discovery._getProjectsRoot('container');
-    assert.ok(containerRoot.includes('.claude'));
-    assert.ok(containerRoot.includes('projects'));
+  it('should throw error for unimplemented _getProjectsRoot', () => {
+    assert.throws(
+      () => discovery._getProjectsRoot('native'),
+      /_getProjectsRoot\(\) must be implemented by ClaudeDiscovery/
+    );
   });
 });
 

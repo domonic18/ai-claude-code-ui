@@ -10,9 +10,8 @@
 import containerManager from '../core/index.js';
 import { CONTAINER } from '../../../config/config.js';
 import { PathValidator } from '../../core/utils/path-utils.js';
-import {
 import { createLogger } from '../../../utils/logger.js';
-const logger = createLogger('services/container/adapters/FileAdapter');
+import {
   cleanFileName,
   isValidFileName,
   isHiddenFile,
@@ -20,6 +19,8 @@ const logger = createLogger('services/container/adapters/FileAdapter');
   readStreamOutput,
   standardizeError
 } from '../../files/utils/file-utils.js';
+
+const logger = createLogger('services/container/adapters/FileAdapter');
 
 /**
  * 容器文件适配器

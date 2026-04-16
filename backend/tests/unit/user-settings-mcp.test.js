@@ -164,25 +164,42 @@ describe('UserSettings Repository', () => {
 });
 
 describe('McpServer Repository', () => {
+    let testUsername1;
     let testUsername2;
 
     beforeEach(async () => {
-        // 生成随机用户名
-        const randomSuffix2 = Math.random().toString(36).substring(7);
-        testUsername2 = `testuser_mcp_${randomSuffix2}`;
-
-        // 创建第二个测试用户
         const { getDatabase } = await import('../../database/connection.js');
         const db = getDatabase();
-        const result = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
+
+        // 清理可能存在的旧测试数据
+        db.prepare('DELETE FROM user_mcp_servers WHERE user_id IN (SELECT id FROM users WHERE username LIKE ?)').run(`testuser_mcp_%`);
+        db.prepare('DELETE FROM user_settings WHERE user_id IN (SELECT id FROM users WHERE username LIKE ?)').run(`testuser_mcp_%`);
+        db.prepare('DELETE FROM users WHERE username LIKE ?').run(`testuser_mcp_%`);
+
+        // 重建第一个测试用户（UserSettings Repository 的 afterEach 会删除它）
+        const randomSuffix1 = Math.random().toString(36).substring(7);
+        testUsername1 = `testuser_mcp_user1_${randomSuffix1}`;
+        const result1 = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
+            .run(testUsername1, 'hash');
+        testUserId = result1.lastInsertRowid;
+
+        // 创建第二个测试用户
+        const randomSuffix2 = Math.random().toString(36).substring(7);
+        testUsername2 = `testuser_mcp_user2_${randomSuffix2}`;
+        const result2 = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
             .run(testUsername2, 'hash');
-        testUserId2 = result.lastInsertRowid;
+        testUserId2 = result2.lastInsertRowid;
     });
 
     afterEach(async () => {
         // 清理测试数据
         const { getDatabase } = await import('../../database/connection.js');
         const db = getDatabase();
+        if (testUserId) {
+            db.prepare('DELETE FROM user_mcp_servers WHERE user_id = ?').run(testUserId);
+            db.prepare('DELETE FROM user_settings WHERE user_id = ?').run(testUserId);
+            db.prepare('DELETE FROM users WHERE id = ?').run(testUserId);
+        }
         if (testUserId2) {
             db.prepare('DELETE FROM user_mcp_servers WHERE user_id = ?').run(testUserId2);
             db.prepare('DELETE FROM user_settings WHERE user_id = ?').run(testUserId2);
@@ -343,6 +360,29 @@ describe('McpServer Repository', () => {
 });
 
 describe('UserSettingsService', () => {
+    beforeEach(async () => {
+        const { getDatabase } = await import('../../database/connection.js');
+        const db = getDatabase();
+
+        // 重建测试用户（McpServer Repository 的 afterEach 会删除它们）
+        const randomSuffix = Math.random().toString(36).substring(7);
+        const username = `testuser_svc_${randomSuffix}`;
+        const result = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
+            .run(username, 'hash');
+        testUserId = result.lastInsertRowid;
+    });
+
+    afterEach(async () => {
+        const { getDatabase } = await import('../../database/connection.js');
+        const db = getDatabase();
+        if (testUserId) {
+            db.prepare('DELETE FROM user_mcp_servers WHERE user_id = ?').run(testUserId);
+            db.prepare('DELETE FROM user_settings WHERE user_id = ?').run(testUserId);
+            db.prepare('DELETE FROM users WHERE id = ?').run(testUserId);
+        }
+    });
+
+
     it('UserSettingsService 导出正确', async () => {
         const { UserSettingsService } = await import('../../services/settings/UserSettingsService.js');
         assert.ok(UserSettingsService != null, 'UserSettingsService 应该被导出');
@@ -423,6 +463,34 @@ describe('UserSettingsService', () => {
 });
 
 describe('McpService', () => {
+    beforeEach(async () => {
+        const { getDatabase } = await import('../../database/connection.js');
+        const db = getDatabase();
+
+        // 创建两个测试用户
+        const r1 = Math.random().toString(36).substring(7);
+        const u1 = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
+            .run(`testuser_mcp_svc1_${r1}`, 'hash');
+        testUserId = u1.lastInsertRowid;
+
+        const r2 = Math.random().toString(36).substring(7);
+        const u2 = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
+            .run(`testuser_mcp_svc2_${r2}`, 'hash');
+        testUserId2 = u2.lastInsertRowid;
+    });
+
+    afterEach(async () => {
+        const { getDatabase } = await import('../../database/connection.js');
+        const db = getDatabase();
+        for (const uid of [testUserId, testUserId2]) {
+            if (uid) {
+                db.prepare('DELETE FROM user_mcp_servers WHERE user_id = ?').run(uid);
+                db.prepare('DELETE FROM user_settings WHERE user_id = ?').run(uid);
+                db.prepare('DELETE FROM users WHERE id = ?').run(uid);
+            }
+        }
+    });
+
     it('McpService 导出正确', async () => {
         const { McpService } = await import('../../services/mcp/McpService.js');
         assert.ok(McpService != null, 'McpService 应该被导出');
@@ -616,6 +684,26 @@ describe('McpService', () => {
 });
 
 describe('McpContainerManager', () => {
+    beforeEach(async () => {
+        const { getDatabase } = await import('../../database/connection.js');
+        const db = getDatabase();
+
+        const r = Math.random().toString(36).substring(7);
+        const result = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
+            .run(`testuser_mcpmgr_${r}`, 'hash');
+        testUserId = result.lastInsertRowid;
+    });
+
+    afterEach(async () => {
+        const { getDatabase } = await import('../../database/connection.js');
+        const db = getDatabase();
+        if (testUserId) {
+            db.prepare('DELETE FROM user_mcp_servers WHERE user_id = ?').run(testUserId);
+            db.prepare('DELETE FROM user_settings WHERE user_id = ?').run(testUserId);
+            db.prepare('DELETE FROM users WHERE id = ?').run(testUserId);
+        }
+    });
+
     it('McpContainerManager 导出正确', async () => {
         const { McpContainerManager } = await import('../../services/mcp/McpContainerManager.js');
         assert.ok(McpContainerManager != null, 'McpContainerManager 应该被导出');
