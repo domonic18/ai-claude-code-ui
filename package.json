@@ -39,7 +39,7 @@
     "test:watch": "npx vitest"
   },
   "keywords": [
-    "claude coode",
+    "claude code",
     "ai",
     "anthropic",
     "ui",

@@ -114,15 +114,13 @@ export class FileAdapter {
         }
       }
 
-      // 写入文件
+      // 写入文件：使用 heredoc + stdin pipe 避免命令行中拼接内容，防御注入风险
       if (base64) {
-        // 使用 base64 解码并写入
-        const command = `printf '%s' "${content}" | base64 -d > "${containerPath}"`;
+        const command = `base64 -d > '${containerPath}' <<'BASE64_EOF'\n${content}\nBASE64_EOF`;
         await this.containerManager.execInContainer(this.userId, command);
       } else {
-        // 转义特殊字符并写入
-        const escapedContent = this._escapeShellContent(content);
-        const command = `printf '%s' '${escapedContent}' > "${containerPath}"`;
+        // 使用 heredoc 包裹内容，内容在单引号界定的 heredoc 中不会被 shell 解释
+        const command = `cat > '${containerPath}' <<'CONTENT_EOF'\n${content}\nCONTENT_EOF`;
         await this.containerManager.execInContainer(this.userId, command);
       }
 

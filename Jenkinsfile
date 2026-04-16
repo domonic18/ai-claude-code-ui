@@ -8,7 +8,7 @@
 //   1. macOS Agent 节点已注册到 Jenkins Master（通过 SSH）
 //   2. macOS Agent 上已安装：Node.js 20、git
 //   3. Jenkins 插件：Pipeline、Git、SSH Build Agents、GitHub plugin
-//   4. GitHub 仓库已配置 webhook: https://jenkins.portal.bj33smarter.com/github-webhook/
+//   4. GitHub 仓库已配置 webhook（地址在 Jenkins 系统配置中管理）
 //
 // Jenkins Credentials（凭据）：
 //   - macos-agent-ssh : SSH Username with private key（连接 macOS Agent 用）
@@ -22,6 +22,10 @@ pipeline {
     parameters {
         // .env.deploy 文件的绝对路径（位于 workspace 外以避免被 CleanBeforeCheckout 清除）
         string(name: 'ENV_DEPLOY_PATH', defaultValue: '', description: '.env.deploy 文件绝对路径（留空则跳过复制，测试将使用默认值）')
+        // Git 仓库地址（避免在代码中硬编码仓库 URL）
+        string(name: 'GIT_REPO_URL', defaultValue: '', description: 'Git 仓库 SSH 地址（留空则使用 SCM 配置中的默认值）')
+        // Git 凭据 ID（避免在代码中暴露凭据命名）
+        string(name: 'GIT_CREDENTIALS_ID', defaultValue: '', description: 'Jenkins 中配置的 Git SSH 凭据 ID（留空则使用 SCM 配置中的默认值）')
     }
 
     environment {
@@ -30,7 +34,7 @@ pipeline {
     }
 
     // GitHub webhook 推送触发（仅 develop 分支的 push 事件）
-    // webhook 地址: https://jenkins.portal.bj33smarter.com/github-webhook/
+    // webhook 地址在 Jenkins 系统配置中管理
     triggers {
         githubPush()
     }
@@ -47,22 +51,30 @@ pipeline {
         // ==================== 拉取代码 ====================
         stage('Checkout') {
             steps {
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: '*/develop']],
-                    extensions: [
-                        // 拉取 submodule（extensions/ 目录）
-                        [$class: 'SubmoduleOption',
-                         recursiveSubmodules: true,
-                         reference: ''],
-                        // 清理未跟踪文件
-                        [$class: 'CleanBeforeCheckout']
-                    ],
-                    userRemoteConfigs: [[
-                        url: 'git@github.com:domonic18/ai-claude-code-ui.git',
-                        credentialsId: 'github-ssh-key'
-                    ]]
-                ])
+                script {
+                    // 从参数获取仓库地址和凭据 ID，未配置时使用 Jenkins SCM 默认值
+                    def repoUrl = params.GIT_REPO_URL ?: env.GIT_URL ?: ''
+                    def credId = params.GIT_CREDENTIALS_ID ?: env.GIT_CREDENTIALS_ID ?: ''
+
+                    def checkoutConfig = [
+                        $class: 'GitSCM',
+                        branches: [[name: '*/develop']],
+                        extensions: [
+                            // 拉取 submodule（extensions/ 目录）
+                            [$class: 'SubmoduleOption',
+                             recursiveSubmodules: true,
+                             reference: ''],
+                            // 清理未跟踪文件
+                            [$class: 'CleanBeforeCheckout']
+                        ],
+                        userRemoteConfigs: [[
+                            url: repoUrl,
+                            credentialsId: credId
+                        ]]
+                    ]
+
+                    checkout(checkoutConfig)
+                }
                 sh 'git log --oneline -5'
             }
         }

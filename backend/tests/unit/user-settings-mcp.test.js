@@ -14,27 +14,29 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-// 测试用户ID
-let testUserId = null;
-let testUserId2 = null;
+// 统一导入数据库连接和服务模块，避免在每个测试用例中重复 import
+const { getDatabase } = await import('../../database/connection.js');
+const { UserSettings } = await import('../../database/repositories/UserSettings.repository.js');
+const { McpServer } = await import('../../database/repositories/McpServer.repository.js');
+const { UserSettingsService } = await import('../../services/settings/UserSettingsService.js');
+const { McpService } = await import('../../services/mcp/McpService.js');
+const { McpContainerManager } = await import('../../services/mcp/McpContainerManager.js');
+const { repositories } = await import('../../database/db.js');
 
 describe('Database Migrations', () => {
     it('用户设置表已创建', async () => {
-        const { getDatabase } = await import('../../database/connection.js');
         const db = getDatabase();
         const tableInfo = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='user_settings'").get();
         assert.ok(tableInfo != null, 'user_settings 表应该存在');
     });
 
     it('MCP服务器表已创建', async () => {
-        const { getDatabase } = await import('../../database/connection.js');
         const db = getDatabase();
         const tableInfo = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='user_mcp_servers'").get();
         assert.ok(tableInfo != null, 'user_mcp_servers 表应该存在');
     });
 
     it('用户设置表有正确的列', async () => {
-        const { getDatabase } = await import('../../database/connection.js');
         const db = getDatabase();
         const columns = db.prepare("PRAGMA table_info(user_settings)").all();
         const columnNames = columns.map(c => c.name);
@@ -46,7 +48,6 @@ describe('Database Migrations', () => {
     });
 
     it('MCP服务器表有正确的列', async () => {
-        const { getDatabase } = await import('../../database/connection.js');
         const db = getDatabase();
         const columns = db.prepare("PRAGMA table_info(user_mcp_servers)").all();
         const columnNames = columns.map(c => c.name);
@@ -59,6 +60,7 @@ describe('Database Migrations', () => {
 });
 
 describe('UserSettings Repository', () => {
+    let testUserId;
     let testUsername;
 
     beforeEach(async () => {
@@ -67,7 +69,6 @@ describe('UserSettings Repository', () => {
         testUsername = `testuser_settings_${randomSuffix}`;
 
         // 清理可能存在的旧测试数据
-        const { getDatabase } = await import('../../database/connection.js');
         const db = getDatabase();
         db.prepare('DELETE FROM user_settings WHERE user_id IN (SELECT id FROM users WHERE username LIKE ?)').run(`testuser_settings_%`);
         db.prepare('DELETE FROM user_mcp_servers WHERE user_id IN (SELECT id FROM users WHERE username LIKE ?)').run(`testuser_settings_%`);
@@ -82,7 +83,6 @@ describe('UserSettings Repository', () => {
     afterEach(async () => {
         // 清理测试数据
         if (testUserId) {
-            const { getDatabase } = await import('../../database/connection.js');
             const db = getDatabase();
             db.prepare('DELETE FROM user_settings WHERE user_id = ?').run(testUserId);
             db.prepare('DELETE FROM user_mcp_servers WHERE user_id = ?').run(testUserId);
@@ -95,7 +95,6 @@ describe('UserSettings Repository', () => {
     });
 
     it('UserSettings Repository 导出正确', async () => {
-        const { UserSettings } = await import('../../database/repositories/UserSettings.repository.js');
         assert.ok(UserSettings != null, 'UserSettings 应该被导出');
         assert.strictEqual(typeof UserSettings.getByUserId, 'function', 'getByUserId 应该是函数');
         assert.strictEqual(typeof UserSettings.getOrCreateDefault, 'function', 'getOrCreateDefault 应该是函数');
@@ -106,7 +105,6 @@ describe('UserSettings Repository', () => {
     });
 
     it('创建用户设置', async () => {
-        const { UserSettings } = await import('../../database/repositories/UserSettings.repository.js');
         const settings = await UserSettings.create(testUserId, 'claude', {
             allowedTools: ['Write', 'Read'],
             skipPermissions: true
@@ -118,20 +116,17 @@ describe('UserSettings Repository', () => {
     });
 
     it('获取用户设置', async () => {
-        const { UserSettings } = await import('../../database/repositories/UserSettings.repository.js');
         const settings = await UserSettings.getByUserId(testUserId, 'claude');
         assert.ok(settings != null, '设置应该存在');
         assert.strictEqual(settings.provider, 'claude', '提供商应该是claude');
     });
 
     it('获取不存在的设置返回null', async () => {
-        const { UserSettings } = await import('../../database/repositories/UserSettings.repository.js');
         const settings = await UserSettings.getByUserId(testUserId, 'cursor');
         assert.strictEqual(settings, null, '不存在的设置应该返回null');
     });
 
     it('getOrCreateDefault 创建默认设置', async () => {
-        const { UserSettings } = await import('../../database/repositories/UserSettings.repository.js');
         const settings = await UserSettings.getOrCreateDefault(testUserId, 'cursor');
         assert.ok(settings != null, '设置应该被创建');
         assert.strictEqual(settings.provider, 'cursor', '提供商应该是cursor');
@@ -139,7 +134,6 @@ describe('UserSettings Repository', () => {
     });
 
     it('更新用户设置', async () => {
-        const { UserSettings } = await import('../../database/repositories/UserSettings.repository.js');
         const updated = await UserSettings.update(testUserId, 'claude', {
             allowedTools: ['Write', 'Read', 'Edit'],
             skipPermissions: false
@@ -149,13 +143,11 @@ describe('UserSettings Repository', () => {
     });
 
     it('获取所有用户设置', async () => {
-        const { UserSettings } = await import('../../database/repositories/UserSettings.repository.js');
         const all = await UserSettings.getAllByUserId(testUserId);
         assert.ok(all.length >= 2, '应该有至少2个提供商的设置');
     });
 
     it('删除用户设置', async () => {
-        const { UserSettings } = await import('../../database/repositories/UserSettings.repository.js');
         const deleted = await UserSettings.delete(testUserId, 'claude');
         assert.ok(deleted, '删除应该成功');
         const settings = await UserSettings.getByUserId(testUserId, 'claude');
@@ -164,11 +156,10 @@ describe('UserSettings Repository', () => {
 });
 
 describe('McpServer Repository', () => {
-    let testUsername1;
-    let testUsername2;
+    let testUserId;
+    let testUserId2;
 
     beforeEach(async () => {
-        const { getDatabase } = await import('../../database/connection.js');
         const db = getDatabase();
 
         // 清理可能存在的旧测试数据
@@ -176,16 +167,16 @@ describe('McpServer Repository', () => {
         db.prepare('DELETE FROM user_settings WHERE user_id IN (SELECT id FROM users WHERE username LIKE ?)').run(`testuser_mcp_%`);
         db.prepare('DELETE FROM users WHERE username LIKE ?').run(`testuser_mcp_%`);
 
-        // 重建第一个测试用户（UserSettings Repository 的 afterEach 会删除它）
+        // 创建第一个测试用户
         const randomSuffix1 = Math.random().toString(36).substring(7);
-        testUsername1 = `testuser_mcp_user1_${randomSuffix1}`;
+        const testUsername1 = `testuser_mcp_user1_${randomSuffix1}`;
         const result1 = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
             .run(testUsername1, 'hash');
         testUserId = result1.lastInsertRowid;
 
         // 创建第二个测试用户
         const randomSuffix2 = Math.random().toString(36).substring(7);
-        testUsername2 = `testuser_mcp_user2_${randomSuffix2}`;
+        const testUsername2 = `testuser_mcp_user2_${randomSuffix2}`;
         const result2 = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
             .run(testUsername2, 'hash');
         testUserId2 = result2.lastInsertRowid;
@@ -193,17 +184,13 @@ describe('McpServer Repository', () => {
 
     afterEach(async () => {
         // 清理测试数据
-        const { getDatabase } = await import('../../database/connection.js');
         const db = getDatabase();
-        if (testUserId) {
-            db.prepare('DELETE FROM user_mcp_servers WHERE user_id = ?').run(testUserId);
-            db.prepare('DELETE FROM user_settings WHERE user_id = ?').run(testUserId);
-            db.prepare('DELETE FROM users WHERE id = ?').run(testUserId);
-        }
-        if (testUserId2) {
-            db.prepare('DELETE FROM user_mcp_servers WHERE user_id = ?').run(testUserId2);
-            db.prepare('DELETE FROM user_settings WHERE user_id = ?').run(testUserId2);
-            db.prepare('DELETE FROM users WHERE id = ?').run(testUserId2);
+        for (const uid of [testUserId, testUserId2]) {
+            if (uid) {
+                db.prepare('DELETE FROM user_mcp_servers WHERE user_id = ?').run(uid);
+                db.prepare('DELETE FROM user_settings WHERE user_id = ?').run(uid);
+                db.prepare('DELETE FROM users WHERE id = ?').run(uid);
+            }
         }
     });
 
@@ -212,7 +199,6 @@ describe('McpServer Repository', () => {
     });
 
     it('McpServer Repository 导出正确', async () => {
-        const { McpServer } = await import('../../database/repositories/McpServer.repository.js');
         assert.ok(McpServer != null, 'McpServer 应该被导出');
         assert.strictEqual(typeof McpServer.getByUserId, 'function', 'getByUserId 应该是函数');
         assert.strictEqual(typeof McpServer.getById, 'function', 'getById 应该是函数');
@@ -226,7 +212,6 @@ describe('McpServer Repository', () => {
     });
 
     it('创建MCP服务器 (stdio类型)', async () => {
-        const { McpServer } = await import('../../database/repositories/McpServer.repository.js');
         const server = await McpServer.create(testUserId, {
             name: 'stdio-server',
             type: 'stdio',
@@ -244,7 +229,6 @@ describe('McpServer Repository', () => {
     });
 
     it('创建MCP服务器 (http类型)', async () => {
-        const { McpServer } = await import('../../database/repositories/McpServer.repository.js');
         const server = await McpServer.create(testUserId, {
             name: 'http-server',
             type: 'http',
@@ -255,7 +239,6 @@ describe('McpServer Repository', () => {
     });
 
     it('创建MCP服务器 (sse类型)', async () => {
-        const { McpServer } = await import('../../database/repositories/McpServer.repository.js');
         const server = await McpServer.create(testUserId, {
             name: 'sse-server',
             type: 'sse',
@@ -265,13 +248,11 @@ describe('McpServer Repository', () => {
     });
 
     it('获取用户的所有MCP服务器', async () => {
-        const { McpServer } = await import('../../database/repositories/McpServer.repository.js');
         const servers = await McpServer.getByUserId(testUserId);
         assert.ok(servers.length >= 3, '应该有至少3个服务器');
     });
 
     it('通过ID获取MCP服务器', async () => {
-        const { McpServer } = await import('../../database/repositories/McpServer.repository.js');
         const servers = await McpServer.getByUserId(testUserId);
         const server = await McpServer.getById(servers[0].id);
         assert.ok(server != null, '服务器应该存在');
@@ -279,41 +260,35 @@ describe('McpServer Repository', () => {
     });
 
     it('通过名称获取MCP服务器', async () => {
-        const { McpServer } = await import('../../database/repositories/McpServer.repository.js');
         const server = await McpServer.getByName(testUserId, 'stdio-server');
         assert.ok(server != null, '服务器应该存在');
         assert.strictEqual(server.name, 'stdio-server', '名称应该匹配');
     });
 
     it('获取不存在的服务器返回null', async () => {
-        const { McpServer } = await import('../../database/repositories/McpServer.repository.js');
         const server = await McpServer.getById(99999);
         assert.strictEqual(server, null, '不存在的服务器应该返回null');
     });
 
     it('检查服务器归属 (属于当前用户)', async () => {
-        const { McpServer } = await import('../../database/repositories/McpServer.repository.js');
         const servers = await McpServer.getByUserId(testUserId);
         const belongs = await McpServer.belongsToUser(servers[0].id, testUserId);
         assert.ok(belongs, '服务器应该属于用户');
     });
 
     it('检查服务器归属 (不属于其他用户)', async () => {
-        const { McpServer } = await import('../../database/repositories/McpServer.repository.js');
         const servers = await McpServer.getByUserId(testUserId);
         const belongs = await McpServer.belongsToUser(servers[0].id, testUserId2);
         assert.ok(!belongs, '服务器不应该属于其他用户');
     });
 
     it('获取启用的服务器', async () => {
-        const { McpServer } = await import('../../database/repositories/McpServer.repository.js');
         const enabled = await McpServer.getEnabled(testUserId);
         assert.ok(enabled.length > 0, '应该有启用的服务器');
         enabled.forEach(s => assert.ok(s.enabled, '所有服务器都应该启用'));
     });
 
     it('切换服务器启用状态', async () => {
-        const { McpServer } = await import('../../database/repositories/McpServer.repository.js');
         const server = await McpServer.getByName(testUserId, 'stdio-server');
         const originalEnabled = server.enabled;
 
@@ -325,7 +300,6 @@ describe('McpServer Repository', () => {
     });
 
     it('更新MCP服务器', async () => {
-        const { McpServer } = await import('../../database/repositories/McpServer.repository.js');
         const server = await McpServer.getByName(testUserId, 'http-server');
         const updated = await McpServer.update(server.id, {
             name: 'http-server-updated',
@@ -336,7 +310,6 @@ describe('McpServer Repository', () => {
     });
 
     it('创建重复名称的服务器应该失败', async () => {
-        const { McpServer } = await import('../../database/repositories/McpServer.repository.js');
         await assert.rejects(
             async () => McpServer.create(testUserId, {
                 name: 'stdio-server',
@@ -349,7 +322,6 @@ describe('McpServer Repository', () => {
     });
 
     it('删除MCP服务器', async () => {
-        const { McpServer } = await import('../../database/repositories/McpServer.repository.js');
         const server = await McpServer.getByName(testUserId, 'sse-server');
         const deleted = await McpServer.delete(server.id);
         assert.ok(deleted, '删除应该成功');
@@ -360,11 +332,11 @@ describe('McpServer Repository', () => {
 });
 
 describe('UserSettingsService', () => {
+    let testUserId;
+
     beforeEach(async () => {
-        const { getDatabase } = await import('../../database/connection.js');
         const db = getDatabase();
 
-        // 重建测试用户（McpServer Repository 的 afterEach 会删除它们）
         const randomSuffix = Math.random().toString(36).substring(7);
         const username = `testuser_svc_${randomSuffix}`;
         const result = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
@@ -373,18 +345,15 @@ describe('UserSettingsService', () => {
     });
 
     afterEach(async () => {
-        const { getDatabase } = await import('../../database/connection.js');
-        const db = getDatabase();
         if (testUserId) {
+            const db = getDatabase();
             db.prepare('DELETE FROM user_mcp_servers WHERE user_id = ?').run(testUserId);
             db.prepare('DELETE FROM user_settings WHERE user_id = ?').run(testUserId);
             db.prepare('DELETE FROM users WHERE id = ?').run(testUserId);
         }
     });
 
-
     it('UserSettingsService 导出正确', async () => {
-        const { UserSettingsService } = await import('../../services/settings/UserSettingsService.js');
         assert.ok(UserSettingsService != null, 'UserSettingsService 应该被导出');
         assert.strictEqual(typeof UserSettingsService.getSettings, 'function', 'getSettings 应该是函数');
         assert.strictEqual(typeof UserSettingsService.updateSettings, 'function', 'updateSettings 应该是函数');
@@ -395,7 +364,6 @@ describe('UserSettingsService', () => {
     });
 
     it('获取用户设置 (自动创建默认)', async () => {
-        const { UserSettingsService } = await import('../../services/settings/UserSettingsService.js');
         const settings = await UserSettingsService.getSettings(testUserId, 'codex');
         assert.ok(settings != null, '设置应该被创建');
         assert.strictEqual(settings.provider, 'codex', '提供商应该是codex');
@@ -403,7 +371,6 @@ describe('UserSettingsService', () => {
     });
 
     it('更新用户设置', async () => {
-        const { UserSettingsService } = await import('../../services/settings/UserSettingsService.js');
         const updated = await UserSettingsService.updateSettings(testUserId, 'codex', {
             allowedTools: ['CustomTool1', 'CustomTool2'],
             disallowedTools: ['Bash(rm:*)'],
@@ -415,7 +382,6 @@ describe('UserSettingsService', () => {
     });
 
     it('获取Claude默认设置', async () => {
-        const { UserSettingsService } = await import('../../services/settings/UserSettingsService.js');
         const defaults = UserSettingsService.getDefaults('claude');
         assert.ok(Array.isArray(defaults.allowedTools), 'allowedTools应该是数组');
         assert.ok(Array.isArray(defaults.disallowedTools), 'disallowedTools应该是数组');
@@ -424,14 +390,12 @@ describe('UserSettingsService', () => {
     });
 
     it('获取Cursor默认设置', async () => {
-        const { UserSettingsService } = await import('../../services/settings/UserSettingsService.js');
         const defaults = UserSettingsService.getDefaults('cursor');
         assert.ok('allowedCommands' in defaults, '应该有allowedCommands');
         assert.ok('disallowedCommands' in defaults, '应该有disallowedCommands');
     });
 
     it('获取SDK配置 (skipPermissions=true)', async () => {
-        const { UserSettingsService } = await import('../../services/settings/UserSettingsService.js');
         // 确保skipPermissions为true(默认值)
         await UserSettingsService.updateSettings(testUserId, 'codex', {
           skipPermissions: true
@@ -443,7 +407,6 @@ describe('UserSettingsService', () => {
     });
 
     it('重置为默认设置', async () => {
-        const { UserSettingsService } = await import('../../services/settings/UserSettingsService.js');
         // 先修改设置
         await UserSettingsService.updateSettings(testUserId, 'codex', {
             allowedTools: ['CustomOnly']
@@ -454,7 +417,6 @@ describe('UserSettingsService', () => {
     });
 
     it('获取所有提供商的设置', async () => {
-        const { UserSettingsService } = await import('../../services/settings/UserSettingsService.js');
         const all = await UserSettingsService.getAllSettings(testUserId);
         assert.ok('claude' in all, '应该有claude设置');
         assert.ok('cursor' in all, '应该有cursor设置');
@@ -463,11 +425,12 @@ describe('UserSettingsService', () => {
 });
 
 describe('McpService', () => {
+    let testUserId;
+    let testUserId2;
+
     beforeEach(async () => {
-        const { getDatabase } = await import('../../database/connection.js');
         const db = getDatabase();
 
-        // 创建两个测试用户
         const r1 = Math.random().toString(36).substring(7);
         const u1 = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
             .run(`testuser_mcp_svc1_${r1}`, 'hash');
@@ -480,7 +443,6 @@ describe('McpService', () => {
     });
 
     afterEach(async () => {
-        const { getDatabase } = await import('../../database/connection.js');
         const db = getDatabase();
         for (const uid of [testUserId, testUserId2]) {
             if (uid) {
@@ -492,7 +454,6 @@ describe('McpService', () => {
     });
 
     it('McpService 导出正确', async () => {
-        const { McpService } = await import('../../services/mcp/McpService.js');
         assert.ok(McpService != null, 'McpService 应该被导出');
         assert.strictEqual(typeof McpService.getServers, 'function', 'getServers 应该是函数');
         assert.strictEqual(typeof McpService.getEnabledServers, 'function', 'getEnabledServers 应该是函数');
@@ -508,21 +469,18 @@ describe('McpService', () => {
     });
 
     it('获取用户的MCP服务器列表', async () => {
-        const { McpService } = await import('../../services/mcp/McpService.js');
         const servers = await McpService.getServers(testUserId);
         assert.ok(Array.isArray(servers), '应该返回数组');
         assert.ok(servers.length >= 2, '应该有至少2个服务器');
     });
 
     it('获取启用的MCP服务器', async () => {
-        const { McpService } = await import('../../services/mcp/McpService.js');
         const servers = await McpService.getEnabledServers(testUserId);
         assert.ok(Array.isArray(servers), '应该返回数组');
         servers.forEach(s => assert.ok(s.enabled, '所有服务器都应该启用'));
     });
 
     it('获取用户拥有的服务器', async () => {
-        const { McpService } = await import('../../services/mcp/McpService.js');
         const servers = await McpService.getServers(testUserId);
         if (servers.length > 0) {
             const server = await McpService.getServer(servers[0].id, testUserId);
@@ -532,7 +490,6 @@ describe('McpService', () => {
     });
 
     it('获取其他用户的服务器应该失败', async () => {
-        const { McpService } = await import('../../services/mcp/McpService.js');
         const servers = await McpService.getServers(testUserId);
         if (servers.length > 0) {
             await assert.rejects(
@@ -544,7 +501,6 @@ describe('McpService', () => {
     });
 
     it('验证有效的stdio配置', async () => {
-        const { McpService } = await import('../../services/mcp/McpService.js');
         McpService.validateConfig({
             name: 'test-server',
             type: 'stdio',
@@ -554,7 +510,6 @@ describe('McpService', () => {
     });
 
     it('验证有效的http配置', async () => {
-        const { McpService } = await import('../../services/mcp/McpService.js');
         McpService.validateConfig({
             name: 'test-server',
             type: 'http',
@@ -564,7 +519,6 @@ describe('McpService', () => {
     });
 
     it('验证无效的配置 (缺少name)', async () => {
-        const { McpService } = await import('../../services/mcp/McpService.js');
         assert.throws(
             () => McpService.validateConfig({
                 type: 'stdio',
@@ -576,7 +530,6 @@ describe('McpService', () => {
     });
 
     it('验证无效的配置 (无效type)', async () => {
-        const { McpService } = await import('../../services/mcp/McpService.js');
         assert.throws(
             () => McpService.validateConfig({
                 name: 'test',
@@ -589,7 +542,6 @@ describe('McpService', () => {
     });
 
     it('验证无效的配置 (stdio缺少command)', async () => {
-        const { McpService } = await import('../../services/mcp/McpService.js');
         assert.throws(
             () => McpService.validateConfig({
                 name: 'test',
@@ -602,7 +554,6 @@ describe('McpService', () => {
     });
 
     it('验证无效的配置 (http缺少url)', async () => {
-        const { McpService } = await import('../../services/mcp/McpService.js');
         assert.throws(
             () => McpService.validateConfig({
                 name: 'test',
@@ -615,7 +566,6 @@ describe('McpService', () => {
     });
 
     it('创建MCP服务器', async () => {
-        const { McpService } = await import('../../services/mcp/McpService.js');
         const server = await McpService.createServer(testUserId2, {
             name: 'service-test-server',
             type: 'stdio',
@@ -630,7 +580,6 @@ describe('McpService', () => {
     });
 
     it('创建重复名称的服务器应该失败', async () => {
-        const { McpService } = await import('../../services/mcp/McpService.js');
         await assert.rejects(
             async () => McpService.createServer(testUserId2, {
                 name: 'service-test-server',
@@ -643,7 +592,6 @@ describe('McpService', () => {
     });
 
     it('更新MCP服务器', async () => {
-        const { McpService } = await import('../../services/mcp/McpService.js');
         const servers = await McpService.getServers(testUserId2);
         const server = servers.find(s => s.name === 'service-test-server');
         if (server) {
@@ -657,7 +605,6 @@ describe('McpService', () => {
     });
 
     it('切换服务器启用状态', async () => {
-        const { McpService } = await import('../../services/mcp/McpService.js');
         const servers = await McpService.getServers(testUserId2);
         const server = servers.find(s => s.name === 'service-test-updated');
         if (server) {
@@ -667,7 +614,6 @@ describe('McpService', () => {
     });
 
     it('删除MCP服务器', async () => {
-        const { McpService } = await import('../../services/mcp/McpService.js');
         const servers = await McpService.getServers(testUserId2);
         const server = servers.find(s => s.name === 'service-test-updated');
         if (server) {
@@ -677,15 +623,15 @@ describe('McpService', () => {
     });
 
     it('获取SDK配置', async () => {
-        const { McpService } = await import('../../services/mcp/McpService.js');
         const config = await McpService.getSdkConfig(testUserId);
         assert.strictEqual(typeof config, 'object', '配置应该是对象');
     });
 });
 
 describe('McpContainerManager', () => {
+    let testUserId;
+
     beforeEach(async () => {
-        const { getDatabase } = await import('../../database/connection.js');
         const db = getDatabase();
 
         const r = Math.random().toString(36).substring(7);
@@ -695,9 +641,8 @@ describe('McpContainerManager', () => {
     });
 
     afterEach(async () => {
-        const { getDatabase } = await import('../../database/connection.js');
-        const db = getDatabase();
         if (testUserId) {
+            const db = getDatabase();
             db.prepare('DELETE FROM user_mcp_servers WHERE user_id = ?').run(testUserId);
             db.prepare('DELETE FROM user_settings WHERE user_id = ?').run(testUserId);
             db.prepare('DELETE FROM users WHERE id = ?').run(testUserId);
@@ -705,7 +650,6 @@ describe('McpContainerManager', () => {
     });
 
     it('McpContainerManager 导出正确', async () => {
-        const { McpContainerManager } = await import('../../services/mcp/McpContainerManager.js');
         assert.ok(McpContainerManager != null, 'McpContainerManager 应该被导出');
         assert.strictEqual(typeof McpContainerManager.getUserMcpConfig, 'function', 'getUserMcpConfig 应该是函数');
         assert.strictEqual(typeof McpContainerManager.getMcpEnvVars, 'function', 'getMcpEnvVars 应该是函数');
@@ -716,20 +660,17 @@ describe('McpContainerManager', () => {
     });
 
     it('获取用户MCP配置', async () => {
-        const { McpContainerManager } = await import('../../services/mcp/McpContainerManager.js');
         const config = await McpContainerManager.getUserMcpConfig(testUserId);
         assert.ok(config != null, '配置不应该为null');
         assert.ok(Array.isArray(config.servers), 'servers应该是数组');
     });
 
     it('检查是否有启用的服务器', async () => {
-        const { McpContainerManager } = await import('../../services/mcp/McpContainerManager.js');
         const hasEnabled = await McpContainerManager.hasEnabledServers(testUserId);
         assert.strictEqual(typeof hasEnabled, 'boolean', '应该返回布尔值');
     });
 
     it('获取MCP环境变量', async () => {
-        const { McpContainerManager } = await import('../../services/mcp/McpContainerManager.js');
         const envVars = await McpContainerManager.getMcpEnvVars(testUserId);
         assert.strictEqual(typeof envVars, 'object', '环境变量应该是对象');
         if (Object.keys(envVars).length > 0) {
@@ -739,7 +680,6 @@ describe('McpContainerManager', () => {
     });
 
     it('获取MCP配置摘要', async () => {
-        const { McpContainerManager } = await import('../../services/mcp/McpContainerManager.js');
         const summary = await McpContainerManager.getSummary(testUserId);
         assert.ok(summary != null, '摘要不应该为null');
         assert.strictEqual(typeof summary.totalCount, 'number', 'totalCount应该是数字');
@@ -747,14 +687,12 @@ describe('McpContainerManager', () => {
     });
 
     it('格式化配置为SDK格式', async () => {
-        const { McpContainerManager } = await import('../../services/mcp/McpContainerManager.js');
         const config = await McpContainerManager.getUserMcpConfig(testUserId);
         const formatted = McpContainerManager.formatForSdk(config);
         assert.strictEqual(typeof formatted, 'object', '格式化配置应该是对象');
     });
 
     it('验证容器配置', async () => {
-        const { McpContainerManager } = await import('../../services/mcp/McpContainerManager.js');
         const config = await McpContainerManager.getUserMcpConfig(testUserId);
         const validation = McpContainerManager.validateForContainer(config);
         assert.strictEqual(typeof validation.valid, 'boolean', 'valid应该是布尔值');
@@ -764,12 +702,10 @@ describe('McpContainerManager', () => {
 
 describe('Database db.js Exports', () => {
     it('导出UserSettings仓库', async () => {
-        const { repositories } = await import('../../database/db.js');
         assert.ok('UserSettings' in repositories, '应该有UserSettings');
     });
 
     it('导出McpServer仓库', async () => {
-        const { repositories } = await import('../../database/db.js');
         assert.ok('McpServer' in repositories, '应该有McpServer');
     });
 });

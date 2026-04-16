@@ -21,11 +21,13 @@ export default defineConfig({
     ],
 
     // 排除 OOM 风险的测试文件（依赖链过重导致 fork 进程内存溢出）
+    // TODO: 修复 sidebar 模块依赖链后移除此排除项
     exclude: [
       'frontend/features/sidebar/hooks/__tests__/useProjects.test.ts',
     ],
 
-    // Worker 进程内存限制（sidebar 等模块依赖链较重）
+    // Worker 进程内存限制
+    // TODO: 8GB 是临时方案，应调查 sidebar 等模块的依赖链过重问题，考虑 lazy import 或拆分模块
     pool: 'forks',
     poolOptions: {
       forks: {
