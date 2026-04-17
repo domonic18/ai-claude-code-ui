@@ -11,6 +11,7 @@ import path from 'path';
 import { promises as fs } from 'fs';
 import { validateRepository } from './gitValidator.js';
 import { gitSpawn } from './gitSpawn.js';
+import { parseStatusOutput, stripDiffHeaders } from './gitStatusParser.js';
 
 /**
  * 获取仓库状态（分支、文件变更列表）
@@ -35,24 +36,7 @@ export async function getStatus(projectPath) {
     }
 
     const { stdout: statusOutput } = await gitSpawn(['status', '--porcelain'], projectPath);
-
-    const modified = [];
-    const added = [];
-    const deleted = [];
-    const untracked = [];
-
-    statusOutput.split('\n').forEach(line => {
-        if (!line.trim()) return;
-        const status = line.substring(0, 2);
-        const file = line.substring(3);
-
-        if (status === 'M ' || status === ' M' || status === 'MM') modified.push(file);
-        else if (status === 'A ' || status === 'AM') added.push(file);
-        else if (status === 'D ' || status === ' D') deleted.push(file);
-        else if (status === '??') untracked.push(file);
-    });
-
-    return { branch, hasCommits, modified, added, deleted, untracked };
+    return { branch, hasCommits, ...parseStatusOutput(statusOutput) };
 }
 
 /**
@@ -247,29 +231,4 @@ export async function getBranches(projectPath) {
         .filter((b, i, self) => self.indexOf(b) === i);
 }
 
-/**
- * 去除 git diff 头部信息
- * @param {string} diff - 原始 diff 输出
- * @returns {string} 清理后的 diff
- */
-export function stripDiffHeaders(diff) {
-    if (!diff) return '';
-
-    const lines = diff.split('\n');
-    const filtered = [];
-    let startIncluding = false;
-
-    for (const line of lines) {
-        if (line.startsWith('diff --git') || line.startsWith('index ') ||
-            line.startsWith('new file mode') || line.startsWith('deleted file mode') ||
-            line.startsWith('---') || line.startsWith('+++')) {
-            continue;
-        }
-        if (line.startsWith('@@') || startIncluding) {
-            startIncluding = true;
-            filtered.push(line);
-        }
-    }
-
-    return filtered.join('\n');
-}
+export { stripDiffHeaders } from './gitStatusParser.js';

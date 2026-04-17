@@ -7,13 +7,12 @@
  * @module projects/discovery/CodexDiscovery
  */
 
-import fsSync from 'fs';
 import { promises as fs } from 'fs';
-import readline from 'readline';
 import path from 'path';
 import os from 'os';
 import { BaseDiscovery } from './BaseDiscovery.js';
 import { createLogger } from '../../../utils/logger.js';
+import { parseCodexSessionFile } from './codexSessionParser.js';
 const logger = createLogger('services/projects/discovery/CodexDiscovery');
 
 /**
@@ -57,7 +56,7 @@ export class CodexDiscovery extends BaseDiscovery {
       // 解析每个文件以提取项目信息
       for (const filePath of jsonlFiles) {
         try {
-          const sessionData = await this._parseCodexSessionFile(filePath);
+          const sessionData = await parseCodexSessionFile(filePath);
           if (sessionData && sessionData.cwd) {
             const projectPath = sessionData.cwd;
 
@@ -141,7 +140,7 @@ export class CodexDiscovery extends BaseDiscovery {
       // 解析每个文件以查找匹配项目的会话
       for (const filePath of jsonlFiles) {
         try {
-          const sessionData = await this._parseCodexSessionFile(filePath);
+          const sessionData = await parseCodexSessionFile(filePath);
 
           if (sessionData && this._isSessionInProject(sessionData, projectIdentifier)) {
             sessions.push(this._normalizeSession({

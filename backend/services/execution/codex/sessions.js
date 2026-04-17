@@ -10,6 +10,7 @@ import readline from 'readline';
 import path from 'path';
 import os from 'os';
 import { createLogger } from '../../../utils/logger.js';
+import { findJsonlFiles, isSessionInProject } from './sessionFileUtils.js';
 const logger = createLogger('services/execution/codex/sessions');
 
 /**
@@ -98,47 +99,19 @@ async function getCodexSessions(projectPath) {
     const codexSessionsDir = path.join(os.homedir(), '.codex', 'sessions');
     const sessions = [];
 
-    // Check if the directory exists
     try {
       await fs.access(codexSessionsDir);
     } catch (error) {
-      // No Codex sessions directory
       return [];
     }
 
-    // Recursively find all .jsonl files in the sessions directory
-    const findJsonlFiles = async (dir) => {
-      const files = [];
-      try {
-        const entries = await fs.readdir(dir, { withFileTypes: true });
-        for (const entry of entries) {
-          const fullPath = path.join(dir, entry.name);
-          if (entry.isDirectory()) {
-            files.push(...await findJsonlFiles(fullPath));
-          } else if (entry.name.endsWith('.jsonl')) {
-            files.push(fullPath);
-          }
-        }
-      } catch (error) {
-        // Skip directories we can't read
-      }
-      return files;
-    };
-
     const jsonlFiles = await findJsonlFiles(codexSessionsDir);
 
-    // Process each file to find sessions matching the project path
     for (const filePath of jsonlFiles) {
       try {
         const sessionData = await parseCodexSessionFile(filePath);
 
-        // Check if this session matches the project path
-        // Handle Windows long paths with \\?\ prefix
-        const sessionCwd = sessionData?.cwd || '';
-        const cleanSessionCwd = sessionCwd.startsWith('\\\\?\\') ? sessionCwd.slice(4) : sessionCwd;
-        const cleanProjectPath = projectPath.startsWith('\\\\?\\') ? projectPath.slice(4) : projectPath;
-
-        if (sessionData && (sessionData.cwd === projectPath || cleanSessionCwd === cleanProjectPath || path.relative(cleanSessionCwd, cleanProjectPath) === '')) {
+        if (sessionData && isSessionInProject(sessionData, projectPath)) {
           sessions.push({
             id: sessionData.id,
             summary: sessionData.summary || 'Codex Session',
@@ -155,10 +128,7 @@ async function getCodexSessions(projectPath) {
       }
     }
 
-    // Sort sessions by last activity (newest first)
     sessions.sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
-
-    // Return only the first 5 sessions for performance
     return sessions.slice(0, 5);
 
   } catch (error) {
@@ -175,23 +145,6 @@ async function getCodexSessions(projectPath) {
 async function deleteCodexSession(sessionId) {
   try {
     const codexSessionsDir = path.join(os.homedir(), '.codex', 'sessions');
-
-    const findJsonlFiles = async (dir) => {
-      const files = [];
-      try {
-        const entries = await fs.readdir(dir, { withFileTypes: true });
-        for (const entry of entries) {
-          const fullPath = path.join(dir, entry.name);
-          if (entry.isDirectory()) {
-            files.push(...await findJsonlFiles(fullPath));
-          } else if (entry.name.endsWith('.jsonl')) {
-            files.push(fullPath);
-          }
-        }
-      } catch (error) {}
-      return files;
-    };
-
     const jsonlFiles = await findJsonlFiles(codexSessionsDir);
 
     for (const filePath of jsonlFiles) {
