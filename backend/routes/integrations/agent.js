@@ -115,6 +115,20 @@ router.post('/', validateExternalApiKey, async (req, res) => {
         return res.status(400).json({ error: 'createBranch and createPR require either githubUrl or projectPath with a GitHub remote' });
     }
 
+    // projectPath 路径安全校验：必须在允许的目录范围内
+    if (projectPath && !githubUrl) {
+        const resolved = path.resolve(projectPath);
+        const externalProjectsDir = path.join(os.homedir(), '.claude', 'external-projects');
+        // 允许：用户主目录下的项目 或 external-projects 目录
+        if (!resolved.startsWith(os.homedir()) && !resolved.startsWith(externalProjectsDir)) {
+            return res.status(400).json({ error: 'projectPath must be within the user home directory' });
+        }
+        // 禁止路径穿越
+        if (resolved.includes('..')) {
+            return res.status(400).json({ error: 'projectPath cannot contain path traversal sequences' });
+        }
+    }
+
     let finalProjectPath = null;
     let writer = null;
 

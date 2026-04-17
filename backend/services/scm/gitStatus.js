@@ -2,17 +2,15 @@
  * Git 状态与 Diff 查询模块
  *
  * 提供仓库状态查询、文件 diff、提交历史、远程状态等功能。
+ * 使用 spawn + 参数数组执行 git 命令，防止命令注入。
  *
  * @module services/scm/gitStatus
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import path from 'path';
 import { promises as fs } from 'fs';
 import { validateRepository } from './gitValidator.js';
-
-const execAsync = promisify(exec);
+import { gitSpawn } from './gitSpawn.js';
 
 /**
  * 获取仓库状态（分支、文件变更列表）
@@ -26,7 +24,7 @@ export async function getStatus(projectPath) {
     let branch = 'main';
     let hasCommits = true;
     try {
-        const { stdout } = await execAsync('git rev-parse --abbrev-ref HEAD', { cwd: projectPath });
+        const { stdout } = await gitSpawn(['rev-parse', '--abbrev-ref', 'HEAD'], projectPath);
         branch = stdout.trim();
     } catch (error) {
         if (error.message.includes('unknown revision') || error.message.includes('ambiguous argument')) {
@@ -36,7 +34,7 @@ export async function getStatus(projectPath) {
         }
     }
 
-    const { stdout: statusOutput } = await execAsync('git status --porcelain', { cwd: projectPath });
+    const { stdout: statusOutput } = await gitSpawn(['status', '--porcelain'], projectPath);
 
     const modified = [];
     const added = [];
@@ -66,7 +64,7 @@ export async function getStatus(projectPath) {
 export async function getFileDiff(projectPath, file) {
     await validateRepository(projectPath);
 
-    const { stdout: statusOutput } = await execAsync(`git status --porcelain "${file}"`, { cwd: projectPath });
+    const { stdout: statusOutput } = await gitSpawn(['status', '--porcelain', '--', file], projectPath);
     const isUntracked = statusOutput.startsWith('??');
     const isDeleted = statusOutput.trim().startsWith('D ') || statusOutput.trim().startsWith(' D');
 
@@ -80,15 +78,15 @@ export async function getFileDiff(projectPath, file) {
     }
 
     if (isDeleted) {
-        const { stdout: fileContent } = await execAsync(`git show HEAD:"${file}"`, { cwd: projectPath });
+        const { stdout: fileContent } = await gitSpawn(['show', `HEAD:${file}`], projectPath);
         const lines = fileContent.split('\n');
         return `--- a/${file}\n+++ /dev/null\n@@ -1,${lines.length} +0,0 @@\n` + lines.map(l => `-${l}`).join('\n');
     }
 
-    const { stdout: unstagedDiff } = await execAsync(`git diff -- "${file}"`, { cwd: projectPath });
+    const { stdout: unstagedDiff } = await gitSpawn(['diff', '--', file], projectPath);
     if (unstagedDiff) return stripDiffHeaders(unstagedDiff);
 
-    const { stdout: stagedDiff } = await execAsync(`git diff --cached -- "${file}"`, { cwd: projectPath });
+    const { stdout: stagedDiff } = await gitSpawn(['diff', '--cached', '--', file], projectPath);
     return stripDiffHeaders(stagedDiff) || '';
 }
 
@@ -101,7 +99,7 @@ export async function getFileDiff(projectPath, file) {
 export async function getFileWithDiff(projectPath, file) {
     await validateRepository(projectPath);
 
-    const { stdout: statusOutput } = await execAsync(`git status --porcelain "${file}"`, { cwd: projectPath });
+    const { stdout: statusOutput } = await gitSpawn(['status', '--porcelain', '--', file], projectPath);
     const isUntracked = statusOutput.startsWith('??');
     const isDeleted = statusOutput.trim().startsWith('D ') || statusOutput.trim().startsWith(' D');
 
@@ -109,7 +107,7 @@ export async function getFileWithDiff(projectPath, file) {
     let oldContent = '';
 
     if (isDeleted) {
-        const { stdout } = await execAsync(`git show HEAD:"${file}"`, { cwd: projectPath });
+        const { stdout } = await gitSpawn(['show', `HEAD:${file}`], projectPath);
         oldContent = stdout;
         currentContent = stdout;
     } else {
@@ -120,7 +118,7 @@ export async function getFileWithDiff(projectPath, file) {
         currentContent = await fs.readFile(filePath, 'utf-8');
         if (!isUntracked) {
             try {
-                const { stdout } = await execAsync(`git show HEAD:"${file}"`, { cwd: projectPath });
+                const { stdout } = await gitSpawn(['show', `HEAD:${file}`], projectPath);
                 oldContent = stdout;
             } catch {
                 oldContent = '';
@@ -140,34 +138,43 @@ export async function getFileWithDiff(projectPath, file) {
 export async function getCommits(projectPath, limit = 10) {
     await validateRepository(projectPath);
 
-    const { stdout } = await execAsync(
-        `git log --pretty=format:'%H|%an|%ae|%ad|%s' --date=relative -n ${limit}`,
-        { cwd: projectPath }
-    );
+    // 安全转换 limit 为整数
+    const safeLimit = Math.max(1, Math.min(100, Math.trunc(Number(limit) || 10)));
 
-    const commits = stdout.split('\n').filter(l => l.trim()).map(line => {
-        const [hash, author, email, date, ...messageParts] = line.split('|');
-        return { hash, author, email, date, message: messageParts.join('|'), stats: '' };
+    // 一次性获取 commits + stats，避免 N+1
+    const { stdout } = await gitSpawn([
+        'log', `--pretty=format:%H|%an|%ae|%ad|%s`, '--stat', '--date=relative', `-n`, String(safeLimit)
+    ], projectPath);
+
+    // 按 commit 边界分割（每个 commit 以空行后的 hash 开头）
+    const commitBlocks = stdout.split(/(?=^[a-f0-9]{40}\|)/m).filter(b => b.trim());
+
+    return commitBlocks.map(block => {
+        const lines = block.split('\n');
+        const firstLine = lines[0];
+        const [hash, author, email, date, ...messageParts] = firstLine.split('|');
+        const message = messageParts.join('|');
+
+        // stats 在最后的 summary 行
+        const statsLines = lines.slice(1).join('\n').trim();
+        const lastLine = statsLines.split('\n').pop() || '';
+
+        return { hash, author, email, date, message, stats: lastLine };
     });
-
-    for (const commit of commits) {
-        try {
-            const { stdout: stats } = await execAsync(`git show --stat --format='' ${commit.hash}`, { cwd: projectPath });
-            commit.stats = stats.trim().split('\n').pop();
-        } catch { /* ignore */ }
-    }
-
-    return commits;
 }
 
 /**
  * 获取特定提交的完整 diff
  * @param {string} projectPath - 项目路径
- * @param {string} commit - 提交哈希
+ * @param {string} commit - 提交哈希（仅允许 hex 字符）
  * @returns {Promise<string>} diff 内容
  */
 export async function getCommitDiff(projectPath, commit) {
-    const { stdout } = await execAsync(`git show ${commit}`, { cwd: projectPath });
+    // 校验 commit hash 格式，防止注入
+    if (!/^[a-f0-9]+$/i.test(commit)) {
+        throw new Error('Invalid commit hash format');
+    }
+    const { stdout } = await gitSpawn(['show', commit], projectPath);
     return stdout;
 }
 
@@ -179,13 +186,13 @@ export async function getCommitDiff(projectPath, commit) {
 export async function getRemoteStatus(projectPath) {
     await validateRepository(projectPath);
 
-    const { stdout: currentBranch } = await execAsync('git rev-parse --abbrev-ref HEAD', { cwd: projectPath });
+    const { stdout: currentBranch } = await gitSpawn(['rev-parse', '--abbrev-ref', 'HEAD'], projectPath);
     const branch = currentBranch.trim();
 
     let trackingBranch;
     let remoteName;
     try {
-        const { stdout } = await execAsync(`git rev-parse --abbrev-ref ${branch}@{upstream}`, { cwd: projectPath });
+        const { stdout } = await gitSpawn(['rev-parse', '--abbrev-ref', `${branch}@{upstream}`], projectPath);
         trackingBranch = stdout.trim();
         remoteName = trackingBranch.split('/')[0];
     } catch {
@@ -193,7 +200,7 @@ export async function getRemoteStatus(projectPath) {
         let hasRemote = false;
         let detectedRemote = null;
         try {
-            const { stdout } = await execAsync('git remote', { cwd: projectPath });
+            const { stdout } = await gitSpawn(['remote'], projectPath);
             const remotes = stdout.trim().split('\n').filter(r => r.trim());
             if (remotes.length > 0) {
                 hasRemote = true;
@@ -204,7 +211,7 @@ export async function getRemoteStatus(projectPath) {
         return { hasRemote, hasUpstream: false, branch, remoteName: detectedRemote, message: 'No remote tracking branch configured' };
     }
 
-    const { stdout: countOutput } = await execAsync(`git rev-list --count --left-right ${trackingBranch}...HEAD`, { cwd: projectPath });
+    const { stdout: countOutput } = await gitSpawn(['rev-list', '--count', '--left-right', `${trackingBranch}...HEAD`], projectPath);
     const [behind, ahead] = countOutput.trim().split('\t').map(Number);
 
     return {
@@ -227,7 +234,7 @@ export async function getRemoteStatus(projectPath) {
 export async function getBranches(projectPath) {
     await validateRepository(projectPath);
 
-    const { stdout } = await execAsync('git branch -a', { cwd: projectPath });
+    const { stdout } = await gitSpawn(['branch', '-a'], projectPath);
     return stdout
         .split('\n')
         .map(b => b.trim())

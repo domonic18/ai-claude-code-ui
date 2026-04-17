@@ -103,6 +103,11 @@ router.post('/prd/:projectName', async (req, res) => {
 router.get('/prd/:projectName/:fileName', async (req, res) => {
     try {
         const { projectName, fileName } = req.params;
+
+        if (!isValidPrdFileName(fileName)) {
+            return res.status(400).json({ error: 'Invalid filename', message: 'Filename contains disallowed characters' });
+        }
+
         const projectPath = await resolveProjectPath(projectName, res);
         if (!projectPath) return;
 
@@ -131,6 +136,11 @@ router.get('/prd/:projectName/:fileName', async (req, res) => {
 router.delete('/prd/:projectName/:fileName', async (req, res) => {
     try {
         const { projectName, fileName } = req.params;
+
+        if (!isValidPrdFileName(fileName)) {
+            return res.status(400).json({ error: 'Invalid filename', message: 'Filename contains disallowed characters' });
+        }
+
         const projectPath = await resolveProjectPath(projectName, res);
         if (!projectPath) return;
 

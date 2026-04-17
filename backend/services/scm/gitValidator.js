@@ -2,19 +2,18 @@
  * Git 仓库验证模块
  *
  * 提供仓库路径解析和验证功能。
+ * 使用 spawn + 参数数组执行 git 命令，防止命令注入。
  *
  * @module services/scm/gitValidator
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import path from 'path';
 import { promises as fs } from 'fs';
 import { extractProjectDirectory } from '../projects/index.js';
 import { createLogger } from '../../utils/logger.js';
+import { gitSpawn } from './gitSpawn.js';
 
 const logger = createLogger('services/scm/gitValidator');
-const execAsync = promisify(exec);
 
 /**
  * 从编码的项目名称中获取实际项目路径
@@ -44,7 +43,7 @@ export async function validateRepository(projectPath) {
     }
 
     try {
-        const { stdout: gitRoot } = await execAsync('git rev-parse --show-toplevel', { cwd: projectPath });
+        const { stdout: gitRoot } = await gitSpawn(['rev-parse', '--show-toplevel'], projectPath);
         const normalizedGitRoot = path.resolve(gitRoot.trim());
         const normalizedProjectPath = path.resolve(projectPath);
 

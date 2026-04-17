@@ -44,12 +44,13 @@ function getChatsPath(cwdId) {
  */
 export function parseTimestamp(value) {
     if (typeof value === 'number') {
+        if (!Number.isFinite(value)) return null;
         const ms = value < 1e12 ? value * 1000 : value;
         return new Date(ms).toISOString();
     }
     if (typeof value === 'string') {
         const n = Number(value);
-        if (!Number.isNaN(n)) {
+        if (Number.isFinite(n)) {
             const ms = n < 1e12 ? n * 1000 : n;
             return new Date(ms).toISOString();
         }

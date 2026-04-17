@@ -167,7 +167,7 @@ export class ContainerLifecycleManager {
           const status = await this.healthMonitor.getContainerStatus(containerInfo.id);
           if (status === 'running') {
             containerInfo.lastActive = new Date();
-            try { Container.updateLastActive(containerInfo.id); } catch {}
+            try { Container.updateLastActive(containerInfo.id); } catch (e) { logger.warn({ err: e, containerId: containerInfo.id }, 'Failed to update last active timestamp'); }
             return containerInfo;
           }
         } catch (err) {
@@ -481,7 +481,7 @@ export class ContainerLifecycleManager {
             Container.delete(container_id);
             let stateMachine = this.stateMachines.get(user_id);
             if (!stateMachine) {
-              try { stateMachine = await containerStateStore.load(user_id); } catch {}
+              try { stateMachine = await containerStateStore.load(user_id); } catch (e) { logger.warn({ err: e, userId: user_id }, 'Failed to load container state from store'); }
             }
             if (stateMachine) {
               stateMachine.forceReset();

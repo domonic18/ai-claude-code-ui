@@ -24,6 +24,7 @@ export function useWebSocket(isEnabled = true): UseWebSocketResult {
   const wsRef = useRef<WebSocket | null>(null);
   const isEnabledRef = useRef<boolean>(isEnabled);
   const isConnectingRef = useRef<boolean>(false);
+  const isUnmountedRef = useRef<boolean>(false);
 
   // Update ref when isEnabled changes
   useEffect(() => {
@@ -121,8 +122,8 @@ export function useWebSocket(isEnabled = true): UseWebSocketResult {
         wsRef.current = null;
         isConnectingRef.current = false;
 
-        // Attempt reconnection if not a normal close and still enabled
-        if (event.code !== 1000 && isEnabledRef.current) {
+        // Attempt reconnection if not a normal close, still enabled, and not unmounted
+        if (event.code !== 1000 && isEnabledRef.current && !isUnmountedRef.current) {
           reconnectTimeoutRef.current = setTimeout(() => {
             logger.info('[WebSocket] Attempting to reconnect...');
             connect();
@@ -149,11 +150,13 @@ export function useWebSocket(isEnabled = true): UseWebSocketResult {
     }
 
     return () => {
+      isUnmountedRef.current = true;
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
       }
       if (wsRef.current) {
-        wsRef.current.close();
+        wsRef.current.close(1000, 'Component unmounted');
       }
     };
   }, [isEnabled, connect]);

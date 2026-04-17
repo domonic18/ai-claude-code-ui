@@ -2,21 +2,20 @@
  * Git 提交操作模块
  *
  * 提供创建初始提交、提交文件、切换/创建分支等写操作。
+ * 使用 spawn + 参数数组执行 git 命令，防止命令注入。
  *
  * @module services/scm/gitCommit
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import path from 'path';
 import { promises as fs } from 'fs';
 import { validateRepository } from './gitValidator.js';
-import { createLogger, sanitizePreview } from '../../utils/logger.js';
+import { gitSpawn } from './gitSpawn.js';
+import { createLogger } from '../../utils/logger.js';
 import { queryClaudeSDK } from '../execution/claude/index.js';
 import { spawnCursor } from '../execution/cursor/index.js';
 
 const logger = createLogger('services/scm/gitCommit');
-const execAsync = promisify(exec);
 
 /**
  * 创建初始提交
@@ -27,14 +26,14 @@ export async function createInitialCommit(projectPath) {
     await validateRepository(projectPath);
 
     try {
-        await execAsync('git rev-parse HEAD', { cwd: projectPath });
+        await gitSpawn(['rev-parse', 'HEAD'], projectPath);
         throw new Error('Repository already has commits. Use regular commit instead.');
     } catch (error) {
         if (error.message.includes('already has commits')) throw error;
     }
 
-    await execAsync('git add .', { cwd: projectPath });
-    const { stdout } = await execAsync('git commit -m "Initial commit"', { cwd: projectPath });
+    await gitSpawn(['add', '.'], projectPath);
+    const { stdout } = await gitSpawn(['commit', '-m', 'Initial commit'], projectPath);
     return { output: stdout };
 }
 
@@ -49,10 +48,10 @@ export async function commitFiles(projectPath, files, message) {
     await validateRepository(projectPath);
 
     for (const file of files) {
-        await execAsync(`git add "${file}"`, { cwd: projectPath });
+        await gitSpawn(['add', '--', file], projectPath);
     }
 
-    const { stdout } = await execAsync(`git commit -m "${message.replace(/"/g, '\\"')}"`, { cwd: projectPath });
+    const { stdout } = await gitSpawn(['commit', '-m', message], projectPath);
     return { output: stdout };
 }
 
@@ -63,7 +62,7 @@ export async function commitFiles(projectPath, files, message) {
  * @returns {Promise<{output: string}>}
  */
 export async function checkoutBranch(projectPath, branch) {
-    const { stdout } = await execAsync(`git checkout "${branch}"`, { cwd: projectPath });
+    const { stdout } = await gitSpawn(['checkout', branch], projectPath);
     return { output: stdout };
 }
 
@@ -74,7 +73,7 @@ export async function checkoutBranch(projectPath, branch) {
  * @returns {Promise<{output: string}>}
  */
 export async function createBranch(projectPath, branch) {
-    const { stdout } = await execAsync(`git checkout -b "${branch}"`, { cwd: projectPath });
+    const { stdout } = await gitSpawn(['checkout', '-b', branch], projectPath);
     return { output: stdout };
 }
 
@@ -87,7 +86,7 @@ export async function createBranch(projectPath, branch) {
 export async function discardChanges(projectPath, file) {
     await validateRepository(projectPath);
 
-    const { stdout: statusOutput } = await execAsync(`git status --porcelain "${file}"`, { cwd: projectPath });
+    const { stdout: statusOutput } = await gitSpawn(['status', '--porcelain', '--', file], projectPath);
     if (!statusOutput.trim()) throw new Error('No changes to discard for this file');
 
     const status = statusOutput.substring(0, 2);
@@ -97,9 +96,9 @@ export async function discardChanges(projectPath, file) {
         if (stats.isDirectory()) await fs.rm(filePath, { recursive: true, force: true });
         else await fs.unlink(filePath);
     } else if (status.includes('M') || status.includes('D')) {
-        await execAsync(`git restore "${file}"`, { cwd: projectPath });
+        await gitSpawn(['restore', '--', file], projectPath);
     } else if (status.includes('A')) {
-        await execAsync(`git reset HEAD "${file}"`, { cwd: projectPath });
+        await gitSpawn(['reset', 'HEAD', '--', file], projectPath);
     }
 }
 
@@ -112,7 +111,7 @@ export async function discardChanges(projectPath, file) {
 export async function deleteUntracked(projectPath, file) {
     await validateRepository(projectPath);
 
-    const { stdout: statusOutput } = await execAsync(`git status --porcelain "${file}"`, { cwd: projectPath });
+    const { stdout: statusOutput } = await gitSpawn(['status', '--porcelain', '--', file], projectPath);
     if (!statusOutput.trim()) throw new Error('File is not untracked or does not exist');
     if (statusOutput.substring(0, 2) !== '??') throw new Error('File is not untracked. Use discard for tracked files.');
 
@@ -138,7 +137,7 @@ export async function generateCommitMessage(projectPath, files, provider = 'clau
     let diffContext = '';
     for (const file of files) {
         try {
-            const { stdout } = await execAsync(`git diff HEAD -- "${file}"`, { cwd: projectPath });
+            const { stdout } = await gitSpawn(['diff', 'HEAD', '--', file], projectPath);
             if (stdout) diffContext += `\n--- ${file} ---\n${stdout}`;
         } catch { /* ignore */ }
     }

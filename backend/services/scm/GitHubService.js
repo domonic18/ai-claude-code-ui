@@ -18,6 +18,7 @@ import os from 'os';
 import { promises as fs } from 'fs';
 import { Octokit } from '@octokit/rest';
 import { createLogger } from '../../utils/logger.js';
+import { gitSpawn } from './gitSpawn.js';
 
 const logger = createLogger('services/scm/GitHubService');
 
@@ -226,40 +227,71 @@ export async function cloneGitHubRepo(githubUrl, githubToken = null, projectPath
 
     await fs.mkdir(path.dirname(cloneDir), { recursive: true });
 
-    let cloneUrl = githubUrl;
-    if (githubToken) {
-        cloneUrl = githubUrl.replace('https://github.com', `https://${githubToken}@github.com`);
-    }
-
     logger.info({ githubUrl, cloneDir }, 'Cloning repository');
 
     return new Promise((resolve, reject) => {
-        const gitProcess = spawn('git', ['clone', '--depth', '1', cloneUrl, cloneDir], {
-            stdio: ['pipe', 'pipe', 'pipe']
-        });
+        if (githubToken) {
+            // 安全传递凭证：创建临时 askpass 脚本，通过环境变量传 token，不暴露在 ps 进程列表
+            const tmpDir = path.join(os.tmpdir(), 'claude-ui-askpass');
+            fs.mkdir(tmpDir, { recursive: true }).then(() => {
+                const askpassPath = path.join(tmpDir, `askpass-${Date.now()}.sh`);
+                const askpassContent = '#!/bin/sh\nprintf \'%s\\n\' "$GIT_ASKPASS_SECRET"\n';
 
-        let stdout = '';
-        let stderr = '';
+                fs.writeFile(askpassPath, askpassContent, { mode: 0o700 }).then(() => {
+                    const gitProcess = spawn('git', ['clone', '--depth', '1', githubUrl, cloneDir], {
+                        stdio: ['pipe', 'pipe', 'pipe'],
+                        env: {
+                            ...process.env,
+                            GIT_ASKPASS: askpassPath,
+                            GIT_ASKPASS_SECRET: githubToken,
+                            GIT_TERMINAL_PROMPT: '0',
+                        },
+                    });
 
-        gitProcess.stdout.on('data', (data) => { stdout += data.toString(); });
-        gitProcess.stderr.on('data', (data) => {
-            stderr += data.toString();
-            logger.debug({ stderr: data.toString() }, 'Git stderr output');
-        });
+                    handleCloneProcess(gitProcess, cloneDir, githubUrl, askpassPath, resolve, reject);
+                }).catch(reject);
+            }).catch(reject);
+        } else {
+            const gitProcess = spawn('git', ['clone', '--depth', '1', githubUrl, cloneDir], {
+                stdio: ['pipe', 'pipe', 'pipe'],
+            });
+            handleCloneProcess(gitProcess, cloneDir, githubUrl, null, resolve, reject);
+        }
+    });
+}
 
-        gitProcess.on('close', (code) => {
-            if (code === 0) {
-                logger.info({ cloneDir, githubUrl }, 'Repository cloned successfully');
-                resolve(cloneDir);
-            } else {
-                logger.error({ stderr, code, githubUrl, cloneDir }, 'Git clone failed');
-                reject(new Error(`Git clone failed: ${stderr}`));
-            }
-        });
+/**
+ * 处理 git clone 进程的事件
+ * @private
+ */
+function handleCloneProcess(gitProcess, cloneDir, githubUrl, askpassPath, resolve, reject) {
+    let stderr = '';
 
-        gitProcess.on('error', (error) => {
-            reject(new Error(`Failed to execute git: ${error.message}`));
-        });
+    gitProcess.stdout.on('data', () => {});
+    gitProcess.stderr.on('data', (data) => {
+        stderr += data.toString();
+    });
+
+    gitProcess.on('close', (code) => {
+        // 清理 askpass 脚本
+        if (askpassPath) {
+            fs.unlink(askpassPath).catch(() => {});
+        }
+
+        if (code === 0) {
+            logger.info({ cloneDir, githubUrl }, 'Repository cloned successfully');
+            resolve(cloneDir);
+        } else {
+            logger.error({ stderr, code, githubUrl, cloneDir }, 'Git clone failed');
+            reject(new Error(`Git clone failed: ${stderr}`));
+        }
+    });
+
+    gitProcess.on('error', (error) => {
+        if (askpassPath) {
+            fs.unlink(askpassPath).catch(() => {});
+        }
+        reject(new Error(`Failed to execute git: ${error.message}`));
     });
 }
 

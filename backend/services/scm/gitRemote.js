@@ -2,17 +2,16 @@
  * Git 远程操作模块
  *
  * 提供 fetch、pull、push、发布分支等远程仓库操作。
+ * 使用 spawn + 参数数组执行 git 命令，防止命令注入。
  *
  * @module services/scm/gitRemote
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { validateRepository } from './gitValidator.js';
+import { gitSpawn } from './gitSpawn.js';
 import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('services/scm/gitRemote');
-const execAsync = promisify(exec);
 
 /**
  * 获取远程仓库的跟踪分支和远程名称
@@ -21,13 +20,13 @@ const execAsync = promisify(exec);
  * @returns {Promise<{remoteName: string, remoteBranch: string}>}
  */
 async function resolveRemoteInfo(projectPath) {
-    const { stdout: currentBranch } = await execAsync('git rev-parse --abbrev-ref HEAD', { cwd: projectPath });
+    const { stdout: currentBranch } = await gitSpawn(['rev-parse', '--abbrev-ref', 'HEAD'], projectPath);
     const branch = currentBranch.trim();
 
     let remoteName = 'origin';
     let remoteBranch = branch;
     try {
-        const { stdout } = await execAsync(`git rev-parse --abbrev-ref ${branch}@{upstream}`, { cwd: projectPath });
+        const { stdout } = await gitSpawn(['rev-parse', '--abbrev-ref', `${branch}@{upstream}`], projectPath);
         const tracking = stdout.trim();
         remoteName = tracking.split('/')[0];
         remoteBranch = tracking.split('/').slice(1).join('/');
@@ -46,7 +45,7 @@ async function resolveRemoteInfo(projectPath) {
 export async function fetchFromRemote(projectPath) {
     await validateRepository(projectPath);
     const { remoteName } = await resolveRemoteInfo(projectPath);
-    const { stdout } = await execAsync(`git fetch ${remoteName}`, { cwd: projectPath });
+    const { stdout } = await gitSpawn(['fetch', remoteName], projectPath);
     return { output: stdout || 'Fetch completed successfully', remoteName };
 }
 
@@ -58,7 +57,7 @@ export async function fetchFromRemote(projectPath) {
 export async function pullFromRemote(projectPath) {
     await validateRepository(projectPath);
     const { remoteName, remoteBranch } = await resolveRemoteInfo(projectPath);
-    const { stdout } = await execAsync(`git pull ${remoteName} ${remoteBranch}`, { cwd: projectPath });
+    const { stdout } = await gitSpawn(['pull', remoteName, remoteBranch], projectPath);
     return { output: stdout || 'Pull completed successfully', remoteName, remoteBranch };
 }
 
@@ -70,7 +69,7 @@ export async function pullFromRemote(projectPath) {
 export async function pushToRemote(projectPath) {
     await validateRepository(projectPath);
     const { remoteName, remoteBranch } = await resolveRemoteInfo(projectPath);
-    const { stdout } = await execAsync(`git push ${remoteName} ${remoteBranch}`, { cwd: projectPath });
+    const { stdout } = await gitSpawn(['push', remoteName, remoteBranch], projectPath);
     return { output: stdout || 'Push completed successfully', remoteName, remoteBranch };
 }
 
@@ -83,14 +82,14 @@ export async function pushToRemote(projectPath) {
 export async function publishBranch(projectPath, branch) {
     await validateRepository(projectPath);
 
-    const { stdout: currentBranch } = await execAsync('git rev-parse --abbrev-ref HEAD', { cwd: projectPath });
+    const { stdout: currentBranch } = await gitSpawn(['rev-parse', '--abbrev-ref', 'HEAD'], projectPath);
     if (currentBranch.trim() !== branch) {
         throw new Error(`Branch mismatch. Current branch is ${currentBranch.trim()}, but trying to publish ${branch}`);
     }
 
     let remoteName = 'origin';
     try {
-        const { stdout } = await execAsync('git remote', { cwd: projectPath });
+        const { stdout } = await gitSpawn(['remote'], projectPath);
         const remotes = stdout.trim().split('\n').filter(r => r.trim());
         if (remotes.length === 0) {
             throw new Error('No remote repository configured. Add a remote with: git remote add origin <url>');
@@ -101,6 +100,6 @@ export async function publishBranch(projectPath, branch) {
         throw new Error('No remote repository configured. Add a remote with: git remote add origin <url>');
     }
 
-    const { stdout } = await execAsync(`git push --set-upstream ${remoteName} ${branch}`, { cwd: projectPath });
+    const { stdout } = await gitSpawn(['push', '--set-upstream', remoteName, branch], projectPath);
     return { output: stdout || 'Branch published successfully', remoteName };
 }

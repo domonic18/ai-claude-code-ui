@@ -9,6 +9,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import DOMPurify from 'dompurify';
 import { api } from '@/shared/services';
 import type { CodeEditorComponentProps } from '../types/editor.types';
 import { logger } from '@/shared/utils/logger';
@@ -480,7 +481,7 @@ function CodeEditor({
                                             ),
                                         }}
                                     >
-                                        {content}
+                                        {DOMPurify.sanitize(content)}
                                     </ReactMarkdown>
                                 </div>
                             </div>
