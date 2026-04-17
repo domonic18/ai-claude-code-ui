@@ -9,7 +9,6 @@
  */
 
 import path from 'path';
-import fs from 'fs';
 import { repositories } from '../../../database/db.js';
 import { getWorkspaceDir, CONTAINER, CONTAINER_TIMEOUTS } from '../../../config/config.js';
 import { ContainerHealthMonitor } from './ContainerHealth.js';
@@ -21,99 +20,173 @@ import * as ContainerSetup from './ContainerSetup.js';
 import { createLogger } from '../../../utils/logger.js';
 
 const logger = createLogger('container/core/ContainerLifecycle');
-
 const { Container } = repositories;
 
-/**
- * 容器生命周期管理器类
- * 编排容器的创建、启动、停止、销毁流程，
- * 使用状态机确保并发安全和幂等性。
- */
+// ─── 常量 ──────────────────────────────────────────────
+
+const STALE_STATE_THRESHOLD_MS = 30000;
+const INTERMEDIATE_STATES = [ContainerState.CREATING, ContainerState.STARTING, ContainerState.HEALTH_CHECKING];
+
+// ─── 主类 ──────────────────────────────────────────────
+
 export class ContainerLifecycleManager {
-  /**
-   * 创建容器生命周期管理器实例
-   * @param {Object} options - 配置选项
-   * @param {Object} options.docker - Docker 客户端实例
-   * @param {string} [options.dataDir] - 数据目录路径
-   * @param {string} [options.image] - Docker 镜像名称
-   * @param {string} [options.network] - 网络模式
-   */
   constructor(options = {}) {
     this.docker = options.docker;
     this.config = {
       dataDir: options.dataDir || getWorkspaceDir(),
       image: options.image || CONTAINER.image,
-      network: options.network || CONTAINER.network
+      network: options.network || CONTAINER.network,
     };
-
-    // 容器池缓存：userId -> containerInfo
     this.containers = new Map();
-
-    // 状态机缓存：userId -> stateMachine
     this.stateMachines = new Map();
-
-    // 健康监控
     this.healthMonitor = new ContainerHealthMonitor(this.docker);
+  }
+
+  // ─── 公共 API ──────────────────────────────────────
+
+  async getOrCreateContainer(userId, userConfig = {}, options = {}) {
+    const stateMachine = await this._getStateMachine(userId);
+
+    // 已就绪：检查运行状态
+    if (stateMachine.is(ContainerState.READY)) {
+      return this._handleReadyState(userId, stateMachine) ||
+        this._createContainerWithStateMachine(userId, userConfig, stateMachine);
+    }
+
+    // 创建中：等待或报错
+    if (INTERMEDIATE_STATES.includes(stateMachine.getState())) {
+      return this._handleIntermediateState(userId, userConfig, options, stateMachine);
+    }
+
+    // 失败或不存在：重置后创建
+    if (stateMachine.is(ContainerState.FAILED)) {
+      stateMachine.transitionTo(ContainerState.NON_EXISTENT);
+      await containerStateStore.save(stateMachine);
+    }
+
+    return this._createContainerWithStateMachine(userId, userConfig, stateMachine);
+  }
+
+  async stopContainer(userId) {
+    const info = this.containers.get(userId);
+    if (!info) return;
+    await ContainerOps.stopContainer(this.docker, info.id);
+    info.status = 'stopped';
+  }
+
+  async startContainer(userId) {
+    const info = this.containers.get(userId);
+    if (!info) throw new Error(`No container found for user ${userId}`);
+    await ContainerOps.startContainer(this.docker, info.id);
+    info.status = 'running';
+    info.lastActive = new Date();
+  }
+
+  async destroyContainer(userId, removeVolume = false) {
+    const info = this.containers.get(userId);
+    if (!info) return;
+    try {
+      await ContainerOps.destroyContainer(this.docker, info.id, this.config.dataDir, userId, removeVolume);
+      this.containers.delete(userId);
+      try { Container.delete(info.id); } catch (e) { logger.warn(`Failed to remove container from database: ${e.message}`); }
+    } catch (error) {
+      throw new Error(`Failed to destroy container for user ${userId}: ${error.message}`);
+    }
+  }
+
+  async execInContainer(userId, command, options = {}) {
+    const info = await this.getOrCreateContainer(userId);
+    return ContainerOps.execInContainer(this.docker, info.id, command, options);
+  }
+
+  async attachToContainerShell(userId, options = {}) {
+    const info = await this.getOrCreateContainer(userId);
+    return ContainerOps.attachToShell(this.docker, info.id);
+  }
+
+  getAllContainers() { return Array.from(this.containers.values()); }
+  getContainerByUserId(userId) { return this.containers.get(userId); }
+
+  // ─── 状态处理 ──────────────────────────────────────
+
+  /** @returns {Promise<Object|undefined>} 容器信息，或 undefined 需要重新创建 */
+  async _handleReadyState(userId, stateMachine) {
+    const containerInfo = this.containers.get(userId);
+    if (!containerInfo) return undefined;
+
+    try {
+      const status = await this.healthMonitor.getContainerStatus(containerInfo.id);
+      if (status === 'running') {
+        containerInfo.lastActive = new Date();
+        try { Container.updateLastActive(containerInfo.id); } catch {}
+        return containerInfo;
+      }
+    } catch (err) {
+      logger.warn(`Container check failed: ${err.message}, resetting state`);
+    }
+
+    stateMachine.transitionTo(ContainerState.NON_EXISTENT);
+    await containerStateStore.save(stateMachine);
+    return undefined;
+  }
+
+  async _handleIntermediateState(userId, userConfig, options, stateMachine) {
+    if (options.wait === false) {
+      throw new Error(`Container is ${stateMachine.getState()}, not ready yet`);
+    }
+    try {
+      await this._waitForReady(userId, options.timeout);
+      return this.containers.get(userId);
+    } catch (error) {
+      if (stateMachine.is(ContainerState.FAILED)) {
+        stateMachine.transitionTo(ContainerState.NON_EXISTENT);
+        await containerStateStore.save(stateMachine);
+        return this.getOrCreateContainer(userId, userConfig, options);
+      }
+      throw error;
+    }
   }
 
   // ─── 状态机管理 ──────────────────────────────────────
 
-  /**
-   * 获取用户的状态机
-   * @private
-   * @param {number} userId - 用户 ID
-   * @returns {Promise<ContainerStateMachine>}
-   */
   async _getStateMachine(userId) {
-    if (this.stateMachines.has(userId)) {
-      return this.stateMachines.get(userId);
-    }
+    if (this.stateMachines.has(userId)) return this.stateMachines.get(userId);
 
     const containerName = `claude-user-${userId}`;
-    const stateMachine = await containerStateStore.getOrCreate(userId, containerName);
+    const sm = await containerStateStore.getOrCreate(userId, containerName);
 
-    // 验证中间状态的一致性
-    const intermediateStates = [ContainerState.CREATING, ContainerState.STARTING, ContainerState.HEALTH_CHECKING];
-    if (intermediateStates.includes(stateMachine.getState())) {
-      const containerExists = await this._verifyContainerExists(containerName);
-      if (!containerExists) {
-        const stateAge = Date.now() - stateMachine.lastTransitionTime.getTime();
-        const staleThreshold = 30000;
+    await this._validateIntermediateState(sm, containerName);
+    this.stateMachines.set(userId, sm);
 
-        if (stateAge > staleThreshold) {
-          logger.info(`Container ${containerName} not found, state is ${stateMachine.getState()} for ${Math.floor(stateAge / 1000)}s, force resetting`);
-          stateMachine.forceReset();
-          await containerStateStore.save(stateMachine);
-        } else {
-          logger.info(`Container ${containerName} not found but state ${stateMachine.getState()} is recent, not resetting`);
-        }
-      }
-    }
-
-    this.stateMachines.set(userId, stateMachine);
-
-    // 监听状态变化自动保存
-    stateMachine.on('stateChanged', async (event) => {
-      const importantTransitions = ['ready', 'failed'];
-      if (importantTransitions.includes(event.to)) {
+    sm.on('stateChanged', async (event) => {
+      if (['ready', 'failed'].includes(event.to)) {
         logger.info(`State changed for user ${userId}: ${event.from} -> ${event.to}`);
       }
-      await containerStateStore.save(stateMachine);
+      await containerStateStore.save(sm);
     });
 
-    return stateMachine;
+    return sm;
   }
 
-  /**
-   * 验证容器是否真实存在
-   * @private
-   * @param {string} containerName - 容器名称
-   * @returns {Promise<boolean>}
-   */
+  async _validateIntermediateState(sm, containerName) {
+    if (!INTERMEDIATE_STATES.includes(sm.getState())) return;
+
+    const exists = await this._verifyContainerExists(containerName);
+    if (exists) return;
+
+    const stateAge = Date.now() - sm.lastTransitionTime.getTime();
+    if (stateAge > STALE_STATE_THRESHOLD_MS) {
+      logger.info(`Container ${containerName} not found, state is ${sm.getState()} for ${Math.floor(stateAge / 1000)}s, force resetting`);
+      sm.forceReset();
+      await containerStateStore.save(sm);
+    } else {
+      logger.info(`Container ${containerName} not found but state ${sm.getState()} is recent, not resetting`);
+    }
+  }
+
   async _verifyContainerExists(containerName) {
     try {
-      const container = this.docker.getContainer(containerName);
-      await container.inspect();
+      await this.docker.getContainer(containerName).inspect();
       return true;
     } catch (error) {
       if (error.statusCode === 404) return false;
@@ -122,218 +195,46 @@ export class ContainerLifecycleManager {
     }
   }
 
-  /**
-   * 等待容器到达就绪状态
-   * @private
-   * @param {number} userId - 用户 ID
-   * @param {number} timeout - 超时时间（毫秒）
-   * @returns {Promise<ContainerStateMachine>}
-   */
   async _waitForReady(userId, timeout = CONTAINER_TIMEOUTS.ready) {
-    const stateMachine = await this._getStateMachine(userId);
+    const sm = await this._getStateMachine(userId);
+    if (sm.is(ContainerState.READY)) return sm;
+    if (sm.is(ContainerState.FAILED)) throw new Error(`Container is in failed state: ${sm.getError()?.message || 'Unknown error'}`);
 
-    if (stateMachine.is(ContainerState.READY)) return stateMachine;
-    if (stateMachine.is(ContainerState.FAILED)) {
-      throw new Error(`Container is in failed state: ${stateMachine.getError()?.message || 'Unknown error'}`);
-    }
+    await sm.waitForStable({ timeout });
 
-    await stateMachine.waitForStable({ timeout });
-
-    if (stateMachine.is(ContainerState.READY)) return stateMachine;
-    if (stateMachine.is(ContainerState.FAILED)) {
-      throw new Error(`Container creation failed: ${stateMachine.getError()?.message || 'Unknown error'}`);
-    }
-
-    throw new Error(`Container not ready, current state: ${stateMachine.getState()}`);
+    if (sm.is(ContainerState.READY)) return sm;
+    if (sm.is(ContainerState.FAILED)) throw new Error(`Container creation failed: ${sm.getError()?.message || 'Unknown error'}`);
+    throw new Error(`Container not ready, current state: ${sm.getState()}`);
   }
 
-  // ─── 公共 API ────────────────────────────────────────
+  // ─── 创建流程 ──────────────────────────────────────
 
-  /**
-   * 获取或创建用户容器
-   * @param {number} userId - 用户 ID
-   * @param {Object} [userConfig={}] - 用户配置
-   * @param {Object} [options={}] - 选项
-   * @returns {Promise<ContainerInfo>} 容器信息
-   */
-  async getOrCreateContainer(userId, userConfig = {}, options = {}) {
-    const stateMachine = await this._getStateMachine(userId);
-
-    // 情况 1: 已就绪，返回缓存
-    if (stateMachine.is(ContainerState.READY)) {
-      const containerInfo = this.containers.get(userId);
-      if (containerInfo) {
-        try {
-          const status = await this.healthMonitor.getContainerStatus(containerInfo.id);
-          if (status === 'running') {
-            containerInfo.lastActive = new Date();
-            try { Container.updateLastActive(containerInfo.id); } catch (e) { logger.warn({ err: e, containerId: containerInfo.id }, 'Failed to update last active timestamp'); }
-            return containerInfo;
-          }
-        } catch (err) {
-          logger.warn(`Container check failed: ${err.message}, resetting state`);
-        }
-      }
-      stateMachine.transitionTo(ContainerState.NON_EXISTENT);
-      await containerStateStore.save(stateMachine);
-    }
-
-    // 情况 2: 正在创建中，等待完成
-    if ([ContainerState.CREATING, ContainerState.STARTING, ContainerState.HEALTH_CHECKING].includes(stateMachine.getState())) {
-      if (options.wait === false) {
-        throw new Error(`Container is ${stateMachine.getState()}, not ready yet`);
-      }
-      try {
-        await this._waitForReady(userId, options.timeout);
-        return this.containers.get(userId);
-      } catch (error) {
-        if (stateMachine.is(ContainerState.FAILED)) {
-          stateMachine.transitionTo(ContainerState.NON_EXISTENT);
-          await containerStateStore.save(stateMachine);
-          return this.getOrCreateContainer(userId, userConfig, options);
-        }
-        throw error;
-      }
-    }
-
-    // 情况 3: 失败状态，重置并重试
-    if (stateMachine.is(ContainerState.FAILED)) {
-      stateMachine.transitionTo(ContainerState.NON_EXISTENT);
-      await containerStateStore.save(stateMachine);
-    }
-
-    // 情况 4: 新建
-    return this._createContainerWithStateMachine(userId, userConfig, stateMachine);
-  }
-
-  /**
-   * 停止用户容器
-   * @param {number} userId - 用户 ID
-   * @returns {Promise<void>}
-   */
-  async stopContainer(userId) {
-    const containerInfo = this.containers.get(userId);
-    if (!containerInfo) return;
-
-    await ContainerOps.stopContainer(this.docker, containerInfo.id);
-    containerInfo.status = 'stopped';
-  }
-
-  /**
-   * 启动已停止的容器
-   * @param {number} userId - 用户 ID
-   * @returns {Promise<void>}
-   */
-  async startContainer(userId) {
-    const containerInfo = this.containers.get(userId);
-    if (!containerInfo) throw new Error(`No container found for user ${userId}`);
-
-    await ContainerOps.startContainer(this.docker, containerInfo.id);
-    containerInfo.status = 'running';
-    containerInfo.lastActive = new Date();
-  }
-
-  /**
-   * 销毁用户容器
-   * @param {number} userId - 用户 ID
-   * @param {boolean} [removeVolume=false] - 是否删除卷
-   * @returns {Promise<void>}
-   */
-  async destroyContainer(userId, removeVolume = false) {
-    const containerInfo = this.containers.get(userId);
-    if (!containerInfo) return;
-
-    try {
-      await ContainerOps.destroyContainer(
-        this.docker, containerInfo.id,
-        this.config.dataDir, userId, removeVolume
-      );
-
-      this.containers.delete(userId);
-
-      try {
-        Container.delete(containerInfo.id);
-      } catch (dbErr) {
-        logger.warn(`Failed to remove container from database: ${dbErr.message}`);
-      }
-    } catch (error) {
-      throw new Error(`Failed to destroy container for user ${userId}: ${error.message}`);
-    }
-  }
-
-  /**
-   * 在容器内执行命令
-   * @param {number} userId - 用户 ID
-   * @param {string} command - 要执行的命令
-   * @param {Object} [options={}] - 执行选项
-   * @returns {Promise<{exec: Object, stream: Object}>}
-   */
-  async execInContainer(userId, command, options = {}) {
-    const containerInfo = await this.getOrCreateContainer(userId);
-    return ContainerOps.execInContainer(this.docker, containerInfo.id, command, options);
-  }
-
-  /**
-   * 附加到容器的交互式 shell
-   * @param {number} userId - 用户 ID
-   * @param {Object} [options={}] - 附加选项
-   * @returns {Promise<{stream: Object, container: Object, containerId: string}>}
-   */
-  async attachToContainerShell(userId, options = {}) {
-    const containerInfo = await this.getOrCreateContainer(userId);
-    return ContainerOps.attachToShell(this.docker, containerInfo.id);
-  }
-
-  /**
-   * 获取所有管理的容器
-   * @returns {Array} 容器信息对象数组
-   */
-  getAllContainers() {
-    return Array.from(this.containers.values());
-  }
-
-  /**
-   * 根据用户 ID 获取容器
-   * @param {number} userId - 用户 ID
-   * @returns {ContainerInfo|undefined}
-   */
-  getContainerByUserId(userId) {
-    return this.containers.get(userId);
-  }
-
-  // ─── 内部创建流程 ────────────────────────────────────
-
-  /**
-   * 使用状态机创建容器
-   * @private
-   */
   async _createContainerWithStateMachine(userId, userConfig, stateMachine) {
-    const containerName = `claude-user-${userId}`;
     stateMachine.beginCreation();
-
     try {
-      stateMachine.transitionTo(ContainerState.CREATING);
-      await containerStateStore.save(stateMachine);
-
-      // 执行创建
-      const containerInfo = await this._doCreateContainer(userId, userConfig);
-
-      stateMachine.transitionTo(ContainerState.STARTING);
-      await containerStateStore.save(stateMachine);
-
-      this.containers.set(userId, containerInfo);
+      // CREATING → STARTING → HEALTH_CHECKING → READY
+      for (const [from, to] of [
+        [null, ContainerState.CREATING],
+        [ContainerState.CREATING, ContainerState.STARTING],
+      ]) {
+        stateMachine.transitionTo(to);
+        await containerStateStore.save(stateMachine);
+        if (to === ContainerState.CREATING) {
+          const containerInfo = await this._doCreateContainer(userId, userConfig);
+          stateMachine.transitionTo(ContainerState.STARTING);
+          await containerStateStore.save(stateMachine);
+          this.containers.set(userId, containerInfo);
+        }
+      }
 
       stateMachine.transitionTo(ContainerState.HEALTH_CHECKING);
       await containerStateStore.save(stateMachine);
-
-      await this.healthMonitor.waitForContainerReady(containerInfo.id);
+      await this.healthMonitor.waitForContainerReady(this.containers.get(userId).id);
 
       stateMachine.transitionTo(ContainerState.READY);
       await containerStateStore.save(stateMachine);
-
-      logger.info(`Container ${containerName} is ready for user ${userId}`);
-      return containerInfo;
-
+      logger.info(`Container claude-user-${userId} is ready`);
+      return this.containers.get(userId);
     } catch (error) {
       logger.error(`Container creation failed for user ${userId}:`, error);
       stateMachine.endCreation();
@@ -341,158 +242,55 @@ export class ContainerLifecycleManager {
       await containerStateStore.save(stateMachine);
       throw new Error(`Failed to create container for user ${userId}: ${error.message}`);
     } finally {
-      if (stateMachine.getState() !== ContainerState.CREATING &&
-          stateMachine.getState() !== ContainerState.STARTING &&
-          stateMachine.getState() !== ContainerState.HEALTH_CHECKING) {
+      if (!INTERMEDIATE_STATES.includes(stateMachine.getState())) {
         stateMachine.endCreation();
       }
     }
   }
 
-  /**
-   * 执行实际的容器创建操作（编排 ContainerOperations + ContainerSetup）
-   * @private
-   */
   async _doCreateContainer(userId, userConfig) {
     const containerName = `claude-user-${userId}`;
     const userDataDir = path.join(this.config.dataDir, 'users', `user_${userId}`, 'data');
 
     try {
-      // 同步扩展到本地备份目录
       const claudeDir = path.join(userDataDir, '.claude');
-      try {
-        await syncExtensions(claudeDir, { overwriteUserFiles: true });
-      } catch (syncError) {
-        logger.warn(`Failed to sync extensions to local backup:`, syncError.message);
-      }
+      try { await syncExtensions(claudeDir, { overwriteUserFiles: true }); } catch (e) { logger.warn(`Failed to sync extensions:`, e.message); }
 
-      // 创建并启动容器（委托给 ContainerOperations）
       const container = await ContainerOps.createAndStartContainer(this.docker, {
-        containerName,
-        userDataDir,
-        userId,
-        userConfig,
-        image: this.config.image,
-        network: this.config.network
+        containerName, userDataDir, userId, userConfig, image: this.config.image, network: this.config.network,
       });
 
-      // 初始化设置（委托给 ContainerSetup）
       await this._runSetup(container, containerName);
 
-      // 构建容器信息
-      const containerInfo = {
-        id: container.id,
-        name: containerName,
-        userId,
-        status: 'running',
-        createdAt: new Date(),
-        lastActive: new Date()
-      };
-
-      // 写入数据库
-      try {
-        Container.create(userId, container.id, containerName);
-      } catch (dbErr) {
-        logger.warn(`Failed to save container to database: ${dbErr.message}`);
-      }
-
+      const containerInfo = { id: container.id, name: containerName, userId, status: 'running', createdAt: new Date(), lastActive: new Date() };
+      try { Container.create(userId, container.id, containerName); } catch (e) { logger.warn(`Failed to save container: ${e.message}`); }
       return containerInfo;
     } catch (error) {
       throw new Error(`Container creation failed: ${error.message}`);
     }
   }
 
-  /**
-   * 运行容器初始化设置步骤
-   * @private
-   * @param {Object} container - Docker 容器实例
-   * @param {string} containerName - 容器名称
-   */
   async _runSetup(container, containerName) {
-    // 1. 确保默认工作区（带重试）
-    let workspaceEnsured = false;
+    // 1. 确保默认工作区（重试3次）
     for (let i = 0; i < 3; i++) {
-      try {
-        await ContainerSetup.ensureDefaultWorkspace(container);
-        workspaceEnsured = true;
-        break;
-      } catch (wsErr) {
-        logger.warn(`Workspace ensure attempt ${i + 1} failed: ${wsErr.message}`);
-        if (i < 2) await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
-    if (!workspaceEnsured) {
-      logger.warn(`Failed to ensure workspace after 3 attempts, will be created on-demand`);
+      try { await ContainerSetup.ensureDefaultWorkspace(container); break; }
+      catch (e) { logger.warn(`Workspace ensure attempt ${i + 1} failed: ${e.message}`); if (i < 2) await new Promise(r => setTimeout(r, 1000)); }
     }
 
-    // 2. 同步扩展到容器
-    try {
-      await ContainerSetup.syncExtensionsToContainer(container);
-      logger.debug(`Extensions synced to container ${containerName}`);
-    } catch (syncError) {
-      logger.warn(`Failed to sync extensions to container:`, syncError.message);
-    }
+    // 2. 同步扩展
+    try { await ContainerSetup.syncExtensionsToContainer(container); } catch (e) { logger.warn(`Failed to sync extensions:`, e.message); }
 
     // 3. 创建 README
-    try {
-      await ContainerSetup.createReadmeInContainer(container);
-    } catch (readmeErr) {
-      logger.warn(`Failed to create README.md:`, readmeErr.message);
-    }
+    try { await ContainerSetup.createReadmeInContainer(container); } catch (e) { logger.warn(`Failed to create README:`, e.message); }
   }
 
-  /**
-   * 从数据库加载容器到内存缓存
-   * @returns {Promise<void>}
-   */
+  // ─── 数据库加载 ──────────────────────────────────────
+
   async loadContainersFromDatabase() {
     try {
       logger.info('Loading containers from database...');
       const activeContainers = Container.listActive();
-
-      for (const dbContainer of activeContainers) {
-        const { user_id, container_id, container_name, created_at, last_active } = dbContainer;
-
-        try {
-          const dockerContainer = this.docker.getContainer(container_id);
-          const containerInfo = await dockerContainer.inspect();
-
-          if (containerInfo.State.Running) {
-            this.containers.set(user_id, {
-              id: container_id,
-              name: container_name,
-              userId: user_id,
-              status: 'running',
-              createdAt: new Date(created_at),
-              lastActive: new Date(last_active)
-            });
-            logger.info(`Restored container for user ${user_id}: ${container_name}`);
-          } else {
-            Container.updateStatus(container_id, 'stopped');
-            const stateMachine = this.stateMachines.get(user_id);
-            if (stateMachine) {
-              stateMachine.forceReset();
-              await containerStateStore.save(stateMachine);
-            }
-          }
-        } catch (dockerErr) {
-          if (dockerErr.statusCode === 404) {
-            logger.info(`Container ${container_name} not found in Docker, removing from database`);
-            Container.delete(container_id);
-            let stateMachine = this.stateMachines.get(user_id);
-            if (!stateMachine) {
-              try { stateMachine = await containerStateStore.load(user_id); } catch (e) { logger.warn({ err: e, userId: user_id }, 'Failed to load container state from store'); }
-            }
-            if (stateMachine) {
-              stateMachine.forceReset();
-              await containerStateStore.save(stateMachine);
-            }
-          } else {
-            logger.warn(`Error checking container ${container_name}: ${dockerErr.message}`);
-          }
-        }
-      }
-
+      for (const db of activeContainers) await this._restoreContainer(db);
       logger.info(`Loaded ${this.containers.size} containers from database`);
     } catch (error) {
       if (error.code === 'SQLITE_ERROR' && error.message.includes('no such table')) {
@@ -500,6 +298,41 @@ export class ContainerLifecycleManager {
       } else {
         logger.warn('Failed to load containers from database:', error.message);
       }
+    }
+  }
+
+  async _restoreContainer(dbContainer) {
+    const { user_id, container_id, container_name, created_at, last_active } = dbContainer;
+    try {
+      const dockerContainer = this.docker.getContainer(container_id);
+      const info = await dockerContainer.inspect();
+
+      if (info.State.Running) {
+        this.containers.set(user_id, { id: container_id, name: container_name, userId: user_id, status: 'running', createdAt: new Date(created_at), lastActive: new Date(last_active) });
+        logger.info(`Restored container for user ${user_id}: ${container_name}`);
+      } else {
+        await this._handleStoppedContainer(user_id, container_id);
+      }
+    } catch (dockerErr) {
+      await this._handleMissingContainer(dockerErr, user_id, container_id, container_name);
+    }
+  }
+
+  async _handleStoppedContainer(userId, containerId) {
+    Container.updateStatus(containerId, 'stopped');
+    const sm = this.stateMachines.get(userId);
+    if (sm) { sm.forceReset(); await containerStateStore.save(sm); }
+  }
+
+  async _handleMissingContainer(dockerErr, userId, containerId, containerName) {
+    if (dockerErr.statusCode === 404) {
+      logger.info(`Container ${containerName} not found in Docker, removing from database`);
+      Container.delete(containerId);
+      let sm = this.stateMachines.get(userId);
+      if (!sm) { try { sm = await containerStateStore.load(userId); } catch {} }
+      if (sm) { sm.forceReset(); await containerStateStore.save(sm); }
+    } else {
+      logger.warn(`Error checking container ${containerName}: ${dockerErr.message}`);
     }
   }
 }
