@@ -2,13 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Mic, Loader2, Brain } from 'lucide-react';
 import { transcribeWithWhisper } from '@/shared/utils/audio';
 import { logger } from '@/shared/utils/logger';
+import { getRecordingErrorMessage } from './micButtonHelpers';
+import type { MicState } from './micButtonHelpers';
 
 export interface MicButtonProps {
   onTranscript?: (text: string) => void;
   className?: string;
 }
-
-type MicState = 'idle' | 'recording' | 'transcribing' | 'processing';
 
 export function MicButton({ onTranscript, className = '' }: MicButtonProps) {
   const [state, setState] = useState<MicState>('idle');
@@ -106,22 +106,7 @@ export function MicButton({ onTranscript, className = '' }: MicButtonProps) {
       logger.info('Recording started successfully');
     } catch (err: any) {
       logger.error('Failed to start recording:', err);
-
-      let errorMessage = 'Microphone access failed';
-
-      if (err.name === 'NotAllowedError') {
-        errorMessage = 'Microphone access denied. Please allow microphone permissions.';
-      } else if (err.name === 'NotFoundError') {
-        errorMessage = 'No microphone found. Please check your audio devices.';
-      } else if (err.name === 'NotSupportedError') {
-        errorMessage = 'Microphone not supported by this browser.';
-      } else if (err.name === 'NotReadableError') {
-        errorMessage = 'Microphone is being used by another application.';
-      } else if (err.message?.includes('HTTPS')) {
-        errorMessage = err.message;
-      }
-
-      setError(errorMessage);
+      setError(getRecordingErrorMessage(err));
       setState('idle');
     }
   };

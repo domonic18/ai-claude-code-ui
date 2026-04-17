@@ -11,21 +11,10 @@ import jwt from 'jsonwebtoken';
 import { repositories } from '../database/db.js';
 import { AUTH, SERVER } from '../config/config.js';
 import { createLogger } from '../utils/logger.js';
+import { AuthType, _tryJwtAuth, _tryInternalApiKeyAuth, _tryExternalApiKeyAuth, _checkRoles, handlePlatformAuth } from './authStrategies.js';
 const logger = createLogger('middleware/auth.middleware');
 
 const { User, ApiKey } = repositories;
-
-/**
- * 认证结果类型
- * @enum {string}
- */
-const AuthType = {
-  JWT: 'jwt',
-  API_KEY: 'api_key',
-  EXTERNAL_API_KEY: 'external_api_key',
-  PLATFORM: 'platform',
-  NONE: 'none'
-};
 
 /**
  * 认证选项
@@ -325,114 +314,6 @@ function generateToken(user) {
     },
     AUTH.jwtSecret
   );
-}
-
-/**
- * 尝试 JWT 认证
- * @private
- * @param {Object} req - Express 请求对象
- * @returns {Promise<Object>} 认证结果
- */
-async function _tryJwtAuth(req) {
-  // 优先从 cookie 读取 token（行业最佳实践：httpOnly cookie）
-  let token = req.cookies?.auth_token;
-
-  // 兼容旧的 Authorization header 方式（用于 WebSocket 等）
-  if (!token) {
-    const authHeader = req.headers['authorization'];
-    token = authHeader && authHeader.split(' ')[1];
-  }
-
-  if (!token) {
-    return { success: false };
-  }
-
-  try {
-    const decoded = jwt.verify(token, AUTH.jwtSecret);
-    const user = User.getById(decoded.userId);
-
-    if (!user) {
-      return { success: false };
-    }
-
-    return { success: true, user };
-  } catch (error) {
-    return { success: false };
-  }
-}
-
-/**
- * 尝试内部 API 密钥认证
- * @private
- * @param {Object} req - Express 请求对象
- * @returns {Promise<Object>} 认证结果
- */
-async function _tryInternalApiKeyAuth(req) {
-  if (!AUTH.apiKey) {
-    return { success: false };
-  }
-
-  const apiKey = req.headers['x-api-key'];
-  if (apiKey !== AUTH.apiKey) {
-    return { success: false };
-  }
-
-  try {
-    const user = User.getFirst();
-    if (!user) {
-      return { success: false };
-    }
-
-    return { success: true, user };
-  } catch (error) {
-    return { success: false };
-  }
-}
-
-/**
- * 尝试外部 API 密钥认证
- * @private
- * @param {Object} req - Express 请求对象
- * @returns {Promise<Object>} 认证结果
- */
-async function _tryExternalApiKeyAuth(req) {
-  const apiKey = req.headers['x-api-key'];
-
-  if (!apiKey || apiKey === AUTH.apiKey) {
-    return { success: false };
-  }
-
-  try {
-    const keyRecord = ApiKey.getByKey(apiKey);
-
-    if (!keyRecord || !keyRecord.isActive) {
-      return { success: false };
-    }
-
-    ApiKey.updateLastUsed(keyRecord.id);
-
-    return { success: true, apiKey: keyRecord };
-  } catch (error) {
-    return { success: false };
-  }
-}
-
-/**
- * 检查用户角色
- * @private
- * @param {Object} req - Express 请求对象
- * @param {Object} res - Express 响应对象
- * @param {Function} next - 下一个中间件
- * @param {Array<string>} requiredRoles - 需要的角色列表
- */
-function _checkRoles(req, res, next, requiredRoles) {
-  if (requiredRoles.length === 0) {
-    return next();
-  }
-
-  // 这里可以添加角色检查逻辑
-  // 当前系统是单用户系统，暂时跳过角色检查
-  return next();
 }
 
 export {

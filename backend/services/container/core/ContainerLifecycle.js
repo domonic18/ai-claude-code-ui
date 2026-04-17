@@ -17,6 +17,9 @@ import containerStateStore from './ContainerStateStore.js';
 import { syncExtensions } from '../../extensions/extension-sync.js';
 import * as ContainerOps from './ContainerOperations.js';
 import * as ContainerSetup from './ContainerSetup.js';
+import {
+  saveContainerToDb, updateLastActive, handleStoppedContainer, handleMissingContainer, loadContainersFromDb, restoreContainerFromDb
+} from './ContainerLifecycleHelpers.js';
 import { createLogger } from '../../../utils/logger.js';
 
 const logger = createLogger('container/core/ContainerLifecycle');
@@ -118,7 +121,7 @@ export class ContainerLifecycleManager {
       const status = await this.healthMonitor.getContainerStatus(containerInfo.id);
       if (status === 'running') {
         containerInfo.lastActive = new Date();
-        try { Container.updateLastActive(containerInfo.id); } catch {}
+        updateLastActive(Container, containerInfo);
         return containerInfo;
       }
     } catch (err) {
@@ -263,7 +266,7 @@ export class ContainerLifecycleManager {
       await this._runSetup(container, containerName);
 
       const containerInfo = { id: container.id, name: containerName, userId, status: 'running', createdAt: new Date(), lastActive: new Date() };
-      try { Container.create(userId, container.id, containerName); } catch (e) { logger.warn(`Failed to save container: ${e.message}`); }
+      saveContainerToDb(Container, userId, containerInfo);
       return containerInfo;
     } catch (error) {
       throw new Error(`Container creation failed: ${error.message}`);
@@ -287,52 +290,18 @@ export class ContainerLifecycleManager {
   // ─── 数据库加载 ──────────────────────────────────────
 
   async loadContainersFromDatabase() {
-    try {
-      logger.info('Loading containers from database...');
-      const activeContainers = Container.listActive();
-      for (const db of activeContainers) await this._restoreContainer(db);
-      logger.info(`Loaded ${this.containers.size} containers from database`);
-    } catch (error) {
-      if (error.code === 'SQLITE_ERROR' && error.message.includes('no such table')) {
-        logger.info('Database not yet initialized, skipping container load');
-      } else {
-        logger.warn('Failed to load containers from database:', error.message);
-      }
-    }
+    await loadContainersFromDb(Container, this.docker, this.containers, this.stateMachines);
   }
 
   async _restoreContainer(dbContainer) {
-    const { user_id, container_id, container_name, created_at, last_active } = dbContainer;
-    try {
-      const dockerContainer = this.docker.getContainer(container_id);
-      const info = await dockerContainer.inspect();
-
-      if (info.State.Running) {
-        this.containers.set(user_id, { id: container_id, name: container_name, userId: user_id, status: 'running', createdAt: new Date(created_at), lastActive: new Date(last_active) });
-        logger.info(`Restored container for user ${user_id}: ${container_name}`);
-      } else {
-        await this._handleStoppedContainer(user_id, container_id);
-      }
-    } catch (dockerErr) {
-      await this._handleMissingContainer(dockerErr, user_id, container_id, container_name);
-    }
+    await restoreContainerFromDb(this.docker, Container, dbContainer, this.containers, this.stateMachines);
   }
 
   async _handleStoppedContainer(userId, containerId) {
-    Container.updateStatus(containerId, 'stopped');
-    const sm = this.stateMachines.get(userId);
-    if (sm) { sm.forceReset(); await containerStateStore.save(sm); }
+    handleStoppedContainer(Container, containerId, userId, this.stateMachines);
   }
 
   async _handleMissingContainer(dockerErr, userId, containerId, containerName) {
-    if (dockerErr.statusCode === 404) {
-      logger.info(`Container ${containerName} not found in Docker, removing from database`);
-      Container.delete(containerId);
-      let sm = this.stateMachines.get(userId);
-      if (!sm) { try { sm = await containerStateStore.load(userId); } catch {} }
-      if (sm) { sm.forceReset(); await containerStateStore.save(sm); }
-    } else {
-      logger.warn(`Error checking container ${containerName}: ${dockerErr.message}`);
-    }
+    await handleMissingContainer(dockerErr, Container, userId, containerId, containerName, this.stateMachines);
   }
 }
