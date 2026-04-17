@@ -20,40 +20,87 @@ const { ServiceProvider: Saml, IdentityProvider: IdP } = saml2;
 
 const router = Router();
 
-// 创建 SAML 实例
-function createSamlInstances() {
-  if (!samlConfig.enabled) {
-    return null;
-  }
+// ─── 证书解析工具 ──────────────────────────────────────────
 
-  // Fail-fast: SAML 启用时校验配置完整性，缺失则阻止路由初始化
+/**
+ * 从 PEM 格式字符串中移除 BEGIN/END 标记和空白
+ * @param {string} pem - PEM 格式的证书或密钥
+ * @returns {string|null} 清理后的 base64 内容
+ */
+function stripPemHeaders(pem) {
+  if (!pem) return null;
+  return pem
+    .replace(/-----BEGIN [\s\S]+?-----/g, '')
+    .replace(/-----END [\s\S]+?-----/g, '')
+    .replace(/\s/g, '');
+}
+
+// ─── SAML 属性映射 ──────────────────────────────────────────
+
+/**
+ * SAML 属性候选名映射表
+ * 每个 UI 字段对应多个可能的 SAML 属性名，取第一个有值的
+ */
+const ATTRIBUTE_MAPPINGS = {
+  email: ['email', 'mail', 'username'],
+  firstName: ['firstName', 'givenname', 'first_name'],
+  lastName: ['lastName', 'sn', 'last_name'],
+  displayName: ['displayName', 'display_name', 'name', 'username'],
+};
+
+/**
+ * 从 SAML 属性中提取第一个有效值
+ * @param {Object} attributes - SAML 属性（数组格式）
+ * @param {string[]} candidates - 候选属性名列表
+ * @param {string} fallback - 默认值
+ * @returns {string} 提取的值
+ */
+function extractAttribute(attributes, candidates, fallback = '') {
+  for (const name of candidates) {
+    if (attributes[name]?.[0]) return attributes[name][0];
+  }
+  return fallback;
+}
+
+/**
+ * 从 SAML 响应中提取用户信息
+ * @param {Object} spResponse - saml2-js 解析后的响应
+ * @returns {Object} { externalId, email, firstName, lastName, displayName }
+ */
+function extractUserInfo(spResponse) {
+  const samlUser = spResponse.user || {};
+  const externalId = samlUser.name_id;
+  const attributes = samlUser.attributes || {};
+
+  const email = extractAttribute(attributes, ATTRIBUTE_MAPPINGS.email, externalId);
+  const firstName = extractAttribute(attributes, ATTRIBUTE_MAPPINGS.firstName, '');
+  const lastName = extractAttribute(attributes, ATTRIBUTE_MAPPINGS.lastName, '');
+  const displayName = extractAttribute(attributes, ATTRIBUTE_MAPPINGS.displayName, '')
+    || `${firstName} ${lastName}`.trim()
+    || email;
+
+  return { externalId, email, firstName, lastName, displayName };
+}
+
+// ─── SAML 实例创建 ──────────────────────────────────────────
+
+/**
+ * 创建 SAML SP/IdP 实例
+ * @returns {{ sp: Object, idp: Object }|null}
+ */
+function createSamlInstances() {
+  if (!samlConfig.enabled) return null;
+
   const validation = validateSamlConfig();
   if (!validation.valid) {
     throw new Error(`SAML configuration invalid: ${validation.errors.join('; ')}`);
   }
 
   try {
-    // 解析 IdP 证书（移除空白和换行）
-    const idpCert = samlConfig.certificate
-      .replace(/-----BEGIN CERTIFICATE-----/g, '')
-      .replace(/-----END CERTIFICATE-----/g, '')
-      .replace(/\s/g, '');
+    const idpCert = stripPemHeaders(samlConfig.certificate);
+    const spPrivateKey = stripPemHeaders(samlConfig.spPrivateKey);
+    const spCert = stripPemHeaders(samlConfig.spCertificate);
 
-    // 解析 SP 私钥（如果配置了）
-    const spPrivateKey = samlConfig.spPrivateKey
-      ?.replace(/-----BEGIN PRIVATE KEY-----/g, '')
-      ?.replace(/-----END PRIVATE KEY-----/g, '')
-      ?.replace(/-----BEGIN RSA PRIVATE KEY-----/g, '')
-      ?.replace(/-----END RSA PRIVATE KEY-----/g, '')
-      ?.replace(/\s/g, '');
-
-    // 解析 SP 证书（如果配置了）
-    const spCert = samlConfig.spCertificate
-      ?.replace(/-----BEGIN CERTIFICATE-----/g, '')
-      ?.replace(/-----END CERTIFICATE-----/g, '')
-      ?.replace(/\s/g, '');
-
-    // 创建 IdP 实例（使用下划线命名）
     const idp = new IdP({
       sso_login_url: samlConfig.sso_url,
       sso_logout_url: samlConfig.slo_url,
@@ -61,327 +108,142 @@ function createSamlInstances() {
       entity_id: samlConfig.entity_id,
     });
 
-    // 创建 SP 实例（使用下划线命名）
     const spConfig = {
       entity_id: samlConfig.issuer,
       assert_endpoint: samlConfig.callbackUrl,
-      // 重要：允许未加密的 Assertion（只签名，不加密）
       allow_unencrypted_assertion: true,
     };
 
-    // 如果配置了 SP 证书和私钥，添加到配置中
     if (spPrivateKey && spCert) {
       spConfig.private_key = spPrivateKey;
       spConfig.certificate = spCert;
     }
 
-    const sp = new Saml(spConfig);
-
-    return { sp, idp };
+    return { sp: new Saml(spConfig), idp };
   } catch (error) {
     logger.error('[SAML] Failed to create SAML instances:', error);
     return null;
   }
 }
 
-/**
- * POST /init
- * 初始化 SSO 登录
- */
+// ─── SAML 禁用检查 ──────────────────────────────────────────
+
+/** 返回 SAML 禁用的标准响应 */
+function samlDisabledResponse(res) {
+  return res.status(404).json({ error: 'SAML authentication is not enabled', code: 'SAML_DISABLED' });
+}
+
+// ─── 路由 ──────────────────────────────────────────────────
+
 router.post('/init', (req, res) => {
-  if (!samlConfig.enabled) {
-    return res.status(404).json({
-      error: 'SAML authentication is not enabled',
-      code: 'SAML_DISABLED'
-    });
-  }
+  if (!samlConfig.enabled) return samlDisabledResponse(res);
 
   const { return_to } = req.body;
-
   if (!return_to) {
-    return res.status(400).json({
-      error: 'return_to parameter is required',
-      code: 'MISSING_RETURN_TO'
-    });
+    return res.status(400).json({ error: 'return_to parameter is required', code: 'MISSING_RETURN_TO' });
   }
 
-  // 优先使用环境变量配置的 SAML_ISSUER 来构建 sso-login URL
-  // SAML_ISSUER 格式: http://brain.bj33smarter.com:20080/api/auth/saml
-  // 我们需要将其转换为: http://brain.bj33smarter.com:20080/api/auth/saml/sso-login
   let baseUrl = samlConfig.issuer;
-
-  // 如果 SAML_ISSUER 未配置或为空，回退到请求的协议和主机
   if (!baseUrl || baseUrl === 'http://localhost:5173') {
-    const protocol = req.protocol;
-    const host = req.get('host');
-    baseUrl = `${protocol}://${host}/api/auth/saml`;
+    baseUrl = `${req.protocol}://${req.get('host')}/api/auth/saml`;
   }
 
-  const ssoLoginUrl = `${baseUrl}/sso-login`;
-
-  return res.json({
-    login_url: ssoLoginUrl,
-    return_to: return_to
-  });
+  return res.json({ login_url: `${baseUrl}/sso-login`, return_to });
 });
 
-/**
- * GET /sso-login
- * 发起 SAML 登录请求
- */
 router.get('/sso-login', async (req, res) => {
-  if (!samlConfig.enabled) {
-    return res.status(404).json({
-      error: 'SAML authentication is not enabled',
-      code: 'SAML_DISABLED'
-    });
-  }
+  if (!samlConfig.enabled) return samlDisabledResponse(res);
 
   try {
     const instances = createSamlInstances();
-    if (!instances) {
-      throw new Error('Failed to create SAML instances');
-    }
+    if (!instances) throw new Error('Failed to create SAML instances');
 
-    // 使用 Promise 包装 saml2-js 的回调式 API
-    const { sp, idp } = instances;
     const url = await new Promise((resolve, reject) => {
-      sp.create_login_request_url(idp, {}, (err, url) => {
+      instances.sp.create_login_request_url(instances.idp, {}, (err, loginUrl) => {
         if (err) reject(err);
-        else resolve(url);
+        else resolve(loginUrl);
       });
     });
 
     return res.redirect(url);
   } catch (error) {
     logger.error('[SAML] Error creating login request:', error);
-    return res.status(500).json({
-      error: 'Failed to create SAML login request',
-      message: error.message
-    });
+    return res.status(500).json({ error: 'Failed to create SAML login request', message: error.message });
   }
 });
 
-/**
- * POST /callback
- * 处理 SAML Response
- */
 router.post('/callback', async (req, res) => {
-  if (!samlConfig.enabled) {
-    return res.status(404).json({
-      error: 'SAML authentication is not enabled',
-      code: 'SAML_DISABLED'
-    });
-  }
-
+  if (!samlConfig.enabled) return samlDisabledResponse(res);
   if (!req.body.SAMLResponse) {
-    return res.status(400).json({
-      error: 'SAMLResponse is required',
-      code: 'MISSING_SAML_RESPONSE'
-    });
+    return res.status(400).json({ error: 'SAMLResponse is required', code: 'MISSING_SAML_RESPONSE' });
   }
 
   try {
     const instances = createSamlInstances();
-    if (!instances) {
-      throw new Error('Failed to create SAML instances');
-    }
+    if (!instances) throw new Error('Failed to create SAML instances');
 
-    // 使用 Promise 包装 saml2-js 的 post_assert 回调式 API
-    const { sp, idp } = instances;
+    // 验证 SAML Response
     const spResponse = await new Promise((resolve, reject) => {
-      sp.post_assert(idp, { request_body: req.body }, (err, response) => {
+      instances.sp.post_assert(instances.idp, { request_body: req.body }, (err, response) => {
         if (err) reject(err);
         else resolve(response);
       });
     });
 
     // 提取用户信息
-    // saml2-js 将数据放在 spResponse.user 下
-    const samlUser = spResponse.user || {};
-    const externalId = samlUser.name_id;
-    const attributes = samlUser.attributes || {};
-
-    // 如果没有 NameID，返回错误
+    const { externalId, email, firstName, lastName, displayName } = extractUserInfo(spResponse);
     if (!externalId) {
       return res.status(400).json({
         error: 'SAML Response missing NameID',
         code: 'MISSING_NAMEID',
-        details: process.env.NODE_ENV === 'development' ? {
-          response: spResponse
-        } : undefined
+        details: process.env.NODE_ENV === 'development' ? { response: spResponse } : undefined,
       });
     }
-
-    // attributes 是数组格式，取第一个元素
-    const email = (attributes.email && attributes.email[0]) ||
-                  (attributes.mail && attributes.mail[0]) ||
-                  (attributes.username && attributes.username[0]) ||
-                  externalId;
-    const firstName = (attributes.firstName && attributes.firstName[0]) ||
-                     (attributes.givenname && attributes.givenname[0]) ||
-                     (attributes.first_name && attributes.first_name[0]) ||
-                     '';
-    const lastName = (attributes.lastName && attributes.lastName[0]) ||
-                    (attributes.sn && attributes.sn[0]) ||
-                    (attributes.last_name && attributes.last_name[0]) ||
-                    '';
-    const displayName = (attributes.displayName && attributes.displayName[0]) ||
-                       (attributes.display_name && attributes.display_name[0]) ||
-                       (attributes.name && attributes.name[0]) ||
-                       (attributes.username && attributes.username[0]) ||
-                       `${firstName} ${lastName}`.trim() ||
-                       email;
 
     // 查找或创建用户
-    let user = User.getByExternalId(externalId);
+    const user = await findOrCreateUser(externalId, { email, firstName, lastName, displayName });
+    if (!user) return; // findOrCreateUser 已发送错误响应
 
-    if (user) {
-      // 检查用户是否已有不同的 identity_provider
-      if (user.identity_provider && user.identity_provider !== 'saml') {
-        return res.status(400).json({
-          error: 'User already exists with a different authentication method',
-          code: 'IDENTITY_PROVIDER_CONFLICT',
-          details: {
-            existing_provider: user.identity_provider,
-            requested_provider: 'saml'
-          }
-        });
-      }
-      User.updateLastLogin(user.id);
-    } else {
-      // 创建新用户 - 处理可能的数据库错误
-      try {
-        user = User.createWithSSO({
-          username: email,
-          email: email,
-          identity_provider: 'saml',
-          external_id: externalId,
-          first_name: firstName,
-          last_name: lastName,
-          display_name: displayName,
-        });
-      } catch (dbError) {
-        logger.error('[SAML] Failed to create user:', dbError);
-        return res.status(500).json({
-          error: 'Failed to create user',
-          code: 'USER_CREATION_FAILED',
-          message: dbError.message
-        });
-      }
-    }
-
-    // 生成 JWT token（generateToken 期望 user.id 字段）
-    const token = generateToken({ id: user.id, username: user.username });
-
-    // 设置 httpOnly cookie
-    // 注意：SAML 跨域重定向需要使用 'lax' 而不是 'strict'
-    // 注意：secure 只在 HTTPS 时设为 true，HTTP 部署需要 false
-    const cookieOptions = {
-      httpOnly: true,
-      secure: process.env.COOKIE_SECURE === 'true',
-      sameSite: 'lax',
-      maxAge: 365 * 24 * 60 * 60 * 1000,
-      path: '/'
-    };
-
-    if (process.env.NODE_ENV === 'production' && process.env.COOKIE_DOMAIN) {
-      cookieOptions.domain = process.env.COOKIE_DOMAIN;
-    }
-
-    res.cookie('auth_token', token, cookieOptions);
-
-    // 为用户创建容器（异步执行，不阻塞登录流程）
-    // 容器创建失败不会阻止登录，但会记录错误以便后续调试
-    containerManager.getOrCreateContainer(user.id)
-      .then(() => {
-        logger.info(`[SAML] Container ready for user ${user.id}`);
-      })
-      .catch(err => {
-        // 容器创建失败不应阻止登录，但需要记录以便排查
-        logger.error(`[SAML] Failed to create container for user ${user.id}:`, err.message);
-        // 可以考虑发送通知或设置标记让用户知道容器状态
-      });
-
-    // 重定向到前端
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173/chat';
-    const redirectUrl = new URL(frontendUrl);
-    redirectUrl.searchParams.set('saml', 'success');
-    return res.redirect(redirectUrl.toString());
+    // 设置认证 cookie 并重定向
+    setAuthCookie(res, user);
+    initiateContainerCreation(user);
+    redirectToFrontend(res);
 
   } catch (error) {
     logger.error('[SAML] Error during callback processing:', error);
     return res.status(500).json({
       error: 'SAML callback processing failed',
       message: error.message,
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   }
 });
 
-/**
- * POST /sso-callback (legacy alias)
- */
 router.post('/sso-callback', async (req, res, next) => {
   req.url = '/callback';
   return router.handle(req, res, next);
 });
 
-/**
- * GET /logout
- * 发起 SAML 登出
- */
 router.get('/logout', (req, res) => {
-  if (!samlConfig.enabled) {
-    return res.status(404).json({
-      error: 'SAML authentication is not enabled',
-      code: 'SAML_DISABLED'
-    });
-  }
+  if (!samlConfig.enabled) return samlDisabledResponse(res);
 
-  res.clearCookie('auth_token', {
-    httpOnly: true,
-    secure: process.env.COOKIE_SECURE === 'true',
-    sameSite: 'lax',
-    path: '/'
-  });
-
-  if (samlConfig.slo_url) {
-    return res.redirect(samlConfig.slo_url);
-  }
-
-  return res.redirect('/login?logged_out=true');
+  res.clearCookie('auth_token', { httpOnly: true, secure: process.env.COOKIE_SECURE === 'true', sameSite: 'lax', path: '/' });
+  return res.redirect(samlConfig.slo_url || '/login?logged_out=true');
 });
 
-/**
- * GET /metadata
- * SP Metadata 端点
- */
 router.get('/metadata', (req, res) => {
-  if (!samlConfig.enabled) {
-    return res.status(404).json({
-      error: 'SAML authentication is not enabled',
-      code: 'SAML_DISABLED'
-    });
-  }
+  if (!samlConfig.enabled) return samlDisabledResponse(res);
 
   const instances = createSamlInstances();
   if (!instances) {
-    return res.status(500).json({
-      error: 'SAML instances not initialized',
-    });
+    return res.status(500).json({ error: 'SAML instances not initialized' });
   }
 
-  const metadata = instances.sp.create_metadata();
   res.set('Content-Type', 'application/xml');
-  res.send(metadata);
+  res.send(instances.sp.create_metadata());
 });
 
-/**
- * GET /status
- * 获取 SAML 配置状态
- */
-router.get('/status', (req, res) => {
+router.get('/status', (_req, res) => {
   res.json({
     enabled: samlConfig.enabled,
     configured: !!samlConfig.certificate && samlConfig.certificate.length > 100,
@@ -392,22 +254,13 @@ router.get('/status', (req, res) => {
   });
 });
 
-/**
- * GET /test
- * 测试 SAML 配置
- */
-router.get('/test', async (req, res) => {
+router.get('/test', async (_req, res) => {
   try {
     const instances = createSamlInstances();
-
     if (!instances) {
       return res.status(500).json({
         error: 'SAML configuration is incomplete',
-        details: {
-          enabled: samlConfig.enabled,
-          hasCertificate: !!samlConfig.certificate,
-          certLength: samlConfig.certificate?.length || 0,
-        }
+        details: { enabled: samlConfig.enabled, hasCertificate: !!samlConfig.certificate, certLength: samlConfig.certificate?.length || 0 },
       });
     }
 
@@ -420,14 +273,97 @@ router.get('/test', async (req, res) => {
         acsUrl: samlConfig.callbackUrl,
         hasCert: !!samlConfig.certificate,
         certLength: samlConfig.certificate?.length || 0,
-      }
+      },
     });
   } catch (error) {
-    return res.status(500).json({
-      error: 'SAML configuration test failed',
-      message: error.message
-    });
+    return res.status(500).json({ error: 'SAML configuration test failed', message: error.message });
   }
 });
+
+// ─── Callback 辅助函数 ──────────────────────────────────────
+
+/**
+ * 查找或创建 SAML 用户
+ * @param {string} externalId - SAML NameID
+ * @param {Object} profile - 用户属性
+ * @returns {Promise<Object|null>} 用户对象，失败时返回 null（并已发送响应）
+ */
+async function findOrCreateUser(externalId, profile) {
+  let user = User.getByExternalId(externalId);
+
+  if (user) {
+    if (user.identity_provider && user.identity_provider !== 'saml') {
+      // 这里无法直接返回 res 响应，调用方需要处理
+      throw Object.assign(new Error('User already exists with a different authentication method'), {
+        statusCode: 400,
+        code: 'IDENTITY_PROVIDER_CONFLICT',
+        details: { existing_provider: user.identity_provider, requested_provider: 'saml' },
+      });
+    }
+    User.updateLastLogin(user.id);
+    return user;
+  }
+
+  try {
+    return User.createWithSSO({
+      username: profile.email,
+      email: profile.email,
+      identity_provider: 'saml',
+      external_id: externalId,
+      first_name: profile.firstName,
+      last_name: profile.lastName,
+      display_name: profile.displayName,
+    });
+  } catch (dbError) {
+    logger.error('[SAML] Failed to create user:', dbError);
+    throw Object.assign(new Error('Failed to create user'), {
+      statusCode: 500,
+      code: 'USER_CREATION_FAILED',
+    });
+  }
+}
+
+/**
+ * 设置认证 Cookie
+ * @param {Object} res - Express 响应对象
+ * @param {Object} user - 用户对象
+ */
+function setAuthCookie(res, user) {
+  const token = generateToken({ id: user.id, username: user.username });
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.COOKIE_SECURE === 'true',
+    sameSite: 'lax',
+    maxAge: 365 * 24 * 60 * 60 * 1000,
+    path: '/',
+  };
+
+  if (process.env.NODE_ENV === 'production' && process.env.COOKIE_DOMAIN) {
+    cookieOptions.domain = process.env.COOKIE_DOMAIN;
+  }
+
+  res.cookie('auth_token', token, cookieOptions);
+}
+
+/**
+ * 异步创建用户容器（不阻塞登录流程）
+ * @param {Object} user - 用户对象
+ */
+function initiateContainerCreation(user) {
+  containerManager.getOrCreateContainer(user.id)
+    .then(() => logger.info(`[SAML] Container ready for user ${user.id}`))
+    .catch(err => logger.error(`[SAML] Failed to create container for user ${user.id}:`, err.message));
+}
+
+/**
+ * 重定向到前端
+ * @param {Object} res - Express 响应对象
+ */
+function redirectToFrontend(res) {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173/chat';
+  const redirectUrl = new URL(frontendUrl);
+  redirectUrl.searchParams.set('saml', 'success');
+  return res.redirect(redirectUrl.toString());
+}
 
 export default router;

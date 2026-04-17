@@ -1,65 +1,19 @@
 /**
  * Message Conversion Utilities
  *
- * Provides functions for converting raw API message data into
- * the ChatMessage format used by the chat interface.
+ * Converts raw API message data into ChatMessage format.
  *
- * Handles:
- * - Tool result collection and attachment
- * - HTML entity decoding
- * - Content unescaping with math formula protection
- * - Message filtering (system/internal messages)
+ * Architecture:
+ * - Two-pass strategy: collect tool results first, then dispatch to type-specific handlers
+ * - O(1) tool result lookup using Map
+ * - Dispatcher pattern for message type handling
  */
 
 import type { ChatMessage } from '../types';
+import { decodeHtmlEntities, unescapeWithMathProtection } from './stringProcessors';
+import { shouldSkipUserMessage } from '../config/messageFilters';
 
-/**
- * Decode HTML entities in text
- */
-export function decodeHtmlEntities(text: string): string {
-  if (!text) return text;
-  return text
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&');
-}
-
-/**
- * Unescape \n, \t, \r while protecting LaTeX formulas ($...$ and $$...$$) from being corrupted
- */
-export function unescapeWithMathProtection(text: string): string {
-  if (!text || typeof text !== 'string') return text;
-
-  const mathBlocks: string[] = [];
-  const PLACEHOLDER_PREFIX = '__MATH_BLOCK_';
-  const PLACEHOLDER_SUFFIX = '__';
-
-  // Extract and protect math formulas
-  let processedText = text.replace(/\$\$([\s\S]*?)\$\$|\$([^\$\n]+?)\$/g, (match) => {
-    const index = mathBlocks.length;
-    mathBlocks.push(match);
-    return `${PLACEHOLDER_PREFIX}${index}${PLACEHOLDER_SUFFIX}`;
-  });
-
-  // Process escape sequences on non-math content
-  processedText = processedText.replace(/\\n/g, '\n')
-    .replace(/\\t/g, '\t')
-    .replace(/\\r/g, '\r');
-
-  // Restore math formulas
-  processedText = processedText.replace(
-    new RegExp(`${PLACEHOLDER_PREFIX}(\\d+)${PLACEHOLDER_SUFFIX}`, 'g'),
-    (match, index) => {
-      return mathBlocks[parseInt(index)];
-    }
-  );
-
-  return processedText;
-}
-
-// ─── 辅助类型 ──────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────
 
 interface ToolResultData {
   content: string | any;
@@ -68,12 +22,19 @@ interface ToolResultData {
   toolUseResult: any;
 }
 
-/** 生成消息 ID */
+type MessageDispatcher = {
+  match: (msg: any) => boolean;
+  handle: (msg: any, converted: ChatMessage[], toolResults: Map<string, ToolResultData>) => void;
+};
+
+// ─── Helper Functions ─────────────────────────────────────
+
+/** Generate unique message ID */
 function makeMsgId(): string {
   return `msg-${Date.now()}-${Math.random()}`;
 }
 
-/** 从 raw message 提取文本内容（处理 string 和 array 两种格式） */
+/** Extract text content from raw message (handles string and array formats) */
 function extractUserContent(content: any): string {
   if (Array.isArray(content)) {
     return content
@@ -84,50 +45,9 @@ function extractUserContent(content: any): string {
   return decodeHtmlEntities(typeof content === 'string' ? content : String(content));
 }
 
-// ─── 消息过滤检测 ──────────────────────────────────────
+// ─── Message Type Handlers ───────────────────────────────
 
-/** Skill system prompt 的多指标检测（至少匹配 2 项才判定） */
-const SKILL_INDICATORS = [
-  '## 角色设定', '## 任务目标', '## 工作流程',
-  '## 何时使用此工作流', '## 标准评估报告模板',
-  'Base directory for this skill'
-];
-
-/** 需要跳过的命令/系统消息前缀 */
-const SKIP_PREFIXES = [
-  '<command-name>', '<command-message>', '<command-args>',
-  '<local-command-stdout>', '<system-reminder>',
-  'Caveat:', 'This session is being continued from a previous',
-  '[Request interrupted'
-];
-
-/** 判断内容是否为 skill system prompt */
-function isSkillSystemPrompt(content: string): boolean {
-  if (content.includes('Base directory for this skill:') ||
-    (content.includes('/.claude/skills/') && content.includes('# '))) {
-    return true;
-  }
-
-  if (content.startsWith('---') &&
-    content.includes('name:') && content.includes('description:') && content.includes('tools:')) {
-    return true;
-  }
-
-  const indicatorCount = SKILL_INDICATORS.filter(indicator => content.includes(indicator)).length;
-  return indicatorCount >= 2 && content.length > 1000;
-}
-
-/** 判断用户消息是否应该被跳过 */
-function shouldSkipUserMessage(content: string): boolean {
-  if (!content) return true;
-  if (SKIP_PREFIXES.some(prefix => content.startsWith(prefix))) return true;
-  if (isSkillSystemPrompt(content)) return true;
-  return false;
-}
-
-// ─── 消息类型处理函数 ──────────────────────────────────
-
-/** 处理 user 消息 */
+/** Process user message */
 function processUserMessage(msg: any, converted: ChatMessage[]): void {
   const content = extractUserContent(msg.message.content);
   if (shouldSkipUserMessage(content)) return;
@@ -140,7 +60,7 @@ function processUserMessage(msg: any, converted: ChatMessage[]): void {
   });
 }
 
-/** 处理 thinking 消息（Codex reasoning） */
+/** Process thinking message (Codex reasoning) */
 function processThinkingMessage(msg: any, converted: ChatMessage[]): void {
   converted.push({
     id: msg.id || makeMsgId(),
@@ -151,7 +71,7 @@ function processThinkingMessage(msg: any, converted: ChatMessage[]): void {
   });
 }
 
-/** 处理 tool_use 消息（Codex function calls） */
+/** Process tool_use message (Codex function calls) */
 function processToolUseMessage(msg: any, converted: ChatMessage[]): void {
   converted.push({
     id: msg.id || makeMsgId(),
@@ -165,22 +85,22 @@ function processToolUseMessage(msg: any, converted: ChatMessage[]): void {
   });
 }
 
-/** 处理 tool_result 消息（Codex function outputs） */
+/** Process tool_result message (Codex function outputs) */
 function processToolResultMessage(msg: any, converted: ChatMessage[]): void {
-  for (let i = converted.length - 1; i >= 0; i--) {
-    if (converted[i].isToolUse && !converted[i].toolResult) {
-      if (!msg.toolCallId || converted[i].toolCallId === msg.toolCallId) {
-        converted[i].toolResult = {
-          content: msg.output || '',
-          isError: false
-        };
-        break;
-      }
-    }
+  const targetIndex = converted.findLastIndex((item) =>
+    item.isToolUse && !item.toolResult &&
+    (!msg.toolCallId || item.toolCallId === msg.toolCallId)
+  );
+
+  if (targetIndex >= 0) {
+    converted[targetIndex].toolResult = {
+      content: msg.output || '',
+      isError: false
+    };
   }
 }
 
-/** 从 assistant 消息的 content 数组中提取文本部分 */
+/** Build ChatMessage from text part in assistant message */
 function buildTextPart(part: any, msg: any): ChatMessage {
   const text = typeof part.text === 'string'
     ? unescapeWithMathProtection(part.text)
@@ -193,7 +113,7 @@ function buildTextPart(part: any, msg: any): ChatMessage {
   };
 }
 
-/** 从 assistant 消息的 content 数组中提取 tool_use 部分并附加结果 */
+/** Build ChatMessage from tool_use part in assistant message */
 function buildToolUsePart(part: any, msg: any, toolResults: Map<string, ToolResultData>): ChatMessage {
   const toolResult = toolResults.get(part.id);
   return {
@@ -214,37 +134,34 @@ function buildToolUsePart(part: any, msg: any, toolResults: Map<string, ToolResu
   };
 }
 
-/** 处理 assistant 消息（文本 + tool_use 混合） */
+/** Process assistant message (text + tool_use mixed) */
 function processAssistantMessage(
   msg: any,
   converted: ChatMessage[],
   toolResults: Map<string, ToolResultData>
 ): void {
-  if (Array.isArray(msg.message.content)) {
-    for (const part of msg.message.content) {
-      if (part.type === 'text') {
-        converted.push(buildTextPart(part, msg));
-      } else if (part.type === 'tool_use') {
-        converted.push(buildToolUsePart(part, msg, toolResults));
-      }
-    }
-  } else if (typeof msg.message.content === 'string') {
+  const { content } = msg.message;
+
+  if (typeof content === 'string') {
     converted.push({
       id: msg.id || makeMsgId(),
       type: 'assistant',
-      content: unescapeWithMathProtection(msg.message.content),
+      content: unescapeWithMathProtection(content),
       timestamp: msg.timestamp || new Date().toISOString()
     });
+    return;
   }
+
+  if (!Array.isArray(content)) return;
+
+  const textParts = content.filter((part: any) => part.type === 'text');
+  const toolUseParts = content.filter((part: any) => part.type === 'tool_use');
+
+  textParts.forEach((part: any) => converted.push(buildTextPart(part, msg)));
+  toolUseParts.forEach((part: any) => converted.push(buildToolUsePart(part, msg, toolResults)));
 }
 
-// ─── 消息分发注册表 ──────────────────────────────────────
-
-/** 消息类型判断 + 处理的注册条目 */
-type MessageDispatcher = {
-  match: (msg: any) => boolean;
-  handle: (msg: any, converted: ChatMessage[], toolResults: Map<string, ToolResultData>) => void;
-};
+// ─── Dispatcher Registry ───────────────────────────────────
 
 const MESSAGE_DISPATCHERS: MessageDispatcher[] = [
   { match: (msg) => msg.message?.role === 'user' && msg.message?.content, handle: (msg, out) => processUserMessage(msg, out) },
@@ -254,28 +171,29 @@ const MESSAGE_DISPATCHERS: MessageDispatcher[] = [
   { match: (msg) => msg.message?.role === 'assistant' && msg.message?.content, handle: (msg, out, tr) => processAssistantMessage(msg, out, tr) },
 ];
 
-// ─── 主转换函数 ────────────────────────────────────────
+// ─── Main Conversion Functions ────────────────────────────
 
 /**
- * 从原始消息中收集所有 tool_result 数据
- * @param rawMessages - 原始消息数组
- * @returns tool_use_id → ToolResultData 映射
+ * Collect all tool_result data from raw messages
+ * @param rawMessages - Raw message array
+ * @returns Map of tool_use_id → ToolResultData
  */
 function collectToolResults(rawMessages: any[]): Map<string, ToolResultData> {
   const toolResults = new Map<string, ToolResultData>();
 
-  for (const msg of rawMessages) {
-    if (msg.message?.role === 'user' && Array.isArray(msg.message?.content)) {
-      for (const part of msg.message.content) {
-        if (part.type === 'tool_result') {
-          toolResults.set(part.tool_use_id, {
-            content: part.content,
-            isError: part.is_error || false,
-            timestamp: new Date(msg.timestamp || Date.now()),
-            toolUseResult: msg.toolUseResult || null
-          });
-        }
-      }
+  const userMessages = rawMessages.filter(
+    msg => msg.message?.role === 'user' && Array.isArray(msg.message?.content)
+  );
+
+  for (const msg of userMessages) {
+    const toolResultParts = msg.message.content.filter((part: any) => part.type === 'tool_result');
+    for (const part of toolResultParts) {
+      toolResults.set(part.tool_use_id, {
+        content: part.content,
+        isError: part.is_error || false,
+        timestamp: new Date(msg.timestamp || Date.now()),
+        toolUseResult: msg.toolUseResult || null
+      });
     }
   }
 
@@ -287,26 +205,21 @@ function collectToolResults(rawMessages: any[]): Map<string, ToolResultData> {
  *
  * Two-pass strategy:
  * 1. Collect all tool results from user messages
- * 2. Process messages and attach tool results to tool uses
+ * 2. Dispatch messages to type-specific handlers
  *
  * @param rawMessages - Raw messages from API with format {message: {role, content}}
  * @returns Array of ChatMessage objects ready for display
  */
 export function convertSessionMessages(rawMessages: any[]): ChatMessage[] {
   const converted: ChatMessage[] = [];
-
-  // First pass: collect all tool results
   const toolResults = collectToolResults(rawMessages);
 
-  // Second pass: dispatch to type-specific handlers via registry
-  for (const msg of rawMessages) {
-    for (const dispatcher of MESSAGE_DISPATCHERS) {
-      if (dispatcher.match(msg)) {
-        dispatcher.handle(msg, converted, toolResults);
-        break;
-      }
+  rawMessages.forEach((msg) => {
+    const dispatcher = MESSAGE_DISPATCHERS.find((d) => d.match(msg));
+    if (dispatcher) {
+      dispatcher.handle(msg, converted, toolResults);
     }
-  }
+  });
 
   return converted;
 }
