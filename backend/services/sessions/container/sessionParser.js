@@ -59,6 +59,131 @@ function extractTextContent(content) {
 }
 
 /**
+ * 创建新的会话对象
+ * @param {string} sessionId - 会话 ID
+ * @param {string} [cwd=''] - 工作目录
+ * @returns {Object} 新会话对象
+ */
+function createSession(sessionId, cwd = '') {
+  return {
+    id: sessionId,
+    summary: 'New Session',
+    messageCount: 0,
+    lastActivity: new Date(),
+    cwd,
+    lastUserMessage: null,
+    lastAssistantMessage: null
+  };
+}
+
+/**
+ * 从条目中更新会话的用户消息
+ * @param {Object} session - 会话对象（可变）
+ * @param {Object} entry - JSONL 条目
+ */
+function updateUserMessage(session, entry) {
+  const rawContent = entry.message.content;
+  const textContent = extractTextContent(rawContent);
+
+  // 过滤记忆上下文内容
+  const filteredTextContent = filterMemoryContext(textContent);
+  if (filteredTextContent !== textContent) {
+    logger.info('[sessionParser] Filtered memory context from user message');
+  }
+
+  if (typeof filteredTextContent === 'string' && filteredTextContent.length > 0 && !isSystemUserMessage(filteredTextContent)) {
+    session.lastUserMessage = filteredTextContent;
+  }
+}
+
+/**
+ * 从条目中更新会话的助手消息
+ * @param {Object} session - 会话对象（可变）
+ * @param {Object} entry - JSONL 条目
+ */
+function updateAssistantMessage(session, entry) {
+  if (entry.isApiErrorMessage === true) {
+    return; // Skip API error messages
+  }
+
+  let assistantText = null;
+  if (Array.isArray(entry.message.content)) {
+    for (const part of entry.message.content) {
+      if (part.type === 'text' && part.text) {
+        assistantText = part.text;
+      }
+    }
+  } else if (typeof entry.message.content === 'string') {
+    assistantText = entry.message.content;
+  }
+
+  if (assistantText && !isSystemAssistantMessage(assistantText)) {
+    session.lastAssistantMessage = assistantText;
+  }
+}
+
+/**
+ * 更新单个条目对应的会话信息
+ * @param {Map} sessions - 会话映射（可变）
+ * @param {Map} pendingSummaries - 待处理的摘要（可变）
+ * @param {Object} entry - JSONL 条目
+ */
+function updateSessionFromEntry(sessions, pendingSummaries, entry) {
+  if (!entry.sessionId) {
+    return;
+  }
+
+  // 初始化会话
+  if (!sessions.has(entry.sessionId)) {
+    sessions.set(entry.sessionId, createSession(entry.sessionId, entry.cwd));
+  }
+
+  const session = sessions.get(entry.sessionId);
+
+  // 应用待处理的摘要
+  if (session.summary === 'New Session' && entry.parentUuid && pendingSummaries.has(entry.parentUuid)) {
+    session.summary = pendingSummaries.get(entry.parentUuid);
+  }
+
+  // 更新摘要
+  if (entry.type === 'summary' && entry.summary) {
+    session.summary = entry.summary;
+  }
+
+  // 处理消息
+  if (entry.message?.role === 'user' && entry.message?.content) {
+    updateUserMessage(session, entry);
+  } else if (entry.message?.role === 'assistant' && entry.message?.content) {
+    updateAssistantMessage(session, entry);
+  }
+
+  session.messageCount++;
+  if (entry.timestamp) {
+    session.lastActivity = new Date(entry.timestamp);
+  }
+}
+
+/**
+ * 完善会话数据：设置最终摘要并过滤无效会话
+ * @param {Map} sessions - 会话映射
+ * @returns {Array} 过滤后的会话列表
+ */
+function finalizeSessions(sessions) {
+  // 设置最终摘要
+  for (const session of sessions.values()) {
+    if (session.summary === 'New Session') {
+      const lastMessage = session.lastUserMessage || session.lastAssistantMessage;
+      if (lastMessage) {
+        session.summary = lastMessage.length > 50 ? lastMessage.substring(0, 50) + '...' : lastMessage;
+      }
+    }
+  }
+
+  // 过滤 JSON 响应错误（Task Master 错误）
+  return Array.from(sessions.values()).filter(session => !session.summary.startsWith('{ "'));
+}
+
+/**
  * 解析 JSONL 文件中的会话数据
  * @param {string} content - JSONL 文件内容
  * @returns {Object} 包含会话和条目的对象 { sessions: Array, entries: Array }
@@ -72,109 +197,27 @@ export function parseJsonlContent(content) {
     const lines = content.split('\n');
 
     for (const line of lines) {
-      if (line.trim()) {
-        try {
-          const entry = JSON.parse(line);
-          entries.push(entry);
+      if (!line.trim()) continue;
 
-          // Handle summary entries
-          if (entry.type === 'summary' && entry.summary && !entry.sessionId && entry.leafUuid) {
-            pendingSummaries.set(entry.leafUuid, entry.summary);
-          }
+      try {
+        const entry = JSON.parse(line);
+        entries.push(entry);
 
-          if (entry.sessionId) {
-            if (!sessions.has(entry.sessionId)) {
-              sessions.set(entry.sessionId, {
-                id: entry.sessionId,
-                summary: 'New Session',
-                messageCount: 0,
-                lastActivity: new Date(),
-                cwd: entry.cwd || '',
-                lastUserMessage: null,
-                lastAssistantMessage: null
-              });
-            }
-
-            const session = sessions.get(entry.sessionId);
-
-            // Apply pending summary
-            if (session.summary === 'New Session' && entry.parentUuid && pendingSummaries.has(entry.parentUuid)) {
-              session.summary = pendingSummaries.get(entry.parentUuid);
-            }
-
-            // Update summary from summary entries
-            if (entry.type === 'summary' && entry.summary) {
-              session.summary = entry.summary;
-            }
-
-            // Track user messages
-            if (entry.message?.role === 'user' && entry.message?.content) {
-              const rawContent = entry.message.content;
-              const textContent = extractTextContent(rawContent);
-
-              // 过滤记忆上下文内容
-              const filteredTextContent = filterMemoryContext(textContent);
-              if (filteredTextContent !== textContent) {
-                logger.info('[sessionParser] Filtered memory context from user message');
-              }
-
-              if (typeof filteredTextContent === 'string' && filteredTextContent.length > 0 && !isSystemUserMessage(filteredTextContent)) {
-                session.lastUserMessage = filteredTextContent;
-              }
-            } else if (entry.message?.role === 'assistant' && entry.message?.content) {
-              if (entry.isApiErrorMessage === true) {
-                // Skip API error messages
-              } else {
-                let assistantText = null;
-
-                if (Array.isArray(entry.message.content)) {
-                  for (const part of entry.message.content) {
-                    if (part.type === 'text' && part.text) {
-                      assistantText = part.text;
-                    }
-                  }
-                } else if (typeof entry.message.content === 'string') {
-                  assistantText = entry.message.content;
-                }
-
-                if (assistantText && !isSystemAssistantMessage(assistantText)) {
-                  session.lastAssistantMessage = assistantText;
-                }
-              }
-            }
-
-            session.messageCount++;
-
-            if (entry.timestamp) {
-              session.lastActivity = new Date(entry.timestamp);
-            }
-          }
-        } catch (parseError) {
-          // Skip malformed lines
+        // 收集无 sessionId 的 summary 条目
+        if (entry.type === 'summary' && entry.summary && !entry.sessionId && entry.leafUuid) {
+          pendingSummaries.set(entry.leafUuid, entry.summary);
         }
+
+        // 更新会话信息
+        updateSessionFromEntry(sessions, pendingSummaries, entry);
+      } catch {
+        // Skip malformed lines
       }
     }
-
-    // Set final summary based on last message if no summary exists
-    for (const session of sessions.values()) {
-      if (session.summary === 'New Session') {
-        const lastMessage = session.lastUserMessage || session.lastAssistantMessage;
-        if (lastMessage) {
-          session.summary = lastMessage.length > 50 ? lastMessage.substring(0, 50) + '...' : lastMessage;
-        }
-      }
-    }
-
-    // 过滤出 JSON 响应错误（Task Master 错误）
-    const allSessions = Array.from(sessions.values());
-    const filteredSessions = allSessions.filter(session => {
-      const shouldFilter = session.summary.startsWith('{ "');
-      return !shouldFilter;
-    });
 
     return {
-      sessions: filteredSessions,
-      entries: entries
+      sessions: finalizeSessions(sessions),
+      entries
     };
 
   } catch (error) {

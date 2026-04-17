@@ -11,16 +11,56 @@ import { createLogger } from '../../../utils/logger.js';
 
 const logger = createLogger('container/claude/ScriptBuilder');
 
-/**
- * 过滤 SDK 选项，移除不需要传给 SDK 的字段
- * @param {object} options - 原始选项
- * @param {number} userId - 用户 ID
- * @returns {Promise<object>} 过滤后的选项
- */
-async function filterSDKOptions(options, userId) {
-  const sdkOptions = { ...options };
+/** 系统级禁用的交互式规划工具（前端暂不支持） */
+const INTERACTIVE_PLANNING_TOOLS = [
+  'EnterPlanMode',   // 进入规划模式
+  'AskUserQuestion', // 向用户提问
+  'ExitPlanMode'     // 退出规划模式
+];
 
-  // 获取用户设置（优先使用数据库中的设置）
+/** 默认允许的工具列表 */
+const DEFAULT_ALLOWED_TOOLS = [
+  // Git 相关命令
+  'Bash(git log:*)',
+  'Bash(git diff:*)',
+  'Bash(git status:*)',
+  // 文档处理命令（PDF、Word 等）
+  'Bash(pdftotext:*)',
+  'Bash(pandoc:*)',
+  'Bash(file:*)',
+  // 其他工具
+  'Write',
+  'Read',
+  'Edit',
+  'Glob',
+  'Grep',
+  'MultiEdit',
+  'Task',
+  'TodoWrite',
+  'TodoRead',
+  'WebFetch',
+  'WebSearch',
+  'Skill'           // 关键修复：启用 Skill 工具，否则 SDK 不会加载 Skills
+];
+
+/** 需要从 SDK 选项中移除的内部字段 */
+const INTERNAL_FIELDS_TO_REMOVE = [
+  'userId',
+  'isContainerProject',
+  'projectPath',
+  'toolsSettings',
+  'images',       // 图片数据在 DockerExecutor 中处理
+  'imagePaths'    // 图片路径在脚本中单独处理
+];
+
+/**
+ * 合并用户设置到 SDK 选项
+ * 优先级：前端传入 > 数据库用户设置 > 默认值
+ * @param {object} sdkOptions - SDK 选项（可变）
+ * @param {object} settings - 前端传入的 toolsSettings
+ * @param {number} userId - 用户 ID
+ */
+async function mergeUserSettings(sdkOptions, settings, userId) {
   let userSettings = null;
   try {
     userSettings = await UserSettingsService.getSettings(userId, 'claude');
@@ -29,177 +69,127 @@ async function filterSDKOptions(options, userId) {
     logger.warn({ error: error.message }, 'Failed to load user settings, using defaults');
   }
 
-  // 合并用户设置和前端传入的设置
-  // 优先级：前端传入 > 用户设置 > 默认值
-  const settings = options.toolsSettings || {};
-
-  // 如果用户设置存在且前端没有覆盖，则使用用户设置
-  if (userSettings) {
-    // allowedTools: 只有在前端没有传入时才使用用户设置
-    if (!settings.allowedTools && userSettings.allowed_tools && userSettings.allowed_tools.length > 0) {
-      sdkOptions.allowedTools = userSettings.allowed_tools;
-      logger.debug({ allowedTools: userSettings.allowed_tools }, 'Using user settings for allowedTools');
-    }
-    // disallowedTools: 只有在前端没有传入时才使用用户设置
-    if (!settings.disallowedTools && userSettings.disallowed_tools && userSettings.disallowed_tools.length > 0) {
-      sdkOptions.disallowedTools = userSettings.disallowed_tools;
-      logger.debug({ disallowedTools: userSettings.disallowed_tools }, 'Using user settings for disallowedTools');
-    }
-    // skipPermissions: 只有在前端没有显式传入时才使用用户设置
-    // 使用 != null 同时排除 null 和 undefined，明确处理 false 值
-    if (settings.skipPermissions == null && userSettings.skip_permissions != null) {
-      settings.skipPermissions = userSettings.skip_permissions;
-      logger.debug({ skipPermissions: userSettings.skip_permissions }, 'Using user settings for skipPermissions');
-    }
+  if (!userSettings) {
+    return;
   }
 
-  // 从 toolsSettings 提取配置（如果存在，包括前端传入和用户设置）
-  if (settings.allowedTools && settings.allowedTools.length > 0) {
-    sdkOptions.allowedTools = settings.allowedTools;
+  // allowedTools: 只有在前端没有传入时才使用用户设置
+  if (!settings.allowedTools && userSettings.allowed_tools?.length > 0) {
+    sdkOptions.allowedTools = userSettings.allowed_tools;
+    logger.debug({ allowedTools: userSettings.allowed_tools }, 'Using user settings for allowedTools');
   }
-  if (settings.disallowedTools && settings.disallowedTools.length > 0) {
-    sdkOptions.disallowedTools = settings.disallowedTools;
+  // disallowedTools: 只有在前端没有传入时才使用用户设置
+  if (!settings.disallowedTools && userSettings.disallowed_tools?.length > 0) {
+    sdkOptions.disallowedTools = userSettings.disallowed_tools;
+    logger.debug({ disallowedTools: userSettings.disallowed_tools }, 'Using user settings for disallowedTools');
   }
+  // skipPermissions: 使用 != null 同时排除 null 和 undefined，明确处理 false 值
+  if (settings.skipPermissions == null && userSettings.skip_permissions != null) {
+    settings.skipPermissions = userSettings.skip_permissions;
+    logger.debug({ skipPermissions: userSettings.skip_permissions }, 'Using user settings for skipPermissions');
+  }
+}
 
-  // 移除不需要传给 SDK 的字段
-  delete sdkOptions.userId;
-  delete sdkOptions.isContainerProject;
-  delete sdkOptions.projectPath;
-  delete sdkOptions.toolsSettings;
-  delete sdkOptions.images;     // 图片数据在 DockerExecutor 中处理
-  delete sdkOptions.imagePaths; // 图片路径在脚本中单独处理
-
-  // 设置默认工具，如果最终没有配置任何工具
+/**
+ * 设置默认工具列表（当没有配置任何工具时）
+ * @param {object} sdkOptions - SDK 选项（可变）
+ */
+function setDefaultTools(sdkOptions) {
   if (!sdkOptions.allowedTools || sdkOptions.allowedTools.length === 0) {
-    sdkOptions.allowedTools = [
-      // Git 相关命令
-      'Bash(git log:*)',
-      'Bash(git diff:*)',
-      'Bash(git status:*)',
-      // 文档处理命令（PDF、Word 等）
-      'Bash(pdftotext:*)',
-      'Bash(pandoc:*)',
-      'Bash(file:*)',
-      // 其他工具
-      'Write',
-      'Read',
-      'Edit',
-      'Glob',
-      'Grep',
-      'MultiEdit',
-      'Task',
-      'TodoWrite',
-      'TodoRead',
-      'WebFetch',
-      'WebSearch',
-      'Skill'           // 关键修复：启用 Skill 工具，否则 SDK 不会加载 Skills
-    ];
+    sdkOptions.allowedTools = [...DEFAULT_ALLOWED_TOOLS];
     logger.debug('Setting default allowedTools');
   }
+}
 
+/**
+ * 配置扩展加载（agents 和 plugins）
+ * @param {object} sdkOptions - SDK 选项（可变）
+ * @param {object} options - 原始选项
+ */
+async function configureExtensions(sdkOptions, options) {
   // 关键修复：设置 settingSources 以从文件系统加载扩展
-  // 根据 Claude Agent SDK 文档，必须显式设置此选项才能加载扩展
-  // - "user": 从 ~/.claude/ 加载（HOME 环境变量指向的目录）
-  // - "project": 从当前工作目录的 .claude/ 加载
-  //
-  // SDK 将自动从以下位置加载：
-  // - settings.json (包含 customAgents 配置，直接注册无需前缀)
-  // - CLAUDE.md (上下文文档)
-  // - skills/ (技能目录)
-  // - agents/ (代理目录)
-  // - commands/ (命令目录)
-  // - hooks/ (钩子目录)
-  // - knowledge/ (知识目录)
+  // SDK 将自动从 settings.json / CLAUDE.md / skills/ / agents/ 等位置加载
   sdkOptions.settingSources = ['user', 'project'];
   logger.debug('Setting settingSources: user, project');
 
-  // 动态加载 agents 和配置 plugins（从 extensions/.claude/ 目录）
-  // 注意：skills 不能通过 sdkOptions.skills 传递给子 agents
-  // 必须使用 plugins 让 SDK 自动扫描，这样主对话和子 agents 都能使用 skills
-  if (options.enableExtensions !== false) {
-    try {
-      // 动态加载 agents（从 .md 文件读取）
-      sdkOptions.agents = await loadAgentsForSDK();
-      logger.debug({ agents: Object.keys(sdkOptions.agents) }, 'Loaded agents');
-
-      // 配置 plugins 指向 skills 目录
-      // SDK 会自动扫描 plugins 目录下的 skills，主对话和子 agents 都能使用
-      sdkOptions.plugins = [
-        {
-          type: 'local',
-          path: '/workspace/.claude'
-        }
-      ];
-      logger.debug('Configured plugins for skills scanning');
-    } catch (error) {
-      logger.error({ error }, 'Failed to load extensions');
-      // 如果加载失败，设置为空
-      sdkOptions.agents = {};
-      sdkOptions.plugins = [];
-    }
+  if (options.enableExtensions === false) {
+    return;
   }
 
-  // 定义系统级禁用的交互式规划工具（前端暂不支持）
-  // 这些工具需要用户实时交互，Web 界面暂时不支持
-  const interactivePlanningTools = [
-    'EnterPlanMode',   // 进入规划模式
-    'AskUserQuestion', // 向用户提问
-    'ExitPlanMode'     // 退出规划模式
-  ];
+  try {
+    // 动态加载 agents（从 .md 文件读取）
+    sdkOptions.agents = await loadAgentsForSDK();
+    logger.debug({ agents: Object.keys(sdkOptions.agents) }, 'Loaded agents');
 
-  // 处理权限模式
-  // 优先级：前端传入的 permissionMode > 用户设置的 skipPermissions > 默认值
-  // 注意：只有用户设置的 disallowedTools 才会影响 bypassPermissions 模式
-  // 系统级禁用（interactivePlanningTools）不影响权限模式选择
+    // 配置 plugins 指向 skills 目录，SDK 会自动扫描
+    sdkOptions.plugins = [{ type: 'local', path: '/workspace/.claude' }];
+    logger.debug('Configured plugins for skills scanning');
+  } catch (error) {
+    logger.error({ error }, 'Failed to load extensions');
+    sdkOptions.agents = {};
+    sdkOptions.plugins = [];
+  }
+}
 
-  // 提取用户设置的禁止工具（不包括系统级的 interactivePlanningTools）
+/**
+ * 确定权限模式
+ * 优先级：前端传入的 permissionMode > skipPermissions > 默认 bypass
+ * @param {object} sdkOptions - SDK 选项（可变）
+ * @param {object} settings - 合并后的 toolsSettings
+ * @returns {string[]} 用户级禁止工具列表（不含系统级）
+ */
+function determinePermissionMode(sdkOptions, settings) {
+  // 提取用户设置的禁止工具（排除系统级的 interactivePlanningTools）
   const userDisallowedTools = sdkOptions.disallowedTools
-    ? sdkOptions.disallowedTools.filter(tool => !interactivePlanningTools.includes(tool))
+    ? sdkOptions.disallowedTools.filter(tool => !INTERACTIVE_PLANNING_TOOLS.includes(tool))
     : [];
   const hasUserDisallowedTools = userDisallowedTools.length > 0;
-
-  // 跟踪是否使用了默认工具列表
   const usingDefaultTools = !sdkOptions.allowedTools || sdkOptions.allowedTools.length === 0;
 
-  // 如果前端明确传入了 permissionMode，使用前端传入的值
   if (sdkOptions.permissionMode) {
-    // 如果前端要求 bypassPermissions 但存在用户设置的禁止工具，发出警告
+    // 前端明确传入了 permissionMode
     if (sdkOptions.permissionMode === 'bypassPermissions' && hasUserDisallowedTools) {
       logger.warn({ disallowedTools: userDisallowedTools }, 'WARNING: bypassPermissions mode will disable user-set disallowedTools');
     }
     logger.debug({ permissionMode: sdkOptions.permissionMode }, 'Using frontend permissionMode');
-  }
-  // 如果用户设置 skipPermissions 为 true，且没有用户设置的禁止工具，则使用 bypassPermissions
-  else if (settings.skipPermissions && !hasUserDisallowedTools) {
+  } else if (settings.skipPermissions && !hasUserDisallowedTools) {
+    // 用户设置 skipPermissions 且没有用户禁止工具
     sdkOptions.permissionMode = 'bypassPermissions';
     logger.debug('Setting permissionMode: bypassPermissions (reason: skipPermissions=true, no user disallowedTools)');
-  }
-  // 新增：如果使用默认工具列表且没有用户设置的禁止工具，则使用 bypassPermissions
-  // 这样新用户可以直接使用所有预配置的工具（包括 PDF 转换等）
-  else if (usingDefaultTools && !hasUserDisallowedTools) {
+  } else if (usingDefaultTools && !hasUserDisallowedTools) {
+    // 使用默认工具列表且没有用户禁止工具
     sdkOptions.permissionMode = 'bypassPermissions';
     logger.debug('Setting permissionMode: bypassPermissions (reason: using default tools, no user disallowedTools)');
-  }
-  // 其他情况（包括有用户设置禁止工具的情况），使用 default 模式
-  else {
+  } else {
     sdkOptions.permissionMode = 'default';
     logger.debug({ reason: hasUserDisallowedTools ? 'has user disallowedTools' : 'default fallback' }, 'Setting permissionMode: default');
   }
 
-  // 处理 resume 参数：
-  // - 如果有 sessionId 且 resume 为 true，将 resume 设置为 sessionId
-  // - 否则完全移除 resume 参数（SDK 不接受 resume: false）
+  return userDisallowedTools;
+}
+
+/**
+ * 清理 SDK 选项中的内部字段和参数
+ * @param {object} sdkOptions - SDK 选项（可变）
+ * @param {object} options - 原始选项
+ * @param {string[]} userDisallowedTools - 用户级禁止工具列表
+ */
+function cleanupSdkOptions(sdkOptions, options, userDisallowedTools) {
+  // 移除不需要传给 SDK 的内部字段
+  for (const field of INTERNAL_FIELDS_TO_REMOVE) {
+    delete sdkOptions[field];
+  }
+
+  // 处理 resume 参数：有 sessionId 且 resume 为 true 时才保留
   if (options.sessionId && options.resume === true) {
     sdkOptions.resume = options.sessionId;
   } else {
-    // 移除 resume 参数（不管是 false 还是其他值）
     delete sdkOptions.resume;
   }
 
   // 合并系统级和用户级的 disallowedTools
-  // 用户设置的禁止工具优先保留，然后添加系统级禁用工具
-  sdkOptions.disallowedTools = [...userDisallowedTools, ...interactivePlanningTools];
-  logger.debug({ interactivePlanningTools }, 'Disallowed interactive planning tools');
+  sdkOptions.disallowedTools = [...userDisallowedTools, ...INTERACTIVE_PLANNING_TOOLS];
+  logger.debug({ interactivePlanningTools: INTERACTIVE_PLANNING_TOOLS }, 'Disallowed interactive planning tools');
   if (userDisallowedTools.length > 0) {
     logger.debug({ userDisallowedTools }, 'User disallowed tools');
   }
@@ -207,13 +197,46 @@ async function filterSDKOptions(options, userId) {
   // 移除 sessionId（SDK 不需要这个参数）
   delete sdkOptions.sessionId;
 
-  // 处理 model 参数：如果是 "custom"，则从环境变量读取
+  // 处理 model 参数：如果是 "custom"，则由环境变量决定
   if (sdkOptions.model === 'custom') {
     delete sdkOptions.model;
   }
 
-  // 调试：检查返回前的 sdkOptions keys
   logger.debug({ keys: Object.keys(sdkOptions) }, 'Returning sdkOptions keys');
+}
+
+/**
+ * 过滤 SDK 选项，移除不需要传给 SDK 的字段
+ * @param {object} options - 原始选项
+ * @param {number} userId - 用户 ID
+ * @returns {Promise<object>} 过滤后的选项
+ */
+async function filterSDKOptions(options, userId) {
+  const sdkOptions = { ...options };
+  const settings = options.toolsSettings || {};
+
+  // 步骤 1：合并用户设置到 SDK 选项
+  await mergeUserSettings(sdkOptions, settings, userId);
+
+  // 步骤 2：从 toolsSettings 提取最终配置覆盖
+  if (settings.allowedTools?.length > 0) {
+    sdkOptions.allowedTools = settings.allowedTools;
+  }
+  if (settings.disallowedTools?.length > 0) {
+    sdkOptions.disallowedTools = settings.disallowedTools;
+  }
+
+  // 步骤 3：设置默认工具
+  setDefaultTools(sdkOptions);
+
+  // 步骤 4：配置扩展加载
+  await configureExtensions(sdkOptions, options);
+
+  // 步骤 5：确定权限模式
+  const userDisallowedTools = determinePermissionMode(sdkOptions, settings);
+
+  // 步骤 6：清理内部字段和参数
+  cleanupSdkOptions(sdkOptions, options, userDisallowedTools);
 
   return sdkOptions;
 }
