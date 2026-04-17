@@ -55,7 +55,7 @@ export function useProjects(
         if (!isRetry) {
           setIsLoadingProjects(true);
         }
-        const response = await api.projects();
+        const response = await api.projects.list();
 
         if (!response.ok) {
           logger.error('Failed to fetch projects:', response.status, response.statusText);
@@ -158,7 +158,7 @@ export function useProjects(
   const handleSidebarRefresh = useCallback(async () => {
     return requestDeduplicator.dedupe('projects:refresh', async () => {
       try {
-        const response = await api.projects();
+        const response = await api.projects.list();
 
         if (!response.ok) {
           logger.error('Failed to refresh projects:', response.status, response.statusText);

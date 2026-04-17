@@ -49,7 +49,7 @@ vi.mock('@/shared/utils/logger', () => ({
 }));
 
 import { useProjects } from '../useProjects';
-import type { Project } from '../types';
+import type { Project } from '../../types';
 
 const createProject = (
   name: string,
@@ -57,7 +57,7 @@ const createProject = (
 ): Project => ({
   name,
   displayName: name,
-  path: `/projects/${name}`,
+  fullPath: `/projects/${name}`,
   sessions: [],
   cursorSessions: [],
   codexSessions: [],
@@ -326,12 +326,12 @@ describe('useProjects', () => {
   describe('updateSessionSummary', () => {
     it('should update session summary across all session arrays', () => {
       const project = createProject('my-project', {
-        sessions: [{ id: 's1', summary: 'old summary' }],
-        cursorSessions: [{ id: 's1', summary: 'old summary' }],
-        codexSessions: [{ id: 's1', summary: 'old summary' }],
+        sessions: [{ id: 's1', summary: 'old summary', lastActivity: '' }],
+        cursorSessions: [{ id: 's1', summary: 'old summary', lastActivity: '' }],
+        codexSessions: [{ id: 's1', summary: 'old summary', lastActivity: '' }],
       });
       const otherProject = createProject('other-project', {
-        sessions: [{ id: 's1', summary: 'unchanged' }],
+        sessions: [{ id: 's1', summary: 'unchanged', lastActivity: '' }],
       });
 
       const { result } = renderHook(() =>
@@ -362,7 +362,7 @@ describe('useProjects', () => {
 
     it('should handle missing session arrays gracefully', () => {
       const project = createProject('my-project', {
-        sessions: [{ id: 's1', summary: 'old' }],
+        sessions: [{ id: 's1', summary: 'old', lastActivity: '' }],
         cursorSessions: undefined,
         codexSessions: undefined,
       });

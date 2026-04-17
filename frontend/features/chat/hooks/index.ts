@@ -2,6 +2,7 @@
  * Chat Hooks Index
  *
  * Export all chat-related hooks.
+ * Note: PermissionMode type is only exported from ./components to avoid ambiguity.
  */
 
 export * from './useChatMessages';
@@ -15,4 +16,8 @@ export * from './useModelSelection';
 export * from './useCommandExecutor';
 export * from './useInputHandler';
 export * from './useSessionLoader';
-export * from './useMessageSender';
+export {
+  useMessageSender,
+  type UseMessageSenderOptions,
+  type UseMessageSenderResult,
+} from './useMessageSender';

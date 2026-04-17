@@ -63,7 +63,7 @@ import { logger } from '@/shared/utils/logger';
  * 获取项目列表（包括 Cursor sessions）
  */
 async function fetchProjects(): Promise<Project[]> {
-  const response = await api.projects();
+  const response = await api.projects.list();
 
   if (!response.ok) {
     throw new Error(`Failed to fetch projects: ${response.status} ${response.statusText}`);

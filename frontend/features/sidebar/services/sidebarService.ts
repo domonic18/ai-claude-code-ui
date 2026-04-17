@@ -37,7 +37,7 @@ export class SidebarService {
    */
   async getProjects(): Promise<Project[]> {
     try {
-      const response = await api.projects();
+      const response = await api.projects.list();
 
       if (!response.ok) {
         throw new SidebarServiceError(
@@ -77,7 +77,7 @@ export class SidebarService {
   ): Promise<PaginatedSessionsResponse> {
     try {
       logger.info('[SidebarService] Fetching sessions:', { projectName, limit, offset });
-      const response = await api.sessions(projectName, limit, offset);
+      const response = await api.projects.sessions(projectName, limit, offset);
 
       if (!response.ok) {
         throw new SidebarServiceError(

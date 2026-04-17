@@ -59,26 +59,28 @@ function Shell({
     onProcessCompleteRef.current = onProcessComplete;
   });
 
+  // Connection hook — created first so its send function is available
+  const connectionSendRef = useRef<(data: object) => void>(() => {});
+
   // Terminal setup hook
-  const { terminalRef, terminal, fitAddon, send } = useTerminalSetup({
+  const { terminalRef, terminal, fitAddon } = useTerminalSetup({
     initKey: selectedProject?.path || selectedProject?.fullPath || '',
     isRestarting,
     onInput: useCallback((data: string) => {
-      send({ type: 'input', data });
-    }, [send]),
+      connectionSendRef.current({ type: 'input', data });
+    }, []),
     onResize: useCallback((cols: number, rows: number) => {
-      send({ type: 'resize', cols, rows });
-    }, [send]),
+      connectionSendRef.current({ type: 'resize', cols, rows });
+    }, []),
     autoConnect,
     onInitialized: () => setIsInitialized(true),
     send: (data: object) => {
-      // Will be wired up after connection hook is created
-      // This is a placeholder - the actual send comes from connection
+      connectionSendRef.current(data);
     },
   });
 
   // Connection hook
-  const { isConnected, isConnecting, userDisconnected, connect, disconnect } = useTerminalConnection({
+  const { isConnected, isConnecting, userDisconnected, connect, disconnect, send: connectionSend } = useTerminalConnection({
     onOutput: useCallback((output: string) => {
       if (terminal.current) {
         terminal.current.write(output);
@@ -95,6 +97,9 @@ function Shell({
     fitAddonRef: fitAddon,
     terminalRef: terminal,
   });
+
+  // Wire up the connection send function so setup hook callbacks can use it
+  connectionSendRef.current = connectionSend;
 
   // Session display names
   const sessionDisplayName = useMemo(() => {
@@ -115,7 +120,6 @@ function Shell({
   // Restart handler
   const restartShell = useCallback(() => {
     setIsRestarting(true);
-    setUserDisconnected(false);
 
     disconnect();
 
