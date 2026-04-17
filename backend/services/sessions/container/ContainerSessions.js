@@ -1,8 +1,13 @@
 /**
- * 容器会话读取模块
+ * 容器会话读取模块（门面）
  *
- * 从 Docker 容器内读取 Claude Code 会话信息
- * 项目现在完全基于容器化架构运行
+ * 从 Docker 容器内读取 Claude Code 会话信息。
+ * 项目现在完全基于容器化架构运行。
+ *
+ * 本文件作为统一入口，将具体实现委托给子模块：
+ * - containerPathEncoder — 路径编解码
+ * - containerFileReader — Docker exec 文件操作
+ * - sessionParser — JSONL 解析与会话数据提取
  *
  * Session 存储位置：/workspace/.claude/projects/{projectName}/
  * 项目名称编码：my-workspace → -workspace-my-workspace
@@ -10,269 +15,21 @@
  * @module sessions/container/ContainerSessions
  */
 
-import containerManager from '../../container/core/index.js';
 import { CONTAINER } from '../../../config/config.js';
-import { filterMemoryContext } from '../../../utils/memoryUtils.js';
-import { writeFileViaPutArchive as writeFileToContainerArchive, writeFileViaShell as writeShell, validateFilePath } from '../../container/utils/containerFileWriter.js';
 import { createLogger } from '../../../utils/logger.js';
+import { encodeProjectName } from './containerPathEncoder.js';
+import { readFileFromContainer, writeJsonlContentToContainer, execAndCollectOutput } from './containerFileReader.js';
+import { parseJsonlContent, filterMemoryContextFromEntry } from './sessionParser.js';
+
 const logger = createLogger('services/sessions/container/ContainerSessions');
 
-/**
- * 编码项目名称为容器内存储格式
- *
- * SDK 在容器内基于工作区路径进行编码：
- * - /workspace/my-workspace → -workspace-my-workspace
- * - /workspace/测试 → -workspace---（中文等非ASCII字符转换为-）
- *
- * 编码规则：
- * 1. 路径开头的 / 替换为 -
- * 2. 路径中间的 / 替换为 -
- * 3. 非ASCII字符（包括中文）替换为 -
- *
- * @param {string} projectName - 项目名称 (如: my-workspace 或 测试)
- * @returns {string} 编码后的名称 (如: -workspace-my-workspace)
- */
-function encodeProjectName(projectName) {
-  // SDK 在容器内编码的是 /workspace/{projectName}
-  // 编码规则：/ → -, 非ASCII字符 → -
-  const fullPath = `/workspace/${projectName}`;
+// ─── 从子模块重导出 ─────────────────────────────────────
 
-  // 先将非 ASCII 字符替换为 -
-  const asciiOnlyPath = fullPath.replace(/[^\x00-\x7F]/g, '-');
+export { encodeProjectName } from './containerPathEncoder.js';
+export { readFileFromContainer } from './containerFileReader.js';
+export { parseJsonlContent } from './sessionParser.js';
 
-  // 然后将所有 / 替换为 -
-  return asciiOnlyPath.replace(/\//g, '-');
-}
-
-/**
- * 从容器内读取 JSONL 文件内容
- * @param {number} userId - 用户 ID
- * @param {string} filePath - 容器内文件路径
- * @returns {Promise<string>} 文件内容
- */
-async function readFileFromContainer(userId, filePath) {
-  const { stream } = await containerManager.execInContainer(
-    userId,
-    ['cat', filePath]
-  );
-
-  // 使用 demuxStream 来正确处理 Docker 的多路复用协议
-  const { PassThrough } = await import('stream');
-  const stdout = new PassThrough();
-  const stderr = new PassThrough();
-
-  containerManager.docker.modem.demuxStream(stream, stdout, stderr);
-
-  return new Promise((resolve, reject) => {
-    let content = '';
-    let errorOutput = '';
-
-    stdout.on('data', (chunk) => {
-      content += chunk.toString();
-    });
-
-    stderr.on('data', (chunk) => {
-      errorOutput += chunk.toString();
-    });
-
-    stream.on('error', (err) => {
-      reject(new Error(`Failed to read file: ${err.message}`));
-    });
-
-    stream.on('end', () => {
-      if (errorOutput && (errorOutput.includes('No such file') || errorOutput.includes('cannot access'))) {
-        reject(new Error(`File not found: ${filePath}`));
-      } else {
-        resolve(content);
-      }
-    });
-  });
-}
-
-/**
- * 解析 JSONL 文件中的会话数据（从主机模式的 sessions.js 复用）
- * @param {string} content - JSONL 文件内容
- * @returns {Object} 包含会话和条目的对象
- */
-function parseJsonlContent(content) {
-  const sessions = new Map();
-  const entries = [];
-  const pendingSummaries = new Map();
-
-  try {
-    const lines = content.split('\n');
-
-    for (const line of lines) {
-      if (line.trim()) {
-        try {
-          const entry = JSON.parse(line);
-          entries.push(entry);
-
-          // Handle summary entries
-          if (entry.type === 'summary' && entry.summary && !entry.sessionId && entry.leafUuid) {
-            pendingSummaries.set(entry.leafUuid, entry.summary);
-          }
-
-          if (entry.sessionId) {
-            if (!sessions.has(entry.sessionId)) {
-              sessions.set(entry.sessionId, {
-                id: entry.sessionId,
-                summary: 'New Session',
-                messageCount: 0,
-                lastActivity: new Date(),
-                cwd: entry.cwd || '',
-                lastUserMessage: null,
-                lastAssistantMessage: null
-              });
-            }
-
-            const session = sessions.get(entry.sessionId);
-
-            // Apply pending summary
-            if (session.summary === 'New Session' && entry.parentUuid && pendingSummaries.has(entry.parentUuid)) {
-              session.summary = pendingSummaries.get(entry.parentUuid);
-            }
-
-            // Update summary from summary entries
-            if (entry.type === 'summary' && entry.summary) {
-              session.summary = entry.summary;
-            }
-
-            // Track user messages
-            if (entry.message?.role === 'user' && entry.message?.content) {
-              const content = entry.message.content;
-
-              let textContent = content;
-              if (Array.isArray(content) && content.length > 0 && content[0].type === 'text') {
-                textContent = content[0].text;
-              }
-
-              // 过滤记忆上下文内容
-              const filteredTextContent = filterMemoryContext(textContent);
-              if (filteredTextContent !== textContent) {
-                logger.info('[ContainerSessions] Filtered memory context from user message');
-              }
-
-              const isSystemMessage = typeof filteredTextContent === 'string' && (
-                filteredTextContent.startsWith('<command-name>') ||
-                filteredTextContent.startsWith('<command-message>') ||
-                filteredTextContent.startsWith('<command-args>') ||
-                filteredTextContent.startsWith('<local-command-stdout>') ||
-                filteredTextContent.startsWith('<system-reminder>') ||
-                filteredTextContent.startsWith('Caveat:') ||
-                filteredTextContent.startsWith('This session is being continued from a previous') ||
-                filteredTextContent.startsWith('Invalid API key') ||
-                filteredTextContent.includes('{"subtasks":') ||
-                filteredTextContent.includes('CRITICAL: You MUST respond with ONLY a JSON') ||
-                filteredTextContent === 'Warmup'
-              );
-
-              if (typeof filteredTextContent === 'string' && filteredTextContent.length > 0 && !isSystemMessage) {
-                session.lastUserMessage = filteredTextContent;
-              }
-            } else if (entry.message?.role === 'assistant' && entry.message?.content) {
-              if (entry.isApiErrorMessage === true) {
-                // Skip
-              } else {
-                let assistantText = null;
-
-                if (Array.isArray(entry.message.content)) {
-                  for (const part of entry.message.content) {
-                    if (part.type === 'text' && part.text) {
-                      assistantText = part.text;
-                    }
-                  }
-                } else if (typeof entry.message.content === 'string') {
-                  assistantText = entry.message.content;
-                }
-
-                const isSystemAssistantMessage = typeof assistantText === 'string' && (
-                  assistantText.startsWith('Invalid API key') ||
-                  assistantText.includes('{"subtasks":') ||
-                  assistantText.includes('CRITICAL: You MUST respond with ONLY a JSON')
-                );
-
-                if (assistantText && !isSystemAssistantMessage) {
-                  session.lastAssistantMessage = assistantText;
-                }
-              }
-            }
-
-            session.messageCount++;
-
-            if (entry.timestamp) {
-              session.lastActivity = new Date(entry.timestamp);
-            }
-          }
-        } catch (parseError) {
-          // Skip malformed lines
-        }
-      }
-    }
-
-    // Set final summary based on last message if no summary exists
-    for (const session of sessions.values()) {
-      if (session.summary === 'New Session') {
-        const lastMessage = session.lastUserMessage || session.lastAssistantMessage;
-        if (lastMessage) {
-          session.summary = lastMessage.length > 50 ? lastMessage.substring(0, 50) + '...' : lastMessage;
-        }
-      }
-    }
-
-    // 过滤出 JSON 响应错误（Task Master 错误）
-    const allSessions = Array.from(sessions.values());
-    const filteredSessions = allSessions.filter(session => {
-      const shouldFilter = session.summary.startsWith('{ "');
-      return !shouldFilter;
-    });
-
-    return {
-      sessions: filteredSessions,
-      entries: entries
-    };
-
-  } catch (error) {
-    logger.error('Error parsing JSONL content:', error);
-    return { sessions: [], entries: [] };
-  }
-}
-
-/**
- * Write JSONL content to container file
- * Shared utility for writing modified JSONL files back to container
- *
- * @param {number} userId - User ID
- * @param {string} filePath - Path to the file in container
- * @param {Array} entries - Array of entries to write
- * @returns {Promise<void>}
- */
-async function writeJsonlContentToContainer(userId, filePath, entries) {
-  // 安全校验：防止路径包含危险字符
-  validateFilePath(filePath);
-
-  // Rebuild JSONL content
-  const updatedContent = entries
-    .map(entry => entry._raw || JSON.stringify(entry))
-    .filter(line => line.trim())
-    .join('\n') + '\n';
-
-  const contentSize = Buffer.byteLength(updatedContent, 'utf8');
-
-  // 阈值 80KB：base64 膨胀 ~33%，80KB 编码后约 107KB，
-  // 留出余量避免接近 Linux exec 的 ~128KB 参数长度限制
-  const SHELL_ARG_SIZE_THRESHOLD = 80 * 1024;
-
-  if (contentSize > SHELL_ARG_SIZE_THRESHOLD) {
-    // 大文件：通过 Docker putArchive API 写入，完全绕过命令行参数长度限制
-    const container = await containerManager.getOrCreateContainer(userId);
-    const dockerContainer = containerManager.docker.getContainer(container.id);
-    await writeFileToContainerArchive(dockerContainer, filePath, updatedContent, { logLabel: 'ContainerSessions' });
-  } else {
-    // 小文件：使用 base64 编码写入（原有逻辑，已验证可正常工作）
-    await writeShell(containerManager, userId, filePath, updatedContent);
-  }
-}
+// ─── 会话文件操作 ────────────────────────────────────────
 
 /**
  * 从容器内列出项目的会话文件
@@ -284,49 +41,22 @@ async function listSessionFiles(userId, projectName) {
   const encodedProjectName = encodeProjectName(projectName);
   const projectDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
 
-  // 使用 for 循环查找所有 .jsonl 文件（更可靠）
-  const { stream } = await containerManager.execInContainer(
+  const output = await execAndCollectOutput(
     userId,
-    ['sh', '-c', 'for f in "$1"/*.jsonl; do [ -f "$f" ] && basename "$f"; done 2>/dev/null || echo ""', 'listJsonl', projectDir]
+    ['sh', '-c', 'for f in "$1"/*.jsonl; do [ -f "$f" ] && basename "$f"; done 2>/dev/null || echo ""', 'listJsonl', projectDir],
+    { silentStderr: true }
   );
 
-  // 使用 demuxStream 来正确处理 Docker 的多路复用协议
-  const { PassThrough } = await import('stream');
-  const stdout = new PassThrough();
-  const stderr = new PassThrough();
-
-  containerManager.docker.modem.demuxStream(stream, stdout, stderr);
-
-  return new Promise((resolve) => {
-    let output = '';
-
-    stdout.on('data', (chunk) => {
-      output += chunk.toString();
-    });
-
-    stderr.on('data', (chunk) => {
-      // 静默处理 stderr 错误（目录可能不存在）
-    });
-
-    stream.on('error', (err) => {
-      // Directory might not exist, return empty array
-      resolve([]);
-    });
-
-    stream.on('end', () => {
-      try {
-        const files = output.trim().split('\n').filter(f => f.trim());
-        // 过滤掉 agent-*.jsonl 文件
-        const sessionFiles = files.filter(f =>
-          f.endsWith('.jsonl') && !f.startsWith('agent-')
-        );
-        resolve(sessionFiles);
-      } catch (e) {
-        resolve([]);
-      }
-    });
-  });
+  try {
+    const files = output.trim().split('\n').filter(f => f.trim());
+    // 过滤掉 agent-*.jsonl 文件
+    return files.filter(f => f.endsWith('.jsonl') && !f.startsWith('agent-'));
+  } catch (e) {
+    return [];
+  }
 }
+
+// ─── 会话查询 ────────────────────────────────────────────
 
 /**
  * 获取项目的会话列表（容器模式）
@@ -338,7 +68,6 @@ async function listSessionFiles(userId, projectName) {
  */
 async function getSessionsInContainer(userId, projectName, limit = 5, offset = 0) {
   try {
-    // 获取会话文件列表
     const sessionFiles = await listSessionFiles(userId, projectName);
 
     if (sessionFiles.length === 0) {
@@ -452,39 +181,13 @@ async function getSessionFilesInfo(userId, projectName) {
     const encodedProjectName = encodeProjectName(projectName);
     const projectDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
 
-    const { stream } = await containerManager.execInContainer(
+    const output = await execAndCollectOutput(
       userId,
-      ['sh', '-c', 'ls -la "$1" 2>/dev/null || echo "Directory not found"', 'lsDir', projectDir]
+      ['sh', '-c', 'ls -la "$1" 2>/dev/null || echo "Directory not found"', 'lsDir', projectDir],
+      { logLabel: 'ContainerSessions' }
     );
 
-    // 使用 demuxStream 来正确处理 Docker 的多路复用协议
-    const { PassThrough } = await import('stream');
-    const stdout = new PassThrough();
-    const stderr = new PassThrough();
-
-    containerManager.docker.modem.demuxStream(stream, stdout, stderr);
-
-    return new Promise((resolve) => {
-      let output = '';
-      let errorOutput = '';
-
-      stdout.on('data', (chunk) => {
-        output += chunk.toString();
-      });
-
-      stderr.on('data', (chunk) => {
-        errorOutput += chunk.toString();
-        logger.info(`[ContainerSessions] STDERR while getting files info:`, chunk.toString());
-      });
-
-      stream.on('error', () => {
-        resolve('');
-      });
-
-      stream.on('end', () => {
-        resolve(output);
-      });
-    });
+    return output;
   } catch (error) {
     logger.error(`[ContainerSessions] Error getting session files info:`, error);
     return '';
@@ -505,7 +208,6 @@ async function getSessionMessagesInContainer(userId, projectName, sessionId, lim
     const encodedProjectName = encodeProjectName(projectName);
     const projectDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
 
-    // 获取会话文件列表
     const sessionFiles = await listSessionFiles(userId, projectName);
 
     if (sessionFiles.length === 0) {
@@ -537,39 +239,6 @@ async function getSessionMessagesInContainer(userId, projectName, sessionId, lim
       } catch (error) {
         logger.warn(`[ContainerSessions] Failed to read session file ${fileName}:`, error.message);
       }
-    }
-
-    /**
-     * 过滤用户消息中的记忆上下文
-     * @param {object} entry - 消息条目
-     * @returns {object} 过滤后的条目
-     */
-    function filterMemoryContextFromEntry(entry) {
-      if (entry.message?.role === 'user' && entry.message?.content) {
-        const content = entry.message.content;
-        let textContent = content;
-
-        if (Array.isArray(content) && content.length > 0 && content[0].type === 'text') {
-          textContent = content[0].text;
-        }
-
-        // 使用共享函数过滤记忆上下文
-        const filteredContent = filterMemoryContext(textContent);
-
-        // 如果内容被修改，返回新的条目
-        if (filteredContent !== textContent) {
-          return {
-            ...entry,
-            message: {
-              ...entry.message,
-              content: filteredContent
-            }
-          };
-        }
-      }
-
-      // 不需要过滤，返回原始条目
-      return entry;
     }
 
     // 按时间戳排序
@@ -606,6 +275,8 @@ async function getSessionMessagesInContainer(userId, projectName, sessionId, lim
   }
 }
 
+// ─── 会话写操作 ──────────────────────────────────────────
+
 /**
  * 更新会话摘要（容器模式）
  * @param {number} userId - 用户 ID
@@ -619,7 +290,6 @@ async function updateSessionSummaryInContainer(userId, projectName, sessionId, n
     const encodedProjectName = encodeProjectName(projectName);
     const projectDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
 
-    // 获取会话文件列表
     const sessionFiles = await listSessionFiles(userId, projectName);
 
     if (sessionFiles.length === 0) {
@@ -705,7 +375,6 @@ async function deleteSessionInContainer(userId, projectName, sessionId) {
     const encodedProjectName = encodeProjectName(projectName);
     const projectDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
 
-    // 获取会话文件列表
     const sessionFiles = await listSessionFiles(userId, projectName);
 
     if (sessionFiles.length === 0) {
@@ -761,9 +430,6 @@ async function deleteSessionInContainer(userId, projectName, sessionId) {
 }
 
 export {
-  encodeProjectName,
-  readFileFromContainer,
-  parseJsonlContent,
   getSessionsInContainer,
   getSessionFilesInfo,
   getSessionMessagesInContainer,
