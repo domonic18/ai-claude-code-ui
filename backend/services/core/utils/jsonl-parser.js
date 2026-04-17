@@ -8,6 +8,7 @@
  */
 
 import { MESSAGE_CONSTANTS } from '../types/message-types.js';
+import { filterMemoryContext } from '../../../utils/memoryUtils.js';
 import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('services/core/utils/jsonl-parser');
 
@@ -58,7 +59,12 @@ function createSession(sessionId, cwd = '') {
  * @param {Object} entry - JSONL 条目
  */
 function processUserEntry(session, entry) {
-  const textContent = JsonlParser._extractTextContent(entry.message);
+  // message 可能是 content 本身（字符串/数组），也可能是包含 content 字段的对象
+  const rawMessage = entry.message;
+  const rawContent = rawMessage?.content !== undefined
+    ? JsonlParser._extractTextContent(rawMessage.content)
+    : JsonlParser._extractTextContent(rawMessage);
+  const textContent = filterMemoryContext(rawContent);
   const isSystemMessage = JsonlParser._isSystemMessage(textContent);
 
   if (textContent && !isSystemMessage) {
@@ -77,10 +83,14 @@ function processAssistantEntry(session, entry, includeApiErrors) {
     return;
   }
 
-  const textContent = JsonlParser._extractTextContent(entry.message);
+  const rawMessage = entry.message;
+  const textContent = rawMessage?.content !== undefined
+    ? JsonlParser._extractTextContent(rawMessage.content)
+    : JsonlParser._extractTextContent(rawMessage);
+  const isSystemMsg = JsonlParser._isSystemMessage(textContent);
   const isApiError = JsonlParser._isApiErrorMessage(textContent);
 
-  if (textContent && !isApiError) {
+  if (textContent && !isSystemMsg && !isApiError) {
     session.lastAssistantMessage = textContent;
   }
 }
@@ -499,3 +509,39 @@ export default {
   SessionGrouping,
   TokenUsageCalculator,
 };
+
+// ─── 兼容层：原 sessionParser.js 的公共 API ──────────────────
+
+/**
+ * 解析 JSONL 文件中的会话数据（兼容原 sessionParser.parseJsonlContent）
+ * @param {string} content - JSONL 文件内容
+ * @returns {Object} 包含会话和条目的对象 { sessions: Array, entries: Array }
+ */
+export function parseJsonlContent(content) {
+  const result = JsonlParser.parse(content, {
+    includeSystemMessages: false,
+    includeApiErrors: false,
+    validateSessions: true,
+  });
+  return { sessions: result.sessions, entries: result.entries };
+}
+
+/**
+ * 过滤用户消息中的记忆上下文（兼容原 sessionParser.filterMemoryContextFromEntry）
+ * @param {Object} entry - 消息条目
+ * @returns {Object} 过滤后的条目
+ */
+export function filterMemoryContextFromEntry(entry) {
+  if (entry.message?.role === 'user' && entry.message?.content) {
+    const textContent = JsonlParser._extractTextContent(entry.message.content);
+    const filteredContent = filterMemoryContext(textContent);
+
+    if (filteredContent !== textContent) {
+      return {
+        ...entry,
+        message: { ...entry.message, content: filteredContent },
+      };
+    }
+  }
+  return entry;
+}

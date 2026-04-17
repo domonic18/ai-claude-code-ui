@@ -19,7 +19,7 @@ import { CONTAINER } from '../../../config/config.js';
 import { createLogger } from '../../../utils/logger.js';
 import { encodeProjectName } from './containerPathEncoder.js';
 import { readFileFromContainer, writeJsonlContentToContainer, execAndCollectOutput } from './containerFileReader.js';
-import { parseJsonlContent, filterMemoryContextFromEntry } from './sessionParser.js';
+import { parseJsonlContent, filterMemoryContextFromEntry } from '../../core/utils/jsonl-parser.js';
 
 const logger = createLogger('services/sessions/container/ContainerSessions');
 
@@ -27,7 +27,7 @@ const logger = createLogger('services/sessions/container/ContainerSessions');
 
 export { encodeProjectName } from './containerPathEncoder.js';
 export { readFileFromContainer } from './containerFileReader.js';
-export { parseJsonlContent } from './sessionParser.js';
+export { parseJsonlContent } from '../../core/utils/jsonl-parser.js';
 
 // ─── 公共 JSONL 工具函数 ────────────────────────────────
 

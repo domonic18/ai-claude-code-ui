@@ -11,6 +11,7 @@ import { WebSocket } from 'ws';
 import { PTY_SESSION_TIMEOUT } from './shell-constants.js';
 import containerManager from '../../services/container/core/index.js';
 import { createLogger, sanitizePreview } from '../../utils/logger.js';
+import { ContainerShellSession } from './ContainerShellSession.js';
 
 const logger = createLogger('websocket/handlers/container-shell');
 
@@ -56,10 +57,7 @@ export async function handleContainerShell(ws, data, ptySessionsMap) {
     }
 
     // 会话键
-    const commandSuffix = isPlainShell && initialCommand
-        ? `_cmd_${Buffer.from(initialCommand).toString('base64').slice(0, 16)}`
-        : '';
-    const ptySessionKey = `container_${userId}_${projectPath}_${sessionId || 'default'}${commandSuffix}`;
+    const ptySessionKey = _buildSessionKey(userId, projectPath, sessionId, isPlainShell, initialCommand);
 
     logger.debug('[Container Shell] Project:', projectPath);
     logger.debug('[Container Shell] Session key:', ptySessionKey);
@@ -67,45 +65,14 @@ export async function handleContainerShell(ws, data, ptySessionsMap) {
     logger.debug({ initialCommandPreview: sanitizePreview(initialCommand) || 'none' }, '[Container Shell] Initial command');
     logger.debug({ cols, rows }, '[Container Shell] Terminal size');
 
-    // 欢迎消息
-    let welcomeMsg;
-    if (isPlainShell) {
-        welcomeMsg = `\x1b[36mContainer Shell: ${projectPath}\x1b[0m\r\n`;
-    } else {
-        const providerName = provider === 'cursor' ? 'Cursor' : 'Claude';
-        welcomeMsg = hasSession ?
-            `\x1b[36mResuming ${providerName} session in container: ${projectPath}\x1b[0m\r\n` :
-            `\x1b[36mStarting new ${providerName} session in container: ${projectPath}\x1b[0m\r\n`;
-    }
-
-    ws.send(JSON.stringify({
-        type: 'output',
-        data: welcomeMsg
-    }));
+    // 发送欢迎消息
+    _sendWelcomeMessage(ws, projectPath, hasSession, provider, isPlainShell);
 
     // 构建容器内的工作目录
     const containerWorkDir = `/workspace/${projectPath}`;
 
     // 构建命令
-    let shellCommand;
-    if (isPlainShell) {
-        // 普通 shell 模式：直接运行命令
-        shellCommand = `cd "${containerWorkDir}" && ${initialCommand}`;
-    } else if (provider === 'cursor') {
-        // Cursor 模式
-        if (hasSession && sessionId) {
-            shellCommand = `cd "${containerWorkDir}" && cursor-agent --resume="${sessionId}"`;
-        } else {
-            shellCommand = `cd "${containerWorkDir}" && cursor-agent`;
-        }
-    } else {
-        // Claude 模式（默认）
-        if (hasSession && sessionId) {
-            shellCommand = `cd "${containerWorkDir}" && claude --resume ${sessionId} || claude`;
-        } else {
-            shellCommand = `cd "${containerWorkDir}" && claude`;
-        }
-    }
+    const shellCommand = _buildShellCommand(containerWorkDir, isPlainShell, provider, hasSession, sessionId, initialCommand);
 
     logger.debug({ shellCommandPreview: sanitizePreview(shellCommand) }, '[Container Shell] Executing command');
 
@@ -120,128 +87,29 @@ export async function handleContainerShell(ws, data, ptySessionsMap) {
         const stream = attachResult.stream;
         logger.debug('[Container Shell] Attached to container, stream type:', stream?.constructor?.name, 'writable:', stream?.writable);
 
-        // 注意：hijack: true 返回的是原始双向流，不使用 Docker 多路复用格式
-        // 所以直接从 stream 读取，不需要使用 demuxStream
-
         // 发送初始命令到 shell
-        // 容器的主进程是 shell，所以我们可以直接发送命令
-        // 使用 cd 和 && 来在项目目录中执行命令
-        const initialCmd = `${shellCommand}\n`;
-        logger.debug({ commandPreview: sanitizePreview(initialCmd) }, '[Container Shell] Sending initial command to shell');
-        if (stream.writable) {
-            stream.write(initialCmd);
-        } else {
-            logger.error('[Container Shell] Stream is not writable, cannot send initial command');
-        }
+        await _sendInitialCommand(stream, shellCommand);
 
-        // 会话对象
-        const session = {
+        // 创建会话对象
+        const session = new ContainerShellSession(
             attachResult,
             stream,
             ws,
-            buffer: [],
             projectPath,
             sessionId,
-            userId,
-            resize: async (newCols, newRows) => {
-                try {
-                    // container.attach() 不支持动态调整 TTY 大小
-                    // TTY 大小在 attach 时确定，后续无法更改
-                    logger.debug('[Container Shell] Resize requested (not supported with attach):', newCols, 'x', newRows);
-                } catch (err) {
-                    logger.error('[Container Shell] Resize error:', err);
-                }
-            },
-            write: async (inputData) => {
-                try {
-                    // 向 attached shell 流写入数据
-                    // stream 现在应该是可写的 Duplex 流
-                    if (stream && stream.writable) {
-                        stream.write(inputData);
-                    }
-                } catch (err) {
-                    logger.error('[Container Shell] Write error:', err);
-                }
-            },
-            kill: async () => {
-                try {
-                    // 关闭 attached 流
-                    if (stream && !stream.destroyed) {
-                        stream.destroy();
-                    }
-                } catch (err) {
-                    logger.error('[Container Shell] Kill error:', err);
-                }
-            }
-        };
+            userId
+        );
 
         // 保存会话
         ptySessionsMap.set(ptySessionKey, session);
 
-        // 确保流在流动（某些情况下流可能被暂停）
-        if (stream.isPaused()) {
-            stream.resume();
-        }
-
-        // 直接从原始流读取数据（hijack 模式不使用多路复用）
-        stream.on('data', (chunk) => {
-            if (session.buffer.length < 5000) {
-                session.buffer.push(chunk.toString());
-            } else {
-                session.buffer.shift();
-                session.buffer.push(chunk.toString());
-            }
-
-            if (ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                    type: 'output',
-                    data: chunk.toString()
-                }));
-            }
-        });
-
-        // 处理流结束
-        stream.on('end', () => {
-            logger.info('[Container Shell] Process ended');
-            if (ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                    type: 'output',
-                    data: `\r\n\x1b[33mProcess exited\x1b[0m\r\n`
-                }));
-            }
-            ptySessionsMap.delete(ptySessionKey);
-        });
-
-        stream.on('error', (err) => {
-            logger.error('[Container Shell] Stream error:', err);
-            if (ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                    type: 'output',
-                    data: `\r\n\x1b[31mError: ${err.message}\x1b[0m\r\n`
-                }));
-            }
-        });
-
-        // 设置当前进程
-        let currentSession = session;
-
-        // 注意：我们不在这里设置 ws.on('message') 处理器
-        // 而是依赖 ptySessionsMap 来让主处理器路由消息
-        // 这样可以避免多个消息处理器冲突
+        // 启动流监听
+        session.startStreamListeners(ptySessionKey, ptySessionsMap);
 
         // 处理 WebSocket 关闭 - 保持会话存活以支持重连
         ws.on('close', () => {
             logger.info('[Container Shell] WebSocket closed, keeping session alive');
-            // 设置超时以在一段时间后清理会话
-            if (!currentSession.timeoutId) {
-                currentSession.timeoutId = setTimeout(() => {
-                    logger.info('[Container Shell] Session timeout, cleaning up:', ptySessionKey);
-                    if (currentSession.kill) {
-                        currentSession.kill();
-                    }
-                    ptySessionsMap.delete(ptySessionKey);
-                }, PTY_SESSION_TIMEOUT);
-            }
+            session.setTimeout(ptySessionKey, ptySessionsMap, PTY_SESSION_TIMEOUT);
         });
 
         // 返回会话键，以便主处理器可以引用此会话
@@ -254,5 +122,76 @@ export async function handleContainerShell(ws, data, ptySessionsMap) {
             data: `\r\n\x1b[31mError: ${error.message}\x1b[0m\r\n`
         }));
         return null;
+    }
+}
+
+/**
+ * 构建会话键
+ * @private
+ */
+function _buildSessionKey(userId, projectPath, sessionId, isPlainShell, initialCommand) {
+    const commandSuffix = isPlainShell && initialCommand
+        ? `_cmd_${Buffer.from(initialCommand).toString('base64').slice(0, 16)}`
+        : '';
+    return `container_${userId}_${projectPath}_${sessionId || 'default'}${commandSuffix}`;
+}
+
+/**
+ * 发送欢迎消息
+ * @private
+ */
+function _sendWelcomeMessage(ws, projectPath, hasSession, provider, isPlainShell) {
+    let welcomeMsg;
+    if (isPlainShell) {
+        welcomeMsg = `\x1b[36mContainer Shell: ${projectPath}\x1b[0m\r\n`;
+    } else {
+        const providerName = provider === 'cursor' ? 'Cursor' : 'Claude';
+        welcomeMsg = hasSession ?
+            `\x1b[36mResuming ${providerName} session in container: ${projectPath}\x1b[0m\r\n` :
+            `\x1b[36mStarting new ${providerName} session in container: ${projectPath}\x1b[0m\r\n`;
+    }
+
+    ws.send(JSON.stringify({
+        type: 'output',
+        data: welcomeMsg
+    }));
+}
+
+/**
+ * 构建 shell 命令
+ * @private
+ */
+function _buildShellCommand(containerWorkDir, isPlainShell, provider, hasSession, sessionId, initialCommand) {
+    if (isPlainShell) {
+        // 普通 shell 模式：直接运行命令
+        return `cd "${containerWorkDir}" && ${initialCommand}`;
+    } else if (provider === 'cursor') {
+        // Cursor 模式
+        if (hasSession && sessionId) {
+            return `cd "${containerWorkDir}" && cursor-agent --resume="${sessionId}"`;
+        } else {
+            return `cd "${containerWorkDir}" && cursor-agent`;
+        }
+    } else {
+        // Claude 模式（默认）
+        if (hasSession && sessionId) {
+            return `cd "${containerWorkDir}" && claude --resume ${sessionId} || claude`;
+        } else {
+            return `cd "${containerWorkDir}" && claude`;
+        }
+    }
+}
+
+/**
+ * 发送初始命令到 shell
+ * @private
+ */
+async function _sendInitialCommand(stream, shellCommand) {
+    const initialCmd = `${shellCommand}\n`;
+    logger.debug({ commandPreview: sanitizePreview(initialCmd) }, '[Container Shell] Sending initial command to shell');
+    if (stream.writable) {
+        stream.write(initialCmd);
+    } else {
+        logger.error('[Container Shell] Stream is not writable, cannot send initial command');
     }
 }

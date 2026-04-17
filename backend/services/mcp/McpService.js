@@ -10,6 +10,9 @@
 
 import { McpServer } from '../../database/repositories/McpServer.repository.js';
 import { createLogger } from '../../utils/logger.js';
+import { validateMcpConfig } from './validators/McpValidator.js';
+import { requireOwnership } from './helpers/ownershipHelper.js';
+
 const logger = createLogger('services/mcp/McpService');
 
 /**
@@ -55,17 +58,7 @@ export class McpService {
    * @returns {Promise<Object>} MCP 服务器对象
    */
   static async getServer(id, userId) {
-    const server = await McpServer.getById(id);
-
-    if (!server) {
-      throw new Error('MCP server not found');
-    }
-
-    if (server.userId !== userId) {
-      throw new Error('Access denied: MCP server belongs to another user');
-    }
-
-    return server;
+    return await requireOwnership(id, userId);
   }
 
   /**
@@ -77,7 +70,7 @@ export class McpService {
   static async createServer(userId, data) {
     try {
       // 验证配置
-      this.validateConfig(data);
+      validateMcpConfig(data);
 
       // 检查名称是否已存在
       const existing = await McpServer.getByName(userId, data.name);
@@ -104,10 +97,7 @@ export class McpService {
   static async updateServer(id, userId, data) {
     try {
       // 验证所有权
-      const server = await McpServer.getById(id);
-      if (!server || server.userId !== userId) {
-        throw new Error('MCP server not found or access denied');
-      }
+      const server = await requireOwnership(id, userId);
 
       // 如果更改名称，检查新名称是否已存在
       if (data.name && data.name !== server.name) {
@@ -118,7 +108,7 @@ export class McpService {
       }
 
       // 验证配置
-      this.validateConfig({ ...server, ...data });
+      validateMcpConfig({ ...server, ...data });
 
       const updated = await McpServer.update(id, data);
       logger.info(`[McpService] Updated MCP server ${id} for user ${userId}`);
@@ -138,10 +128,7 @@ export class McpService {
   static async deleteServer(id, userId) {
     try {
       // 验证所有权
-      const server = await McpServer.getById(id);
-      if (!server || server.userId !== userId) {
-        throw new Error('MCP server not found or access denied');
-      }
+      await requireOwnership(id, userId);
 
       const success = await McpServer.delete(id);
       if (success) {
@@ -231,57 +218,6 @@ export class McpService {
     } catch (error) {
       logger.error(`[McpService] Error toggling server ${id}:`, error);
       throw error;
-    }
-  }
-
-  /**
-   * 验证 MCP 配置
-   * @param {Object} data - 配置数据
-   * @throws {Error} 配置无效时抛出错误
-   */
-  static validateConfig(data) {
-    if (!data.name || typeof data.name !== 'string' || data.name.trim() === '') {
-      throw new Error('MCP server name is required and must be a non-empty string');
-    }
-
-    if (!/^[a-zA-Z0-9_-]+$/.test(data.name)) {
-      throw new Error('MCP server name can only contain letters, numbers, hyphens, and underscores');
-    }
-
-    const validTypes = ['stdio', 'http', 'sse'];
-    if (!data.type || !validTypes.includes(data.type)) {
-      throw new Error(`MCP server type must be one of: ${validTypes.join(', ')}`);
-    }
-
-    if (!data.config || typeof data.config !== 'object') {
-      throw new Error('MCP server config is required and must be an object');
-    }
-
-    // 根据类型验证配置
-    switch (data.type) {
-      case 'stdio':
-        if (!data.config.command || typeof data.config.command !== 'string') {
-          throw new Error('stdio type requires a "command" string in config');
-        }
-        if (data.config.args && !Array.isArray(data.config.args)) {
-          throw new Error('stdio "args" must be an array');
-        }
-        if (data.config.env && typeof data.config.env !== 'object') {
-          throw new Error('stdio "env" must be an object');
-        }
-        break;
-
-      case 'http':
-      case 'sse':
-        if (!data.config.url || typeof data.config.url !== 'string') {
-          throw new Error(`${data.type} type requires a "url" string in config`);
-        }
-        try {
-          new URL(data.config.url);
-        } catch {
-          throw new Error(`Invalid URL format: ${data.config.url}`);
-        }
-        break;
     }
   }
 

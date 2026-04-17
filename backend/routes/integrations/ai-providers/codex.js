@@ -1,65 +1,70 @@
+/**
+ * Codex 集成路由
+ *
+ * 提供 Codex CLI 配置读取、会话管理和 MCP 服务器管理的 REST API。
+ * MCP CLI 操作委托给 CodexCli 模块统一执行。
+ *
+ * @module routes/integrations/ai-providers/codex
+ */
+
 import express from 'express';
-import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
 import TOML from '@iarna/toml';
 import { getCodexSessions, getCodexSessionMessages, deleteCodexSession } from '../../../services/execution/codex/index.js';
+import { runCodexCliCommand, parseCodexListOutput, parseCodexGetOutput } from '../../../services/execution/codex/CodexCli.js';
 import { createLogger } from '../../../utils/logger.js';
-const logger = createLogger('routes/integrations/ai-providers/codex');
 
+const logger = createLogger('routes/integrations/ai-providers/codex');
 const router = express.Router();
 
-function createCliResponder(res) {
-  let responded = false;
-  return (status, payload) => {
-    if (responded || res.headersSent) {
-      return;
-    }
-    responded = true;
-    res.status(status).json(payload);
-  };
+// ─── 配置 ─────────────────────────────────────────────────
+
+const CODEX_CONFIG_PATH = path.join(os.homedir(), '.codex', 'config.toml');
+
+/** @returns {Promise<Object|null>} 解析后的配置，文件不存在返回 null */
+async function readCodexConfigFile() {
+  try {
+    const content = await fs.readFile(CODEX_CONFIG_PATH, 'utf8');
+    return TOML.parse(content);
+  } catch {
+    return null;
+  }
 }
 
-router.get('/config', async (req, res) => {
-  try {
-    const configPath = path.join(os.homedir(), '.codex', 'config.toml');
-    const content = await fs.readFile(configPath, 'utf8');
-    const config = TOML.parse(content);
+function buildDefaultConfig() {
+  return { model: null, mcpServers: {}, approvalMode: 'suggest' };
+}
 
+router.get('/config', async (_req, res) => {
+  try {
+    const configData = await readCodexConfigFile();
+    if (!configData) {
+      return res.json({ success: true, config: buildDefaultConfig() });
+    }
     res.json({
       success: true,
       config: {
-        model: config.model || null,
-        mcpServers: config.mcp_servers || {},
-        approvalMode: config.approval_mode || 'suggest'
-      }
+        model: configData.model || null,
+        mcpServers: configData.mcp_servers || {},
+        approvalMode: configData.approval_mode || 'suggest',
+      },
     });
   } catch (error) {
-    if (error.code === 'ENOENT') {
-      res.json({
-        success: true,
-        config: {
-          model: null,
-          mcpServers: {},
-          approvalMode: 'suggest'
-        }
-      });
-    } else {
-      logger.error('Error reading Codex config:', error);
-      res.status(500).json({ success: false, error: error.message });
-    }
+    logger.error('Error reading Codex config:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
+
+// ─── 会话 CRUD ─────────────────────────────────────────────
 
 router.get('/sessions', async (req, res) => {
   try {
     const { projectPath } = req.query;
-
     if (!projectPath) {
       return res.status(400).json({ success: false, error: 'projectPath query parameter required' });
     }
-
     const sessions = await getCodexSessions(projectPath);
     res.json({ success: true, sessions });
   } catch (error) {
@@ -70,15 +75,12 @@ router.get('/sessions', async (req, res) => {
 
 router.get('/sessions/:sessionId/messages', async (req, res) => {
   try {
-    const { sessionId } = req.params;
     const { limit, offset } = req.query;
-
     const result = await getCodexSessionMessages(
-      sessionId,
+      req.params.sessionId,
       limit ? parseInt(limit, 10) : null,
-      offset ? parseInt(offset, 10) : 0
+      offset ? parseInt(offset, 10) : 0,
     );
-
     res.json({ success: true, ...result });
   } catch (error) {
     logger.error('Error fetching Codex session messages:', error);
@@ -88,8 +90,7 @@ router.get('/sessions/:sessionId/messages', async (req, res) => {
 
 router.delete('/sessions/:sessionId', async (req, res) => {
   try {
-    const { sessionId } = req.params;
-    await deleteCodexSession(sessionId);
+    await deleteCodexSession(req.params.sessionId);
     res.json({ success: true });
   } catch (error) {
     logger.error(`Error deleting Codex session ${req.params.sessionId}:`, error);
@@ -97,251 +98,71 @@ router.delete('/sessions/:sessionId', async (req, res) => {
   }
 });
 
-// MCP 服务器管理路由
+// ─── MCP CLI 操作 ──────────────────────────────────────────
 
-router.get('/mcp/cli/list', async (req, res) => {
-  try {
-    const respond = createCliResponder(res);
-    const proc = spawn('codex', ['mcp', 'list'], { stdio: ['pipe', 'pipe', 'pipe'] });
-
-    let stdout = '';
-    let stderr = '';
-
-    proc.stdout?.on('data', (data) => { stdout += data.toString(); });
-    proc.stderr?.on('data', (data) => { stderr += data.toString(); });
-
-    proc.on('close', (code) => {
-      if (code === 0) {
-        respond(200, { success: true, output: stdout, servers: parseCodexListOutput(stdout) });
-      } else {
-        respond(500, { error: 'Codex CLI command failed', details: stderr || `Exited with code ${code}` });
-      }
-    });
-
-    proc.on('error', (error) => {
-      const isMissing = error?.code === 'ENOENT';
-      respond(isMissing ? 503 : 500, {
-        error: isMissing ? 'Codex CLI not installed' : 'Failed to run Codex CLI',
-        details: error.message,
-        code: error.code
-      });
-    });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to list MCP servers', details: error.message });
-  }
+router.get('/mcp/cli/list', async (_req, res) => {
+  const result = await runCodexCliCommand(['mcp', 'list'], {
+    parseSuccess: (stdout) => ({ servers: parseCodexListOutput(stdout) }),
+  });
+  res.status(result.status).json(result.body);
 });
 
 router.post('/mcp/cli/add', async (req, res) => {
-  try {
-    const { name, command, args = [], env = {} } = req.body;
-
-    if (!name || !command) {
-      return res.status(400).json({ error: 'name and command are required' });
-    }
-
-    // 构建: codex mcp add <name> [-e KEY=VAL]... -- <command> [args...]
-    let cliArgs = ['mcp', 'add', name];
-
-    Object.entries(env).forEach(([key, value]) => {
-      cliArgs.push('-e', `${key}=${value}`);
-    });
-
-    cliArgs.push('--', command);
-
-    if (args && args.length > 0) {
-      cliArgs.push(...args);
-    }
-
-    const respond = createCliResponder(res);
-    const proc = spawn('codex', cliArgs, { stdio: ['pipe', 'pipe', 'pipe'] });
-
-    let stdout = '';
-    let stderr = '';
-
-    proc.stdout?.on('data', (data) => { stdout += data.toString(); });
-    proc.stderr?.on('data', (data) => { stderr += data.toString(); });
-
-    proc.on('close', (code) => {
-      if (code === 0) {
-        respond(200, { success: true, output: stdout, message: `MCP server "${name}" added successfully` });
-      } else {
-        respond(400, { error: 'Codex CLI command failed', details: stderr || `Exited with code ${code}` });
-      }
-    });
-
-    proc.on('error', (error) => {
-      const isMissing = error?.code === 'ENOENT';
-      respond(isMissing ? 503 : 500, {
-        error: isMissing ? 'Codex CLI not installed' : 'Failed to run Codex CLI',
-        details: error.message,
-        code: error.code
-      });
-    });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to add MCP server', details: error.message });
+  const { name, command, args = [], env = {} } = req.body;
+  if (!name || !command) {
+    return res.status(400).json({ error: 'name and command are required' });
   }
+
+  const cliArgs = ['mcp', 'add', name];
+  Object.entries(env).forEach(([key, value]) => cliArgs.push('-e', `${key}=${value}`));
+  cliArgs.push('--', command);
+  if (args.length > 0) cliArgs.push(...args);
+
+  const result = await runCodexCliCommand(cliArgs, {
+    successMessage: `MCP server "${name}" added successfully`,
+  });
+  res.status(result.status).json(result.body);
 });
 
 router.delete('/mcp/cli/remove/:name', async (req, res) => {
-  try {
-    const { name } = req.params;
-
-    const respond = createCliResponder(res);
-    const proc = spawn('codex', ['mcp', 'remove', name], { stdio: ['pipe', 'pipe', 'pipe'] });
-
-    let stdout = '';
-    let stderr = '';
-
-    proc.stdout?.on('data', (data) => { stdout += data.toString(); });
-    proc.stderr?.on('data', (data) => { stderr += data.toString(); });
-
-    proc.on('close', (code) => {
-      if (code === 0) {
-        respond(200, { success: true, output: stdout, message: `MCP server "${name}" removed successfully` });
-      } else {
-        respond(400, { error: 'Codex CLI command failed', details: stderr || `Exited with code ${code}` });
-      }
-    });
-
-    proc.on('error', (error) => {
-      const isMissing = error?.code === 'ENOENT';
-      respond(isMissing ? 503 : 500, {
-        error: isMissing ? 'Codex CLI not installed' : 'Failed to run Codex CLI',
-        details: error.message,
-        code: error.code
-      });
-    });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to remove MCP server', details: error.message });
-  }
+  const result = await runCodexCliCommand(['mcp', 'remove', req.params.name], {
+    successMessage: `MCP server "${req.params.name}" removed successfully`,
+  });
+  res.status(result.status).json(result.body);
 });
 
 router.get('/mcp/cli/get/:name', async (req, res) => {
-  try {
-    const { name } = req.params;
-
-    const respond = createCliResponder(res);
-    const proc = spawn('codex', ['mcp', 'get', name], { stdio: ['pipe', 'pipe', 'pipe'] });
-
-    let stdout = '';
-    let stderr = '';
-
-    proc.stdout?.on('data', (data) => { stdout += data.toString(); });
-    proc.stderr?.on('data', (data) => { stderr += data.toString(); });
-
-    proc.on('close', (code) => {
-      if (code === 0) {
-        respond(200, { success: true, output: stdout, server: parseCodexGetOutput(stdout) });
-      } else {
-        respond(404, { error: 'Codex CLI command failed', details: stderr || `Exited with code ${code}` });
-      }
-    });
-
-    proc.on('error', (error) => {
-      const isMissing = error?.code === 'ENOENT';
-      respond(isMissing ? 503 : 500, {
-        error: isMissing ? 'Codex CLI not installed' : 'Failed to run Codex CLI',
-        details: error.message,
-        code: error.code
-      });
-    });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to get MCP server details', details: error.message });
-  }
+  const result = await runCodexCliCommand(['mcp', 'get', req.params.name], {
+    errorCode: 404,
+    parseSuccess: (stdout) => ({ server: parseCodexGetOutput(stdout) }),
+  });
+  res.status(result.status).json(result.body);
 });
 
-router.get('/mcp/config/read', async (req, res) => {
+// ─── MCP 配置读取 ──────────────────────────────────────────
+
+router.get('/mcp/config/read', async (_req, res) => {
   try {
-    const configPath = path.join(os.homedir(), '.codex', 'config.toml');
-
-    let configData = null;
-
-    try {
-      const fileContent = await fs.readFile(configPath, 'utf8');
-      configData = TOML.parse(fileContent);
-    } catch (error) {
-      // 配置文件不存在
-    }
-
+    const configData = await readCodexConfigFile();
     if (!configData) {
       return res.json({ success: false, message: 'No Codex configuration file found', servers: [] });
     }
 
     const servers = [];
-
     if (configData.mcp_servers && typeof configData.mcp_servers === 'object') {
       for (const [name, config] of Object.entries(configData.mcp_servers)) {
         servers.push({
-          id: name,
-          name: name,
-          type: 'stdio',
-          scope: 'user',
-          config: {
-            command: config.command || '',
-            args: config.args || [],
-            env: config.env || {}
-          },
-          raw: config
+          id: name, name, type: 'stdio', scope: 'user',
+          config: { command: config.command || '', args: config.args || [], env: config.env || {} },
+          raw: config,
         });
       }
     }
 
-    res.json({ success: true, configPath, servers });
+    res.json({ success: true, configPath: CODEX_CONFIG_PATH, servers });
   } catch (error) {
     res.status(500).json({ error: 'Failed to read Codex configuration', details: error.message });
   }
 });
-
-function parseCodexListOutput(output) {
-  const servers = [];
-  const lines = output.split('\n').filter(line => line.trim());
-
-  for (const line of lines) {
-    if (line.includes(':')) {
-      const colonIndex = line.indexOf(':');
-      const name = line.substring(0, colonIndex).trim();
-
-      if (!name) continue;
-
-      const rest = line.substring(colonIndex + 1).trim();
-      let description = rest;
-      let status = 'unknown';
-
-      if (rest.includes('✓') || rest.includes('✗')) {
-        const statusMatch = rest.match(/(.*?)\s*-\s*([✓✗].*)$/);
-        if (statusMatch) {
-          description = statusMatch[1].trim();
-          status = statusMatch[2].includes('✓') ? 'connected' : 'failed';
-        }
-      }
-
-      servers.push({ name, type: 'stdio', status, description });
-    }
-  }
-
-  return servers;
-}
-
-function parseCodexGetOutput(output) {
-  try {
-    const jsonMatch = output.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
-    }
-
-    const server = { raw_output: output };
-    const lines = output.split('\n');
-
-    for (const line of lines) {
-      if (line.includes('Name:')) server.name = line.split(':')[1]?.trim();
-      else if (line.includes('Type:')) server.type = line.split(':')[1]?.trim();
-      else if (line.includes('Command:')) server.command = line.split(':')[1]?.trim();
-    }
-
-    return server;
-  } catch (error) {
-    return { raw_output: output, parse_error: error.message };
-  }
-}
 
 export default router;
