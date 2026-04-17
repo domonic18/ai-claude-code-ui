@@ -22,141 +22,82 @@ const logger = createLogger('services/execution/codex/CodexExecutor');
 const activeCodexSessions = new Map();
 
 /**
+ * Codex SDK item.type → 转换函数映射
+ * 每个 handler 接收 item 对象，返回转换后的数据
+ * @type {Map<string, function(Object): Object>}
+ */
+const ITEM_TRANSFORMERS = new Map([
+  ['agent_message', (item) => ({
+    type: 'item', itemType: 'agent_message',
+    message: { role: 'assistant', content: item.text }
+  })],
+  ['reasoning', (item) => ({
+    type: 'item', itemType: 'reasoning',
+    message: { role: 'assistant', content: item.text, isReasoning: true }
+  })],
+  ['command_execution', (item) => ({
+    type: 'item', itemType: 'command_execution',
+    command: item.command, output: item.aggregated_output,
+    exitCode: item.exit_code, status: item.status
+  })],
+  ['file_change', (item) => ({
+    type: 'item', itemType: 'file_change',
+    changes: item.changes, status: item.status
+  })],
+  ['mcp_tool_call', (item) => ({
+    type: 'item', itemType: 'mcp_tool_call',
+    server: item.server, tool: item.tool, arguments: item.arguments,
+    result: item.result, error: item.error, status: item.status
+  })],
+  ['web_search', (item) => ({
+    type: 'item', itemType: 'web_search', query: item.query
+  })],
+  ['todo_list', (item) => ({
+    type: 'item', itemType: 'todo_list', items: item.items
+  })],
+  ['error', (item) => ({
+    type: 'item', itemType: 'error',
+    message: { role: 'error', content: item.message }
+  })],
+]);
+
+/**
+ * Codex SDK event.type → 转换函数映射（非 item 类事件）
+ * @type {Map<string, function(Object): Object>}
+ */
+const EVENT_TRANSFORMERS = new Map([
+  ['turn.started', () => ({ type: 'turn_started' })],
+  ['turn.completed', (event) => ({ type: 'turn_complete', usage: event.usage })],
+  ['turn.failed', (event) => ({ type: 'turn_failed', error: event.error })],
+  ['thread.started', (event) => ({ type: 'thread_started', threadId: event.id })],
+  ['error', (event) => ({ type: 'error', message: event.message })],
+]);
+
+/** item 类事件类型集合 */
+const ITEM_EVENT_TYPES = new Set(['item.started', 'item.updated', 'item.completed']);
+
+/**
  * 将 Codex SDK 事件转换为 WebSocket 消息格式
  * @param {object} event - SDK 事件
  * @returns {object} - 为 WebSocket 转换的事件
  */
 function transformCodexEvent(event) {
-  // 将 SDK 事件类型映射为一致的格式
-  switch (event.type) {
-    case 'item.started':
-    case 'item.updated':
-    case 'item.completed':
-      const item = event.item;
-      if (!item) {
-        return { type: event.type, item: null };
-      }
+  // item 类事件：内层按 item.type 分发
+  if (ITEM_EVENT_TYPES.has(event.type)) {
+    const item = event.item;
+    if (!item) return { type: event.type, item: null };
 
-      // 基于项目类型进行转换
-      switch (item.type) {
-        case 'agent_message':
-          return {
-            type: 'item',
-            itemType: 'agent_message',
-            message: {
-              role: 'assistant',
-              content: item.text
-            }
-          };
-
-        case 'reasoning':
-          return {
-            type: 'item',
-            itemType: 'reasoning',
-            message: {
-              role: 'assistant',
-              content: item.text,
-              isReasoning: true
-            }
-          };
-
-        case 'command_execution':
-          return {
-            type: 'item',
-            itemType: 'command_execution',
-            command: item.command,
-            output: item.aggregated_output,
-            exitCode: item.exit_code,
-            status: item.status
-          };
-
-        case 'file_change':
-          return {
-            type: 'item',
-            itemType: 'file_change',
-            changes: item.changes,
-            status: item.status
-          };
-
-        case 'mcp_tool_call':
-          return {
-            type: 'item',
-            itemType: 'mcp_tool_call',
-            server: item.server,
-            tool: item.tool,
-            arguments: item.arguments,
-            result: item.result,
-            error: item.error,
-            status: item.status
-          };
-
-        case 'web_search':
-          return {
-            type: 'item',
-            itemType: 'web_search',
-            query: item.query
-          };
-
-        case 'todo_list':
-          return {
-            type: 'item',
-            itemType: 'todo_list',
-            items: item.items
-          };
-
-        case 'error':
-          return {
-            type: 'item',
-            itemType: 'error',
-            message: {
-              role: 'error',
-              content: item.message
-            }
-          };
-
-        default:
-          return {
-            type: 'item',
-            itemType: item.type,
-            item: item
-          };
-      }
-
-    case 'turn.started':
-      return {
-        type: 'turn_started'
-      };
-
-    case 'turn.completed':
-      return {
-        type: 'turn_complete',
-        usage: event.usage
-      };
-
-    case 'turn.failed':
-      return {
-        type: 'turn_failed',
-        error: event.error
-      };
-
-    case 'thread.started':
-      return {
-        type: 'thread_started',
-        threadId: event.id
-      };
-
-    case 'error':
-      return {
-        type: 'error',
-        message: event.message
-      };
-
-    default:
-      return {
-        type: event.type,
-        data: event
-      };
+    const transformer = ITEM_TRANSFORMERS.get(item.type);
+    return transformer
+      ? transformer(item)
+      : { type: 'item', itemType: item.type, item };
   }
+
+  // 非 item 类事件：按 event.type 分发
+  const eventTransformer = EVENT_TRANSFORMERS.get(event.type);
+  return eventTransformer
+    ? eventTransformer(event)
+    : { type: event.type, data: event };
 }
 
 /**

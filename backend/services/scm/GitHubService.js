@@ -12,7 +12,6 @@
  * @module services/scm/GitHubService
  */
 
-import { spawn } from 'child_process';
 import path from 'path';
 import os from 'os';
 import { promises as fs } from 'fs';
@@ -138,27 +137,8 @@ export function validateBranchName(branchName) {
  * @returns {Promise<string>} 远程 URL
  */
 export async function getGitRemoteUrl(repoPath) {
-    return new Promise((resolve, reject) => {
-        const gitProcess = spawn('git', ['config', '--get', 'remote.origin.url'], {
-            cwd: repoPath,
-            stdio: ['pipe', 'pipe', 'pipe']
-        });
-
-        let stdout = '';
-        let stderr = '';
-
-        gitProcess.stdout.on('data', (data) => { stdout += data.toString(); });
-        gitProcess.stderr.on('data', (data) => { stderr += data.toString(); });
-
-        gitProcess.on('close', (code) => {
-            if (code === 0) resolve(stdout.trim());
-            else reject(new Error(`Failed to get git remote: ${stderr}`));
-        });
-
-        gitProcess.on('error', (error) => {
-            reject(new Error(`Failed to execute git: ${error.message}`));
-        });
-    });
+    const { stdout } = await gitSpawn(['config', '--get', 'remote.origin.url'], repoPath);
+    return stdout.trim();
 }
 
 /**
@@ -168,30 +148,8 @@ export async function getGitRemoteUrl(repoPath) {
  * @returns {Promise<string[]>} 提交消息数组
  */
 export async function getCommitMessages(projectPath, limit = 5) {
-    return new Promise((resolve, reject) => {
-        const gitProcess = spawn('git', ['log', `-${limit}`, '--pretty=format:%s'], {
-            cwd: projectPath,
-            stdio: ['pipe', 'pipe', 'pipe']
-        });
-
-        let stdout = '';
-        let stderr = '';
-
-        gitProcess.stdout.on('data', (data) => { stdout += data.toString(); });
-        gitProcess.stderr.on('data', (data) => { stderr += data.toString(); });
-
-        gitProcess.on('close', (code) => {
-            if (code === 0) {
-                resolve(stdout.trim().split('\n').filter(msg => msg.length > 0));
-            } else {
-                reject(new Error(`Failed to get commit messages: ${stderr}`));
-            }
-        });
-
-        gitProcess.on('error', (error) => {
-            reject(new Error(`Failed to execute git: ${error.message}`));
-        });
-    });
+    const { stdout } = await gitSpawn(['log', `-${limit}`, '--pretty=format:%s'], projectPath);
+    return stdout.trim().split('\n').filter(msg => msg.length > 0);
 }
 
 /**
@@ -229,70 +187,48 @@ export async function cloneGitHubRepo(githubUrl, githubToken = null, projectPath
 
     logger.info({ githubUrl, cloneDir }, 'Cloning repository');
 
-    return new Promise((resolve, reject) => {
-        if (githubToken) {
-            // 安全传递凭证：创建临时 askpass 脚本，通过环境变量传 token，不暴露在 ps 进程列表
-            const tmpDir = path.join(os.tmpdir(), 'claude-ui-askpass');
-            fs.mkdir(tmpDir, { recursive: true }).then(() => {
-                const askpassPath = path.join(tmpDir, `askpass-${Date.now()}.sh`);
-                const askpassContent = '#!/bin/sh\nprintf \'%s\\n\' "$GIT_ASKPASS_SECRET"\n';
+    // clone 没有 cwd（目标目录是参数），所以不能直接用 gitSpawn 的 cwd 模式
+    // 但 gitSpawn 接受任意 cwd，我们传 process.cwd() 即可
+    if (githubToken) {
+        // 安全传递凭证：创建临时 askpass 脚本，通过环境变量传 token，不暴露在 ps 进程列表
+        const tmpDir = path.join(os.tmpdir(), 'claude-ui-askpass');
+        await fs.mkdir(tmpDir, { recursive: true });
+        const askpassPath = path.join(tmpDir, `askpass-${Date.now()}.sh`);
+        const askpassContent = '#!/bin/sh\nprintf \'%s\\n\' "$GIT_ASKPASS_SECRET"\n';
 
-                fs.writeFile(askpassPath, askpassContent, { mode: 0o700 }).then(() => {
-                    const gitProcess = spawn('git', ['clone', '--depth', '1', githubUrl, cloneDir], {
-                        stdio: ['pipe', 'pipe', 'pipe'],
-                        env: {
-                            ...process.env,
-                            GIT_ASKPASS: askpassPath,
-                            GIT_ASKPASS_SECRET: githubToken,
-                            GIT_TERMINAL_PROMPT: '0',
-                        },
-                    });
+        try {
+            await fs.writeFile(askpassPath, askpassContent, { mode: 0o700 });
 
-                    handleCloneProcess(gitProcess, cloneDir, githubUrl, askpassPath, resolve, reject);
-                }).catch(reject);
-            }).catch(reject);
-        } else {
-            const gitProcess = spawn('git', ['clone', '--depth', '1', githubUrl, cloneDir], {
-                stdio: ['pipe', 'pipe', 'pipe'],
+            await gitSpawn(['clone', '--depth', '1', githubUrl, cloneDir], process.cwd(), {
+                env: {
+                    GIT_ASKPASS: askpassPath,
+                    GIT_ASKPASS_SECRET: githubToken,
+                    GIT_TERMINAL_PROMPT: '0',
+                },
+                timeout: 60000,
             });
-            handleCloneProcess(gitProcess, cloneDir, githubUrl, null, resolve, reject);
-        }
-    });
-}
 
-/**
- * 处理 git clone 进程的事件
- * @private
- */
-function handleCloneProcess(gitProcess, cloneDir, githubUrl, askpassPath, resolve, reject) {
-    let stderr = '';
-
-    gitProcess.stdout.on('data', () => {});
-    gitProcess.stderr.on('data', (data) => {
-        stderr += data.toString();
-    });
-
-    gitProcess.on('close', (code) => {
-        // 清理 askpass 脚本
-        if (askpassPath) {
-            fs.unlink(askpassPath).catch(() => {});
-        }
-
-        if (code === 0) {
             logger.info({ cloneDir, githubUrl }, 'Repository cloned successfully');
-            resolve(cloneDir);
-        } else {
-            logger.error({ stderr, code, githubUrl, cloneDir }, 'Git clone failed');
-            reject(new Error(`Git clone failed: ${stderr}`));
+            return cloneDir;
+        } catch (error) {
+            logger.error({ error: error.message, githubUrl, cloneDir }, 'Git clone failed');
+            throw new Error(`Git clone failed: ${error.message}`);
+        } finally {
+            // 清理 askpass 脚本
+            await fs.unlink(askpassPath).catch(() => {});
         }
-    });
-
-    gitProcess.on('error', (error) => {
-        if (askpassPath) {
-            fs.unlink(askpassPath).catch(() => {});
+    } else {
+        try {
+            await gitSpawn(['clone', '--depth', '1', githubUrl, cloneDir], process.cwd(), {
+                timeout: 60000,
+            });
+            logger.info({ cloneDir, githubUrl }, 'Repository cloned successfully');
+            return cloneDir;
+        } catch (error) {
+            logger.error({ error: error.message, githubUrl, cloneDir }, 'Git clone failed');
+            throw new Error(`Git clone failed: ${error.message}`);
         }
-        reject(new Error(`Failed to execute git: ${error.message}`));
-    });
+    }
 }
 
 /**
@@ -303,62 +239,35 @@ function handleCloneProcess(gitProcess, cloneDir, githubUrl, askpassPath, resolv
  */
 export async function createAndPushBranch(projectPath, branchName) {
     // 创建并 checkout 分支
-    await new Promise((resolve, reject) => {
-        const checkoutProcess = spawn('git', ['checkout', '-b', branchName], {
-            cwd: projectPath,
-            stdio: 'pipe'
-        });
-
-        let stderr = '';
-        checkoutProcess.stderr.on('data', (data) => { stderr += data.toString(); });
-
-        checkoutProcess.on('close', (code) => {
-            if (code === 0) {
-                logger.info({ branchName }, 'Created and checked out local branch');
-                resolve();
-            } else if (stderr.includes('already exists')) {
-                // 分支已存在，checkout 已有分支
-                logger.info({ branchName }, 'Branch already exists locally, checking out');
-                const checkoutExisting = spawn('git', ['checkout', branchName], {
-                    cwd: projectPath,
-                    stdio: 'pipe'
-                });
-                checkoutExisting.on('close', (checkoutCode) => {
-                    if (checkoutCode === 0) {
-                        logger.info({ branchName }, 'Checked out existing branch');
-                        resolve();
-                    } else {
-                        reject(new Error(`Failed to checkout existing branch: ${stderr}`));
-                    }
-                });
-            } else {
-                reject(new Error(`Failed to create branch: ${stderr}`));
+    try {
+        await gitSpawn(['checkout', '-b', branchName], projectPath);
+        logger.info({ branchName }, 'Created and checked out local branch');
+    } catch (error) {
+        if (error.stderr && error.stderr.includes('already exists')) {
+            // 分支已存在，checkout 已有分支
+            logger.info({ branchName }, 'Branch already exists locally, checking out');
+            try {
+                await gitSpawn(['checkout', branchName], projectPath);
+                logger.info({ branchName }, 'Checked out existing branch');
+            } catch {
+                throw new Error(`Failed to checkout existing branch: ${error.stderr}`);
             }
-        });
-    });
+        } else {
+            throw new Error(`Failed to create branch: ${error.stderr || error.message}`);
+        }
+    }
 
     // 推送到远程
-    await new Promise((resolve, reject) => {
-        const pushProcess = spawn('git', ['push', '-u', 'origin', branchName], {
-            cwd: projectPath,
-            stdio: 'pipe'
-        });
-
-        let stderr = '';
-        pushProcess.stderr.on('data', (data) => { stderr += data.toString(); });
-
-        pushProcess.on('close', (code) => {
-            if (code === 0) {
-                logger.info({ branchName }, 'Pushed branch to remote');
-                resolve();
-            } else if (stderr.includes('already exists') || stderr.includes('up-to-date')) {
-                logger.info({ branchName }, 'Branch already exists on remote, using existing branch');
-                resolve();
-            } else {
-                reject(new Error(`Failed to push branch: ${stderr}`));
-            }
-        });
-    });
+    try {
+        await gitSpawn(['push', '-u', 'origin', branchName], projectPath);
+        logger.info({ branchName }, 'Pushed branch to remote');
+    } catch (error) {
+        if (error.stderr && (error.stderr.includes('already exists') || error.stderr.includes('up-to-date'))) {
+            logger.info({ branchName }, 'Branch already exists on remote, using existing branch');
+        } else {
+            throw new Error(`Failed to push branch: ${error.stderr || error.message}`);
+        }
+    }
 }
 
 // ─── GitHub API 操作 ───────────────────────────────────
