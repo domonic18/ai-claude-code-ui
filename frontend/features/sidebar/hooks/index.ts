@@ -16,11 +16,15 @@ export type { UseProjectSearchReturn } from './useProjectSearch';
 export { useStarredProjects } from './useStarredProjects';
 export type { UseStarredProjectsReturn } from './useStarredProjects';
 
-// Project management hooks (merged from features/project)
-export { useProject, useProjectFiles, useWorkspace, useProjectSessions } from './useProject';
-export type {
-  UseProjectReturn,
-  UseProjectFilesReturn,
-  UseWorkspaceReturn,
-  UseProjectSessionsReturn,
-} from './useProject';
+// Project management hooks (one hook per file)
+export { useProject } from './useProject';
+export type { UseProjectReturn } from './useProject';
+
+export { useProjectFiles } from './useProjectFiles';
+export type { UseProjectFilesReturn } from './useProjectFiles';
+
+export { useWorkspace } from './useWorkspace';
+export type { UseWorkspaceReturn } from './useWorkspace';
+
+export { useProjectSessions } from './useProjectSessions';
+export type { UseProjectSessionsReturn } from './useProjectSessions';

@@ -29,6 +29,57 @@ export { encodeProjectName } from './containerPathEncoder.js';
 export { readFileFromContainer } from './containerFileReader.js';
 export { parseJsonlContent } from './sessionParser.js';
 
+// ─── 公共 JSONL 工具函数 ────────────────────────────────
+
+/**
+ * 将 JSONL 文本内容解析为条目数组
+ * 格式错误的行保留为 { _raw: line } 以防丢失原始数据。
+ * @param {string} content - JSONL 文件内容
+ * @returns {Array<Object>} 解析后的条目数组
+ */
+function parseJsonlLines(content) {
+  const lines = content.split('\n');
+  const entries = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    try {
+      entries.push(JSON.parse(trimmed));
+    } catch {
+      // 保留无法解析的行
+      entries.push({ _raw: line });
+    }
+  }
+
+  return entries;
+}
+
+/**
+ * 遍历项目的所有会话文件，对每个文件执行 handler。
+ * handler 返回 true 时提前终止遍历（用于 "找到就停" 的场景）。
+ * @param {number} userId - 用户 ID
+ * @param {string} projectDir - 容器内项目目录路径
+ * @param {string[]} sessionFiles - 会话文件名列表
+ * @param {function({filePath: string, entries: Object[]}): boolean|null} handler - 文件处理器
+ * @returns {Promise<void>}
+ */
+async function forEachSessionFile(userId, projectDir, sessionFiles, handler) {
+  for (const fileName of sessionFiles) {
+    try {
+      const filePath = `${projectDir}/${fileName}`;
+      const content = await readFileFromContainer(userId, filePath);
+      const entries = parseJsonlLines(content);
+
+      const shouldStop = await handler({ filePath, entries });
+      if (shouldStop) return;
+    } catch (error) {
+      logger.warn(`[ContainerSessions] Failed to process session file ${fileName}:`, error.message);
+    }
+  }
+}
+
 // ─── 会话文件操作 ────────────────────────────────────────
 
 /**
@@ -56,6 +107,16 @@ async function listSessionFiles(userId, projectName) {
   }
 }
 
+/**
+ * 获取容器内项目目录的完整路径
+ * @param {string} projectName - 项目名称
+ * @returns {string} 容器内项目目录路径
+ */
+function getProjectDir(projectName) {
+  const encodedProjectName = encodeProjectName(projectName);
+  return `${CONTAINER.paths.projects}/${encodedProjectName}`;
+}
+
 // ─── 会话查询 ────────────────────────────────────────────
 
 /**
@@ -77,26 +138,21 @@ async function getSessionsInContainer(userId, projectName, limit = 5, offset = 0
     // 读取所有会话文件
     const allSessions = new Map();
     const allEntries = [];
+    const projectDir = getProjectDir(projectName);
 
-    for (const fileName of sessionFiles) {
-      try {
-        const encodedProjectName = encodeProjectName(projectName);
-        const filePath = `${CONTAINER.paths.projects}/${encodedProjectName}/${fileName}`;
-        const content = await readFileFromContainer(userId, filePath);
+    await forEachSessionFile(userId, projectDir, sessionFiles, ({ entries }) => {
+      const result = parseJsonlContent(
+        entries.map(e => e._raw || JSON.stringify(e)).filter(l => l.trim()).join('\n')
+      );
 
-        const result = parseJsonlContent(content);
+      result.sessions.forEach(session => {
+        if (!allSessions.has(session.id)) {
+          allSessions.set(session.id, session);
+        }
+      });
 
-        result.sessions.forEach(session => {
-          if (!allSessions.has(session.id)) {
-            allSessions.set(session.id, session);
-          }
-        });
-
-        allEntries.push(...result.entries);
-      } catch (error) {
-        logger.warn(`[ContainerSessions] Failed to read session file ${fileName}:`, error.message);
-      }
-    }
+      allEntries.push(...result.entries);
+    });
 
     // 构建会话分组（与主机模式相同逻辑）
     const sessionGroups = new Map();
@@ -178,8 +234,7 @@ async function getSessionsInContainer(userId, projectName, limit = 5, offset = 0
  */
 async function getSessionFilesInfo(userId, projectName) {
   try {
-    const encodedProjectName = encodeProjectName(projectName);
-    const projectDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
+    const projectDir = getProjectDir(projectName);
 
     const output = await execAndCollectOutput(
       userId,
@@ -205,9 +260,7 @@ async function getSessionFilesInfo(userId, projectName) {
  */
 async function getSessionMessagesInContainer(userId, projectName, sessionId, limit = null, offset = 0) {
   try {
-    const encodedProjectName = encodeProjectName(projectName);
-    const projectDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
-
+    const projectDir = getProjectDir(projectName);
     const sessionFiles = await listSessionFiles(userId, projectName);
 
     if (sessionFiles.length === 0) {
@@ -216,30 +269,13 @@ async function getSessionMessagesInContainer(userId, projectName, sessionId, lim
 
     const messages = [];
 
-    // 读取所有会话文件以查找该 session 的消息
-    for (const fileName of sessionFiles) {
-      try {
-        const filePath = `${projectDir}/${fileName}`;
-        const content = await readFileFromContainer(userId, filePath);
-
-        // 解析 JSONL 内容
-        const lines = content.split('\n');
-        for (const line of lines) {
-          if (line.trim()) {
-            try {
-              const entry = JSON.parse(line);
-              if (entry.sessionId === sessionId) {
-                messages.push(entry);
-              }
-            } catch (parseError) {
-              // 跳过格式错误的行
-            }
-          }
+    await forEachSessionFile(userId, projectDir, sessionFiles, ({ entries }) => {
+      for (const entry of entries) {
+        if (entry.sessionId === sessionId && !entry._raw) {
+          messages.push(entry);
         }
-      } catch (error) {
-        logger.warn(`[ContainerSessions] Failed to read session file ${fileName}:`, error.message);
       }
-    }
+    });
 
     // 按时间戳排序
     messages.sort((a, b) => {
@@ -287,9 +323,7 @@ async function getSessionMessagesInContainer(userId, projectName, sessionId, lim
  */
 async function updateSessionSummaryInContainer(userId, projectName, sessionId, newSummary) {
   try {
-    const encodedProjectName = encodeProjectName(projectName);
-    const projectDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
-
+    const projectDir = getProjectDir(projectName);
     const sessionFiles = await listSessionFiles(userId, projectName);
 
     if (sessionFiles.length === 0) {
@@ -297,66 +331,51 @@ async function updateSessionSummaryInContainer(userId, projectName, sessionId, n
     }
 
     // 在所有会话文件中查找该会话
-    for (const fileName of sessionFiles) {
-      try {
-        const filePath = `${projectDir}/${fileName}`;
-        const content = await readFileFromContainer(userId, filePath);
+    let found = false;
 
-        // 解析 JSONL 内容
-        const lines = content.split('\n');
-        const entries = [];
-        let sessionFound = false;
-        let summaryEntryIndex = -1;
+    await forEachSessionFile(userId, projectDir, sessionFiles, async ({ filePath, entries }) => {
+      let sessionFound = false;
+      let summaryEntryIndex = -1;
 
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (line) {
-            try {
-              const entry = JSON.parse(line);
-              entries.push(entry);
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        if (entry._raw) continue;
 
-              if (entry.sessionId === sessionId) {
-                sessionFound = true;
-                // 查找或更新 summary 条目
-                if (entry.type === 'summary') {
-                  summaryEntryIndex = entries.length - 1;
-                  entries[entries.length - 1] = {
-                    ...entry,
-                    summary: newSummary,
-                    timestamp: entry.timestamp || new Date().toISOString()
-                  };
-                }
-              }
-            } catch (parseError) {
-              // 保留无法解析的行
-              entries.push({ _raw: line });
-            }
-          }
-        }
-
-        if (sessionFound) {
-          // If no summary entry exists, add a new one
-          if (summaryEntryIndex === -1) {
-            entries.push({
-              type: 'summary',
-              sessionId: sessionId,
+        if (entry.sessionId === sessionId) {
+          sessionFound = true;
+          if (entry.type === 'summary') {
+            summaryEntryIndex = i;
+            entries[i] = {
+              ...entry,
               summary: newSummary,
-              timestamp: new Date().toISOString()
-            });
+              timestamp: entry.timestamp || new Date().toISOString()
+            };
           }
-
-          // Write back to file using shared function
-          await writeJsonlContentToContainer(userId, filePath, entries);
-
-          return true;
         }
-      } catch (error) {
-        logger.warn(`[ContainerSessions] Failed to process session file ${fileName}:`, error.message);
       }
-    }
 
-    logger.warn(`[ContainerSessions] Session ${sessionId} not found`);
-    return false;
+      if (sessionFound) {
+        if (summaryEntryIndex === -1) {
+          entries.push({
+            type: 'summary',
+            sessionId: sessionId,
+            summary: newSummary,
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        // Write back to file
+        await writeJsonlContentToContainer(userId, filePath, entries);
+
+        found = true;
+        return true; // 提前终止遍历
+      }
+    });
+
+    if (!found) {
+      logger.warn(`[ContainerSessions] Session ${sessionId} not found`);
+    }
+    return found;
   } catch (error) {
     logger.error(`[ContainerSessions] Error updating session summary:`, error);
     return false;
@@ -372,9 +391,7 @@ async function updateSessionSummaryInContainer(userId, projectName, sessionId, n
  */
 async function deleteSessionInContainer(userId, projectName, sessionId) {
   try {
-    const encodedProjectName = encodeProjectName(projectName);
-    const projectDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
-
+    const projectDir = getProjectDir(projectName);
     const sessionFiles = await listSessionFiles(userId, projectName);
 
     if (sessionFiles.length === 0) {
@@ -382,47 +399,33 @@ async function deleteSessionInContainer(userId, projectName, sessionId) {
     }
 
     // 在所有会话文件中查找并删除该会话的条目
-    for (const fileName of sessionFiles) {
-      try {
-        const filePath = `${projectDir}/${fileName}`;
-        const content = await readFileFromContainer(userId, filePath);
+    let found = false;
 
-        // 解析 JSONL 内容
-        const lines = content.split('\n');
-        const entries = [];
-        let sessionFound = false;
+    await forEachSessionFile(userId, projectDir, sessionFiles, async ({ filePath, entries }) => {
+      let sessionFound = false;
 
-        for (const line of lines) {
-          const trimmedLine = line.trim();
-          if (trimmedLine) {
-            try {
-              const entry = JSON.parse(line);
-              // 只保留不属于该会话的条目
-              if (entry.sessionId !== sessionId) {
-                entries.push(entry);
-              } else {
-                sessionFound = true;
-              }
-            } catch (parseError) {
-              // 保留无法解析的行
-              entries.push({ _raw: line });
-            }
-          }
+      // 过滤掉属于该会话的条目
+      for (let i = entries.length - 1; i >= 0; i--) {
+        const entry = entries[i];
+        if (!entry._raw && entry.sessionId === sessionId) {
+          entries.splice(i, 1);
+          sessionFound = true;
         }
-
-        if (sessionFound) {
-          // Write back to file using shared function
-          await writeJsonlContentToContainer(userId, filePath, entries);
-
-          return true;
-        }
-      } catch (error) {
-        logger.warn(`[ContainerSessions] Failed to process session file ${fileName}:`, error.message);
       }
-    }
 
-    logger.warn(`[ContainerSessions] Session ${sessionId} not found`);
-    return false;
+      if (sessionFound) {
+        // Write back to file
+        await writeJsonlContentToContainer(userId, filePath, entries);
+
+        found = true;
+        return true; // 提前终止遍历
+      }
+    });
+
+    if (!found) {
+      logger.warn(`[ContainerSessions] Session ${sessionId} not found`);
+    }
+    return found;
   } catch (error) {
     logger.error(`[ContainerSessions] Error deleting session:`, error);
     return false;

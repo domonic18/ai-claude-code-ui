@@ -59,9 +59,8 @@ export function unescapeWithMathProtection(text: string): string {
   return processedText;
 }
 
-/**
- * Interface for tool result data
- */
+// ─── 辅助类型 ──────────────────────────────────────────
+
 interface ToolResultData {
   content: string | any;
   isError: boolean;
@@ -69,12 +68,174 @@ interface ToolResultData {
   toolUseResult: any;
 }
 
+/** 生成消息 ID */
+function makeMsgId(): string {
+  return `msg-${Date.now()}-${Math.random()}`;
+}
+
+/** 从 raw message 提取文本内容（处理 string 和 array 两种格式） */
+function extractUserContent(content: any): string {
+  if (Array.isArray(content)) {
+    return content
+      .filter((part: any) => part.type === 'text')
+      .map((part: any) => decodeHtmlEntities(part.text))
+      .join('\n');
+  }
+  return decodeHtmlEntities(typeof content === 'string' ? content : String(content));
+}
+
+// ─── 消息过滤检测 ──────────────────────────────────────
+
+/** Skill system prompt 的多指标检测（至少匹配 2 项才判定） */
+const SKILL_INDICATORS = [
+  '## 角色设定', '## 任务目标', '## 工作流程',
+  '## 何时使用此工作流', '## 标准评估报告模板',
+  'Base directory for this skill'
+];
+
+/** 需要跳过的命令/系统消息前缀 */
+const SKIP_PREFIXES = [
+  '<command-name>', '<command-message>', '<command-args>',
+  '<local-command-stdout>', '<system-reminder>',
+  'Caveat:', 'This session is being continued from a previous',
+  '[Request interrupted'
+];
+
+/** 判断内容是否为 skill system prompt */
+function isSkillSystemPrompt(content: string): boolean {
+  if (content.includes('Base directory for this skill:') ||
+    (content.includes('/.claude/skills/') && content.includes('# '))) {
+    return true;
+  }
+
+  if (content.startsWith('---') &&
+    content.includes('name:') && content.includes('description:') && content.includes('tools:')) {
+    return true;
+  }
+
+  const indicatorCount = SKILL_INDICATORS.filter(indicator => content.includes(indicator)).length;
+  return indicatorCount >= 2 && content.length > 1000;
+}
+
+/** 判断用户消息是否应该被跳过 */
+function shouldSkipUserMessage(content: string): boolean {
+  if (!content) return true;
+  if (SKIP_PREFIXES.some(prefix => content.startsWith(prefix))) return true;
+  if (isSkillSystemPrompt(content)) return true;
+  return false;
+}
+
+// ─── 消息类型处理函数 ──────────────────────────────────
+
+/** 处理 user 消息 */
+function processUserMessage(msg: any, converted: ChatMessage[]): void {
+  const content = extractUserContent(msg.message.content);
+  if (shouldSkipUserMessage(content)) return;
+
+  converted.push({
+    id: msg.id || makeMsgId(),
+    type: 'user',
+    content: unescapeWithMathProtection(content),
+    timestamp: msg.timestamp || new Date().toISOString()
+  });
+}
+
+/** 处理 thinking 消息（Codex reasoning） */
+function processThinkingMessage(msg: any, converted: ChatMessage[]): void {
+  converted.push({
+    id: msg.id || makeMsgId(),
+    type: 'assistant',
+    content: unescapeWithMathProtection(msg.message.content),
+    timestamp: msg.timestamp || new Date().toISOString(),
+    isThinking: true
+  });
+}
+
+/** 处理 tool_use 消息（Codex function calls） */
+function processToolUseMessage(msg: any, converted: ChatMessage[]): void {
+  converted.push({
+    id: msg.id || makeMsgId(),
+    type: 'assistant',
+    content: '',
+    timestamp: msg.timestamp || new Date().toISOString(),
+    isToolUse: true,
+    toolName: msg.toolName,
+    toolInput: msg.toolInput || '',
+    toolCallId: msg.toolCallId
+  });
+}
+
+/** 处理 tool_result 消息（Codex function outputs） */
+function processToolResultMessage(msg: any, converted: ChatMessage[]): void {
+  for (let i = converted.length - 1; i >= 0; i--) {
+    if (converted[i].isToolUse && !converted[i].toolResult) {
+      if (!msg.toolCallId || converted[i].toolCallId === msg.toolCallId) {
+        converted[i].toolResult = {
+          content: msg.output || '',
+          isError: false
+        };
+        break;
+      }
+    }
+  }
+}
+
+/** 处理 assistant 消息（文本 + tool_use 混合） */
+function processAssistantMessage(
+  msg: any,
+  converted: ChatMessage[],
+  toolResults: Map<string, ToolResultData>
+): void {
+  if (Array.isArray(msg.message.content)) {
+    for (const part of msg.message.content) {
+      if (part.type === 'text') {
+        const text = typeof part.text === 'string'
+          ? unescapeWithMathProtection(part.text)
+          : part.text;
+        converted.push({
+          id: msg.id || makeMsgId(),
+          type: 'assistant',
+          content: text,
+          timestamp: msg.timestamp || new Date().toISOString()
+        });
+      } else if (part.type === 'tool_use') {
+        const toolResult = toolResults.get(part.id);
+        converted.push({
+          id: msg.id || makeMsgId(),
+          type: 'assistant',
+          content: '',
+          timestamp: msg.timestamp || new Date().toISOString(),
+          isToolUse: true,
+          toolName: part.name,
+          toolInput: JSON.stringify(part.input),
+          toolResult: toolResult ? {
+            content: typeof toolResult.content === 'string' ? toolResult.content : JSON.stringify(toolResult.content),
+            isError: toolResult.isError,
+            toolUseResult: toolResult.toolUseResult
+          } : null,
+          toolError: toolResult?.isError || false,
+          toolResultTimestamp: toolResult?.timestamp || new Date()
+        });
+      }
+    }
+  } else if (typeof msg.message.content === 'string') {
+    converted.push({
+      id: msg.id || makeMsgId(),
+      type: 'assistant',
+      content: unescapeWithMathProtection(msg.message.content),
+      timestamp: msg.timestamp || new Date().toISOString()
+    });
+  }
+}
+
+// ─── 主转换函数 ────────────────────────────────────────
+
 /**
  * Convert raw session messages from API to ChatMessage format
  *
- * This function implements a two-pass conversion strategy:
- * 1. First pass: Collect all tool results from user messages
- * 2. Second pass: Process messages and attach tool results to tool uses
+ * Two-pass strategy:
+ * 1. Collect all tool results from user messages
+ * 2. Process messages and attach tool results to tool uses
  *
  * @param rawMessages - Raw messages from API with format {message: {role, content}}
  * @returns Array of ChatMessage objects ready for display
@@ -99,172 +260,18 @@ export function convertSessionMessages(rawMessages: any[]): ChatMessage[] {
     }
   }
 
-  // Second pass: process messages and attach tool results to tool uses
+  // Second pass: dispatch to type-specific handlers
   for (const msg of rawMessages) {
-    // Handle user messages
     if (msg.message?.role === 'user' && msg.message?.content) {
-      let content = '';
-      let messageType: ChatMessage['type'] = 'user';
-
-      if (Array.isArray(msg.message.content)) {
-        // Handle array content, but skip tool results (they're attached to tool uses)
-        const textParts: string[] = [];
-
-        for (const part of msg.message.content) {
-          if (part.type === 'text') {
-            textParts.push(decodeHtmlEntities(part.text));
-          }
-          // Skip tool_result parts - they're handled in the first pass
-        }
-
-        content = textParts.join('\n');
-      } else if (typeof msg.message.content === 'string') {
-        content = decodeHtmlEntities(msg.message.content);
-      } else {
-        content = decodeHtmlEntities(String(msg.message.content));
-      }
-
-      // Check if content is a skill system prompt (should be hidden from users)
-      // These are SDK-internal messages that should not be displayed to users
-
-      // Pattern 1: Skill directory message - SDK generated
-      // "Base directory for this skill: /workspace/.claude/skills/..."
-      const isSkillDirectoryMessage = content.includes('Base directory for this skill:') ||
-        (content.includes('/.claude/skills/') && content.includes('# '));
-
-      // Pattern 2: YAML frontmatter with skill metadata
-      // Matches skill definition files starting with "---" containing name/description/tools
-      const isSkillYamlPrompt = content.startsWith('---') &&
-        content.includes('name:') &&
-        content.includes('description:') &&
-        content.includes('tools:');
-
-      // Pattern 3: Multi-pattern skill instruction detection
-      // Must match at least 2 of these indicators to avoid false positives:
-      const skillIndicators = [
-        '## 角色设定', '## 任务目标', '## 工作流程',
-        '## 何时使用此工作流', '## 标准评估报告模板',
-        'Base directory for this skill'
-      ];
-      const indicatorCount = skillIndicators.filter(indicator => content.includes(indicator)).length;
-      const isSkillInstructionMessage = indicatorCount >= 2 && content.length > 1000;
-
-      const isSkillSystemPrompt = isSkillDirectoryMessage || isSkillYamlPrompt || isSkillInstructionMessage;
-
-      // Skip command messages, system messages, skill prompts, and empty content
-      const shouldSkip = !content ||
-        content.startsWith('<command-name>') ||
-        content.startsWith('<command-message>') ||
-        content.startsWith('<command-args>') ||
-        content.startsWith('<local-command-stdout>') ||
-        content.startsWith('<system-reminder>') ||
-        content.startsWith('Caveat:') ||
-        content.startsWith('This session is being continued from a previous') ||
-        content.startsWith('[Request interrupted') ||
-        isSkillSystemPrompt;
-
-      if (!shouldSkip) {
-        // Unescape with math formula protection
-        content = unescapeWithMathProtection(content);
-        converted.push({
-          id: msg.id || `msg-${Date.now()}-${Math.random()}`,
-          type: messageType,
-          content: content,
-          timestamp: msg.timestamp || new Date().toISOString()
-        });
-      }
-    }
-
-    // Handle thinking messages (Codex reasoning)
-    else if (msg.type === 'thinking' && msg.message?.content) {
-      converted.push({
-        id: msg.id || `msg-${Date.now()}-${Math.random()}`,
-        type: 'assistant',
-        content: unescapeWithMathProtection(msg.message.content),
-        timestamp: msg.timestamp || new Date().toISOString(),
-        isThinking: true
-      });
-    }
-
-    // Handle tool_use messages (Codex function calls)
-    else if (msg.type === 'tool_use' && msg.toolName) {
-      converted.push({
-        id: msg.id || `msg-${Date.now()}-${Math.random()}`,
-        type: 'assistant',
-        content: '',
-        timestamp: msg.timestamp || new Date().toISOString(),
-        isToolUse: true,
-        toolName: msg.toolName,
-        toolInput: msg.toolInput || '',
-        toolCallId: msg.toolCallId
-      });
-    }
-
-    // Handle tool_result messages (Codex function outputs)
-    else if (msg.type === 'tool_result') {
-      // Find the matching tool_use by callId, or the last tool_use without a result
-      for (let i = converted.length - 1; i >= 0; i--) {
-        if (converted[i].isToolUse && !converted[i].toolResult) {
-          if (!msg.toolCallId || converted[i].toolCallId === msg.toolCallId) {
-            converted[i].toolResult = {
-              content: msg.output || '',
-              isError: false
-            };
-            break;
-          }
-        }
-      }
-    }
-
-    // Handle assistant messages
-    else if (msg.message?.role === 'assistant' && msg.message?.content) {
-      if (Array.isArray(msg.message.content)) {
-        for (const part of msg.message.content) {
-          if (part.type === 'text') {
-            // Unescape with math formula protection
-            let text = part.text;
-            if (typeof text === 'string') {
-              text = unescapeWithMathProtection(text);
-            }
-            converted.push({
-              id: msg.id || `msg-${Date.now()}-${Math.random()}`,
-              type: 'assistant',
-              content: text,
-              timestamp: msg.timestamp || new Date().toISOString()
-            });
-          } else if (part.type === 'tool_use') {
-            // Get the corresponding tool result
-            const toolResult = toolResults.get(part.id);
-
-            converted.push({
-              id: msg.id || `msg-${Date.now()}-${Math.random()}`,
-              type: 'assistant',
-              content: '',
-              timestamp: msg.timestamp || new Date().toISOString(),
-              isToolUse: true,
-              toolName: part.name,
-              toolInput: JSON.stringify(part.input),
-              toolResult: toolResult ? {
-                content: typeof toolResult.content === 'string' ? toolResult.content : JSON.stringify(toolResult.content),
-                isError: toolResult.isError,
-                toolUseResult: toolResult.toolUseResult
-              } : null,
-              toolError: toolResult?.isError || false,
-              toolResultTimestamp: toolResult?.timestamp || new Date()
-            });
-          }
-        }
-      } else if (typeof msg.message.content === 'string') {
-        // Unescape with math formula protection
-        let text = msg.message.content;
-        text = unescapeWithMathProtection(text);
-        converted.push({
-          id: msg.id || `msg-${Date.now()}-${Math.random()}`,
-          type: 'assistant',
-          content: text,
-          timestamp: msg.timestamp || new Date().toISOString()
-        });
-      }
+      processUserMessage(msg, converted);
+    } else if (msg.type === 'thinking' && msg.message?.content) {
+      processThinkingMessage(msg, converted);
+    } else if (msg.type === 'tool_use' && msg.toolName) {
+      processToolUseMessage(msg, converted);
+    } else if (msg.type === 'tool_result') {
+      processToolResultMessage(msg, converted);
+    } else if (msg.message?.role === 'assistant' && msg.message?.content) {
+      processAssistantMessage(msg, converted, toolResults);
     }
   }
 
