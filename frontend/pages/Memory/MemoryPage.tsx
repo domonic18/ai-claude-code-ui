@@ -1,15 +1,10 @@
 /**
  * MemoryPage.tsx
  *
- * 记忆管理页面
+ * 记忆管理页面（路由入口）
+ * Re-exports from the feature module.
  *
  * @module pages/Memory
  */
 
-import { MemoryManager } from '@/features/memory';
-
-export function MemoryPage() {
-  return <MemoryManager />;
-}
-
-export default MemoryPage;
+export { MemoryPage, default } from '@/features/memory';

@@ -16,3 +16,23 @@ export {
 export {
   getCursorSessions
 } from './sessions.js';
+
+// 从 CursorConfigService.js 导出配置管理
+export {
+  readConfig,
+  writeConfig,
+  getDefaultConfig,
+  readMcpConfig,
+  addMcpServer,
+  addMcpServerJson,
+  removeMcpServer
+} from './CursorConfigService.js';
+
+// 从 CursorSessionService.js 导出会话查询
+export {
+  getSessions,
+  getSessionDetail,
+  computeCwdId,
+  parseTimestamp,
+  parseMetadata
+} from './CursorSessionService.js';

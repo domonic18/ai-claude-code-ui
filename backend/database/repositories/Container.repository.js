@@ -76,6 +76,15 @@ export const Container = {
     },
 
     /**
+     * 获取所有已知容器 ID 的集合（用于批量孤儿检测）
+     * @returns {Set<string>} 容器 ID 集合
+     */
+    getAllIds() {
+        const rows = db().prepare('SELECT container_id FROM user_containers').all();
+        return new Set(rows.map(r => r.container_id));
+    },
+
+    /**
      * 列出所有活动容器
      * @returns {Array}
      */

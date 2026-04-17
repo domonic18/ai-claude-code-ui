@@ -33,9 +33,76 @@ export const api = {
   },
 
   // Protected endpoints
-  projects: () => authenticatedFetch('/api/projects'),
-  sessions: (projectName: string, limit = 5, offset = 0) =>
-    authenticatedFetch(`/api/projects/${projectName}/sessions?limit=${limit}&offset=${offset}`),
+  projects: {
+    /** List all projects */
+    list: () => authenticatedFetch('/api/projects'),
+    /** Create a new project */
+    create: (options: Record<string, any>) =>
+      authenticatedFetch('/api/projects/create', {
+        method: 'POST',
+        body: JSON.stringify(options),
+      }),
+    /** Delete a project */
+    delete: (projectName: string) =>
+      authenticatedFetch(`/api/projects/${projectName}`, {
+        method: 'DELETE',
+      }),
+    /** Rename a project */
+    rename: (projectName: string, displayName: string) =>
+      authenticatedFetch(`/api/projects/${projectName}/rename`, {
+        method: 'PUT',
+        body: JSON.stringify({ displayName }),
+      }),
+    /** Get project files */
+    files: (projectName: string) =>
+      authenticatedFetch(`/api/projects/${projectName}/files`),
+    /** Get project sessions */
+    sessions: (projectName: string, limit = 5, offset = 0) =>
+      authenticatedFetch(`/api/projects/${projectName}/sessions?limit=${limit}&offset=${offset}`),
+    /** Create a file in a project */
+    createFile: (projectName: string, filePath: string) =>
+      authenticatedFetch(`/api/projects/${projectName}/file`, {
+        method: 'POST',
+        body: JSON.stringify({ path: filePath }),
+      }),
+    /** Delete a file in a project */
+    deleteFile: (projectName: string, filePath: string) =>
+      authenticatedFetch(`/api/projects/${projectName}/files`, {
+        method: 'DELETE',
+        body: JSON.stringify({ path: filePath }),
+      }),
+    /** Rename a file in a project */
+    renameFile: (projectName: string, oldPath: string, newPath: string) =>
+      authenticatedFetch(`/api/projects/${projectName}/rename`, {
+        method: 'PUT',
+        body: JSON.stringify({ oldPath, newName: newPath }),
+      }),
+    /** Add a project to workspace */
+    addProjectToWorkspace: (workspaceName: string, projectPath: string) =>
+      authenticatedFetch(`/api/projects/${workspaceName}/add-project`, {
+        method: 'POST',
+        body: JSON.stringify({ projectPath }),
+      }),
+    /** Remove a project from workspace */
+    removeProjectFromWorkspace: (workspaceName: string, projectPath: string) =>
+      authenticatedFetch(`/api/projects/${workspaceName}/remove-project`, {
+        method: 'POST',
+        body: JSON.stringify({ projectPath }),
+      }),
+    /** Get workspace projects */
+    getWorkspaceProjects: (workspaceName: string) =>
+      authenticatedFetch(`/api/projects/${workspaceName}/projects`),
+    /** Delete a session */
+    deleteSession: (projectName: string, sessionId: string) =>
+      authenticatedFetch(`/api/projects/${projectName}/sessions/${sessionId}`, {
+        method: 'DELETE',
+      }),
+    /** Resume a session */
+    resumeSession: (projectName: string, sessionId: string) =>
+      authenticatedFetch(`/api/projects/${projectName}/sessions/${sessionId}/resume`, {
+        method: 'POST',
+      }),
+  },
   sessionMessages: (projectName: string, sessionId: string, limit = null, offset = 0, provider = 'claude') => {
     const params = new URLSearchParams();
     if (limit !== null) {

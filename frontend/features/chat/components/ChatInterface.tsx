@@ -28,6 +28,7 @@ import {
   useCommandExecutor,
   useInputHandler,
   useSessionLoader,
+  useMessageSender,
 } from '../hooks';
 import { ChatToolbar } from './ChatToolbar';
 import { getChatService } from '../services';
@@ -435,81 +436,8 @@ export function ChatInterface({
     processedCountRef.current = wsMessages.length;
   }, [wsMessages, currentSessionId, addMessage, updateMessage, completeStream, resetStream, updateStreamContent, updateStreamThinking]);
 
-  /**
-   * Handle send message
-   */
-  const handleSend = useCallback(async () => {
-    if (!input.trim() || isLoading) return;
-
-    const content = input.trim();
-    const files = attachedFiles;
-
-    // Clear input and attachments
-    setInput('');
-    setAttachedFiles([]);
-
-    // Clear draft from localStorage to prevent it from being restored on refresh/session switch
-    if (selectedProject?.name) {
-      const draftKey = STORAGE_KEYS.DRAFT_INPUT(selectedProject.name);
-      localStorage.removeItem(draftKey);
-    }
-
-    // Mark session as active
-    if (currentSessionId) {
-      onSessionActive?.(currentSessionId);
-    }
-
-    setIsLoading(true);
-    startStream();
-
-    // Convert image files to images array for display in UserMessage
-    const images = files
-      .filter(f => f.type?.startsWith('image/'))
-      .map(f => ({
-        name: f.name,
-        data: f.data || '',
-        type: f.type
-      }));
-
-    // Non-image files keep as files array
-    const documentFiles = files.filter(f => !f.type?.startsWith('image/'));
-
-    // Add user message
-    const userMessage: ChatMessage = {
-      id: `user-${Date.now()}`,
-      type: 'user',
-      content,
-      timestamp: Date.now(),
-      images: images.length > 0 ? images : undefined,
-      files: documentFiles.length > 0 ? documentFiles : undefined,
-    };
-
-    addMessage(userMessage);
-
-    // Send via WebSocket
-    if (sendMessage && ws) {
-      // Create temporary session ID if needed
-      const sessionId = currentSessionId || `temp-${Date.now()}`;
-
-      // Send message in the format expected by the backend
-      const messageToSend = {
-        type: 'claude-command',
-        command: content,
-        attachments: files.length > 0 ? files : undefined, // Include attached files
-        options: {
-          projectPath: selectedProject?.name,
-          sessionId,
-          model: selectedModel, // Directly use the selected model name (backend format)
-          resume: !!currentSessionId,
-          permissionMode, // Include permission mode
-        },
-      };
-
-      sendMessage(messageToSend);
-
-      onSessionProcessing?.(sessionId);
-    }
-  }, [
+  // Use message sender hook
+  const { handleSend } = useMessageSender({
     input,
     isLoading,
     currentSessionId,
@@ -518,12 +446,15 @@ export function ChatInterface({
     selectedProject,
     ws,
     sendMessage,
-    addMessage,
-    startStream,
+    onAddMessage: addMessage,
+    onStartStream: startStream,
+    onSetLoading: setIsLoading,
+    onSetInput: setInput,
+    onSetAttachedFiles: setAttachedFiles,
     onSessionActive,
     onSessionProcessing,
     permissionMode,
-  ]);
+  });
 
   /**
    * Create diff for Edit tool

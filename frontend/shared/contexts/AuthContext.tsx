@@ -29,7 +29,7 @@ export interface AuthContextValue {
   login: (username: string, password: string) => Promise<AuthResult>;
   register: (username: string, password: string) => Promise<AuthResult>;
   logout: () => Promise<void>;
-  checkAuthStatus: () => Promise<void>;
+  checkAuthStatus: (force?: boolean) => Promise<void>;
   isLoading: boolean;
   needsSetup: boolean;
   error: string | null;

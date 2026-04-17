@@ -32,5 +32,5 @@ export * from './services/index';
 // Types
 export * from './types/index';
 
-// Utilities
-export * from './utils/index';
+// Utilities (reserved for future use — currently empty)
+// export * from './utils/index';

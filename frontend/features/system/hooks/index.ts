@@ -8,3 +8,4 @@ export * from './useVersionUpgrade';
 export * from './usePWA';
 export * from './useSessionProtection';
 export * from './useProjectManager';
+export * from './useProjectUtils';

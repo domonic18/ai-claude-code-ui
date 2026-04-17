@@ -1,28 +1,25 @@
+/**
+ * Shell / Terminal Component
+ *
+ * Interactive terminal UI component with WebSocket shell support.
+ * Connection logic is in hooks/useTerminalConnection.ts
+ * Terminal setup is in hooks/useTerminalSetup.ts
+ */
+
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { Terminal } from '@xterm/xterm';
-import { FitAddon } from '@xterm/addon-fit';
-import { WebglAddon } from '@xterm/addon-webgl';
-import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 import type { ShellProps } from '../types/terminal.types';
 import { logger } from '@/shared/utils/logger';
+import { useTerminalConnection } from '../hooks/useTerminalConnection';
+import { useTerminalSetup } from '../hooks/useTerminalSetup';
 
+/** Inject xterm style overrides at module load */
 const xtermStyles = `
-  .xterm .xterm-screen {
-    outline: none !important;
-  }
-  .xterm:focus .xterm-screen {
-    outline: none !important;
-  }
-  .xterm-screen:focus {
-    outline: none !important;
-  }
-  .xterm {
-    z-index: 1;
-  }
-  .xterm-link-layer {
-    z-index: 2;
-  }
+  .xterm .xterm-screen { outline: none !important; }
+  .xterm:focus .xterm-screen { outline: none !important; }
+  .xterm-screen:focus { outline: none !important; }
+  .xterm { z-index: 1; }
+  .xterm-link-layer { z-index: 2; }
 `;
 
 if (typeof document !== 'undefined') {
@@ -42,23 +39,17 @@ function Shell({
   autoConnect = false,
   isActive = false
 }: ShellProps) {
-  const terminalRef = useRef<HTMLDivElement>(null);
-  const terminal = useRef<Terminal | null>(null);
-  const fitAddon = useRef<FitAddon | null>(null);
-  const ws = useRef<WebSocket | null>(null);
-  const [isConnected, setIsConnected] = useState<boolean>(false);
-  const [isInitialized, setIsInitialized] = useState<boolean>(false);
-  const [isRestarting, setIsRestarting] = useState<boolean>(false);
+  // State
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [isRestarting, setIsRestarting] = useState(false);
   const [lastSessionId, setLastSessionId] = useState<string | null>(null);
-  const [isConnecting, setIsConnecting] = useState<boolean>(false);
-  const [userDisconnected, setUserDisconnected] = useState<boolean>(false);
 
+  // Refs for stable callback access
   const selectedProjectRef = useRef(selectedProject);
   const selectedSessionRef = useRef(selectedSession);
   const initialCommandRef = useRef(initialCommand);
   const isPlainShellRef = useRef(isPlainShell);
   const onProcessCompleteRef = useRef(onProcessComplete);
-  const isConnectingRef = useRef(false); // 使用 ref 跟踪连接状态，避免状态更新延迟问题
 
   useEffect(() => {
     selectedProjectRef.current = selectedProject;
@@ -68,173 +59,49 @@ function Shell({
     onProcessCompleteRef.current = onProcessComplete;
   });
 
-  const connectWebSocket = useCallback(async () => {
-    if (isConnectingRef.current || isConnected) {
-      return;
-    }
+  // Connection hook — created first so its send function is available
+  const connectionSendRef = useRef<(data: object) => void>(() => {});
 
-    // 立即设置连接标志
-    isConnectingRef.current = true;
-    setIsConnecting(true);
+  // Terminal setup hook
+  const { terminalRef, terminal, fitAddon } = useTerminalSetup({
+    initKey: selectedProject?.path || selectedProject?.fullPath || '',
+    isRestarting,
+    onInput: useCallback((data: string) => {
+      connectionSendRef.current({ type: 'input', data });
+    }, []),
+    onResize: useCallback((cols: number, rows: number) => {
+      connectionSendRef.current({ type: 'resize', cols, rows });
+    }, []),
+    autoConnect,
+    onInitialized: () => setIsInitialized(true),
+    send: (data: object) => {
+      connectionSendRef.current(data);
+    },
+  });
 
-    try {
-      const isPlatform = import.meta.env.VITE_IS_PLATFORM === 'true';
-      let wsUrl;
-
-      if (isPlatform) {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        wsUrl = `${protocol}//${window.location.host}/shell`;
-      } else {
-        // 获取 WebSocket token（从 cookie 复制）
-        let token;
-        try {
-          logger.info('[Shell] Fetching ws-token from /api/auth/ws-token');
-          const response = await fetch('/api/auth/ws-token', {
-            credentials: 'include' // 发送 cookie
-          });
-          logger.info('[Shell] ws-token response status:', response.status);
-          if (response.ok) {
-            const data = await response.json();
-            // 后端返回 {success: true, data: {token: "..."}}
-            token = data.data?.token;
-            logger.info('[Shell] Got token, length:', token?.length);
-          } else {
-            logger.info('[Shell] ws-token response not ok:', response.status);
-            const errorText = await response.text();
-            logger.info('[Shell] Error response:', errorText);
-          }
-        } catch (error) {
-          logger.error('[Shell] Error fetching ws-token:', error);
-          setIsConnecting(false);
-          isConnectingRef.current = false;
-          return;
-        }
-
-        if (!token) {
-          logger.info('[Shell] No token available, aborting connection');
-          setIsConnecting(false);
-          isConnectingRef.current = false;
-          return;
-        }
-
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        wsUrl = `${protocol}//${window.location.host}/shell?token=${encodeURIComponent(token)}`;
-        logger.info('[Shell] Non-platform mode, wsUrl:', wsUrl.substring(0, 50) + '...');
+  // Connection hook
+  const { isConnected, isConnecting, userDisconnected, connect, disconnect, send: connectionSend } = useTerminalConnection({
+    onOutput: useCallback((output: string) => {
+      if (terminal.current) {
+        terminal.current.write(output);
       }
+    }, [terminal]),
+    onUrlOpen: useCallback((url: string) => {
+      window.open(url, '_blank');
+    }, []),
+    selectedProjectRef,
+    selectedSessionRef,
+    initialCommandRef,
+    isPlainShellRef,
+    onProcessCompleteRef,
+    fitAddonRef: fitAddon,
+    terminalRef: terminal,
+  });
 
-      logger.info('[Shell] Creating WebSocket with URL:', wsUrl.substring(0, 80) + '...');
-      ws.current = new WebSocket(wsUrl);
+  // Wire up the connection send function so setup hook callbacks can use it
+  connectionSendRef.current = connectionSend;
 
-      ws.current.onopen = () => {
-        logger.info('[Shell] WebSocket opened');
-        setIsConnected(true);
-        setIsConnecting(false);
-        isConnectingRef.current = false;
-
-        setTimeout(() => {
-          if (fitAddon.current && terminal.current && ws.current) {
-            fitAddon.current.fit();
-
-            ws.current.send(JSON.stringify({
-              type: 'init',
-              projectPath: selectedProjectRef.current.fullPath || selectedProjectRef.current.path,
-              sessionId: isPlainShellRef.current ? null : selectedSessionRef.current?.id,
-              hasSession: isPlainShellRef.current ? false : !!selectedSessionRef.current,
-              provider: isPlainShellRef.current ? 'plain-shell' : (selectedSessionRef.current?.__provider || 'claude'),
-              cols: terminal.current.cols,
-              rows: terminal.current.rows,
-              initialCommand: initialCommandRef.current,
-              isPlainShell: isPlainShellRef.current
-            }));
-          }
-        }, 100);
-      };
-
-      ws.current.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-
-          if (data.type === 'output') {
-            let output = data.data;
-
-            if (isPlainShellRef.current && onProcessCompleteRef.current) {
-              const cleanOutput = output.replace(/\x1b\[[0-9;]*m/g, '');
-              if (cleanOutput.includes('Process exited with code 0')) {
-                onProcessCompleteRef.current(0);
-              } else if (cleanOutput.match(/Process exited with code (\d+)/)) {
-                const exitCode = parseInt(cleanOutput.match(/Process exited with code (\d+)/)[1]);
-                if (exitCode !== 0) {
-                  onProcessCompleteRef.current(exitCode);
-                }
-              }
-            }
-
-            if (terminal.current) {
-              terminal.current.write(output);
-            }
-          } else if (data.type === 'url_open') {
-            window.open(data.url, '_blank');
-          }
-        } catch (error) {
-          logger.error('[Shell] Error handling WebSocket message:', error, event.data);
-        }
-      };
-
-      ws.current.onclose = (event) => {
-        logger.info('[Shell] WebSocket closed:', event.code, event.reason);
-        setIsConnected(false);
-        setIsConnecting(false);
-        isConnectingRef.current = false;
-
-        if (terminal.current) {
-          terminal.current.clear();
-          terminal.current.write('\x1b[2J\x1b[H');
-        }
-      };
-
-      ws.current.onerror = (error) => {
-        logger.error('[Shell] WebSocket error:', error);
-        setIsConnected(false);
-        setIsConnecting(false);
-        isConnectingRef.current = false;
-      };
-    } catch (error) {
-      setIsConnected(false);
-      setIsConnecting(false);
-      isConnectingRef.current = false;
-    }
-  }, [isConnected]);
-
-  const connectToShell = useCallback(() => {
-    // 使用 ref 检查，避免状态更新延迟
-    if (!isInitialized || isConnected || isConnectingRef.current) {
-      return;
-    }
-    // 清除用户主动断开的标志
-    setUserDisconnected(false);
-    connectWebSocket();
-  }, [isInitialized, isConnected, connectWebSocket]);
-
-  const disconnectFromShell = useCallback(() => {
-    // 标记用户主动断开
-    setUserDisconnected(true);
-    // 重置连接状态 ref
-    isConnectingRef.current = false;
-
-    if (ws.current) {
-      ws.current.close();
-      ws.current = null;
-    }
-
-    if (terminal.current) {
-      terminal.current.clear();
-      terminal.current.write('\x1b[2J\x1b[H');
-    }
-
-    setIsConnected(false);
-    setIsConnecting(false);
-  }, []);
-
+  // Session display names
   const sessionDisplayName = useMemo(() => {
     if (!selectedSession) return null;
     return selectedSession.__provider === 'cursor'
@@ -243,26 +110,18 @@ function Shell({
   }, [selectedSession]);
 
   const sessionDisplayNameShort = useMemo(() => {
-    if (!sessionDisplayName) return null;
-    return sessionDisplayName.slice(0, 30);
+    return sessionDisplayName?.slice(0, 30) ?? null;
   }, [sessionDisplayName]);
 
   const sessionDisplayNameLong = useMemo(() => {
-    if (!sessionDisplayName) return null;
-    return sessionDisplayName.slice(0, 50);
+    return sessionDisplayName?.slice(0, 50) ?? null;
   }, [sessionDisplayName]);
 
-  const restartShell = () => {
+  // Restart handler
+  const restartShell = useCallback(() => {
     setIsRestarting(true);
-    // 清除用户主动断开的标志
-    setUserDisconnected(false);
-    // 重置连接状态 ref
-    isConnectingRef.current = false;
 
-    if (ws.current) {
-      ws.current.close();
-      ws.current = null;
-    }
+    disconnect();
 
     if (terminal.current) {
       terminal.current.dispose();
@@ -270,167 +129,36 @@ function Shell({
       fitAddon.current = null;
     }
 
-    setIsConnected(false);
     setIsInitialized(false);
+    setTimeout(() => setIsRestarting(false), 200);
+  }, [disconnect, terminal, fitAddon]);
 
-    setTimeout(() => {
-      setIsRestarting(false);
-    }, 200);
-  };
+  // Disconnect with terminal clear
+  const disconnectFromShell = useCallback(() => {
+    disconnect();
+    if (terminal.current) {
+      terminal.current.clear();
+      terminal.current.write('\x1b[2J\x1b[H');
+    }
+  }, [disconnect, terminal]);
 
+  // Auto-reconnect on session change
   useEffect(() => {
     const currentSessionId = selectedSession?.id || null;
-
     if (lastSessionId !== null && lastSessionId !== currentSessionId && isInitialized) {
       disconnectFromShell();
     }
-
     setLastSessionId(currentSessionId);
-  }, [selectedSession?.id, isInitialized, disconnectFromShell]);
+  }, [selectedSession?.id, isInitialized, disconnectFromShell, lastSessionId]);
 
+  // Auto-connect effect
   useEffect(() => {
-    if (!terminalRef.current || !selectedProject || isRestarting || terminal.current) {
-      return;
-    }
-
-
-    terminal.current = new Terminal({
-      cursorBlink: true,
-      fontSize: 14,
-      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-      allowProposedApi: true,
-      allowTransparency: false,
-      convertEol: true,
-      scrollback: 10000,
-      tabStopWidth: 4,
-      windowsMode: false,
-      macOptionIsMeta: true,
-      macOptionClickForcesSelection: false,
-      theme: {
-        background: '#1e1e1e',
-        foreground: '#d4d4d4',
-        cursor: '#ffffff',
-        cursorAccent: '#1e1e1e',
-        black: '#000000',
-        red: '#cd3131',
-        green: '#0dbc79',
-        yellow: '#e5e510',
-        blue: '#2472c8',
-        magenta: '#bc3fbc',
-        cyan: '#11a8cd',
-        white: '#e5e5e5',
-        brightBlack: '#666666',
-        brightRed: '#f14c4c',
-        brightGreen: '#23d18b',
-        brightYellow: '#f5f543',
-        brightBlue: '#3b8eea',
-        brightMagenta: '#d670d6',
-        brightCyan: '#29b8db',
-        brightWhite: '#ffffff'
-      } as any
-    });
-
-    fitAddon.current = new FitAddon();
-    const webglAddon = new WebglAddon();
-    const webLinksAddon = new WebLinksAddon();
-
-    terminal.current.loadAddon(fitAddon.current);
-    terminal.current.loadAddon(webLinksAddon);
-    // Note: ClipboardAddon removed - we handle clipboard operations manually in attachCustomKeyEventHandler
-
-    try {
-      terminal.current.loadAddon(webglAddon);
-    } catch (error) {
-      logger.warn('[Shell] WebGL renderer unavailable, using Canvas fallback');
-    }
-
-    terminal.current.open(terminalRef.current);
-
-    terminal.current.attachCustomKeyEventHandler((event) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === 'c' && terminal.current.hasSelection()) {
-        document.execCommand('copy');
-        return false;
-      }
-
-      if ((event.ctrlKey || event.metaKey) && event.key === 'v') {
-        navigator.clipboard.readText().then(text => {
-          if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-            ws.current.send(JSON.stringify({
-              type: 'input',
-              data: text
-            }));
-          }
-        }).catch(() => {});
-        return false;
-      }
-
-      return true;
-    });
-
-    setTimeout(() => {
-      if (fitAddon.current) {
-        fitAddon.current.fit();
-        if (terminal.current && ws.current && ws.current.readyState === WebSocket.OPEN) {
-          ws.current.send(JSON.stringify({
-            type: 'resize',
-            cols: terminal.current.cols,
-            rows: terminal.current.rows
-          }));
-        }
-      }
-    }, 100);
-
-    setIsInitialized(true);
-    terminal.current.onData((data) => {
-      if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-        ws.current.send(JSON.stringify({
-          type: 'input',
-          data: data
-        }));
-      }
-    });
-
-    const resizeObserver = new ResizeObserver(() => {
-      if (fitAddon.current && terminal.current) {
-        setTimeout(() => {
-          fitAddon.current.fit();
-          if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-            ws.current.send(JSON.stringify({
-              type: 'resize',
-              cols: terminal.current.cols,
-              rows: terminal.current.rows
-            }));
-          }
-        }, 50);
-      }
-    });
-
-    if (terminalRef.current) {
-      resizeObserver.observe(terminalRef.current);
-    }
-
-    return () => {
-      resizeObserver.disconnect();
-
-      if (ws.current && (ws.current.readyState === WebSocket.OPEN || ws.current.readyState === WebSocket.CONNECTING)) {
-        ws.current.close();
-      }
-      ws.current = null;
-
-      if (terminal.current) {
-        terminal.current.dispose();
-        terminal.current = null;
-      }
-    };
-  }, [selectedProject?.path || selectedProject?.fullPath, isRestarting]);
-
-  useEffect(() => {
-    // 如果用户主动断开了连接，不要自动重连
     if (userDisconnected) return;
-
     if (!autoConnect || !isInitialized || isConnecting || isConnected) return;
-    connectToShell();
-  }, [autoConnect, isInitialized, isConnecting, isConnected, connectToShell, userDisconnected]);
+    connect();
+  }, [autoConnect, isInitialized, isConnecting, isConnected, connect, userDisconnected]);
+
+  // --- Render ---
 
   if (!selectedProject) {
     return (
@@ -519,7 +247,7 @@ function Shell({
           <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-90 p-4 z-40">
             <div className="text-center max-w-sm w-full">
               <button
-                onClick={connectToShell}
+                onClick={connect}
                 className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 text-base font-medium w-full sm:w-auto"
                 title="Connect to shell"
               >

@@ -58,7 +58,7 @@ i18n.on('languageChanged', (lng) => {
  * @returns Translated string
  */
 export function t(key: string, options?: Record<string, any>): string {
-  return i18n.t(key, options);
+  return i18n.t(key, options) as string;
 }
 
 /**

@@ -45,8 +45,9 @@ async function filterSDKOptions(options, userId) {
       sdkOptions.disallowedTools = userSettings.disallowed_tools;
       logger.debug({ disallowedTools: userSettings.disallowed_tools }, 'Using user settings for disallowedTools');
     }
-    // skipPermissions: 只有在前端没有传入时才使用用户设置
-    if (settings.skipPermissions === undefined && userSettings.skip_permissions !== undefined) {
+    // skipPermissions: 只有在前端没有显式传入时才使用用户设置
+    // 使用 != null 同时排除 null 和 undefined，明确处理 false 值
+    if (settings.skipPermissions == null && userSettings.skip_permissions != null) {
       settings.skipPermissions = userSettings.skip_permissions;
       logger.debug({ skipPermissions: userSettings.skip_permissions }, 'Using user settings for skipPermissions');
     }

@@ -8,10 +8,10 @@ export interface LoginModalProps {
   onClose?: () => void;
   provider?: Provider;
   project?: {
-    name?: string;
-    path?: string;
-    [key: string]: any;
-  };
+    name: string;
+    path: string;
+    displayName?: string;
+  } | null;
   onComplete?: (exitCode: number) => void;
   customCommand?: string;
 }
