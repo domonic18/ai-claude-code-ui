@@ -50,13 +50,15 @@ export async function syncExtensions(targetDir, options = {}) {
         const subdirs = ['agents', 'commands', 'skills', 'hooks', 'knowledge'];
         await Promise.all(subdirs.map(dir => fs.mkdir(path.join(targetDir, dir), { recursive: true })));
 
-        // 同步各类型
-        await syncResourceType('agents', targetDir, results.agents, overwriteUserFiles);
-        await syncResourceType('commands', targetDir, results.commands, overwriteUserFiles);
-        await syncResourceType('skills', targetDir, results.skills, overwriteUserFiles);
-        await syncResourceType('hooks', targetDir, results.hooks, overwriteUserFiles);
-        await syncResourceType('knowledge', targetDir, results.knowledge, overwriteUserFiles);
-        await syncConfigFiles(targetDir, results.config, overwriteUserFiles);
+        // 并行同步各类型（独立操作，无相互依赖）
+        await Promise.all([
+            syncResourceType('agents', targetDir, results.agents, overwriteUserFiles),
+            syncResourceType('commands', targetDir, results.commands, overwriteUserFiles),
+            syncResourceType('skills', targetDir, results.skills, overwriteUserFiles),
+            syncResourceType('hooks', targetDir, results.hooks, overwriteUserFiles),
+            syncResourceType('knowledge', targetDir, results.knowledge, overwriteUserFiles),
+            syncConfigFiles(targetDir, results.config, overwriteUserFiles),
+        ]);
 
         // 汇总日志
         const totalSynced = Object.values(results).reduce((sum, r) => sum + r.synced, 0);
@@ -228,10 +230,10 @@ async function syncConfigFiles(targetDir, results, overwrite) {
 
 // ─── 重新导出公共 API ─────────────────────────────────
 
-import { getAllExtensions } from './extension-reader.js';
+import { getAllExtensions, clearExtensionsCache } from './extension-reader.js';
 import { loadAgentsForSDK, loadSkillsForSDK } from './extension-sdk-loader.js';
 
-export { getAllExtensions, loadAgentsForSDK, loadSkillsForSDK };
+export { getAllExtensions, clearExtensionsCache, loadAgentsForSDK, loadSkillsForSDK };
 
 export default {
     syncExtensions,

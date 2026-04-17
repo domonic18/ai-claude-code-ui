@@ -73,14 +73,15 @@ export class ContainerCleanupManager {
         }
       });
 
+      // 批量获取所有已知容器 ID，避免逐个查数据库（N+1 问题）
+      const knownIds = Container.getAllIds();
+
       for (const containerInfo of containers) {
         const containerId = containerInfo.Id;
         const containerName = containerInfo.Names[0].replace(/^\//, ''); // 移除前导斜杠
 
-        // 检查此容器是否在我们的数据库中
-        const dbRecord = Container.getById(containerId);
-
-        if (!dbRecord) {
+        // 使用内存 Set 快速判断是否为孤儿容器
+        if (!knownIds.has(containerId)) {
           // 容器在 Docker 中存在但数据库中不存在 - 它是孤立的
           logger.warn(`[ContainerCleanup] Found orphaned container: ${containerName} (${containerId}), cleaning up`);
 

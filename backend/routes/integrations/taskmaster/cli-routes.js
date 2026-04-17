@@ -96,6 +96,10 @@ router.post('/add-task/:projectName', async (req, res) => {
         const { projectName } = req.params;
         const { prompt, title, description, priority = 'medium', dependencies } = req.body;
 
+        if (!['low', 'medium', 'high'].includes(priority)) {
+            return res.status(400).json({ error: 'Invalid priority', message: 'priority must be "low", "medium", or "high"' });
+        }
+
         if (!prompt && (!title || !description)) {
             return res.status(400).json({
                 error: 'Missing required parameters',

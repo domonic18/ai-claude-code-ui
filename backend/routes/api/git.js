@@ -51,7 +51,7 @@ router.get('/status', async (req, res) => {
         res.json(result);
     } catch (error) {
         logger.error('Git status error:', error);
-        res.json({
+        res.status(500).json({
             error: error.message.includes('not a git repository') || error.message.includes('Project directory is not a git repository')
                 ? error.message : 'Git operation failed',
             details: error.message
@@ -72,7 +72,7 @@ router.get('/diff', async (req, res) => {
         res.json({ diff });
     } catch (error) {
         logger.error('Git diff error:', error);
-        res.json({ error: error.message });
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -92,7 +92,7 @@ router.get('/file-with-diff', async (req, res) => {
         if (error.message.includes('Cannot show diff for directories')) {
             return res.status(400).json({ error: error.message });
         }
-        res.json({ error: error.message });
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -109,7 +109,7 @@ router.get('/branches', async (req, res) => {
         res.json({ branches });
     } catch (error) {
         logger.error('Git branches error:', error);
-        res.json({ error: error.message });
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -120,13 +120,15 @@ router.get('/commits', async (req, res) => {
     const { project, limit = 10 } = req.query;
     if (!project) return res.status(400).json({ error: 'Project name is required' });
 
+    const safeLimit = Math.min(Math.max(1, Number(limit) || 10), 500);
+
     try {
         const projectPath = await resolveProjectPath(project);
-        const commits = await getCommits(projectPath, limit);
+        const commits = await getCommits(projectPath, safeLimit);
         res.json({ commits });
     } catch (error) {
         logger.error('Git commits error:', error);
-        res.json({ error: error.message });
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -143,7 +145,7 @@ router.get('/commit-diff', async (req, res) => {
         res.json({ diff });
     } catch (error) {
         logger.error('Git commit diff error:', error);
-        res.json({ error: error.message });
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -160,7 +162,7 @@ router.get('/remote-status', async (req, res) => {
         res.json(result);
     } catch (error) {
         logger.error('Git remote status error:', error);
-        res.json({ error: error.message });
+        res.status(500).json({ error: error.message });
     }
 });
 

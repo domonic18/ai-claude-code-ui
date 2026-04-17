@@ -348,23 +348,28 @@ export async function listPrdFiles(projectPath) {
     }
 
     const files = await fsPromises.readdir(docsPath);
-    const prdFiles = [];
 
-    for (const file of files) {
-        const filePath = path.join(docsPath, file);
-        const stats = await fsPromises.stat(filePath);
+    // 并行 stat 所有文件，避免顺序 I/O
+    const statResults = await Promise.all(
+        files.map(async (file) => {
+            const filePath = path.join(docsPath, file);
+            try {
+                const stats = await fsPromises.stat(filePath);
+                if (stats.isFile() && (file.endsWith('.txt') || file.endsWith('.md'))) {
+                    return {
+                        name: file,
+                        path: path.relative(projectPath, filePath),
+                        size: stats.size,
+                        modified: stats.mtime.toISOString(),
+                        created: stats.birthtime.toISOString()
+                    };
+                }
+            } catch { /* ignore individual stat errors */ }
+            return null;
+        })
+    );
 
-        if (stats.isFile() && (file.endsWith('.txt') || file.endsWith('.md'))) {
-            prdFiles.push({
-                name: file,
-                path: path.relative(projectPath, filePath),
-                size: stats.size,
-                modified: stats.mtime.toISOString(),
-                created: stats.birthtime.toISOString()
-            });
-        }
-    }
-
+    const prdFiles = statResults.filter(Boolean);
     return prdFiles.sort((a, b) => new Date(b.modified) - new Date(a.modified));
 }
 

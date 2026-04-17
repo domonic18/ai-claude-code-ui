@@ -71,6 +71,10 @@ router.post('/prd/:projectName', async (req, res) => {
             return res.status(400).json({ error: 'Missing required fields', message: 'fileName and content are required' });
         }
 
+        if (typeof content !== 'string' || content.length > 10_000_000) {
+            return res.status(413).json({ error: 'Content too large', message: 'PRD content must not exceed 10 MB' });
+        }
+
         if (!isValidPrdFileName(fileName)) {
             return res.status(400).json({
                 error: 'Invalid filename',

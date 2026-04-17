@@ -243,11 +243,23 @@ async function readKnowledge() {
 
 // ─── 公共 API ─────────────────────────────────────────
 
+/** 扩展元数据缓存（避免每次请求都从磁盘读取全部文件） */
+let extensionsCache = null;
+let extensionsCacheTime = 0;
+const EXTENSIONS_CACHE_TTL_MS = 30_000; // 30 秒
+
 /**
  * 获取所有可用扩展的元数据
+ * @param {Object} [options] - 选项
+ * @param {boolean} [options.forceRefresh=false] - 强制刷新缓存
  * @returns {Promise<Object>} 包含 agents、commands、skills、hooks、knowledge 数组
  */
-export async function getAllExtensions() {
+export async function getAllExtensions(options = {}) {
+    const now = Date.now();
+    if (!options.forceRefresh && extensionsCache && (now - extensionsCacheTime) < EXTENSIONS_CACHE_TTL_MS) {
+        return extensionsCache;
+    }
+
     const [agents, commands, skills, hooks, knowledge] = await Promise.all([
         readAgents(),
         readCommands(),
@@ -256,5 +268,15 @@ export async function getAllExtensions() {
         readKnowledge()
     ]);
 
-    return { agents, commands, skills, hooks, knowledge };
+    extensionsCache = { agents, commands, skills, hooks, knowledge };
+    extensionsCacheTime = now;
+    return extensionsCache;
+}
+
+/**
+ * 清除扩展元数据缓存（扩展文件变更时调用）
+ */
+export function clearExtensionsCache() {
+    extensionsCache = null;
+    extensionsCacheTime = 0;
 }

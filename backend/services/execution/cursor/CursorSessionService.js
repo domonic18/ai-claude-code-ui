@@ -209,21 +209,17 @@ export async function getSessions(projectPath) {
             const sessionData = await parseSessionListEntry(db, sessionId, projectPath, dbStatMtimeMs);
 
             await db.close();
+
+            // 合并 createdAt 补全：优先使用 dbStatMtimeMs 或目录 stat
+            if (!sessionData.createdAt) {
+                sessionData.createdAt = dbStatMtimeMs
+                    ? new Date(dbStatMtimeMs).toISOString()
+                    : new Date().toISOString();
+            }
+
             sessions.push(sessionData);
         } catch (error) {
             logger.info(`Could not read session ${sessionId}:`, error.message);
-        }
-    }
-
-    // 补全缺失的 createdAt
-    for (const s of sessions) {
-        if (!s.createdAt) {
-            try {
-                const st = await fs.stat(path.join(cursorChatsPath, s.id));
-                s.createdAt = new Date(st.mtimeMs).toISOString();
-            } catch {
-                s.createdAt = new Date().toISOString();
-            }
         }
     }
 

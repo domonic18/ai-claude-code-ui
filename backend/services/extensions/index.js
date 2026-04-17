@@ -8,6 +8,7 @@ export {
     syncExtensions,
     syncToAllUsers,
     getAllExtensions,
+    clearExtensionsCache,
     loadAgentsForSDK,
     loadSkillsForSDK
 } from './extension-sync.js';

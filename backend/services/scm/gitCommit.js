@@ -146,7 +146,12 @@ export async function generateCommitMessage(projectPath, files, provider = 'clau
     if (!diffContext.trim()) {
         for (const file of files) {
             try {
-                const filePath = path.join(projectPath, file);
+                const filePath = path.resolve(projectPath, file);
+                // 防止路径穿越：确保解析后的路径仍在项目目录内
+                if (!filePath.startsWith(path.resolve(projectPath) + path.sep) && filePath !== path.resolve(projectPath)) {
+                    logger.warn({ file }, 'Path traversal detected in untracked file');
+                    continue;
+                }
                 const stats = await fs.stat(filePath);
                 if (!stats.isDirectory()) {
                     const content = await fs.readFile(filePath, 'utf-8');

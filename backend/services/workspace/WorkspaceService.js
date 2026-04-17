@@ -54,7 +54,8 @@ async function execAndWait(userId, command, options = {}) {
 
     setTimeout(() => {
       if (!resolved) {
-        cleanup();
+        resolved = true;
+        reject(new Error(`Command timed out after ${timeout}ms`));
       }
     }, timeout);
   });

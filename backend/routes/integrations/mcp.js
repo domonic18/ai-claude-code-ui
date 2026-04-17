@@ -19,6 +19,38 @@ import { createLogger } from '../../utils/logger.js';
 const logger = createLogger('routes/integrations/mcp');
 const router = express.Router();
 
+/**
+ * Blocked environment variable name patterns.
+ * These could be used for privilege escalation or code injection if allowed.
+ */
+const BLOCKED_ENV_PREFIXES = [
+    'LD_', 'DYLD_', 'PATH', 'HOME', 'USER', 'SHELL', 'IFS',
+    'NODE_', 'PYTHON_', 'RUBY', 'PERL', 'JAVA_',
+    'LIB', 'APPIMAGE', 'ELECTRON_', 'CHROME_',
+];
+
+/**
+ * Filter out dangerous environment variables from user input.
+ * @param {Object} env - User-provided environment variables
+ * @returns {Object} Sanitized environment variables
+ */
+function sanitizeEnvVars(env) {
+    if (!env || typeof env !== 'object') return {};
+    const safe = {};
+    for (const [key, value] of Object.entries(env)) {
+        const upperKey = key.toUpperCase();
+        const isBlocked = BLOCKED_ENV_PREFIXES.some(prefix => upperKey === prefix || upperKey.startsWith(prefix + '_') || upperKey.startsWith(prefix));
+        if (isBlocked) {
+            logger.warn({ key }, 'Blocked dangerous env variable in MCP config');
+            continue;
+        }
+        if (typeof value === 'string') {
+            safe[key] = value;
+        }
+    }
+    return safe;
+}
+
 // GET /api/mcp/cli/list - List MCP servers using Claude CLI
 router.get('/cli/list', async (req, res) => {
   try {
@@ -41,7 +73,18 @@ router.get('/cli/list', async (req, res) => {
 // POST /api/mcp/cli/add - Add MCP server using Claude CLI
 router.post('/cli/add', async (req, res) => {
   try {
-    const { name, type, command, args, url, headers, env, scope = 'user', projectPath } = req.body;
+    const { name, type, command, args, url, headers, env: rawEnv, scope = 'user', projectPath } = req.body;
+    const env = sanitizeEnvVars(rawEnv);
+
+    // 校验 name 格式
+    if (!name || typeof name !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/.test(name)) {
+      return res.status(400).json({ error: 'Invalid server name. Must be 1-64 alphanumeric chars (can include _.- after the first char)' });
+    }
+
+    // 校验 scope 枚举
+    if (!['user', 'local', 'global'].includes(scope)) {
+      return res.status(400).json({ error: 'scope must be "user", "local", or "global"' });
+    }
 
     logger.info(`Adding MCP server using Claude CLI (${scope} scope):`, name);
 

@@ -14,12 +14,15 @@ import { createLogger } from '../../../utils/logger.js';
 
 const logger = createLogger('services/sessions/container/containerFileReader');
 
+/** Docker exec 读取文件默认超时时间（毫秒） */
+const READ_FILE_TIMEOUT_MS = 30000;
+
 /**
  * 从容器内读取文件内容
  * @param {number} userId - 用户 ID
  * @param {string} filePath - 容器内文件路径
  * @returns {Promise<string>} 文件内容
- * @throws {Error} 文件不存在或读取失败
+ * @throws {Error} 文件不存在或读取失败，或超时
  */
 export async function readFileFromContainer(userId, filePath) {
   const { stream } = await containerManager.execInContainer(
@@ -36,6 +39,14 @@ export async function readFileFromContainer(userId, filePath) {
   return new Promise((resolve, reject) => {
     let content = '';
     let errorOutput = '';
+    let settled = false;
+
+    const safeResolve = (val) => { if (!settled) { settled = true; resolve(val); } };
+    const safeReject = (err) => { if (!settled) { settled = true; reject(err); } };
+
+    const timer = setTimeout(() => {
+      safeReject(new Error(`Docker exec timed out after ${READ_FILE_TIMEOUT_MS}ms while reading: ${filePath}`));
+    }, READ_FILE_TIMEOUT_MS);
 
     stdout.on('data', (chunk) => {
       content += chunk.toString();
@@ -46,14 +57,16 @@ export async function readFileFromContainer(userId, filePath) {
     });
 
     stream.on('error', (err) => {
-      reject(new Error(`Failed to read file: ${err.message}`));
+      clearTimeout(timer);
+      safeReject(new Error(`Failed to read file: ${err.message}`));
     });
 
     stream.on('end', () => {
+      clearTimeout(timer);
       if (errorOutput && (errorOutput.includes('No such file') || errorOutput.includes('cannot access'))) {
-        reject(new Error(`File not found: ${filePath}`));
+        safeReject(new Error(`File not found: ${filePath}`));
       } else {
-        resolve(content);
+        safeResolve(content);
       }
     });
   });

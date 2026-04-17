@@ -111,6 +111,20 @@ router.post('/', validateExternalApiKey, async (req, res) => {
     if (!['claude', 'cursor', 'codex'].includes(provider)) {
         return res.status(400).json({ error: 'provider must be "claude", "cursor", or "codex"' });
     }
+    if (githubUrl) {
+        try {
+            const parsed = new URL(githubUrl.trim());
+            if (!['https:', 'http:'].includes(parsed.protocol)) {
+                return res.status(400).json({ error: 'githubUrl must use http or https protocol' });
+            }
+            const allowedHosts = ['github.com', 'gitlab.com', 'bitbucket.org'];
+            if (!allowedHosts.includes(parsed.hostname.toLowerCase())) {
+                return res.status(400).json({ error: `githubUrl host must be one of: ${allowedHosts.join(', ')}` });
+            }
+        } catch {
+            return res.status(400).json({ error: 'githubUrl is not a valid URL' });
+        }
+    }
     if ((createBranch || createPR) && !githubUrl && !projectPath) {
         return res.status(400).json({ error: 'createBranch and createPR require either githubUrl or projectPath with a GitHub remote' });
     }
