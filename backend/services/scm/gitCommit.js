@@ -126,14 +126,12 @@ export async function deleteUntracked(projectPath, file) {
 }
 
 /**
- * 使用 AI 生成提交消息
+ * 收集已跟踪文件的 diff 上下文
  * @param {string} projectPath - 项目路径
  * @param {string[]} files - 文件列表
- * @param {string} provider - AI 提供者：'claude' 或 'cursor'
- * @returns {Promise<string>} 生成的提交消息
+ * @returns {Promise<string>} diff 内容
  */
-export async function generateCommitMessage(projectPath, files, provider = 'claude') {
-    // 收集 diff 上下文
+async function collectDiffContext(projectPath, files) {
     let diffContext = '';
     for (const file of files) {
         try {
@@ -141,29 +139,47 @@ export async function generateCommitMessage(projectPath, files, provider = 'clau
             if (stdout) diffContext += `\n--- ${file} ---\n${stdout}`;
         } catch { /* ignore */ }
     }
+    return diffContext;
+}
 
-    // 未跟踪文件：读取文件内容
-    if (!diffContext.trim()) {
-        for (const file of files) {
-            try {
-                const filePath = path.resolve(projectPath, file);
-                // 防止路径穿越：确保解析后的路径仍在项目目录内
-                if (!filePath.startsWith(path.resolve(projectPath) + path.sep) && filePath !== path.resolve(projectPath)) {
-                    logger.warn({ file }, 'Path traversal detected in untracked file');
-                    continue;
-                }
-                const stats = await fs.stat(filePath);
-                if (!stats.isDirectory()) {
-                    const content = await fs.readFile(filePath, 'utf-8');
-                    diffContext += `\n--- ${file} (new file) ---\n${content.substring(0, 1000)}\n`;
-                } else {
-                    diffContext += `\n--- ${file} (new directory) ---\n`;
-                }
-            } catch { /* ignore */ }
-        }
+/**
+ * 收集未跟踪文件的内容作为上下文
+ * @param {string} projectPath - 项目路径
+ * @param {string[]} files - 文件列表
+ * @returns {Promise<string>} 文件内容
+ */
+async function collectUntrackedFileContent(projectPath, files) {
+    let content = '';
+    const resolvedProject = path.resolve(projectPath);
+
+    for (const file of files) {
+        try {
+            const filePath = path.resolve(projectPath, file);
+            // 防止路径穿越：确保解析后的路径仍在项目目录内
+            if (!filePath.startsWith(resolvedProject + path.sep) && filePath !== resolvedProject) {
+                logger.warn({ file }, 'Path traversal detected in untracked file');
+                continue;
+            }
+            const stats = await fs.stat(filePath);
+            if (!stats.isDirectory()) {
+                const fileContent = await fs.readFile(filePath, 'utf-8');
+                content += `\n--- ${file} (new file) ---\n${fileContent.substring(0, 1000)}\n`;
+            } else {
+                content += `\n--- ${file} (new directory) ---\n`;
+            }
+        } catch { /* ignore */ }
     }
+    return content;
+}
 
-    const prompt = `Generate a conventional commit message for these changes.
+/**
+ * 构建 AI 提交消息生成 prompt
+ * @param {string[]} files - 文件列表
+ * @param {string} diffContext - diff 上下文
+ * @returns {string} prompt 文本
+ */
+function createCommitPrompt(files, diffContext) {
+    return `Generate a conventional commit message for these changes.
 
 REQUIREMENTS:
 - Format: type(scope): subject
@@ -181,36 +197,69 @@ DIFFS:
 ${diffContext.substring(0, 4000)}
 
 Generate the commit message:`;
+}
 
-    try {
-        let responseText = '';
-        const writer = {
-            send: (data) => {
-                try {
-                    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
-                    if (parsed.type === 'claude-response' && parsed.data) {
-                        const message = parsed.data.message || parsed.data;
-                        if (message.content && Array.isArray(message.content)) {
-                            for (const item of message.content) {
-                                if (item.type === 'text' && item.text) responseText += item.text;
-                            }
+/**
+ * 调用 AI 提供者并收集响应文本
+ * @param {string} prompt - prompt 文本
+ * @param {string} projectPath - 项目路径
+ * @param {string} provider - AI 提供者
+ * @returns {Promise<string>} AI 响应文本
+ */
+async function queryAIProvider(prompt, projectPath, provider) {
+    let responseText = '';
+    const writer = {
+        send: (data) => {
+            try {
+                const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+                if (parsed.type === 'claude-response' && parsed.data) {
+                    const message = parsed.data.message || parsed.data;
+                    if (message.content && Array.isArray(message.content)) {
+                        for (const item of message.content) {
+                            if (item.type === 'text' && item.text) responseText += item.text;
                         }
-                    } else if (parsed.type === 'cursor-output' && parsed.output) {
-                        responseText += parsed.output;
-                    } else if (parsed.type === 'text' && parsed.text) {
-                        responseText += parsed.text;
                     }
-                } catch { /* ignore parse errors */ }
-            },
-            setSessionId: () => {},
-        };
+                } else if (parsed.type === 'cursor-output' && parsed.output) {
+                    responseText += parsed.output;
+                } else if (parsed.type === 'text' && parsed.text) {
+                    responseText += parsed.text;
+                }
+            } catch { /* ignore parse errors */ }
+        },
+        setSessionId: () => {},
+    };
 
-        if (provider === 'claude') {
-            await queryClaudeSDK(prompt, { cwd: projectPath, permissionMode: 'bypassPermissions', model: 'sonnet' }, writer);
-        } else if (provider === 'cursor') {
-            await spawnCursor(prompt, { cwd: projectPath, skipPermissions: true }, writer);
+    if (provider === 'claude') {
+        await queryClaudeSDK(prompt, { cwd: projectPath, permissionMode: 'bypassPermissions', model: 'sonnet' }, writer);
+    } else if (provider === 'cursor') {
+        await spawnCursor(prompt, { cwd: projectPath, skipPermissions: true }, writer);
+    }
+
+    return responseText;
+}
+
+/**
+ * 使用 AI 生成提交消息
+ * @param {string} projectPath - 项目路径
+ * @param {string[]} files - 文件列表
+ * @param {string} provider - AI 提供者：'claude' 或 'cursor'
+ * @returns {Promise<string>} 生成的提交消息
+ */
+export async function generateCommitMessage(projectPath, files, provider = 'claude') {
+    try {
+        // 步骤 1：收集 diff 上下文
+        let diffContext = await collectDiffContext(projectPath, files);
+
+        // 步骤 2：如果没有 diff，尝试读取未跟踪文件内容
+        if (!diffContext.trim()) {
+            diffContext = await collectUntrackedFileContent(projectPath, files);
         }
 
+        // 步骤 3：构建 prompt
+        const prompt = createCommitPrompt(files, diffContext);
+
+        // 步骤 4：调用 AI 并解析响应
+        const responseText = await queryAIProvider(prompt, projectPath, provider);
         const cleaned = cleanCommitMessage(responseText);
         return cleaned || 'chore: update files';
     } catch (error) {

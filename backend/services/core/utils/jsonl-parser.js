@@ -35,6 +35,57 @@ const API_ERROR_INDICATORS = [
 ];
 
 /**
+ * 创建新会话对象
+ * @param {string} sessionId - 会话 ID
+ * @param {string} [cwd=''] - 工作目录
+ * @returns {Object} 新会话对象
+ */
+function createSession(sessionId, cwd = '') {
+  return {
+    id: sessionId,
+    summary: 'New Session',
+    messageCount: 0,
+    lastActivity: new Date(),
+    cwd,
+    lastUserMessage: null,
+    lastAssistantMessage: null,
+  };
+}
+
+/**
+ * 处理用户消息条目
+ * @param {Object} session - 会话对象（可变）
+ * @param {Object} entry - JSONL 条目
+ */
+function processUserEntry(session, entry) {
+  const textContent = JsonlParser._extractTextContent(entry.message);
+  const isSystemMessage = JsonlParser._isSystemMessage(textContent);
+
+  if (textContent && !isSystemMessage) {
+    session.lastUserMessage = textContent;
+  }
+}
+
+/**
+ * 处理助手消息条目
+ * @param {Object} session - 会话对象（可变）
+ * @param {Object} entry - JSONL 条目
+ * @param {boolean} includeApiErrors - 是否包含 API 错误消息
+ */
+function processAssistantEntry(session, entry, includeApiErrors) {
+  if (entry.isApiErrorMessage === true && !includeApiErrors) {
+    return;
+  }
+
+  const textContent = JsonlParser._extractTextContent(entry.message);
+  const isApiError = JsonlParser._isApiErrorMessage(textContent);
+
+  if (textContent && !isApiError) {
+    session.lastAssistantMessage = textContent;
+  }
+}
+
+/**
  * JSONL 解析器类
  * 提供 JSONL 文件解析功能，用于解析 Claude Code 会话文件
  */
@@ -70,7 +121,7 @@ export class JsonlParser {
           const entry = JSON.parse(line);
           entries.push(entry);
 
-          // 处理 summary 条目
+          // 收集无 sessionId 的 summary 条目
           if (entry.type === 'summary' && entry.summary && !entry.sessionId && entry.leafUuid) {
             pendingSummaries.set(entry.leafUuid, entry.summary);
           }
@@ -119,15 +170,7 @@ export class JsonlParser {
 
     // 初始化会话
     if (!sessions.has(entry.sessionId)) {
-      sessions.set(entry.sessionId, {
-        id: entry.sessionId,
-        summary: 'New Session',
-        messageCount: 0,
-        lastActivity: new Date(),
-        cwd: entry.cwd || '',
-        lastUserMessage: null,
-        lastAssistantMessage: null,
-      });
+      sessions.set(entry.sessionId, createSession(entry.sessionId, entry.cwd));
     }
 
     const session = sessions.get(entry.sessionId);
@@ -142,33 +185,14 @@ export class JsonlParser {
       session.summary = entry.summary;
     }
 
-    // 处理用户消息（支持两种格式）
-    // 格式1: { role: 'user', message: '...' }
-    // 格式2: { message: { role: 'user', content: '...' } }
+    // 分派到对应的消息处理函数
     const isUserMessage = entry.role === 'user' || entry.message?.role === 'user';
-    if (isUserMessage && entry.message) {
-      const textContent = this._extractTextContent(entry.message);
-      const isSystemMessage = this._isSystemMessage(textContent);
-
-      if (textContent && !isSystemMessage) {
-        session.lastUserMessage = textContent;
-      }
-    }
-
-    // 处理助手消息（支持两种格式）
     const isAssistantMessage = entry.role === 'assistant' || entry.message?.role === 'assistant';
-    if (isAssistantMessage && entry.message) {
-      if (entry.isApiErrorMessage === true && !includeApiErrors) {
-        // 跳过 API 错误消息
-        return;
-      }
 
-      const textContent = this._extractTextContent(entry.message);
-      const isSystemMessage = this._isApiErrorMessage(textContent);
-
-      if (textContent && !isSystemMessage) {
-        session.lastAssistantMessage = textContent;
-      }
+    if (isUserMessage && entry.message) {
+      processUserEntry(session, entry);
+    } else if (isAssistantMessage && entry.message) {
+      processAssistantEntry(session, entry, includeApiErrors);
     }
 
     // 更新消息计数和活动时间

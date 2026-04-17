@@ -329,17 +329,15 @@ export async function getSessionDetail(sessionId, projectPath) {
 }
 
 /**
- * 从 blob 数据构建消息时间线（DAG + 拓扑排序）
+ * 将 blob 分类为 JSON 消息和 protobuf DAG 结构
  * @param {Array<{rowid: number, id: string, data: Buffer}>} allBlobs - 所有 blob
- * @returns {{messages: Array, sortedBlobs: Array}} 排序后的消息和 blob
+ * @returns {{blobMap: Map, parentRefs: Map, jsonBlobs: Array}} 分类结果
  */
-function buildMessageTimeline(allBlobs) {
+function categorizeBlobs(allBlobs) {
     const blobMap = new Map();
     const parentRefs = new Map();
-    const childRefs = new Map();
     const jsonBlobs = [];
 
-    // 第一遍：分类 blob（JSON 消息 vs protobuf DAG 结构）
     for (const blob of allBlobs) {
         blobMap.set(blob.id, blob);
 
@@ -356,24 +354,24 @@ function buildMessageTimeline(allBlobs) {
             const parents = extractParentRefs(blob, blobMap);
             if (parents.length > 0) {
                 parentRefs.set(blob.id, parents);
-                for (const parentId of parents) {
-                    if (!childRefs.has(parentId)) {
-                        childRefs.set(parentId, []);
-                    }
-                    childRefs.get(parentId).push(blob.id);
-                }
             }
         }
     }
 
-    // 拓扑排序
-    const sorted = topologicalSort(allBlobs, parentRefs, blobMap);
+    return { blobMap, parentRefs, jsonBlobs };
+}
 
-    // 建立 JSON blob 的出现顺序
+/**
+ * 根据拓扑排序结果建立 JSON blob 的出现顺序
+ * @param {Array} sortedBlobs - 拓扑排序后的 blob
+ * @param {Array} jsonBlobs - JSON blob 列表
+ * @returns {Map<string, number>} blob ID -> 顺序索引
+ */
+function buildMessageOrder(sortedBlobs, jsonBlobs) {
     const messageOrder = new Map();
     let orderIndex = 0;
 
-    for (const blob of sorted) {
+    for (const blob of sortedBlobs) {
         if (blob.data && blob.data[0] !== 0x7B) {
             for (const jsonBlob of jsonBlobs) {
                 try {
@@ -390,15 +388,15 @@ function buildMessageTimeline(allBlobs) {
         }
     }
 
-    // 按 DAG 顺序排列 JSON blob
-    const sortedJsonBlobs = jsonBlobs.sort((a, b) => {
-        const orderA = messageOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER;
-        const orderB = messageOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER;
-        if (orderA !== orderB) return orderA - orderB;
-        return a.rowid - b.rowid;
-    });
+    return messageOrder;
+}
 
-    // 过滤系统消息，构建最终输出
+/**
+ * 从排序后的 JSON blob 中过滤系统消息并构建最终消息列表
+ * @param {Array} sortedJsonBlobs - 按 DAG 顺序排列的 JSON blob
+ * @returns {Array} 过滤后的消息列表
+ */
+function filterAndFormatMessages(sortedJsonBlobs) {
     const messages = [];
     for (let idx = 0; idx < sortedJsonBlobs.length; idx++) {
         const blob = sortedJsonBlobs[idx];
@@ -415,6 +413,34 @@ function buildMessageTimeline(allBlobs) {
             content: parsed
         });
     }
+    return messages;
+}
+
+/**
+ * 从 blob 数据构建消息时间线（DAG + 拓扑排序）
+ * @param {Array<{rowid: number, id: string, data: Buffer}>} allBlobs - 所有 blob
+ * @returns {{messages: Array, sortedBlobs: Array}} 排序后的消息和 blob
+ */
+function buildMessageTimeline(allBlobs) {
+    // 步骤 1：分类 blob
+    const { blobMap, parentRefs, jsonBlobs } = categorizeBlobs(allBlobs);
+
+    // 步骤 2：拓扑排序
+    const sorted = topologicalSort(allBlobs, parentRefs, blobMap);
+
+    // 步骤 3：建立消息出现顺序
+    const messageOrder = buildMessageOrder(sorted, jsonBlobs);
+
+    // 步骤 4：按 DAG 顺序排列 JSON blob
+    const sortedJsonBlobs = jsonBlobs.sort((a, b) => {
+        const orderA = messageOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+        const orderB = messageOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+        if (orderA !== orderB) return orderA - orderB;
+        return a.rowid - b.rowid;
+    });
+
+    // 步骤 5：过滤系统消息并格式化
+    const messages = filterAndFormatMessages(sortedJsonBlobs);
 
     return { messages, sortedBlobs: sorted };
 }

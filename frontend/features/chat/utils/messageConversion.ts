@@ -180,6 +180,40 @@ function processToolResultMessage(msg: any, converted: ChatMessage[]): void {
   }
 }
 
+/** 从 assistant 消息的 content 数组中提取文本部分 */
+function buildTextPart(part: any, msg: any): ChatMessage {
+  const text = typeof part.text === 'string'
+    ? unescapeWithMathProtection(part.text)
+    : part.text;
+  return {
+    id: msg.id || makeMsgId(),
+    type: 'assistant',
+    content: text,
+    timestamp: msg.timestamp || new Date().toISOString()
+  };
+}
+
+/** 从 assistant 消息的 content 数组中提取 tool_use 部分并附加结果 */
+function buildToolUsePart(part: any, msg: any, toolResults: Map<string, ToolResultData>): ChatMessage {
+  const toolResult = toolResults.get(part.id);
+  return {
+    id: msg.id || makeMsgId(),
+    type: 'assistant',
+    content: '',
+    timestamp: msg.timestamp || new Date().toISOString(),
+    isToolUse: true,
+    toolName: part.name,
+    toolInput: JSON.stringify(part.input),
+    toolResult: toolResult ? {
+      content: typeof toolResult.content === 'string' ? toolResult.content : JSON.stringify(toolResult.content),
+      isError: toolResult.isError,
+      toolUseResult: toolResult.toolUseResult
+    } : null,
+    toolError: toolResult?.isError || false,
+    toolResultTimestamp: toolResult?.timestamp || new Date()
+  };
+}
+
 /** 处理 assistant 消息（文本 + tool_use 混合） */
 function processAssistantMessage(
   msg: any,
@@ -189,33 +223,9 @@ function processAssistantMessage(
   if (Array.isArray(msg.message.content)) {
     for (const part of msg.message.content) {
       if (part.type === 'text') {
-        const text = typeof part.text === 'string'
-          ? unescapeWithMathProtection(part.text)
-          : part.text;
-        converted.push({
-          id: msg.id || makeMsgId(),
-          type: 'assistant',
-          content: text,
-          timestamp: msg.timestamp || new Date().toISOString()
-        });
+        converted.push(buildTextPart(part, msg));
       } else if (part.type === 'tool_use') {
-        const toolResult = toolResults.get(part.id);
-        converted.push({
-          id: msg.id || makeMsgId(),
-          type: 'assistant',
-          content: '',
-          timestamp: msg.timestamp || new Date().toISOString(),
-          isToolUse: true,
-          toolName: part.name,
-          toolInput: JSON.stringify(part.input),
-          toolResult: toolResult ? {
-            content: typeof toolResult.content === 'string' ? toolResult.content : JSON.stringify(toolResult.content),
-            isError: toolResult.isError,
-            toolUseResult: toolResult.toolUseResult
-          } : null,
-          toolError: toolResult?.isError || false,
-          toolResultTimestamp: toolResult?.timestamp || new Date()
-        });
+        converted.push(buildToolUsePart(part, msg, toolResults));
       }
     }
   } else if (typeof msg.message.content === 'string') {
@@ -228,23 +238,32 @@ function processAssistantMessage(
   }
 }
 
+// ─── 消息分发注册表 ──────────────────────────────────────
+
+/** 消息类型判断 + 处理的注册条目 */
+type MessageDispatcher = {
+  match: (msg: any) => boolean;
+  handle: (msg: any, converted: ChatMessage[], toolResults: Map<string, ToolResultData>) => void;
+};
+
+const MESSAGE_DISPATCHERS: MessageDispatcher[] = [
+  { match: (msg) => msg.message?.role === 'user' && msg.message?.content, handle: (msg, out) => processUserMessage(msg, out) },
+  { match: (msg) => msg.type === 'thinking' && msg.message?.content, handle: (msg, out) => processThinkingMessage(msg, out) },
+  { match: (msg) => msg.type === 'tool_use' && msg.toolName, handle: (msg, out) => processToolUseMessage(msg, out) },
+  { match: (msg) => msg.type === 'tool_result', handle: (msg, out) => processToolResultMessage(msg, out) },
+  { match: (msg) => msg.message?.role === 'assistant' && msg.message?.content, handle: (msg, out, tr) => processAssistantMessage(msg, out, tr) },
+];
+
 // ─── 主转换函数 ────────────────────────────────────────
 
 /**
- * Convert raw session messages from API to ChatMessage format
- *
- * Two-pass strategy:
- * 1. Collect all tool results from user messages
- * 2. Process messages and attach tool results to tool uses
- *
- * @param rawMessages - Raw messages from API with format {message: {role, content}}
- * @returns Array of ChatMessage objects ready for display
+ * 从原始消息中收集所有 tool_result 数据
+ * @param rawMessages - 原始消息数组
+ * @returns tool_use_id → ToolResultData 映射
  */
-export function convertSessionMessages(rawMessages: any[]): ChatMessage[] {
-  const converted: ChatMessage[] = [];
+function collectToolResults(rawMessages: any[]): Map<string, ToolResultData> {
   const toolResults = new Map<string, ToolResultData>();
 
-  // First pass: collect all tool results
   for (const msg of rawMessages) {
     if (msg.message?.role === 'user' && Array.isArray(msg.message?.content)) {
       for (const part of msg.message.content) {
@@ -260,18 +279,32 @@ export function convertSessionMessages(rawMessages: any[]): ChatMessage[] {
     }
   }
 
-  // Second pass: dispatch to type-specific handlers
+  return toolResults;
+}
+
+/**
+ * Convert raw session messages from API to ChatMessage format
+ *
+ * Two-pass strategy:
+ * 1. Collect all tool results from user messages
+ * 2. Process messages and attach tool results to tool uses
+ *
+ * @param rawMessages - Raw messages from API with format {message: {role, content}}
+ * @returns Array of ChatMessage objects ready for display
+ */
+export function convertSessionMessages(rawMessages: any[]): ChatMessage[] {
+  const converted: ChatMessage[] = [];
+
+  // First pass: collect all tool results
+  const toolResults = collectToolResults(rawMessages);
+
+  // Second pass: dispatch to type-specific handlers via registry
   for (const msg of rawMessages) {
-    if (msg.message?.role === 'user' && msg.message?.content) {
-      processUserMessage(msg, converted);
-    } else if (msg.type === 'thinking' && msg.message?.content) {
-      processThinkingMessage(msg, converted);
-    } else if (msg.type === 'tool_use' && msg.toolName) {
-      processToolUseMessage(msg, converted);
-    } else if (msg.type === 'tool_result') {
-      processToolResultMessage(msg, converted);
-    } else if (msg.message?.role === 'assistant' && msg.message?.content) {
-      processAssistantMessage(msg, converted, toolResults);
+    for (const dispatcher of MESSAGE_DISPATCHERS) {
+      if (dispatcher.match(msg)) {
+        dispatcher.handle(msg, converted, toolResults);
+        break;
+      }
     }
   }
 
