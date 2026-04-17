@@ -7,6 +7,12 @@
  * @module container/core/ContainerStats
  */
 
+import {
+  extractNetworkStats,
+  extractDiskStats,
+  buildStatsResponse
+} from './ContainerStatsHelpers.js';
+
 /**
  * 容器资源监控器类
  */
@@ -28,18 +34,7 @@ export class ContainerResourceMonitor {
     const container = this.docker.getContainer(containerId);
     const stats = await container.stats({ stream: false });
 
-    return {
-      cpuPercent: this.calculateCPUPercent(stats),
-      memoryUsage: stats.memory_stats?.usage || 0,
-      memoryLimit: stats.memory_stats?.limit || 0,
-      memoryPercent: stats.memory_stats
-        ? (stats.memory_stats.usage / stats.memory_stats.limit) * 100
-        : 0,
-      networkRx: stats.networks?.eth0?.rx_bytes || 0,
-      networkTx: stats.networks?.eth0?.tx_bytes || 0,
-      blockRead: stats.blkio_stats?.io_service_bytes_recursive?.find(x => x.op === 'Read')?.value || 0,
-      blockWrite: stats.blkio_stats?.io_service_bytes_recursive?.find(x => x.op === 'Write')?.value || 0
-    };
+    return buildStatsResponse(stats);
   }
 
   /**
@@ -94,20 +89,7 @@ export class ContainerResourceMonitor {
     const stats = await container.stats({ stream: false });
 
     const networks = stats.networks || {};
-    const result = {};
-
-    for (const [name, data] of Object.entries(networks)) {
-      result[name] = {
-        rxBytes: data.rx_bytes || 0,
-        txBytes: data.tx_bytes || 0,
-        rxDropped: data.rx_dropped || 0,
-        txDropped: data.tx_dropped || 0,
-        rxErrors: data.rx_errors || 0,
-        txErrors: data.tx_errors || 0
-      };
-    }
-
-    return result;
+    return extractNetworkStats(networks);
   }
 
   /**
@@ -122,25 +104,6 @@ export class ContainerResourceMonitor {
     const blkioStats = stats.blkio_stats || {};
     const ioRecursive = blkioStats.io_service_bytes_recursive || [];
 
-    const result = {
-      readBytes: 0,
-      writeBytes: 0,
-      readCount: 0,
-      writeCount: 0
-    };
-
-    for (const entry of ioRecursive) {
-      if (entry.op === 'Read') {
-        result.readBytes = entry.value || 0;
-      } else if (entry.op === 'Write') {
-        result.writeBytes = entry.value || 0;
-      } else if (entry.op === 'Read' && entry.op === 'Sync') {
-        result.readCount = entry.value || 0;
-      } else if (entry.op === 'Write' && entry.op === 'Sync') {
-        result.writeCount = entry.value || 0;
-      }
-    }
-
-    return result;
+    return extractDiskStats(ioRecursive);
   }
 }

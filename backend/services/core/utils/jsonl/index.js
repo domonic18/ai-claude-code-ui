@@ -6,11 +6,11 @@
  * @module core/utils/jsonl
  */
 
-export { JsonlParser, parseJsonlContent, filterMemoryContextFromEntry } from './JsonlParser.js';
+export { JsonlParser, parseJsonlContent, filterMemoryContextFromEntry } from '../jsonl-parser.js';
 export { SessionGrouping } from './SessionGrouping.js';
 export { TokenUsageCalculator } from './TokenUsageCalculator.js';
 
-import { JsonlParser } from './JsonlParser.js';
+import { JsonlParser } from '../jsonl-parser.js';
 import { SessionGrouping } from './SessionGrouping.js';
 import { TokenUsageCalculator } from './TokenUsageCalculator.js';
 
