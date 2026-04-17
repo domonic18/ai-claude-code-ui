@@ -122,6 +122,7 @@
     "@vitejs/plugin-react": "^4.6.0",
     "auto-changelog": "^2.5.0",
     "autoprefixer": "^10.4.16",
+    "complexity-report": "^2.0.0-alpha",
     "concurrently": "^8.2.2",
     "jsdom": "^27.0.1",
     "node-gyp": "^10.0.0",
