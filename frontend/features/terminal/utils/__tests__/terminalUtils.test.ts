@@ -403,7 +403,7 @@ describe('ansiProcessor', () => {
     });
 
     it('should handle mixed text and codes', () => {
-      expect(stripAnsiColors('normal \x1b[31mred\x1b[0m normal')).toBe('normal red normal');
+      expect(stripAnsiCodes('normal \x1b[31mred\x1b[0m normal')).toBe('normal red normal');
     });
 
     it('should handle empty string', () => {

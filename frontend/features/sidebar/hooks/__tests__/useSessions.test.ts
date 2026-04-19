@@ -156,28 +156,27 @@ describe('useSessions', () => {
       { id: 'session-1', summary: 'Old Summary', lastActivity: '2025-01-01' },
       { id: 'session-2', summary: 'Another Session', lastActivity: '2025-01-02' },
     ];
-    
-    const { result } = renderHook(() => useSessions());
-    
-    act(() => {
-      result.current.sessions = { 'test-project': [...initialSessions] };
-      result.current.additionalSessions = { 'test-project': [...initialSessions] };
-    });
 
+    mockGetSessions.mockResolvedValue({ sessions: initialSessions, hasMore: false });
     mockRenameSession.mockResolvedValue(undefined);
+
+    const { result } = renderHook(() => useSessions());
+
+    await act(async () => {
+      await result.current.loadMoreSessions('test-project');
+    });
 
     await act(async () => {
       await result.current.renameSession('test-project', 'session-1', 'New Summary');
     });
 
     expect(mockRenameSession).toHaveBeenCalledWith('test-project', 'session-1', 'New Summary');
-    
+
     const expectedSessions = [
       { id: 'session-1', summary: 'New Summary', lastActivity: '2025-01-01' },
       { id: 'session-2', summary: 'Another Session', lastActivity: '2025-01-02' },
     ];
-    
-    expect(result.current.sessions['test-project']).toEqual(expectedSessions);
+
     expect(result.current.additionalSessions['test-project']).toEqual(expectedSessions);
   });
 
@@ -200,34 +199,33 @@ describe('useSessions', () => {
     );
   });
 
-  it('should delete session from both sessions and additionalSessions', async () => {
+  it('should delete session from additionalSessions', async () => {
     const initialSessions: Session[] = [
       { id: 'session-1', summary: 'Session 1', lastActivity: '2025-01-01' },
       { id: 'session-2', summary: 'Session 2', lastActivity: '2025-01-02' },
       { id: 'session-3', summary: 'Session 3', lastActivity: '2025-01-03' },
     ];
-    
-    const { result } = renderHook(() => useSessions());
-    
-    act(() => {
-      result.current.sessions = { 'test-project': [...initialSessions] };
-      result.current.additionalSessions = { 'test-project': [...initialSessions] };
-    });
 
+    mockGetSessions.mockResolvedValue({ sessions: initialSessions, hasMore: false });
     mockDeleteSession.mockResolvedValue(undefined);
+
+    const { result } = renderHook(() => useSessions());
+
+    await act(async () => {
+      await result.current.loadMoreSessions('test-project');
+    });
 
     await act(async () => {
       await result.current.deleteSession('test-project', 'session-2', 'claude');
     });
 
     expect(mockDeleteSession).toHaveBeenCalledWith('test-project', 'session-2', 'claude');
-    
+
     const expectedSessions = [
       { id: 'session-1', summary: 'Session 1', lastActivity: '2025-01-01' },
       { id: 'session-3', summary: 'Session 3', lastActivity: '2025-01-03' },
     ];
-    
-    expect(result.current.sessions['test-project']).toEqual(expectedSessions);
+
     expect(result.current.additionalSessions['test-project']).toEqual(expectedSessions);
   });
 
@@ -235,22 +233,21 @@ describe('useSessions', () => {
     const initialSessions: Session[] = [
       { id: 'session-1', summary: 'Session 1', lastActivity: '2025-01-01' },
     ];
-    
-    const { result } = renderHook(() => useSessions());
-    
-    act(() => {
-      result.current.sessions = { 'test-project': [...initialSessions] };
-      result.current.additionalSessions = { 'test-project': [...initialSessions] };
-    });
 
+    mockGetSessions.mockResolvedValue({ sessions: initialSessions, hasMore: false });
     mockDeleteSession.mockResolvedValue(undefined);
+
+    const { result } = renderHook(() => useSessions());
+
+    await act(async () => {
+      await result.current.loadMoreSessions('test-project');
+    });
 
     await act(async () => {
       await result.current.deleteSession('test-project', 'session-1');
     });
 
     expect(mockDeleteSession).toHaveBeenCalledWith('test-project', 'session-1', undefined);
-    expect(result.current.sessions['test-project']).toEqual([]);
     expect(result.current.additionalSessions['test-project']).toEqual([]);
   });
 
@@ -273,14 +270,20 @@ describe('useSessions', () => {
     );
   });
 
-  it('should reset all state', () => {
+  it('should reset all state', async () => {
+    mockGetSessions.mockResolvedValue({
+      sessions: [{ id: 'session-1', summary: 'Test', lastActivity: '2025-01-01' }],
+      hasMore: true,
+    });
+
     const { result } = renderHook(() => useSessions());
 
-    act(() => {
-      result.current.sessions = { 'test-project': [{ id: 'session-1', summary: 'Test', lastActivity: '2025-01-01' }] };
-      result.current.additionalSessions = { 'test-project': [{ id: 'session-2', summary: 'Test 2', lastActivity: '2025-01-02' }] };
-      result.current.hasMore = { 'test-project': true };
+    await act(async () => {
+      await result.current.loadMoreSessions('test-project');
     });
+
+    expect(result.current.additionalSessions['test-project'].length).toBe(1);
+    expect(result.current.hasMore['test-project']).toBe(true);
 
     act(() => {
       result.current.reset();
