@@ -109,8 +109,8 @@ export function connect(
     return;
   }
 
-  // Don't connect if not enabled
-  if (!refs.isEnabledRef.current) {
+  // Don't connect if not enabled or if component is unmounted
+  if (!refs.isEnabledRef.current || refs.isUnmountedRef.current) {
     return;
   }
 
@@ -119,16 +119,27 @@ export function connect(
   // Clear previous connections
   if (refs.wsRef.current) {
     refs.wsRef.current.close();
+    refs.wsRef.current = null;
   }
   if (refs.reconnectTimeoutRef.current) {
     clearTimeout(refs.reconnectTimeoutRef.current);
+    refs.reconnectTimeoutRef.current = null;
   }
 
   buildWebSocketUrl()
     .then((wsUrl) => {
+      // Guard: abort if unmounted or disabled during async URL fetch
+      if (refs.isUnmountedRef.current || !refs.isEnabledRef.current) {
+        refs.isConnectingRef.current = false;
+        return;
+      }
+
       logger.info('[WebSocket] Connecting to:', wsUrl.replace(/token=[^&]+/, 'token=***'));
 
       const websocket = new WebSocket(wsUrl);
+      // Store immediately so cleanup can close it if component unmounts
+      // before onopen fires
+      refs.wsRef.current = websocket;
       setupWebSocketHandlers(websocket, refs, callbacks);
     })
     .catch((error) => {

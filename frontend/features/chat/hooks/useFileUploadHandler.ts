@@ -30,12 +30,14 @@ interface UseFileUploadHandlerReturn {
   getRootProps: (props?: React.HTMLAttributes<HTMLElement>) => React.HTMLAttributes<HTMLElement>;
   /** Get input props for dropzone */
   getInputProps: (props?: React.InputHTMLAttributes<HTMLInputElement>) => React.InputHTMLAttributes<HTMLInputElement>;
+  /** Upload a single file to server (for non-image files) */
+  handleFileUpload: (file: File, attachment: FileAttachment) => Promise<void>;
 }
 
 /**
- * Handle file upload to server
+ * Upload a single file to the server
  */
-async function handleFileUpload(
+async function uploadFileToServer(
   file: File,
   attachment: FileAttachment,
   authenticatedFetch: (url: string, options?: RequestInit) => Promise<Response>,
@@ -43,7 +45,7 @@ async function handleFileUpload(
   onAddFile?: (file: FileAttachment) => void
 ): Promise<void> {
   if (!authenticatedFetch) {
-    logger.error('[handleFileUpload] authenticatedFetch not available');
+    logger.error('[uploadFileToServer] authenticatedFetch not available');
     attachment.error = 'Upload service unavailable';
     onAddFile?.(attachment);
     return;
@@ -67,7 +69,7 @@ async function handleFileUpload(
 
     if (!response.ok) {
       const errorText = await response.text();
-      logger.error('[handleFileUpload] Upload failed:', response.status, errorText);
+      logger.error('[uploadFileToServer] Upload failed:', response.status, errorText);
       throw new Error(`Upload failed: ${response.status} ${errorText}`);
     }
 
@@ -77,7 +79,7 @@ async function handleFileUpload(
     // Update the existing file instead of adding a duplicate
     onAddFile?.(attachment);
   } catch (error) {
-    logger.error('[handleFileUpload] File upload error:', error);
+    logger.error('[uploadFileToServer] File upload error:', error);
     attachment.error = error instanceof Error ? error.message : 'Upload failed';
     // Update the existing file with error state
     onAddFile?.(attachment);
@@ -120,10 +122,18 @@ export function useFileUploadHandler({
         reader.readAsDataURL(file);
       } else {
         // For documents, upload to server and store path
-        handleFileUpload(file, attachment, authenticatedFetch!, selectedProject, onAddFile);
+        uploadFileToServer(file, attachment, authenticatedFetch!, selectedProject, onAddFile);
       }
     });
   }, [maxFileSize, onAddFile, authenticatedFetch, selectedProject]);
+
+  /**
+   * Upload a single file to server (for non-image files)
+   * Used by ChatInputActions file picker button.
+   */
+  const handleFileUploadCallback = useCallback((file: File, attachment: FileAttachment) => {
+    return uploadFileToServer(file, attachment, authenticatedFetch!, selectedProject, onAddFile);
+  }, [authenticatedFetch, selectedProject, onAddFile]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -146,5 +156,6 @@ export function useFileUploadHandler({
     isDragActive,
     getRootProps,
     getInputProps,
+    handleFileUpload: handleFileUploadCallback,
   };
 }
