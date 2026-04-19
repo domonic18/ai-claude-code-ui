@@ -1,20 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { WebSocketMessage } from '@/shared/types';
 import { logger } from '@/shared/utils/logger';
 import { connect, type WebSocketConnectionRefs } from './useWebSocketConnection';
-
-/**
- * Initialize WebSocket refs
- */
-function createWebSocketRefs(isEnabled: boolean): WebSocketConnectionRefs {
-  return {
-    wsRef: useRef<WebSocket | null>(null),
-    reconnectTimeoutRef: useRef<ReturnType<typeof setTimeout> | null>(null),
-    isConnectingRef: useRef<boolean>(false),
-    isUnmountedRef: useRef<boolean>(false),
-    isEnabledRef: useRef<boolean>(isEnabled),
-  };
-}
 
 export interface UseWebSocketResult {
   ws: WebSocket | null;
@@ -61,36 +48,65 @@ export function useWebSocket(isEnabled = true): UseWebSocketResult {
   const [messages, setMessages] = useState<WebSocketMessage[]>([]);
   const [isConnected, setIsConnected] = useState<boolean>(false);
 
-  const refs = createWebSocketRefs(isEnabled);
+  // Create refs directly in the hook — stable across renders
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isConnectingRef = useRef<boolean>(false);
+  const isUnmountedRef = useRef<boolean>(false);
+  const isEnabledRef = useRef<boolean>(isEnabled);
 
-  // Update ref when isEnabled changes
+  // Wrap in a stable object via useMemo so callbacks/effects don't re-run
+  const refs: WebSocketConnectionRefs = useMemo(() => ({
+    wsRef,
+    reconnectTimeoutRef,
+    isConnectingRef,
+    isUnmountedRef,
+    isEnabledRef,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), []);
+
+  // Update enabled ref when prop changes
   useEffect(() => {
     refs.isEnabledRef.current = isEnabled;
   }, [isEnabled, refs.isEnabledRef]);
 
-  // Memoized connect function
-  const connectCallback = useCallback(() => {
-    const callbacks = createConnectionCallbacks(setIsConnected, setWs, setMessages, refs.wsRef);
-    connect(refs, callbacks);
-  }, [refs]); // refs is stable
+  // Stable setState references via refs to avoid recreating callbacks
+  const stateRefs = useRef({ setIsConnected, setWs, setMessages });
+  stateRefs.current = { setIsConnected, setWs, setMessages };
 
-  // Connect/disconnect when isEnabled changes
+  // Memoized connect function — depends only on stable refs
+  const connectCallback = useCallback(() => {
+    const callbacks = createConnectionCallbacks(
+      stateRefs.current.setIsConnected,
+      stateRefs.current.setWs,
+      stateRefs.current.setMessages,
+      refs.wsRef
+    );
+    connect(refs, callbacks);
+  }, [refs]);
+
+  // Connect/disconnect — only re-run when isEnabled changes
   useEffect(() => {
     if (isEnabled) {
+      // Reset unmounted flag when intentionally connecting
+      refs.isUnmountedRef.current = false;
       connectCallback();
     }
 
     return () => {
       refs.isUnmountedRef.current = true;
+      refs.isConnectingRef.current = false;
       if (refs.reconnectTimeoutRef.current) {
         clearTimeout(refs.reconnectTimeoutRef.current);
         refs.reconnectTimeoutRef.current = null;
       }
       if (refs.wsRef.current) {
         refs.wsRef.current.close(1000, 'Component unmounted');
+        refs.wsRef.current = null;
       }
     };
-  }, [isEnabled, connectCallback, refs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEnabled]);
 
   const sendMessage = useCallback((message: any) => {
     if (refs.wsRef.current && refs.wsRef.current.readyState === WebSocket.OPEN) {
@@ -98,12 +114,10 @@ export function useWebSocket(isEnabled = true): UseWebSocketResult {
       logger.info('[WebSocket] Sent message:', message.type);
     } else {
       logger.warn('[WebSocket] Cannot send message: not connected. State:', {
-        wsState: ws?.readyState,
         wsRefState: refs.wsRef.current?.readyState,
-        isConnected
       });
     }
-  }, [isConnected, ws, refs.wsRef]);
+  }, [refs.wsRef]);
 
   return {
     ws,

@@ -176,7 +176,7 @@ export function useChatInputState({
   }, [disabled]);
 
   // File upload handling
-  const { isDragActive, getRootProps, getInputProps } = useFileUploadHandler({
+  const { isDragActive, getRootProps, getInputProps, handleFileUpload } = useFileUploadHandler({
     maxFileSize,
     onAddFile,
     authenticatedFetch,
@@ -191,6 +191,7 @@ export function useChatInputState({
     canSend,
     getRootProps,
     getInputProps,
+    handleFileUpload,
     ...inputHandlers,
   };
 }
