@@ -210,6 +210,25 @@ function checkCursorStatus() {
   });
 }
 
+/**
+ * 从 id_token JWT 中提取电子邮件
+ * @param {string} idToken - JWT token
+ * @returns {string} 提取的 email 或 'Authenticated'
+ */
+function extractEmailFromToken(idToken) {
+  if (!idToken) return 'Authenticated';
+  try {
+    const parts = idToken.split('.');
+    if (parts.length >= 2) {
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+      return payload.email || payload.user || 'Authenticated';
+    }
+  } catch {
+    // JWT 解码失败，使用回退
+  }
+  return 'Authenticated';
+}
+
 async function checkCodexCredentials() {
   try {
     const authPath = path.join(os.homedir(), '.codex', 'auth.json');
@@ -221,23 +240,7 @@ async function checkCodexCredentials() {
 
     // 检查有效令牌（id_token 或 access_token）
     if (tokens.id_token || tokens.access_token) {
-      // 尝试从 id_token JWT 负载中提取电子邮件
-      let email = 'Authenticated';
-      if (tokens.id_token) {
-        try {
-          // JWT 是 base64url 编码的：header.payload.signature
-          const parts = tokens.id_token.split('.');
-          if (parts.length >= 2) {
-            // 解码负载（第二部分）
-            const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-            email = payload.email || payload.user || 'Authenticated';
-          }
-        } catch {
-          // 如果 JWT 解码失败，使用回退
-          email = 'Authenticated';
-        }
-      }
-
+      const email = extractEmailFromToken(tokens.id_token);
       return {
         authenticated: true,
         email

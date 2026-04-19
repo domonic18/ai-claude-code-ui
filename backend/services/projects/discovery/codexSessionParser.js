@@ -12,6 +12,49 @@ import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('services/projects/discovery/codexSessionParser');
 
 /**
+ * 处理单条 JSONL entry，更新解析状态
+ * @param {Object} entry - 解析后的 JSON entry
+ * @param {Object} state - 可变的解析状态 { sessionMeta, lastTimestamp, lastUserMessage, messageCount }
+ */
+function processEntry(entry, state) {
+  if (entry.timestamp) {
+    state.lastTimestamp = entry.timestamp;
+  }
+
+  if (entry.type === 'session_meta' && entry.payload) {
+    state.sessionMeta = {
+      id: entry.payload.id,
+      cwd: entry.payload.cwd,
+      model: entry.payload.model || entry.payload.model_provider,
+      timestamp: entry.timestamp,
+      git: entry.payload.git
+    };
+  }
+
+  if (entry.type === 'event_msg' && entry.payload?.type === 'user_message') {
+    state.messageCount++;
+    if (entry.payload.message) {
+      state.lastUserMessage = entry.payload.message;
+    }
+  }
+
+  if (entry.type === 'response_item' && entry.payload?.type === 'message' && entry.payload.role === 'assistant') {
+    state.messageCount++;
+  }
+}
+
+/**
+ * 截断摘要文本到指定最大长度
+ * @param {string} text - 原始文本
+ * @param {number} maxLength - 最大长度
+ * @returns {string} 截断后的文本
+ */
+function truncateSummary(text, maxLength = 50) {
+  if (!text) return 'Codex Session';
+  return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+}
+
+/**
  * 解析 Codex 会话 JSONL 文件以提取元数据
  * @param {string} filePath - JSONL 文件路径
  * @returns {Promise<Object|null>} 会话元数据
@@ -24,59 +67,26 @@ export async function parseCodexSessionFile(filePath) {
       crlfDelay: Infinity
     });
 
-    let sessionMeta = null;
-    let lastTimestamp = null;
-    let lastUserMessage = null;
-    let messageCount = 0;
+    const state = { sessionMeta: null, lastTimestamp: null, lastUserMessage: null, messageCount: 0 };
 
     for await (const line of rl) {
-      if (line.trim()) {
-        try {
-          const entry = JSON.parse(line);
-
-          if (entry.timestamp) {
-            lastTimestamp = entry.timestamp;
-          }
-
-          if (entry.type === 'session_meta' && entry.payload) {
-            sessionMeta = {
-              id: entry.payload.id,
-              cwd: entry.payload.cwd,
-              model: entry.payload.model || entry.payload.model_provider,
-              timestamp: entry.timestamp,
-              git: entry.payload.git
-            };
-          }
-
-          if (entry.type === 'event_msg' && entry.payload?.type === 'user_message') {
-            messageCount++;
-            if (entry.payload.message) {
-              lastUserMessage = entry.payload.message;
-            }
-          }
-
-          if (entry.type === 'response_item' && entry.payload?.type === 'message' && entry.payload.role === 'assistant') {
-            messageCount++;
-          }
-
-        } catch (parseError) {
-          // Skip malformed lines
-        }
+      if (!line.trim()) continue;
+      try {
+        const entry = JSON.parse(line);
+        processEntry(entry, state);
+      } catch (_parseError) {
+        // Skip malformed lines
       }
     }
 
-    if (sessionMeta) {
-      return {
-        ...sessionMeta,
-        timestamp: lastTimestamp || sessionMeta.timestamp,
-        summary: lastUserMessage
-          ? (lastUserMessage.length > 50 ? lastUserMessage.substring(0, 50) + '...' : lastUserMessage)
-          : 'Codex Session',
-        messageCount
-      };
-    }
+    if (!state.sessionMeta) return null;
 
-    return null;
+    return {
+      ...state.sessionMeta,
+      timestamp: state.lastTimestamp || state.sessionMeta.timestamp,
+      summary: truncateSummary(state.lastUserMessage),
+      messageCount: state.messageCount
+    };
 
   } catch (error) {
     logger.error('Error parsing Codex session file:', error);

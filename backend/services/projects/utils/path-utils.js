@@ -25,10 +25,25 @@ function selectBestCwd(cwdCounts, latestCwd) {
   return latestCwd;
 }
 
+/**
+ * 处理单条 JSONL entry，更新 cwd 统计
+ * @param {Object} entry - 解析后的 entry
+ * @param {Map} cwdCounts - cwd 计数 Map
+ * @param {{latestTimestamp: number, latestCwd: string|null}} state - 状态
+ */
+function updateCwdFromEntry(entry, cwdCounts, state) {
+  if (!entry.cwd) return;
+  cwdCounts.set(entry.cwd, (cwdCounts.get(entry.cwd) || 0) + 1);
+  const ts = new Date(entry.timestamp || 0).getTime();
+  if (ts > state.latestTimestamp) {
+    state.latestTimestamp = ts;
+    state.latestCwd = entry.cwd;
+  }
+}
+
 async function scanJsonlForCwd(jsonlFiles, projectDir, projectName) {
   const cwdCounts = new Map();
-  let latestTimestamp = 0;
-  let latestCwd = null;
+  const state = { latestTimestamp: 0, latestCwd: null };
 
   for (const file of jsonlFiles) {
     const jsonlFile = path.join(projectDir, file);
@@ -38,17 +53,12 @@ async function scanJsonlForCwd(jsonlFiles, projectDir, projectName) {
     for await (const line of rl) {
       if (!line.trim()) continue;
       try {
-        const entry = JSON.parse(line);
-        if (entry.cwd) {
-          cwdCounts.set(entry.cwd, (cwdCounts.get(entry.cwd) || 0) + 1);
-          const ts = new Date(entry.timestamp || 0).getTime();
-          if (ts > latestTimestamp) { latestTimestamp = ts; latestCwd = entry.cwd; }
-        }
+        updateCwdFromEntry(JSON.parse(line), cwdCounts, state);
       } catch { /* skip malformed */ }
     }
   }
 
-  return selectBestCwd(cwdCounts, latestCwd) || decodeProjectName(projectName);
+  return selectBestCwd(cwdCounts, state.latestCwd) || decodeProjectName(projectName);
 }
 
 async function extractProjectDirectory(projectName) {

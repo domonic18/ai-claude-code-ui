@@ -74,10 +74,8 @@ async function parseJsonlMessages(filePath) {
       // Dispatch response_item entries to handlers
       if (entry.type === 'response_item' && entry.payload?.type) {
         const handler = PAYLOAD_HANDLERS.get(entry.payload.type);
-        if (handler) {
-          const result = handler(entry);
-          if (result) messages.push(result);
-        }
+        const result = handler?.(entry);
+        if (result) messages.push(result);
       }
     } catch {
       // Skip malformed lines

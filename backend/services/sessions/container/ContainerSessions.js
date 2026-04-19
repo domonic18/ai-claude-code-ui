@@ -126,35 +126,42 @@ function getProjectDir(projectName) {
  * @param {Map} allSessions - 所有会话 Map
  * @returns {Map} firstUserMsgId → { latestSession, allSessions }
  */
+/**
+ * 将会话添加到分组（新建或更新现有分组）
+ * @param {Map} sessionGroups - 分组 Map
+ * @param {string} firstUserMsgId - 首条用户消息 ID
+ * @param {Object} session - 会话对象
+ */
+function addToSessionGroup(sessionGroups, firstUserMsgId, session) {
+  if (!sessionGroups.has(firstUserMsgId)) {
+    sessionGroups.set(firstUserMsgId, {
+      latestSession: session,
+      allSessions: [session]
+    });
+    return;
+  }
+
+  const group = sessionGroups.get(firstUserMsgId);
+  group.allSessions.push(session);
+
+  if (new Date(session.lastActivity) > new Date(group.latestSession.lastActivity)) {
+    group.latestSession = session;
+  }
+}
+
 function buildSessionGroups(allEntries, allSessions) {
   const sessionGroups = new Map();
   const sessionToFirstUserMsgId = new Map();
 
   allEntries.forEach(entry => {
-    if (entry.sessionId && entry.type === 'user' && entry.parentUuid === null && entry.uuid) {
-      const firstUserMsgId = entry.uuid;
+    if (!(entry.sessionId && entry.type === 'user' && entry.parentUuid === null && entry.uuid)) return;
 
-      if (!sessionToFirstUserMsgId.has(entry.sessionId)) {
-        sessionToFirstUserMsgId.set(entry.sessionId, firstUserMsgId);
+    const firstUserMsgId = entry.uuid;
+    if (sessionToFirstUserMsgId.has(entry.sessionId)) return;
 
-        const session = allSessions.get(entry.sessionId);
-        if (session) {
-          if (!sessionGroups.has(firstUserMsgId)) {
-            sessionGroups.set(firstUserMsgId, {
-              latestSession: session,
-              allSessions: [session]
-            });
-          } else {
-            const group = sessionGroups.get(firstUserMsgId);
-            group.allSessions.push(session);
-
-            if (new Date(session.lastActivity) > new Date(group.latestSession.lastActivity)) {
-              group.latestSession = session;
-            }
-          }
-        }
-      }
-    }
+    sessionToFirstUserMsgId.set(entry.sessionId, firstUserMsgId);
+    const session = allSessions.get(entry.sessionId);
+    if (session) addToSessionGroup(sessionGroups, firstUserMsgId, session);
   });
 
   return sessionGroups;

@@ -84,21 +84,7 @@ export class ContainerCleanupManager {
         if (!knownIds.has(containerId)) {
           // 容器在 Docker 中存在但数据库中不存在 - 它是孤立的
           logger.warn(`[ContainerCleanup] Found orphaned container: ${containerName} (${containerId}), cleaning up`);
-
-          try {
-            const container = this.docker.getContainer(containerId);
-
-            // 停止并删除容器
-            if (containerInfo.State === 'running') {
-              await container.stop({ t: 5 });
-            }
-            await container.remove();
-
-            cleanedCount++;
-            logger.info(`[ContainerCleanup] Cleaned up orphaned container: ${containerName}`);
-          } catch (cleanupErr) {
-            logger.error(`[ContainerCleanup] Failed to clean up orphaned container ${containerName}:`, cleanupErr.message);
-          }
+          cleanedCount += await this._removeOrphanedContainer(containerInfo, containerId, containerName);
         }
       }
 
@@ -110,6 +96,29 @@ export class ContainerCleanupManager {
     } catch (error) {
       logger.error('[ContainerCleanup] Error during orphaned container cleanup:', error.message);
       return cleanedCount;
+    }
+  }
+
+  /**
+   * 停止并移除单个孤立容器
+   * @param {Object} containerInfo - Docker 容器信息
+   * @param {string} containerId - 容器 ID
+   * @param {string} containerName - 容器名称
+   * @returns {Promise<number>} 清理计数（1 或 0）
+   * @private
+   */
+  async _removeOrphanedContainer(containerInfo, containerId, containerName) {
+    try {
+      const container = this.docker.getContainer(containerId);
+      if (containerInfo.State === 'running') {
+        await container.stop({ t: 5 });
+      }
+      await container.remove();
+      logger.info(`[ContainerCleanup] Cleaned up orphaned container: ${containerName}`);
+      return 1;
+    } catch (cleanupErr) {
+      logger.error(`[ContainerCleanup] Failed to clean up orphaned container ${containerName}:`, cleanupErr.message);
+      return 0;
     }
   }
 

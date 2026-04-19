@@ -114,6 +114,21 @@ export function topologicalSort(allBlobs, parentRefs, blobMap) {
 }
 
 /**
+ * 检查 blob 数据中是否包含指定 jsonBlob 的 ID 引用
+ * @param {Object} blob - protobuf blob
+ * @param {Object} jsonBlob - JSON blob
+ * @returns {boolean} 是否包含引用
+ */
+function blobContainsJsonId(blob, jsonBlob) {
+    try {
+        const jsonIdBytes = Buffer.from(jsonBlob.id, 'hex');
+        return blob.data.includes(jsonIdBytes);
+    } catch {
+        return false;
+    }
+}
+
+/**
  * 根据拓扑排序结果建立 JSON blob 的出现顺序
  * @param {Array} sortedBlobs - 拓扑排序后的 blob
  * @param {Array} jsonBlobs - JSON blob 列表
@@ -124,18 +139,11 @@ export function buildMessageOrder(sortedBlobs, jsonBlobs) {
     let orderIndex = 0;
 
     for (const blob of sortedBlobs) {
-        if (blob.data && blob.data[0] !== 0x7B) {
-            for (const jsonBlob of jsonBlobs) {
-                try {
-                    const jsonIdBytes = Buffer.from(jsonBlob.id, 'hex');
-                    if (blob.data.includes(jsonIdBytes)) {
-                        if (!messageOrder.has(jsonBlob.id)) {
-                            messageOrder.set(jsonBlob.id, orderIndex++);
-                        }
-                    }
-                } catch {
-                    // 跳过无法转换的 ID
-                }
+        if (!blob.data || blob.data[0] === 0x7B) continue;
+
+        for (const jsonBlob of jsonBlobs) {
+            if (blobContainsJsonId(blob, jsonBlob) && !messageOrder.has(jsonBlob.id)) {
+                messageOrder.set(jsonBlob.id, orderIndex++);
             }
         }
     }

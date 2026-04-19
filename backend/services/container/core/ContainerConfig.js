@@ -39,47 +39,49 @@ export class ContainerConfigBuilder {
     return {
       name: name,
       Image: image,
-      // 关键配置：启用 TTY 和 stdin 以支持交互式 shell attach
-      // 这是使用 container.attach() 获取可写流的必要条件
       Tty: true,
       OpenStdin: true,
       AttachStdin: true,
       AttachStdout: true,
       AttachStderr: true,
-      // 容器主命令：交互式 shell
-      // 这样 container.attach() 可以获取到可写的 shell 流
-      // 每个用户有独立的容器，所以不会有多用户冲突
       Cmd: ['/bin/sh', '-c', 'exec /bin/sh -i 2>&1'],
       Env: this._buildEnvironment(userId, tier),
-      HostConfig: {
-        // 使用命名卷而不是 bind mount，支持 Docker-in-Docker 环境
-        // 格式：卷名:容器路径:选项
-        Binds: [
-          `${volumeName}:${CONTAINER.paths.workspace}:rw`,      // 用户工作区命名卷
-          '/var/run/docker.sock:/var/run/docker.sock:rw'        // Docker socket
-        ],
-        Memory: resourceLimits.memory,
-        CpuQuota: resourceLimits.cpuQuota,
-        CpuPeriod: resourceLimits.cpuPeriod,
-        NetworkMode: network,
-        ReadonlyRootfs: false,
-        // Seccomp 安全策略：直接传递 JSON 对象
-        Seccomp: this._loadSeccompProfile(),
-        // AppArmor 和其他安全选项
-        SecurityOpt: this._buildSecurityOptions(),
-        LogConfig: {
-          Type: 'json-file',
-          Config: {
-            'max-size': '10m',
-            'max-file': '3'
-          }
-        }
-      },
-      // 定义容器内的挂载点（Docker API 要求）
+      HostConfig: this._buildHostConfig(volumeName, resourceLimits, network),
       Volumes: {
         [CONTAINER.paths.workspace]: {}
       },
       Labels: this._buildLabels(userId, tier, volumeName)
+    };
+  }
+
+  /**
+   * 构建 Docker HostConfig
+   * @param {string} volumeName - 命名卷名称
+   * @param {Object} resourceLimits - 资源限制
+   * @param {string} network - 网络模式
+   * @returns {Object} Docker HostConfig
+   * @private
+   */
+  _buildHostConfig(volumeName, resourceLimits, network) {
+    return {
+      Binds: [
+        `${volumeName}:${CONTAINER.paths.workspace}:rw`,
+        '/var/run/docker.sock:/var/run/docker.sock:rw'
+      ],
+      Memory: resourceLimits.memory,
+      CpuQuota: resourceLimits.cpuQuota,
+      CpuPeriod: resourceLimits.cpuPeriod,
+      NetworkMode: network,
+      ReadonlyRootfs: false,
+      Seccomp: this._loadSeccompProfile(),
+      SecurityOpt: this._buildSecurityOptions(),
+      LogConfig: {
+        Type: 'json-file',
+        Config: {
+          'max-size': '10m',
+          'max-file': '3'
+        }
+      }
     };
   }
 
