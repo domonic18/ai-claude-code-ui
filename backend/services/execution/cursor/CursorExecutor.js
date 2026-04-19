@@ -1,242 +1,146 @@
 import { spawn } from 'child_process';
 import crossSpawn from 'cross-spawn';
-import { promises as fs } from 'fs';
-import path from 'path';
-import os from 'os';
 import { createLogger, sanitizePreview } from '../../../utils/logger.js';
 const logger = createLogger('services/execution/cursor/CursorExecutor');
 
-// 在 Windows 上使用 cross-spawn 以获得更好的命令执行
 const spawnFunction = process.platform === 'win32' ? crossSpawn : spawn;
+const activeCursorProcesses = new Map();
 
-let activeCursorProcesses = new Map(); // 按会话 ID 跟踪活动进程
+function buildCursorArgs(command, sessionId, model, skipPermissions, settings) {
+  const args = [];
+
+  if (sessionId) args.push('--resume=' + sessionId);
+  if (command && command.trim()) {
+    args.push('-p', command);
+    if (!sessionId && model) args.push('--model', model);
+    args.push('--output-format', 'stream-json');
+  }
+  if (skipPermissions || settings.skipPermissions) {
+    args.push('-f');
+    logger.info({ sessionId }, '[CursorExecutor] Using -f flag (skip permissions)');
+  }
+
+  return args;
+}
+
+function handleSystemInit(response, context) {
+  if (!response.session_id || context.capturedSessionId) return;
+  context.capturedSessionId = response.session_id;
+  logger.info({ sessionId: context.capturedSessionId }, '[CursorExecutor] Captured session ID');
+
+  if (context.processKey !== context.capturedSessionId) {
+    activeCursorProcesses.delete(context.processKey);
+    activeCursorProcesses.set(context.capturedSessionId, context.cursorProcess);
+  }
+
+  if (context.ws.setSessionId && typeof context.ws.setSessionId === 'function') {
+    context.ws.setSessionId(context.capturedSessionId);
+  }
+
+  if (!context.sessionId && !context.sessionCreatedSent) {
+    context.sessionCreatedSent = true;
+    context.ws.send({ type: 'session-created', sessionId: context.capturedSessionId, model: response.model, cwd: response.cwd });
+  }
+}
+
+function handleAssistantMessage(response, context) {
+  if (!response.message?.content?.length) return;
+  const textContent = response.message.content[0].text;
+  context.messageBuffer += textContent;
+  context.ws.send({
+    type: 'claude-response',
+    data: { type: 'content_block_delta', delta: { type: 'text_delta', text: textContent } },
+  });
+}
+
+function handleResultMessage(response, context) {
+  const sid = context.capturedSessionId || context.sessionId;
+  logger.info({ sessionId: sid, success: response.subtype === 'success' }, '[CursorExecutor] Session result');
+
+  if (context.messageBuffer) {
+    context.ws.send({ type: 'claude-response', data: { type: 'content_block_stop' } });
+  }
+
+  context.ws.send({ type: 'cursor-result', sessionId: sid, data: response, success: response.subtype === 'success' });
+}
+
+const RESPONSE_HANDLERS = {
+  system(response, context) {
+    if (response.subtype === 'init') {
+      handleSystemInit(response, context);
+      context.ws.send({ type: 'cursor-system', data: response });
+    }
+  },
+  user(response, context) {
+    context.ws.send({ type: 'cursor-user', data: response });
+  },
+  assistant(response, context) {
+    handleAssistantMessage(response, context);
+  },
+  result(response, context) {
+    handleResultMessage(response, context);
+  },
+};
+
+function processStdoutLine(line, context) {
+  try {
+    const response = JSON.parse(line);
+    logger.debug({ sessionId: context.sessionId, responseType: response.type, subtype: response.subtype }, '[CursorExecutor] Parsed response');
+    const handler = RESPONSE_HANDLERS[response.type];
+    if (handler) handler(response, context);
+    else context.ws.send({ type: 'cursor-response', data: response });
+  } catch {
+    logger.debug({ sessionId: context.sessionId, lineLength: line.length }, '[CursorExecutor] Non-JSON response');
+    context.ws.send({ type: 'cursor-output', data: line });
+  }
+}
 
 async function spawnCursor(command, options = {}, ws) {
   return new Promise(async (resolve, reject) => {
-    const { sessionId, projectPath, cwd, resume, toolsSettings, skipPermissions, model, images } = options;
-    let capturedSessionId = sessionId; // 在整个过程中跟踪会话 ID
-    let sessionCreatedSent = false; // 跟踪我们是否已经发送了 session-created 事件
-    let messageBuffer = ''; // 用于累积助手消息的缓冲区
-
-    // 使用前端传递的工具设置，或使用默认值
-    const settings = toolsSettings || {
-      allowedShellCommands: [],
-      skipPermissions: false
-    };
-
-    // 构建 Cursor CLI 命令
-    const args = [];
-
-    // 构建允许同时恢复和提示的标志（在现有会话中回复）
-    // 将 sessionId 的存在视为恢复的意图，无论 resume 标志如何
-    if (sessionId) {
-      args.push('--resume=' + sessionId);
-    }
-
-    if (command && command.trim()) {
-      // 提供提示（对新会话和恢复的会话都有效）
-      args.push('-p', command);
-
-      // 如果指定了模型标志，则添加（仅对新会话有意义；对恢复无影响）
-      if (!sessionId && model) {
-        args.push('--model', model);
-      }
-
-      // 当我们提供提示时，请求流式 JSON
-      args.push('--output-format', 'stream-json');
-    }
-
-    // 如果启用，则添加跳过权限标志
-    if (skipPermissions || settings.skipPermissions) {
-      args.push('-f');
-      logger.info({ sessionId }, '[CursorExecutor] Using -f flag (skip permissions)');
-    }
-
-    // 使用 cwd（实际项目目录）而不是 projectPath
+    const { sessionId, projectPath, cwd, toolsSettings, skipPermissions, model } = options;
+    const settings = toolsSettings || { allowedShellCommands: [], skipPermissions: false };
     const workingDir = cwd || projectPath || process.cwd();
 
-    logger.info({ sessionId, workingDir, resume: !!resume }, '[CursorExecutor] Spawning Cursor CLI');
+    const args = buildCursorArgs(command, sessionId, model, skipPermissions, settings);
+    logger.info({ sessionId, workingDir, resume: !!sessionId }, '[CursorExecutor] Spawning Cursor CLI');
     logger.debug({ sessionId, commandPreview: sanitizePreview(command), totalLength: command?.length || 0 }, '[CursorExecutor] User command');
-    
-    const cursorProcess = spawnFunction('cursor-agent', args, {
-      cwd: workingDir,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env } // 继承所有环境变量
-    });
 
-    // 存储进程引用以潜在地中止
-    const processKey = capturedSessionId || Date.now().toString();
+    const cursorProcess = spawnFunction('cursor-agent', args, { cwd: workingDir, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env } });
+
+    const processKey = sessionId || Date.now().toString();
     activeCursorProcesses.set(processKey, cursorProcess);
 
-    // 处理 stdout（流式 JSON 响应）
+    const context = {
+      sessionId, capturedSessionId: sessionId, sessionCreatedSent: false,
+      messageBuffer: '', processKey, cursorProcess, ws,
+    };
+
     cursorProcess.stdout.on('data', (data) => {
-      const rawOutput = data.toString();
-      logger.debug({ sessionId, outputLength: rawOutput.length }, '[CursorExecutor] stdout received');
-
-      const lines = rawOutput.split('\n').filter(line => line.trim());
-
-      for (const line of lines) {
-        try {
-          const response = JSON.parse(line);
-          logger.debug({ sessionId, responseType: response.type, subtype: response.subtype }, '[CursorExecutor] Parsed response');
-          
-          // 处理不同的消息类型
-          switch (response.type) {
-            case 'system':
-              if (response.subtype === 'init') {
-                // 捕获会话 ID
-                if (response.session_id && !capturedSessionId) {
-                  capturedSessionId = response.session_id;
-                  logger.info({ sessionId: capturedSessionId }, '[CursorExecutor] Captured session ID');
-
-                  // 使用捕获的会话 ID 更新进程键
-                  if (processKey !== capturedSessionId) {
-                    activeCursorProcesses.delete(processKey);
-                    activeCursorProcesses.set(capturedSessionId, cursorProcess);
-                  }
-
-                  // 在 writer 上设置会话 ID（用于 API 端点兼容性）
-                  if (ws.setSessionId && typeof ws.setSessionId === 'function') {
-                    ws.setSessionId(capturedSessionId);
-                  }
-
-                  // 仅为新会话发送一次 session-created 事件
-                  if (!sessionId && !sessionCreatedSent) {
-                    sessionCreatedSent = true;
-                    ws.send({
-                      type: 'session-created',
-                      sessionId: capturedSessionId,
-                      model: response.model,
-                      cwd: response.cwd
-                    });
-                  }
-                }
-
-                // 向前端发送系统信息
-                ws.send({
-                  type: 'cursor-system',
-                  data: response
-                });
-              }
-              break;
-
-            case 'user':
-              // 转发用户消息
-              ws.send({
-                type: 'cursor-user',
-                data: response
-              });
-              break;
-
-            case 'assistant':
-              // 累积助手消息块
-              if (response.message && response.message.content && response.message.content.length > 0) {
-                const textContent = response.message.content[0].text;
-                messageBuffer += textContent;
-
-                // 作为 Claude 兼容格式发送到前端
-                ws.send({
-                  type: 'claude-response',
-                  data: {
-                    type: 'content_block_delta',
-                    delta: {
-                      type: 'text_delta',
-                      text: textContent
-                    }
-                  }
-                });
-              }
-              break;
-
-            case 'result':
-              // 会话完成
-              logger.info({ sessionId: capturedSessionId || sessionId, success: response.subtype === 'success' }, '[CursorExecutor] Session result');
-
-              // 如果我们有缓冲内容，则发送最终消息
-              if (messageBuffer) {
-                ws.send({
-                  type: 'claude-response',
-                  data: {
-                    type: 'content_block_stop'
-                  }
-                });
-              }
-
-              // 发送完成事件
-              ws.send({
-                type: 'cursor-result',
-                sessionId: capturedSessionId || sessionId,
-                data: response,
-                success: response.subtype === 'success'
-              });
-              break;
-
-            default:
-              // 转发任何其他消息类型
-              ws.send({
-                type: 'cursor-response',
-                data: response
-              });
-          }
-        } catch (parseError) {
-          logger.debug({ sessionId, lineLength: line.length }, '[CursorExecutor] Non-JSON response');
-          // 如果不是 JSON，则作为原始文本发送
-          ws.send({
-            type: 'cursor-output',
-            data: line
-          });
-        }
-      }
+      const lines = data.toString().split('\n').filter(l => l.trim());
+      for (const line of lines) processStdoutLine(line, context);
     });
 
-    // 处理 stderr
     cursorProcess.stderr.on('data', (data) => {
-      logger.error({ sessionId: capturedSessionId || sessionId, stderr: data.toString().substring(0, 500) }, '[CursorExecutor] stderr');
-      ws.send({
-        type: 'cursor-error',
-        error: data.toString()
-      });
+      logger.error({ sessionId: context.capturedSessionId || sessionId, stderr: data.toString().substring(0, 500) }, '[CursorExecutor] stderr');
+      ws.send({ type: 'cursor-error', error: data.toString() });
     });
-    
-    // 处理进程完成
+
     cursorProcess.on('close', async (code) => {
-      const finalSessionId = capturedSessionId || sessionId || processKey;
+      const finalSessionId = context.capturedSessionId || processKey;
       logger.info({ sessionId: finalSessionId, exitCode: code }, '[CursorExecutor] Process exited');
-
-      // 清理进程引用
       activeCursorProcesses.delete(finalSessionId);
-
-      ws.send({
-        type: 'claude-complete',
-        sessionId: finalSessionId,
-        exitCode: code,
-        isNewSession: !sessionId && !!command // 指示这是一个新会话的标志
-      });
-
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(`Cursor CLI exited with code ${code}`));
-      }
+      ws.send({ type: 'claude-complete', sessionId: finalSessionId, exitCode: code, isNewSession: !sessionId && !!command });
+      code === 0 ? resolve() : reject(new Error(`Cursor CLI exited with code ${code}`));
     });
 
-    // 处理进程错误
     cursorProcess.on('error', (error) => {
-      const finalSessionId = capturedSessionId || sessionId || processKey;
+      const finalSessionId = context.capturedSessionId || processKey;
       logger.error({ sessionId: finalSessionId, err: error }, '[CursorExecutor] Process error');
-
-      // 错误时清理进程引用
       activeCursorProcesses.delete(finalSessionId);
-
-      ws.send({
-        type: 'cursor-error',
-        error: error.message
-      });
-
+      ws.send({ type: 'cursor-error', error: error.message });
       reject(error);
     });
 
-    // 关闭 stdin，因为 Cursor 不需要交互式输入
     cursorProcess.stdin.end();
   });
 }
@@ -260,9 +164,4 @@ function getActiveCursorSessions() {
   return Array.from(activeCursorProcesses.keys());
 }
 
-export {
-  spawnCursor,
-  abortCursorSession,
-  isCursorSessionActive,
-  getActiveCursorSessions
-};
+export { spawnCursor, abortCursorSession, isCursorSessionActive, getActiveCursorSessions };

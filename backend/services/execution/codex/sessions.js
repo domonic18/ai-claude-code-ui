@@ -1,9 +1,3 @@
-/**
- * Codex 会话解析
- *
- * 解析 Codex 的 JSONL 会话文件，提取会话元数据
- */
-
 import fsSync from 'fs';
 import { promises as fs } from 'fs';
 import readline from 'readline';
@@ -13,104 +7,74 @@ import { createLogger } from '../../../utils/logger.js';
 import { findJsonlFiles, isSessionInProject } from './sessionFileUtils.js';
 const logger = createLogger('services/execution/codex/sessions');
 
-/**
- * 解析 Codex 会话 JSONL 文件以提取元数据
- * @param {string} filePath - JSONL 文件路径
- * @returns {Promise<Object|null>} 会话元数据
- */
+function processEntry(entry, state) {
+  if (entry.timestamp) state.lastTimestamp = entry.timestamp;
+
+  if (entry.type === 'session_meta' && entry.payload) {
+    state.sessionMeta = {
+      id: entry.payload.id,
+      cwd: entry.payload.cwd,
+      model: entry.payload.model || entry.payload.model_provider,
+      timestamp: entry.timestamp,
+      git: entry.payload.git,
+    };
+  }
+
+  if (entry.type === 'event_msg' && entry.payload?.type === 'user_message') {
+    state.messageCount++;
+    if (entry.payload.message) state.lastUserMessage = entry.payload.message;
+  }
+
+  if (entry.type === 'response_item' && entry.payload?.type === 'message' && entry.payload.role === 'assistant') {
+    state.messageCount++;
+  }
+}
+
+function buildSummary(sessionMeta, lastTimestamp, lastUserMessage, messageCount) {
+  return {
+    ...sessionMeta,
+    timestamp: lastTimestamp || sessionMeta.timestamp,
+    summary: lastUserMessage
+      ? (lastUserMessage.length > 50 ? lastUserMessage.substring(0, 50) + '...' : lastUserMessage)
+      : 'Codex Session',
+    messageCount,
+  };
+}
+
 async function parseCodexSessionFile(filePath) {
   try {
     const fileStream = fsSync.createReadStream(filePath);
-    const rl = readline.createInterface({
-      input: fileStream,
-      crlfDelay: Infinity
-    });
+    const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
 
-    let sessionMeta = null;
-    let lastTimestamp = null;
-    let lastUserMessage = null;
-    let messageCount = 0;
+    const state = { sessionMeta: null, lastTimestamp: null, lastUserMessage: null, messageCount: 0 };
 
     for await (const line of rl) {
-      if (line.trim()) {
-        try {
-          const entry = JSON.parse(line);
-
-          // Track timestamp
-          if (entry.timestamp) {
-            lastTimestamp = entry.timestamp;
-          }
-
-          // Extract session metadata
-          if (entry.type === 'session_meta' && entry.payload) {
-            sessionMeta = {
-              id: entry.payload.id,
-              cwd: entry.payload.cwd,
-              model: entry.payload.model || entry.payload.model_provider,
-              timestamp: entry.timestamp,
-              git: entry.payload.git
-            };
-          }
-
-          // Count messages and extract user messages for summary
-          if (entry.type === 'event_msg' && entry.payload?.type === 'user_message') {
-            messageCount++;
-            if (entry.payload.message) {
-              lastUserMessage = entry.payload.message;
-            }
-          }
-
-          if (entry.type === 'response_item' && entry.payload?.type === 'message' && entry.payload.role === 'assistant') {
-            messageCount++;
-          }
-
-        } catch (parseError) {
-          // Skip malformed lines
-        }
-      }
+      if (!line.trim()) continue;
+      try {
+        processEntry(JSON.parse(line), state);
+      } catch { /* skip malformed lines */ }
     }
 
-    if (sessionMeta) {
-      return {
-        ...sessionMeta,
-        timestamp: lastTimestamp || sessionMeta.timestamp,
-        summary: lastUserMessage ?
-          (lastUserMessage.length > 50 ? lastUserMessage.substring(0, 50) + '...' : lastUserMessage) :
-          'Codex Session',
-        messageCount
-      };
-    }
-
-    return null;
-
+    return state.sessionMeta
+      ? buildSummary(state.sessionMeta, state.lastTimestamp, state.lastUserMessage, state.messageCount)
+      : null;
   } catch (error) {
     logger.error('Error parsing Codex session file:', error);
     return null;
   }
 }
 
-/**
- * 获取项目的 Codex 会话列表
- * @param {string} projectPath - 项目路径
- * @returns {Promise<Array>} Codex 会话列表
- */
 async function getCodexSessions(projectPath) {
   try {
     const codexSessionsDir = path.join(os.homedir(), '.codex', 'sessions');
-    const sessions = [];
-
-    try {
-      await fs.access(codexSessionsDir);
-    } catch (error) {
-      return [];
-    }
+    try { await fs.access(codexSessionsDir); } catch { return []; }
 
     const jsonlFiles = await findJsonlFiles(codexSessionsDir);
+    const sessions = [];
 
     for (const filePath of jsonlFiles) {
       try {
         const sessionData = await parseCodexSessionFile(filePath);
-
         if (sessionData && isSessionInProject(sessionData, projectPath)) {
           sessions.push({
             id: sessionData.id,
@@ -119,8 +83,8 @@ async function getCodexSessions(projectPath) {
             lastActivity: sessionData.timestamp ? new Date(sessionData.timestamp) : new Date(),
             cwd: sessionData.cwd,
             model: sessionData.model,
-            filePath: filePath,
-            provider: 'codex'
+            filePath,
+            provider: 'codex',
           });
         }
       } catch (error) {
@@ -130,18 +94,12 @@ async function getCodexSessions(projectPath) {
 
     sessions.sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
     return sessions.slice(0, 5);
-
   } catch (error) {
     logger.error('Error fetching Codex sessions:', error);
     return [];
   }
 }
 
-/**
- * 删除 Codex 会话
- * @param {string} sessionId - 会话 ID
- * @returns {Promise<boolean>} 是否成功删除
- */
 async function deleteCodexSession(sessionId) {
   try {
     const codexSessionsDir = path.join(os.homedir(), '.codex', 'sessions');
@@ -154,7 +112,6 @@ async function deleteCodexSession(sessionId) {
         return true;
       }
     }
-
     throw new Error(`Codex session file not found for session ${sessionId}`);
   } catch (error) {
     logger.error(`Error deleting Codex session ${sessionId}:`, error);
@@ -162,8 +119,4 @@ async function deleteCodexSession(sessionId) {
   }
 }
 
-export {
-  parseCodexSessionFile,
-  getCodexSessions,
-  deleteCodexSession
-};
+export { parseCodexSessionFile, getCodexSessions, deleteCodexSession };

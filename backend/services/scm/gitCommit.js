@@ -206,25 +206,24 @@ Generate the commit message:`;
  * @param {string} provider - AI 提供者
  * @returns {Promise<string>} AI 响应文本
  */
+function extractResponseText(data) {
+    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+    if (parsed.type === 'claude-response' && parsed.data) {
+        const message = parsed.data.message || parsed.data;
+        if (message.content && Array.isArray(message.content)) {
+            return message.content.filter(i => i.type === 'text' && i.text).map(i => i.text).join('');
+        }
+    }
+    if (parsed.type === 'cursor-output' && parsed.output) return parsed.output;
+    if (parsed.type === 'text' && parsed.text) return parsed.text;
+    return '';
+}
+
 async function queryAIProvider(prompt, projectPath, provider) {
     let responseText = '';
     const writer = {
         send: (data) => {
-            try {
-                const parsed = typeof data === 'string' ? JSON.parse(data) : data;
-                if (parsed.type === 'claude-response' && parsed.data) {
-                    const message = parsed.data.message || parsed.data;
-                    if (message.content && Array.isArray(message.content)) {
-                        for (const item of message.content) {
-                            if (item.type === 'text' && item.text) responseText += item.text;
-                        }
-                    }
-                } else if (parsed.type === 'cursor-output' && parsed.output) {
-                    responseText += parsed.output;
-                } else if (parsed.type === 'text' && parsed.text) {
-                    responseText += parsed.text;
-                }
-            } catch { /* ignore parse errors */ }
+            try { responseText += extractResponseText(data); } catch { /* ignore */ }
         },
         setSessionId: () => {},
     };

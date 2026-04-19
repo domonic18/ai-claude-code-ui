@@ -45,334 +45,242 @@ import {
 const logger = createLogger('routes/api/git');
 const router = express.Router();
 
+function gitHandler(handler, errorFormatter) {
+    return async (req, res) => {
+        try {
+            await handler(req, res);
+        } catch (error) {
+            logger.error(`Git ${req.path} error:`, error);
+            const formatted = errorFormatter
+                ? errorFormatter(error)
+                : { error: error.message };
+            res.status(500).json(formatted);
+        }
+    };
+}
+
+function formatGitStatusError(error) {
+    const isGitRepoError = error.message.includes('not a git repository')
+        || error.message.includes('Project directory is not a git repository');
+    return {
+        error: isGitRepoError ? error.message : 'Git operation failed',
+        details: error.message
+    };
+}
+
+function formatInitialCommitError(error) {
+    if (error.message.includes('already has commits')) {
+        return { status: 400, error: error.message };
+    }
+    if (error.message.includes('nothing to commit')) {
+        return { status: 400, error: 'Nothing to commit', details: 'No files found in the repository. Add some files first.' };
+    }
+    return { status: 500, error: error.message };
+}
+
+function formatFileWithDiffError(error) {
+    if (error.message.includes('Cannot show diff for directories')) {
+        return { status: 400, error: error.message };
+    }
+    return { status: 500, error: error.message };
+}
+
+function gitHandlerWithStatus(handler, statusErrorFormatter) {
+    return async (req, res) => {
+        try {
+            await handler(req, res);
+        } catch (error) {
+            logger.error(`Git ${req.path} error:`, error);
+            const result = statusErrorFormatter(error);
+            res.status(result.status || 500).json(result);
+        }
+    };
+}
+
 // ─── 状态查询路由 ──────────────────────────────────────
 
-/**
- * GET /status - 获取项目的 git 状态
- */
-router.get('/status', async (req, res) => {
-    const { project } = req.query;
-    if (!project) return res.status(400).json({ error: 'Project name is required' });
-
-    try {
+router.get('/status', gitHandler(
+    async (req, res) => {
+        const { project } = req.query;
+        if (!project) return res.status(400).json({ error: 'Project name is required' });
         const projectPath = await resolveProjectPath(project);
-        const result = await getStatus(projectPath);
-        res.json(result);
-    } catch (error) {
-        logger.error('Git status error:', error);
-        res.status(500).json({
-            error: error.message.includes('not a git repository') || error.message.includes('Project directory is not a git repository')
-                ? error.message : 'Git operation failed',
-            details: error.message
-        });
-    }
-});
+        res.json(await getStatus(projectPath));
+    },
+    formatGitStatusError
+));
 
-/**
- * GET /diff - 获取特定文件的 diff
- */
-router.get('/diff', async (req, res) => {
-    const { project, file } = req.query;
-    if (!project || !file) return res.status(400).json({ error: 'Project name and file path are required' });
-
-    try {
+router.get('/diff', gitHandler(
+    async (req, res) => {
+        const { project, file } = req.query;
+        if (!project || !file) return res.status(400).json({ error: 'Project name and file path are required' });
         const projectPath = await resolveProjectPath(project);
-        const diff = await getFileDiff(projectPath, file);
-        res.json({ diff });
-    } catch (error) {
-        logger.error('Git diff error:', error);
-        res.status(500).json({ error: error.message });
+        res.json({ diff: await getFileDiff(projectPath, file) });
     }
-});
+));
 
-/**
- * GET /file-with-diff - 获取文件内容和 diff 信息
- */
-router.get('/file-with-diff', async (req, res) => {
-    const { project, file } = req.query;
-    if (!project || !file) return res.status(400).json({ error: 'Project name and file path are required' });
-
-    try {
+router.get('/file-with-diff', gitHandlerWithStatus(
+    async (req, res) => {
+        const { project, file } = req.query;
+        if (!project || !file) return res.status(400).json({ error: 'Project name and file path are required' });
         const projectPath = await resolveProjectPath(project);
-        const result = await getFileWithDiff(projectPath, file);
-        res.json(result);
-    } catch (error) {
-        logger.error('Git file-with-diff error:', error);
-        if (error.message.includes('Cannot show diff for directories')) {
-            return res.status(400).json({ error: error.message });
-        }
-        res.status(500).json({ error: error.message });
-    }
-});
+        res.json(await getFileWithDiff(projectPath, file));
+    },
+    formatFileWithDiffError
+));
 
-/**
- * GET /branches - 获取分支列表
- */
-router.get('/branches', async (req, res) => {
-    const { project } = req.query;
-    if (!project) return res.status(400).json({ error: 'Project name is required' });
-
-    try {
+router.get('/branches', gitHandler(
+    async (req, res) => {
+        const { project } = req.query;
+        if (!project) return res.status(400).json({ error: 'Project name is required' });
         const projectPath = await resolveProjectPath(project);
-        const branches = await getBranches(projectPath);
-        res.json({ branches });
-    } catch (error) {
-        logger.error('Git branches error:', error);
-        res.status(500).json({ error: error.message });
+        res.json({ branches: await getBranches(projectPath) });
     }
-});
+));
 
-/**
- * GET /commits - 获取最近的提交
- */
-router.get('/commits', async (req, res) => {
-    const { project, limit = 10 } = req.query;
-    if (!project) return res.status(400).json({ error: 'Project name is required' });
-
-    const safeLimit = Math.min(Math.max(1, Number(limit) || 10), 500);
-
-    try {
+router.get('/commits', gitHandler(
+    async (req, res) => {
+        const { project, limit = 10 } = req.query;
+        if (!project) return res.status(400).json({ error: 'Project name is required' });
+        const safeLimit = Math.min(Math.max(1, Number(limit) || 10), 500);
         const projectPath = await resolveProjectPath(project);
-        const commits = await getCommits(projectPath, safeLimit);
-        res.json({ commits });
-    } catch (error) {
-        logger.error('Git commits error:', error);
-        res.status(500).json({ error: error.message });
+        res.json({ commits: await getCommits(projectPath, safeLimit) });
     }
-});
+));
 
-/**
- * GET /commit-diff - 获取特定提交的 diff
- */
-router.get('/commit-diff', async (req, res) => {
-    const { project, commit } = req.query;
-    if (!project || !commit) return res.status(400).json({ error: 'Project name and commit hash are required' });
-
-    try {
+router.get('/commit-diff', gitHandler(
+    async (req, res) => {
+        const { project, commit } = req.query;
+        if (!project || !commit) return res.status(400).json({ error: 'Project name and commit hash are required' });
         const projectPath = await resolveProjectPath(project);
-        const diff = await getCommitDiff(projectPath, commit);
-        res.json({ diff });
-    } catch (error) {
-        logger.error('Git commit diff error:', error);
-        res.status(500).json({ error: error.message });
+        res.json({ diff: await getCommitDiff(projectPath, commit) });
     }
-});
+));
 
-/**
- * GET /remote-status - 获取远程状态
- */
-router.get('/remote-status', async (req, res) => {
-    const { project } = req.query;
-    if (!project) return res.status(400).json({ error: 'Project name is required' });
-
-    try {
+router.get('/remote-status', gitHandler(
+    async (req, res) => {
+        const { project } = req.query;
+        if (!project) return res.status(400).json({ error: 'Project name is required' });
         const projectPath = await resolveProjectPath(project);
-        const result = await getRemoteStatus(projectPath);
-        res.json(result);
-    } catch (error) {
-        logger.error('Git remote status error:', error);
-        res.status(500).json({ error: error.message });
+        res.json(await getRemoteStatus(projectPath));
     }
-});
+));
 
 // ─── 提交操作路由 ──────────────────────────────────────
 
-/**
- * POST /initial-commit - 创建初始提交
- */
-router.post('/initial-commit', async (req, res) => {
-    const { project } = req.body;
-    if (!project) return res.status(400).json({ error: 'Project name is required' });
-
-    try {
+router.post('/initial-commit', gitHandlerWithStatus(
+    async (req, res) => {
+        const { project } = req.body;
+        if (!project) return res.status(400).json({ error: 'Project name is required' });
         const projectPath = await resolveProjectPath(project);
         const result = await createInitialCommit(projectPath);
         res.json({ success: true, ...result, message: 'Initial commit created successfully' });
-    } catch (error) {
-        logger.error('Git initial commit error:', error);
-        if (error.message.includes('already has commits')) return res.status(400).json({ error: error.message });
-        if (error.message.includes('nothing to commit')) return res.status(400).json({ error: 'Nothing to commit', details: 'No files found in the repository. Add some files first.' });
-        res.status(500).json({ error: error.message });
-    }
-});
+    },
+    formatInitialCommitError
+));
 
-/**
- * POST /commit - 提交更改
- */
-router.post('/commit', async (req, res) => {
-    const { project, message, files } = req.body;
-    if (!project || !message || !files || files.length === 0) {
-        return res.status(400).json({ error: 'Project name, commit message, and files are required' });
-    }
-
-    try {
+router.post('/commit', gitHandler(
+    async (req, res) => {
+        const { project, message, files } = req.body;
+        if (!project || !message || !files || files.length === 0) {
+            return res.status(400).json({ error: 'Project name, commit message, and files are required' });
+        }
         const projectPath = await resolveProjectPath(project);
-        const result = await commitFiles(projectPath, files, message);
-        res.json({ success: true, ...result });
-    } catch (error) {
-        logger.error('Git commit error:', error);
-        res.status(500).json({ error: error.message });
+        res.json({ success: true, ...await commitFiles(projectPath, files, message) });
     }
-});
+));
 
-/**
- * POST /generate-commit-message - AI 生成提交消息
- */
-router.post('/generate-commit-message', async (req, res) => {
-    const { project, files, provider = 'claude' } = req.body;
-    if (!project || !files || files.length === 0) return res.status(400).json({ error: 'Project name and files are required' });
-    if (!['claude', 'cursor'].includes(provider)) return res.status(400).json({ error: 'provider must be "claude" or "cursor"' });
-
-    try {
+router.post('/generate-commit-message', gitHandler(
+    async (req, res) => {
+        const { project, files, provider = 'claude' } = req.body;
+        if (!project || !files || files.length === 0) return res.status(400).json({ error: 'Project name and files are required' });
+        if (!['claude', 'cursor'].includes(provider)) return res.status(400).json({ error: 'provider must be "claude" or "cursor"' });
         const projectPath = await resolveProjectPath(project);
-        const message = await generateCommitMessage(projectPath, files, provider);
-        res.json({ message });
-    } catch (error) {
-        logger.error('Generate commit message error:', error);
-        res.status(500).json({ error: error.message });
+        res.json({ message: await generateCommitMessage(projectPath, files, provider) });
     }
-});
+));
 
 // ─── 分支操作路由 ──────────────────────────────────────
 
-/**
- * POST /checkout - 切换分支
- */
-router.post('/checkout', async (req, res) => {
-    const { project, branch } = req.body;
-    if (!project || !branch) return res.status(400).json({ error: 'Project name and branch are required' });
-
-    try {
+router.post('/checkout', gitHandler(
+    async (req, res) => {
+        const { project, branch } = req.body;
+        if (!project || !branch) return res.status(400).json({ error: 'Project name and branch are required' });
         const projectPath = await resolveProjectPath(project);
-        const result = await checkoutBranch(projectPath, branch);
-        res.json({ success: true, ...result });
-    } catch (error) {
-        logger.error('Git checkout error:', error);
-        res.status(500).json({ error: error.message });
+        res.json({ success: true, ...await checkoutBranch(projectPath, branch) });
     }
-});
+));
 
-/**
- * POST /create-branch - 创建新分支
- */
-router.post('/create-branch', async (req, res) => {
-    const { project, branch } = req.body;
-    if (!project || !branch) return res.status(400).json({ error: 'Project name and branch name are required' });
-
-    try {
+router.post('/create-branch', gitHandler(
+    async (req, res) => {
+        const { project, branch } = req.body;
+        if (!project || !branch) return res.status(400).json({ error: 'Project name and branch name are required' });
         const projectPath = await resolveProjectPath(project);
-        const result = await createBranch(projectPath, branch);
-        res.json({ success: true, ...result });
-    } catch (error) {
-        logger.error('Git create branch error:', error);
-        res.status(500).json({ error: error.message });
+        res.json({ success: true, ...await createBranch(projectPath, branch) });
     }
-});
+));
 
 // ─── 远程操作路由 ──────────────────────────────────────
 
-/**
- * POST /fetch - 从远程获取
- */
-router.post('/fetch', async (req, res) => {
-    const { project } = req.body;
-    if (!project) return res.status(400).json({ error: 'Project name is required' });
-
-    try {
+router.post('/fetch', gitHandler(
+    async (req, res) => {
+        const { project } = req.body;
+        if (!project) return res.status(400).json({ error: 'Project name is required' });
         const projectPath = await resolveProjectPath(project);
-        const result = await fetchFromRemote(projectPath);
-        res.json({ success: true, ...result });
-    } catch (error) {
-        logger.error('Git fetch error:', error);
-        res.status(500).json({ error: 'Fetch failed', details: classifyRemoteError(error) });
-    }
-});
+        res.json({ success: true, ...await fetchFromRemote(projectPath) });
+    },
+    (error) => ({ error: 'Fetch failed', details: classifyRemoteError(error) })
+));
 
-/**
- * POST /pull - 从远程拉取
- */
-router.post('/pull', async (req, res) => {
-    const { project } = req.body;
-    if (!project) return res.status(400).json({ error: 'Project name is required' });
-
-    try {
+router.post('/pull', gitHandler(
+    async (req, res) => {
+        const { project } = req.body;
+        if (!project) return res.status(400).json({ error: 'Project name is required' });
         const projectPath = await resolveProjectPath(project);
-        const result = await pullFromRemote(projectPath);
-        res.json({ success: true, ...result });
-    } catch (error) {
-        logger.error('Git pull error:', error);
-        res.status(500).json({ error: classifyPullError(error), details: classifyPullDetails(error) });
-    }
-});
+        res.json({ success: true, ...await pullFromRemote(projectPath) });
+    },
+    (error) => ({ error: classifyPullError(error), details: classifyPullDetails(error) })
+));
 
-/**
- * POST /push - 推送到远程
- */
-router.post('/push', async (req, res) => {
-    const { project } = req.body;
-    if (!project) return res.status(400).json({ error: 'Project name is required' });
-
-    try {
+router.post('/push', gitHandler(
+    async (req, res) => {
+        const { project } = req.body;
+        if (!project) return res.status(400).json({ error: 'Project name is required' });
         const projectPath = await resolveProjectPath(project);
-        const result = await pushToRemote(projectPath);
-        res.json({ success: true, ...result });
-    } catch (error) {
-        logger.error('Git push error:', error);
-        res.status(500).json({ error: classifyPushError(error), details: classifyPushDetails(error) });
-    }
-});
+        res.json({ success: true, ...await pushToRemote(projectPath) });
+    },
+    (error) => ({ error: classifyPushError(error), details: classifyPushDetails(error) })
+));
 
-/**
- * POST /publish - 发布分支到远程
- */
-router.post('/publish', async (req, res) => {
-    const { project, branch } = req.body;
-    if (!project || !branch) return res.status(400).json({ error: 'Project name and branch are required' });
-
-    try {
+router.post('/publish', gitHandler(
+    async (req, res) => {
+        const { project, branch } = req.body;
+        if (!project || !branch) return res.status(400).json({ error: 'Project name and branch are required' });
         const projectPath = await resolveProjectPath(project);
-        const result = await publishBranch(projectPath, branch);
-        res.json({ success: true, ...result });
-    } catch (error) {
-        logger.error('Git publish error:', error);
-        res.status(500).json({ error: classifyPublishError(error), details: classifyPublishDetails(error) });
-    }
-});
+        res.json({ success: true, ...await publishBranch(projectPath, branch) });
+    },
+    (error) => ({ error: classifyPublishError(error), details: classifyPublishDetails(error) })
+));
 
 // ─── 文件操作路由 ──────────────────────────────────────
 
-/**
- * POST /discard - 丢弃文件更改
- */
-router.post('/discard', async (req, res) => {
-    const { project, file } = req.body;
-    if (!project || !file) return res.status(400).json({ error: 'Project name and file path are required' });
-
-    try {
+router.post('/discard', gitHandler(
+    async (req, res) => {
+        const { project, file } = req.body;
+        if (!project || !file) return res.status(400).json({ error: 'Project name and file path are required' });
         const projectPath = await resolveProjectPath(project);
         await discardChanges(projectPath, file);
         res.json({ success: true, message: `Changes discarded for ${file}` });
-    } catch (error) {
-        logger.error('Git discard error:', error);
-        res.status(500).json({ error: error.message });
     }
-});
+));
 
-/**
- * POST /delete-untracked - 删除未跟踪的文件
- */
-router.post('/delete-untracked', async (req, res) => {
-    const { project, file } = req.body;
-    if (!project || !file) return res.status(400).json({ error: 'Project name and file path are required' });
-
-    try {
+router.post('/delete-untracked', gitHandler(
+    async (req, res) => {
+        const { project, file } = req.body;
+        if (!project || !file) return res.status(400).json({ error: 'Project name and file path are required' });
         const projectPath = await resolveProjectPath(project);
         const isDir = await deleteUntracked(projectPath, file);
         res.json({ success: true, message: `Untracked ${isDir ? 'directory' : 'file'} ${file} deleted successfully` });
-    } catch (error) {
-        logger.error('Git delete untracked error:', error);
-        res.status(500).json({ error: error.message });
     }
-});
+));
 
 export default router;

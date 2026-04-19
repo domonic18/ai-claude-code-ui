@@ -209,26 +209,45 @@ async function startServer() {
     await import('./index.js');
 }
 
-// 解析 CLI 参数
+const OPTION_DEFINITIONS = [
+    { flags: ['--port', '-p'], key: 'port', hasValue: true },
+    { flags: ['--database-path'], key: 'databasePath', hasValue: true },
+    { flags: ['--help', '-h'], key: 'help', command: 'help' },
+    { flags: ['--version', '-v'], key: 'version', command: 'version' },
+];
+
 function parseArgs(args) {
     const parsed = { command: 'start', options: {} };
 
     for (let i = 0; i < args.length; i++) {
         const arg = args[i];
+        let matched = false;
 
-        if (arg === '--port' || arg === '-p') {
-            parsed.options.port = args[++i];
-        } else if (arg.startsWith('--port=')) {
-            parsed.options.port = arg.split('=')[1];
-        } else if (arg === '--database-path') {
-            parsed.options.databasePath = args[++i];
-        } else if (arg.startsWith('--database-path=')) {
-            parsed.options.databasePath = arg.split('=')[1];
-        } else if (arg === '--help' || arg === '-h') {
-            parsed.command = 'help';
-        } else if (arg === '--version' || arg === '-v') {
-            parsed.command = 'version';
-        } else if (!arg.startsWith('-')) {
+        for (const def of OPTION_DEFINITIONS) {
+            if (def.flags.includes(arg)) {
+                if (def.hasValue) {
+                    parsed.options[def.key] = args[++i];
+                } else if (def.command) {
+                    parsed.command = def.command;
+                }
+                matched = true;
+                break;
+            }
+
+            for (const flag of def.flags) {
+                if (flag.startsWith('--') && arg.startsWith(flag + '=')) {
+                    if (def.hasValue) {
+                        parsed.options[def.key] = arg.split('=')[1];
+                    }
+                    matched = true;
+                    break;
+                }
+            }
+
+            if (matched) break;
+        }
+
+        if (!matched && !arg.startsWith('-')) {
             parsed.command = arg;
         }
     }

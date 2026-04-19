@@ -135,25 +135,7 @@ export class McpServer {
       const db = getDatabase();
       const now = new Date().toISOString();
 
-      const updates = [];
-      const values = [];
-
-      if (data.name !== undefined) {
-        updates.push('name = ?');
-        values.push(data.name);
-      }
-      if (data.type !== undefined) {
-        updates.push('type = ?');
-        values.push(data.type);
-      }
-      if (data.config !== undefined) {
-        updates.push('config = ?');
-        values.push(JSON.stringify(data.config));
-      }
-      if (data.enabled !== undefined) {
-        updates.push('enabled = ?');
-        values.push(data.enabled ? 1 : 0);
-      }
+      const { updates, values } = this._buildUpdateFields(data);
 
       if (updates.length === 0) {
         return await this.getById(id);
