@@ -15,8 +15,18 @@ export interface ImageViewerProps {
   onClose: () => void;
 }
 
-function ImageViewer({ file, onClose }: ImageViewerProps) {
-  const imagePath = `/api/projects/${file.projectName}/files/content?path=${encodeURIComponent(file.path)}`;
+interface ImageLoaderResult {
+  imageUrl: string | null;
+  error: string | null;
+  loading: boolean;
+}
+
+/**
+ * Custom hook to handle image loading with AbortController and cleanup
+ * @param {string} imagePath - The API path to fetch the image from
+ * @returns {ImageLoaderResult} - Object containing imageUrl, error, and loading state
+ */
+function useImageLoader(imagePath: string): ImageLoaderResult {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,6 +73,13 @@ function ImageViewer({ file, onClose }: ImageViewerProps) {
       }
     };
   }, [imagePath]);
+
+  return { imageUrl, error, loading };
+}
+
+function ImageViewer({ file, onClose }: ImageViewerProps) {
+  const imagePath = `/api/projects/${file.projectName}/files/content?path=${encodeURIComponent(file.path)}`;
+  const { imageUrl, error, loading } = useImageLoader(imagePath);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

@@ -55,57 +55,58 @@ interface ChatInputComponentProps extends Omit<ChatInputProps, 'files' | 'onAddF
   projectName?: string;
 }
 
+/** Default prop values to reduce destructuring boilerplate */
+const DEFAULT_INPUT_PROPS = {
+  value: '',
+  disabled: false,
+  isLoading: false,
+  sendByCtrlEnter: false,
+  maxFileSize: MAX_FILE_SIZE,
+  minRows: 1,
+  maxRows: 10,
+  projectName: '',
+  files: [],
+  // Command system defaults
+  commands: [],
+  frequentCommands: [],
+  commandMenuOpen: false,
+  commandQuery: '',
+  selectedCommandIndex: -1,
+  slashPosition: -1,
+  // File reference system defaults
+  fileReferences: [],
+  fileMenuOpen: false,
+  fileQuery: '',
+  selectedFileIndex: -1,
+  atPosition: -1,
+  filesLoading: false,
+};
+
 /**
  * ChatInput Component
  *
  * A multi-line text input with file attachment support and slash commands.
  * Refactored to use modular hooks for keyboard handling and menu positioning.
  */
-export function ChatInput({
-  value = '',
-  onChange,
-  onSend,
-  files = [],
-  onAddFile,
-  onRemoveFile,
-  disabled = false,
-  isLoading = false,
-  sendByCtrlEnter = false,
-  onFocusChange,
-  maxFileSize = MAX_FILE_SIZE,
-  placeholder,
-  minRows = 1,
-  maxRows = 10,
-  projectName = '',
-  // Command system props
-  commands = [],
-  frequentCommands = [],
-  commandMenuOpen = false,
-  commandQuery = '',
-  selectedCommandIndex = -1,
-  slashPosition = -1,
-  onCommandSelect,
-  onCommandMenuClose,
-  // File reference system props
-  fileReferences = [],
-  fileMenuOpen = false,
-  fileQuery = '',
-  selectedFileIndex = -1,
-  atPosition = -1,
-  onFileSelect,
-  onFileMenuClose,
-  filesLoading = false,
-  authenticatedFetch,
-  selectedProject,
-}: ChatInputComponentProps) {
+export function ChatInput(props: ChatInputComponentProps) {
   const { t } = useTranslation();
 
-  // Use custom hook for state management
+  // Merge props with defaults
   const {
-    textareaRef, isFocused, cursorPosition, isDragActive, canSend,
-    getRootProps, getInputProps, handleFocus, handleBlur,
-    handleFileUpload, handleRemoveFile, handleInputChange,
-  } = useChatInputState({
+    value, onChange, onSend, files, onAddFile, onRemoveFile,
+    disabled, isLoading, sendByCtrlEnter, onFocusChange,
+    maxFileSize, placeholder, minRows, maxRows, projectName,
+    // Command system props
+    commands, frequentCommands, commandMenuOpen, commandQuery,
+    selectedCommandIndex, slashPosition, onCommandSelect, onCommandMenuClose,
+    // File reference system props
+    fileReferences, fileMenuOpen, fileQuery, selectedFileIndex,
+    atPosition, onFileSelect, onFileMenuClose, filesLoading,
+    authenticatedFetch, selectedProject,
+  } = { ...DEFAULT_INPUT_PROPS, ...props };
+
+  // Use custom hook for state management
+  const state = useChatInputState({
     value, onChange, onSend, disabled, isLoading, sendByCtrlEnter,
     onFocusChange, maxFileSize, minRows, maxRows, projectName,
     onAddFile, onRemoveFile, authenticatedFetch, selectedProject,
@@ -113,43 +114,44 @@ export function ChatInput({
 
   // Setup keyboard and menu configuration
   const { handleKeyDown, menuProps } = useChatInputSetup({
-    textareaRef, sendByCtrlEnter, onSend, value, onChange, cursorPosition,
-    commandMenuOpen, commands, selectedCommandIndex, commandQuery, slashPosition,
-    onCommandSelect, onCommandMenuClose, fileMenuOpen, fileReferences,
-    selectedFileIndex, fileQuery, atPosition, onFileSelect, onFileMenuClose,
-    filesLoading, authenticatedFetch, selectedProject, frequentCommands,
+    textareaRef: state.textareaRef,
+    sendByCtrlEnter, onSend, value, onChange,
+    cursorPosition: state.cursorPosition,
+    commandMenuOpen, commands, selectedCommandIndex,
+    commandQuery, slashPosition, onCommandSelect, onCommandMenuClose,
+    fileMenuOpen, fileReferences, selectedFileIndex, fileQuery,
+    atPosition, onFileSelect, onFileMenuClose, filesLoading,
+    authenticatedFetch, selectedProject, frequentCommands,
   });
 
-  return (
-    <ChatInputWrapper
-      {...{
-        files,
-        handleRemoveFile,
-        getRootProps,
-        getInputProps,
-        isDragActive,
-        isFocused,
-        textareaRef,
-        value,
-        handleInputChange,
-        handleKeyDown,
-        handleFocus,
-        handleBlur,
-        placeholder: placeholder || t('chat.typeMessage'),
-        disabled,
-        isLoading,
-        minRows,
-        canSend,
-        onSend,
-        maxFileSize,
-        onAddFile,
-        handleFileUpload,
-        sendByCtrlEnter,
-        hasProject: !!selectedProject,
-        menuProps,
-      }}
-    />
-  );
+  const wrapperProps = {
+    files,
+    handleRemoveFile: state.handleRemoveFile,
+    getRootProps: state.getRootProps,
+    getInputProps: state.getInputProps,
+    isDragActive: state.isDragActive,
+    isFocused: state.isFocused,
+    textareaRef: state.textareaRef,
+    value,
+    handleInputChange: state.handleInputChange,
+    handleKeyDown,
+    handleFocus: state.handleFocus,
+    handleBlur: state.handleBlur,
+    placeholder: placeholder || t('chat.typeMessage'),
+    disabled,
+    isLoading,
+    minRows,
+    canSend: state.canSend,
+    onSend,
+    maxFileSize,
+    onAddFile,
+    handleFileUpload: state.handleFileUpload,
+    sendByCtrlEnter,
+    hasProject: !!selectedProject,
+    menuProps,
+  };
+
+  return <ChatInputWrapper {...wrapperProps} />;
 }
 
 export default ChatInput;

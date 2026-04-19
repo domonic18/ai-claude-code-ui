@@ -9,7 +9,7 @@
  * - Manages session loading and pagination
  */
 
-import React, { memo, useCallback, useState, useEffect, useRef } from 'react';
+import React, { memo, useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollArea } from '@/shared/components/ui/ScrollArea';
 import { formatTimeAgo, getAllSessions } from '../utils/timeFormatters';
@@ -17,6 +17,38 @@ import type { ProjectListProps, Project, Session, SessionProvider } from '../typ
 import { cn } from '../../../lib/utils';
 import SessionList from './SessionList';
 import { SKELETON_COUNT } from '../constants/sidebar.constants';
+
+/**
+ * Custom hook to track which projects have loaded their initial sessions
+ * @param projects - Array of projects to track
+ * @returns Set of project names that have loaded initial sessions
+ */
+function useInitialSessionTracking(projects: Project[]): Set<string> {
+  const [initialSessionsLoaded, setInitialSessionsLoaded] = useState<Set<string>>(new Set());
+  const prevProjectsRef = useRef<Project[]>([]);
+
+  useEffect(() => {
+    // Check if projects have actually changed by comparing project names
+    const prevNames = new Set(prevProjectsRef.current.map(p => p.name));
+    const currentNames = new Set(projects.map(p => p.name));
+
+    const hasChanged = projects.length !== prevProjectsRef.current.length ||
+                       !projects.every(p => prevNames.has(p.name));
+
+    if (hasChanged) {
+      const newLoaded = new Set<string>();
+      projects.forEach(project => {
+        // All projects should be marked as loaded when we receive them
+        // The sessions data (even if empty) has been loaded from the server
+        newLoaded.add(project.name);
+      });
+      setInitialSessionsLoaded(newLoaded);
+      prevProjectsRef.current = projects;
+    }
+  }, [projects]);
+
+  return initialSessionsLoaded;
+}
 
 /**
  * ProjectListItem - Renders a single project with its sessions
@@ -94,24 +126,11 @@ const ProjectListItem = memo(function ProjectListItem({
  */
 export const ProjectList = memo(function ProjectList({
   projects,
-  selectedProject,
   selectedSession,
-  expandedProjects,
-  starredProjects,
-  editingProject,
-  editingName,
   loadingSessions,
   hasMoreSessions,
   currentTime,
   isLoading,
-  onToggleProject,
-  onStartEditing,
-  onCancelEditing,
-  onSaveProjectName,
-  onSetEditingName,
-  onToggleStar,
-  onDeleteProject,
-  onSelectProject,
   onSessionClick,
   onDeleteSession,
   onUpdateSessionSummary,
@@ -123,71 +142,7 @@ export const ProjectList = memo(function ProjectList({
   onNewSession,
 }: ProjectListProps) {
   const { t } = useTranslation();
-
-  // Track initial sessions loaded state per project
-  const [initialSessionsLoaded, setInitialSessionsLoaded] = useState<Set<string>>(new Set());
-
-  // Use ref to track previous projects for deep comparison
-  const prevProjectsRef = useRef<Project[]>([]);
-
-  // Mark all projects as loaded when they come in (regardless of whether they have sessions)
-  useEffect(() => {
-    // Check if projects have actually changed by comparing project names
-    const prevNames = new Set(prevProjectsRef.current.map(p => p.name));
-    const currentNames = new Set(projects.map(p => p.name));
-
-    const hasChanged = projects.length !== prevProjectsRef.current.length ||
-                       !projects.every(p => prevNames.has(p.name));
-
-    if (hasChanged) {
-      const newLoaded = new Set<string>();
-      projects.forEach(project => {
-        // All projects should be marked as loaded when we receive them
-        // The sessions data (even if empty) has been loaded from the server
-        newLoaded.add(project.name);
-      });
-      setInitialSessionsLoaded(newLoaded);
-      prevProjectsRef.current = projects;
-    }
-  }, [projects]);
-
-  const handleSaveProjectName = useCallback(async (projectName: string, newName: string) => {
-    await onSaveProjectName(projectName, newName);
-  }, [onSaveProjectName]);
-
-  const handleToggleStar = useCallback((projectName: string) => {
-    onToggleStar(projectName);
-  }, [onToggleStar]);
-
-  const handleDeleteProject = useCallback((projectName: string) => {
-    onDeleteProject(projectName);
-  }, [onDeleteProject]);
-
-  const handleSelectProject = useCallback((project: Project) => {
-    onSelectProject(project);
-  }, [onSelectProject]);
-
-  const handleSessionClick = useCallback((session: Session, projectName: string) => {
-    onSessionClick(session, projectName);
-  }, [onSessionClick]);
-
-  const handleSessionDelete = useCallback(async (projectName: string, sessionId: string, provider?: SessionProvider) => {
-    await onDeleteSession(projectName, sessionId, provider);
-  }, [onDeleteSession]);
-
-  const handleSessionRename = useCallback(async (projectName: string, sessionId: string, summary: string) => {
-    await onUpdateSessionSummary(projectName, sessionId, summary);
-  }, [onUpdateSessionSummary]);
-
-  const handleLoadMoreSessions = useCallback(async (project: Project) => {
-    await onLoadMoreSessions(project);
-  }, [onLoadMoreSessions]);
-
-  const handleNewSession = useCallback((projectName: string) => {
-    if (onNewSession) {
-      onNewSession(projectName);
-    }
-  }, [onNewSession]);
+  const initialSessionsLoaded = useInitialSessionTracking(projects);
 
   return (
     <ScrollArea className="flex-1">
@@ -222,13 +177,13 @@ export const ProjectList = memo(function ProjectList({
               initialSessionsLoaded={initialSessionsLoaded.has(project.name)}
               editingSession={editingSession}
               editingSessionName={editingSessionName}
-              onSessionClick={handleSessionClick}
-              onSessionDelete={handleSessionDelete}
-              onSessionRename={handleSessionRename}
-              onLoadMoreSessions={handleLoadMoreSessions}
+              onSessionClick={onSessionClick}
+              onSessionDelete={onDeleteSession}
+              onSessionRename={onUpdateSessionSummary}
+              onLoadMoreSessions={onLoadMoreSessions}
               onSetEditingSession={onSetEditingSession}
               onSetEditingSessionName={onSetEditingSessionName}
-              onNewSession={handleNewSession}
+              onNewSession={onNewSession}
             />
           ))
         )}

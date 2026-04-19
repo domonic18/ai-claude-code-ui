@@ -188,29 +188,35 @@ function ProjectActions({
 }
 
 /**
+ * MobileProjectItem Component Props
+ *
+ * Props for the mobile version of the project item with expand button, project info, and actions.
+ */
+interface MobileProjectItemProps {
+  isSelected: boolean;
+  isStarred: boolean;
+  isExpanded: boolean;
+  isEditing: boolean;
+  editingName: string;
+  sessionCount: number;
+  hasMoreSessions: boolean;
+  handleExpandToggle: () => void;
+  handleKeyDown: (e: KeyboardEvent<HTMLInputElement>) => void;
+  project: ProjectCardProps['project'];
+  onSetEditingName: (name: string) => void;
+  onToggleExpand: () => void;
+  onSelect: () => void;
+  onSaveName: (name: string) => void;
+  onCancelEdit: () => void;
+  onToggleStar: () => void;
+  onStartEdit: () => void;
+  onDelete: () => void;
+}
+
+/**
  * MobileProjectItem Component
  *
  * Mobile version of the project item with expand button, project info, and actions.
- *
- * @param {Object} props - Component props
- * @param {boolean} props.isSelected - Whether project is selected
- * @param {boolean} props.isStarred - Whether project is starred
- * @param {boolean} props.isExpanded - Whether project is expanded
- * @param {boolean} props.isEditing - Whether project is being edited
- * @param {string} props.editingName - Current editing name value
- * @param {number} props.sessionCount - Number of sessions
- * @param {boolean} props.hasMoreSessions - Whether there are more sessions to load
- * @param {Function} props.handleExpandToggle - Handler to toggle expand/collapse
- * @param {Function} props.handleKeyDown - Keyboard handler for edit input
- * @param {Object} props.project - Project data
- * @param {Function} props.onSetEditingName - Handler to update editing name
- * @param {Function} props.onToggleExpand - Handler to toggle expand/collapse
- * @param {Function} props.onSelect - Handler to select project
- * @param {Function} props.onSaveName - Handler to save edited name
- * @param {Function} props.onCancelEdit - Handler to cancel editing
- * @param {Function} props.onToggleStar - Handler to toggle star status
- * @param {Function} props.onStartEdit - Handler to start editing
- * @param {Function} props.onDelete - Handler to delete project
  */
 function MobileProjectItem({
   isSelected,
@@ -231,26 +237,7 @@ function MobileProjectItem({
   onToggleStar,
   onStartEdit,
   onDelete,
-}: {
-  isSelected: boolean;
-  isStarred: boolean;
-  isExpanded: boolean;
-  isEditing: boolean;
-  editingName: string;
-  sessionCount: number;
-  hasMoreSessions: boolean;
-  handleExpandToggle: () => void;
-  handleKeyDown: (e: KeyboardEvent<HTMLInputElement>) => void;
-  project: ProjectCardProps['project'];
-  onSetEditingName: (name: string) => void;
-  onToggleExpand: () => void;
-  onSelect: () => void;
-  onSaveName: (name: string) => void;
-  onCancelEdit: () => void;
-  onToggleStar: () => void;
-  onStartEdit: () => void;
-  onDelete: () => void;
-}) {
+}: MobileProjectItemProps) {
   return (
     <div
       className={cn(

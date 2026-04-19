@@ -56,6 +56,122 @@ export interface UseMessageSenderResult {
 }
 
 /**
+ * Build user message object from content and files
+ * @param content - Message content
+ * @param files - Attached files
+ * @returns User message object
+ */
+function buildUserMessage(content: string, files: FileAttachment[]): ChatMessage {
+  // Convert image files to images array for display in UserMessage
+  const images = files
+    .filter(f => f.type?.startsWith('image/'))
+    .map(f => ({
+      name: f.name,
+      data: f.data || '',
+      type: f.type
+    }));
+
+  // Non-image files keep as files array
+  const documentFiles = files.filter(f => !f.type?.startsWith('image/'));
+
+  return {
+    id: `user-${Date.now()}`,
+    type: 'user',
+    content,
+    timestamp: Date.now(),
+    images: images.length > 0 ? images : undefined,
+    files: documentFiles.length > 0 ? documentFiles : undefined,
+  };
+}
+
+/**
+ * Send WebSocket message with command and attachments
+ * @param sendMessage - WebSocket send function
+ * @param content - Message content
+ * @param files - Attached files
+ * @param currentSessionId - Current session ID
+ * @param selectedProject - Selected project
+ * @param selectedModel - Selected model
+ * @param permissionMode - Permission mode
+ * @param onSessionProcessing - Session processing callback
+ */
+function sendWebSocketMessage(
+  sendMessage: (message: any) => void,
+  content: string,
+  files: FileAttachment[],
+  currentSessionId: string | null,
+  selectedProject?: { name: string },
+  selectedModel?: string,
+  permissionMode?: PermissionMode,
+  onSessionProcessing?: (sessionId: string) => void
+) {
+  // Create temporary session ID if needed
+  const sessionId = currentSessionId || `temp-${Date.now()}`;
+
+  // Send message in the format expected by the backend
+  sendMessage({
+    type: 'claude-command',
+    command: content,
+    attachments: files.length > 0 ? files : undefined,
+    options: {
+      projectPath: selectedProject?.name,
+      sessionId,
+      model: selectedModel,
+      resume: !!currentSessionId,
+      permissionMode,
+    },
+  });
+
+  onSessionProcessing?.(sessionId);
+}
+
+/**
+ * Clear input state and draft storage
+ * @param input - Current input value
+ * @param selectedProject - Selected project
+ * @param onSetInput - Set input callback
+ * @param onSetAttachedFiles - Set attached files callback
+ */
+function clearInputState(
+  input: string,
+  selectedProject: { name: string } | undefined,
+  onSetInput: (value: string) => void,
+  onSetAttachedFiles: (files: FileAttachment[]) => void
+) {
+  // Clear input and attachments
+  onSetInput('');
+  onSetAttachedFiles([]);
+
+  // Clear draft from localStorage to prevent it from being restored on refresh/session switch
+  if (selectedProject?.name) {
+    const draftKey = STORAGE_KEYS.DRAFT_INPUT(selectedProject.name);
+    localStorage.removeItem(draftKey);
+  }
+}
+
+/**
+ * Prepare message sending: mark session active, set loading, start stream
+ * @param currentSessionId - Current session ID
+ * @param onSessionActive - Session active callback
+ * @param onSetLoading - Set loading callback
+ * @param onStartStream - Start stream callback
+ */
+function prepareMessageSending(
+  currentSessionId: string | null,
+  onSessionActive?: (sessionId: string) => void,
+  onSetLoading?: (loading: boolean) => void,
+  onStartStream?: () => void
+) {
+  // Mark session as active
+  if (currentSessionId) {
+    onSessionActive?.(currentSessionId);
+  }
+
+  onSetLoading?.(true);
+  onStartStream?.();
+}
+
+/**
  * Hook for handling message sending
  *
  * @param options - Hook options
@@ -81,77 +197,34 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
     permissionMode,
   } = options;
 
-  /**
-   * Handle send message
-   */
   const handleSend = useCallback(async () => {
     if (!input.trim() || isLoading) return;
 
     const content = input.trim();
     const files = attachedFiles;
 
-    // Clear input and attachments
-    onSetInput('');
-    onSetAttachedFiles([]);
+    // Clear input state
+    clearInputState(input, selectedProject, onSetInput, onSetAttachedFiles);
 
-    // Clear draft from localStorage to prevent it from being restored on refresh/session switch
-    if (selectedProject?.name) {
-      const draftKey = STORAGE_KEYS.DRAFT_INPUT(selectedProject.name);
-      localStorage.removeItem(draftKey);
-    }
+    // Prepare message sending
+    prepareMessageSending(currentSessionId, onSessionActive, onSetLoading, onStartStream);
 
-    // Mark session as active
-    if (currentSessionId) {
-      onSessionActive?.(currentSessionId);
-    }
-
-    onSetLoading(true);
-    onStartStream();
-
-    // Convert image files to images array for display in UserMessage
-    const images = files
-      .filter(f => f.type?.startsWith('image/'))
-      .map(f => ({
-        name: f.name,
-        data: f.data || '',
-        type: f.type
-      }));
-
-    // Non-image files keep as files array
-    const documentFiles = files.filter(f => !f.type?.startsWith('image/'));
-
-    // Add user message
-    const userMessage: ChatMessage = {
-      id: `user-${Date.now()}`,
-      type: 'user',
-      content,
-      timestamp: Date.now(),
-      images: images.length > 0 ? images : undefined,
-      files: documentFiles.length > 0 ? documentFiles : undefined,
-    };
-
+    // Build and add user message
+    const userMessage = buildUserMessage(content, files);
     onAddMessage(userMessage);
 
     // Send via WebSocket
     if (sendMessage && ws) {
-      // Create temporary session ID if needed
-      const sessionId = currentSessionId || `temp-${Date.now()}`;
-
-      // Send message in the format expected by the backend
-      sendMessage({
-        type: 'claude-command',
-        command: content,
-        attachments: files.length > 0 ? files : undefined,
-        options: {
-          projectPath: selectedProject?.name,
-          sessionId,
-          model: selectedModel,
-          resume: !!currentSessionId,
-          permissionMode,
-        },
-      });
-
-      onSessionProcessing?.(sessionId);
+      sendWebSocketMessage(
+        sendMessage,
+        content,
+        files,
+        currentSessionId,
+        selectedProject,
+        selectedModel,
+        permissionMode,
+        onSessionProcessing
+      );
     }
   }, [
     input,
@@ -172,9 +245,7 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
     permissionMode,
   ]);
 
-  return {
-    handleSend,
-  };
+  return { handleSend };
 }
 
 export default useMessageSender;

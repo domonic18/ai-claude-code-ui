@@ -93,27 +93,139 @@ async function markTourCompletedOnBackend(): Promise<void> {
 }
 
 /**
- * Hook for managing product tour state
+ * Check and set tour status for a user
+ * Handles localStorage migration, backend checks, and auto-triggering
  *
- * @param totalSteps - Total number of tour steps
- * @returns Tour state and control functions
+ * @param userId - User ID to check tour status for
+ * @param storageKey - Per-user localStorage key
+ * @param callbacks - State setters and ref for tour status
+ * @param callbacks.setIsTourActive - Set tour active state
+ * @param callbacks.setHasCompletedTour - Set completed state
+ * @param callbacks.lastResolvedUserIdRef - Ref tracking last resolved user
+ * @returns Cleanup function to cancel async operations
  */
-export function useProductTour(totalSteps: number): UseProductTourResult {
-  const { user } = useAuth();
-  const userId = user?.id;
+async function checkAndSetTourStatus(
+  userId: string,
+  storageKey: string,
+  callbacks: {
+    setIsTourActive: (active: boolean) => void;
+    setHasCompletedTour: (completed: boolean) => void;
+    lastResolvedUserIdRef: React.MutableRefObject<string | null>;
+  }
+): Promise<() => void> {
+  const { setIsTourActive, setHasCompletedTour, lastResolvedUserIdRef } = callbacks;
+  let cancelled = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
 
-  const [isTourActive, setIsTourActive] = useState(false);
-  const [hasCompletedTour, setHasCompletedTour] = useState(false);
-  const [currentStep, setCurrentStep] = useState(0);
-  // Track the last userId whose tour status was fully resolved.
-  // Only set after async checks complete to prevent re-triggering on re-renders.
-  const lastResolvedUserId = useRef<string | null>(null);
+  // Migration: clean up legacy global key from old version
+  // Old code used 'product_tour_completed' (no userId suffix).
+  // If it exists, remove it so it doesn't interfere with per-user checks.
+  const legacyKey = TOUR_COMPLETED_KEY_PREFIX;
+  if (localStorage.getItem(legacyKey) !== null) {
+    localStorage.removeItem(legacyKey);
+  }
 
-  // Check tour status when userId changes (login/switch user)
-  useEffect(() => {
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
+  // First check per-user localStorage for fast response
+  const localCompleted = localStorage.getItem(storageKey) === 'true';
 
+  if (localCompleted) {
+    if (!cancelled) {
+      setHasCompletedTour(true);
+      lastResolvedUserIdRef.current = userId;
+    }
+    return () => { cancelled = true; };
+  }
+
+  // Then check backend API (per-user in DB, uses HttpOnly cookie)
+  const backendCompleted = await fetchTourStatusFromBackend();
+
+  if (cancelled) return () => {};
+
+  if (backendCompleted) {
+    setHasCompletedTour(true);
+    localStorage.setItem(storageKey, 'true');
+    lastResolvedUserIdRef.current = userId;
+    return () => { cancelled = true; };
+  }
+
+  // Tour not completed - auto-trigger after delay
+  timer = setTimeout(() => {
+    if (cancelled) return;
+    setIsTourActive(true);
+    lastResolvedUserIdRef.current = userId;
+  }, 800);
+
+  // Cleanup function
+  return () => {
+    cancelled = true;
+    if (timer) clearTimeout(timer);
+  };
+}
+
+/**
+ * Create start tour callback
+ */
+function createStartTourCallback(
+  userId: string | undefined,
+  setCurrentStep: (step: number) => void,
+  setIsTourActive: (active: boolean) => void,
+  lastResolvedUserId: React.MutableRefObject<string | null>
+) {
+  return useCallback(() => {
+    // Clear persisted completion state so tour can re-trigger
+    if (userId) {
+      const storageKey = getTourStorageKey(userId);
+      localStorage.removeItem(storageKey);
+    }
+    // Also clean up legacy global key if present
+    localStorage.removeItem(TOUR_COMPLETED_KEY_PREFIX);
+
+    setCurrentStep(0);
+    setIsTourActive(true);
+    lastResolvedUserId.current = userId ?? null;
+  }, [userId, setCurrentStep, setIsTourActive, lastResolvedUserId]);
+}
+
+/**
+ * Create complete tour callback
+ */
+function createCompleteTourCallback(
+  userId: string | undefined,
+  setIsTourActive: (active: boolean) => void,
+  setHasCompletedTour: (completed: boolean) => void,
+  setCurrentStep: (step: number) => void,
+  lastResolvedUserId: React.MutableRefObject<string | null>
+) {
+  return useCallback(() => {
+    setIsTourActive(false);
+    setHasCompletedTour(true);
+    setCurrentStep(0);
+
+    // Persist to per-user localStorage and backend
+    if (userId) {
+      const storageKey = getTourStorageKey(userId);
+      localStorage.setItem(storageKey, 'true');
+    }
+    lastResolvedUserId.current = userId;
+    markTourCompletedOnBackend();
+  }, [userId, setIsTourActive, setHasCompletedTour, setCurrentStep, lastResolvedUserId]);
+}
+
+/**
+ * Setup tour status checking effect
+ * @returns Effect cleanup function or undefined
+ */
+function useTourStatusEffect(
+  userId: string | undefined,
+  isTourActive: boolean,
+  hasCompletedTour: boolean,
+  currentStep: number,
+  lastResolvedUserId: React.MutableRefObject<string | null>,
+  setIsTourActive: (active: boolean) => void,
+  setHasCompletedTour: (completed: boolean) => void,
+  setCurrentStep: (step: number) => void
+) {
+  return useEffect(() => {
     // No user → reset everything
     if (!userId) {
       setIsTourActive(false);
@@ -133,88 +245,55 @@ export function useProductTour(totalSteps: number): UseProductTourResult {
 
     const storageKey = getTourStorageKey(userId);
 
-    const checkTourStatus = async () => {
-      // Migration: clean up legacy global key from old version
-      // Old code used 'product_tour_completed' (no userId suffix).
-      // If it exists, remove it so it doesn't interfere with per-user checks.
-      const legacyKey = TOUR_COMPLETED_KEY_PREFIX;
-      if (localStorage.getItem(legacyKey) !== null) {
-        localStorage.removeItem(legacyKey);
-      }
+    let cleanup: (() => void) | undefined;
 
-      // First check per-user localStorage for fast response
-      const localCompleted = localStorage.getItem(storageKey) === 'true';
+    checkAndSetTourStatus(userId, storageKey, {
+      setIsTourActive,
+      setHasCompletedTour,
+      lastResolvedUserIdRef: lastResolvedUserId,
+    }).then((cleanupFn) => {
+      cleanup = cleanupFn;
+    });
 
-      if (localCompleted) {
-        if (!cancelled) {
-          setHasCompletedTour(true);
-          lastResolvedUserId.current = userId;
-        }
-        return;
-      }
-
-      // Then check backend API (per-user in DB, uses HttpOnly cookie)
-      const backendCompleted = await fetchTourStatusFromBackend();
-
-      if (cancelled) return;
-
-      if (backendCompleted) {
-        setHasCompletedTour(true);
-        localStorage.setItem(storageKey, 'true');
-        lastResolvedUserId.current = userId;
-        return;
-      }
-
-      // Tour not completed - auto-trigger after delay
-      timer = setTimeout(() => {
-        if (cancelled) return;
-        setIsTourActive(true);
-        lastResolvedUserId.current = userId;
-      }, 800);
-    };
-
-    checkTourStatus();
-
-    // Cleanup: mark as cancelled so stale async callbacks bail out.
-    // Under StrictMode, the first mount's cleanup sets cancelled=true,
-    // so its async results are discarded. The second mount runs fresh.
+    // Cleanup function will be called by the returned cleanup from checkAndSetTourStatus
     return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
+      if (cleanup) cleanup();
     };
-  }, [userId]);
+  }, [userId, setIsTourActive, setHasCompletedTour, setCurrentStep, lastResolvedUserId]);
+}
 
-  /**
-   * Start the tour from scratch.
-   * Clears any persisted completion state so the tour can be re-triggered.
-   */
-  const startTour = useCallback(() => {
-    // Clear persisted completion state so tour can re-trigger
-    if (userId) {
-      const storageKey = getTourStorageKey(userId);
-      localStorage.removeItem(storageKey);
-    }
-    // Also clean up legacy global key if present
-    localStorage.removeItem(TOUR_COMPLETED_KEY_PREFIX);
+/**
+ * Hook for managing product tour state
+ *
+ * @param totalSteps - Total number of tour steps
+ * @returns Tour state and control functions
+ */
+export function useProductTour(totalSteps: number): UseProductTourResult {
+  const { user } = useAuth();
+  const userId = user?.id;
 
-    setCurrentStep(0);
-    setIsTourActive(true);
-    lastResolvedUserId.current = userId ?? null;
-  }, [userId]);
+  const [isTourActive, setIsTourActive] = useState(false);
+  const [hasCompletedTour, setHasCompletedTour] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  // Track the last userId whose tour status was fully resolved.
+  // Only set after async checks complete to prevent re-triggering on re-renders.
+  const lastResolvedUserId = useRef<string | null>(null);
 
-  const completeTour = useCallback(() => {
-    setIsTourActive(false);
-    setHasCompletedTour(true);
-    setCurrentStep(0);
+  // Check tour status when userId changes (login/switch user)
+  useTourStatusEffect(
+    userId,
+    isTourActive,
+    hasCompletedTour,
+    currentStep,
+    lastResolvedUserId,
+    setIsTourActive,
+    setHasCompletedTour,
+    setCurrentStep
+  );
 
-    // Persist to per-user localStorage and backend
-    if (userId) {
-      const storageKey = getTourStorageKey(userId);
-      localStorage.setItem(storageKey, 'true');
-    }
-    lastResolvedUserId.current = userId;
-    markTourCompletedOnBackend();
-  }, [userId]);
+  // Create tour control callbacks
+  const startTour = createStartTourCallback(userId, setCurrentStep, setIsTourActive, lastResolvedUserId);
+  const completeTour = createCompleteTourCallback(userId, setIsTourActive, setHasCompletedTour, setCurrentStep, lastResolvedUserId);
 
   /**
    * Advance to next step.

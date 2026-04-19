@@ -106,6 +106,45 @@ async function checkClaudeCredentials() {
   }
 }
 
+/**
+ * Parse Cursor CLI status output
+ * @param {string} stdout - Standard output from cursor-agent
+ * @param {number} code - Exit code
+ * @param {string} stderr - Standard error output
+ * @returns {Object} Parsed status result
+ */
+function parseCursorStatusOutput(stdout, code, stderr) {
+  if (code === 0) {
+    const emailMatch = stdout.match(/Logged in as ([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
+
+    if (emailMatch) {
+      return {
+        authenticated: true,
+        email: emailMatch[1],
+        output: stdout
+      };
+    } else if (stdout.includes('Logged in')) {
+      return {
+        authenticated: true,
+        email: 'Logged in',
+        output: stdout
+      };
+    } else {
+      return {
+        authenticated: false,
+        email: null,
+        error: 'Not logged in'
+      };
+    }
+  } else {
+    return {
+      authenticated: false,
+      email: null,
+      error: stderr || 'Not logged in'
+    };
+  }
+}
+
 function checkCursorStatus() {
   return new Promise((resolve) => {
     let processCompleted = false;
@@ -154,35 +193,7 @@ function checkCursorStatus() {
       processCompleted = true;
       clearTimeout(timeout);
 
-      if (code === 0) {
-        const emailMatch = stdout.match(/Logged in as ([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
-
-        if (emailMatch) {
-          resolve({
-            authenticated: true,
-            email: emailMatch[1],
-            output: stdout
-          });
-        } else if (stdout.includes('Logged in')) {
-          resolve({
-            authenticated: true,
-            email: 'Logged in',
-            output: stdout
-          });
-        } else {
-          resolve({
-            authenticated: false,
-            email: null,
-            error: 'Not logged in'
-          });
-        }
-      } else {
-        resolve({
-          authenticated: false,
-          email: null,
-          error: stderr || 'Not logged in'
-        });
-      }
+      resolve(parseCursorStatusOutput(stdout, code, stderr));
     });
 
     childProcess.on('error', (err) => {

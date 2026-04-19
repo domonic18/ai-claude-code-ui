@@ -24,34 +24,11 @@ function getCustomApiConfig() {
 }
 
 /**
- * 将 CLI 选项映射为 SDK 兼容的选项格式
- * @param {Object} options - CLI 选项
- * @returns {Object} SDK 兼容的选项
+ * 构建默认工具列表
+ * @returns {Array<string>} 默认工具列表
  */
-export function mapCliOptionsToSDK(options = {}) {
-  const { sessionId, cwd, toolsSettings, permissionMode, images } = options;
-
-  const sdkOptions = {};
-
-  // 映射工作目录
-  if (cwd) {
-    sdkOptions.cwd = cwd;
-  }
-
-  // 映射权限模式
-  if (permissionMode && permissionMode !== 'default') {
-    sdkOptions.permissionMode = permissionMode;
-  }
-
-  // 映射工具设置
-  const settings = toolsSettings || {
-    allowedTools: [],
-    disallowedTools: [],
-    skipPermissions: false
-  };
-
-  // 默认工具列表
-  const defaultTools = [
+function getDefaultTools() {
+  return [
     // Git 相关命令
     'Bash(git log:*)',
     'Bash(git diff:*)',
@@ -74,35 +51,56 @@ export function mapCliOptionsToSDK(options = {}) {
     'WebSearch',
     'Skill'           // 关键：启用 Skill 工具，否则 SDK 不会加载 Skills
   ];
+}
+
+/**
+ * 构建工具权限配置
+ * @param {Object} settings - 工具设置
+ * @param {string} permissionMode - 权限模式
+ * @returns {Object} 工具权限配置
+ */
+function buildToolPermissions(settings, permissionMode) {
+  const defaultTools = getDefaultTools();
 
   // 处理工具权限
   if (settings.skipPermissions && permissionMode !== 'plan') {
-    sdkOptions.permissionMode = 'bypassPermissions';
-  } else {
-    let allowedTools = (settings.allowedTools && settings.allowedTools.length > 0) 
-      ? [...settings.allowedTools] 
-      : [...defaultTools];
+    return { permissionMode: 'bypassPermissions' };
+  }
 
-    // 添加计划模式默认工具
-    if (permissionMode === 'plan') {
-      const planModeTools = ['Read', 'Task', 'exit_plan_mode', 'TodoRead', 'TodoWrite', 'WebFetch', 'WebSearch'];
-      for (const tool of planModeTools) {
-        if (!allowedTools.includes(tool)) {
-          allowedTools.push(tool);
-        }
+  let allowedTools = (settings.allowedTools && settings.allowedTools.length > 0)
+    ? [...settings.allowedTools]
+    : [...defaultTools];
+
+  // 添加计划模式默认工具
+  if (permissionMode === 'plan') {
+    const planModeTools = ['Read', 'Task', 'exit_plan_mode', 'TodoRead', 'TodoWrite', 'WebFetch', 'WebSearch'];
+    for (const tool of planModeTools) {
+      if (!allowedTools.includes(tool)) {
+        allowedTools.push(tool);
       }
-    }
-
-    if (allowedTools.length > 0) {
-      sdkOptions.allowedTools = allowedTools;
-    }
-
-    if (settings.disallowedTools && settings.disallowedTools.length > 0) {
-      sdkOptions.disallowedTools = settings.disallowedTools;
     }
   }
 
-  // 应用环境变量中的自定义 API 配置
+  const result = {};
+
+  if (allowedTools.length > 0) {
+    result.allowedTools = allowedTools;
+  }
+
+  if (settings.disallowedTools && settings.disallowedTools.length > 0) {
+    result.disallowedTools = settings.disallowedTools;
+  }
+
+  return result;
+}
+
+/**
+ * 应用自定义 API 配置
+ * @param {Object} sdkOptions - SDK 选项对象
+ * @param {Object} options - 原始选项
+ * @returns {Object} 更新后的 SDK 选项
+ */
+function applyCustomApiConfig(sdkOptions, options) {
   const customConfig = getCustomApiConfig();
 
   // 映射模型
@@ -125,6 +123,42 @@ export function mapCliOptionsToSDK(options = {}) {
     sdkOptions.apiKey = customConfig.apiKey;
     logger.info(`Using custom API key from environment`);
   }
+
+  return sdkOptions;
+}
+
+/**
+ * 将 CLI 选项映射为 SDK 兼容的选项格式
+ * @param {Object} options - CLI 选项
+ * @returns {Object} SDK 兼容的选项
+ */
+export function mapCliOptionsToSDK(options = {}) {
+  const { sessionId, cwd, toolsSettings, permissionMode, images } = options;
+
+  const settings = toolsSettings || {
+    allowedTools: [],
+    disallowedTools: [],
+    skipPermissions: false
+  };
+
+  const sdkOptions = {};
+
+  // 映射工作目录
+  if (cwd) {
+    sdkOptions.cwd = cwd;
+  }
+
+  // 映射权限模式
+  if (permissionMode && permissionMode !== 'default') {
+    sdkOptions.permissionMode = permissionMode;
+  }
+
+  // 映射工具权限
+  const toolPermissions = buildToolPermissions(settings, permissionMode);
+  Object.assign(sdkOptions, toolPermissions);
+
+  // 应用自定义 API 配置
+  applyCustomApiConfig(sdkOptions, options);
 
   // 映射系统提示配置
   sdkOptions.systemPrompt = {
