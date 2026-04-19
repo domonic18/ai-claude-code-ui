@@ -13,6 +13,7 @@ import { ClaudeDiscovery } from '../../services/projects/discovery/index.js';
 import { NotFoundError, ValidationError } from '../../middleware/error-handler.middleware.js';
 import { createNewWorkspace, addExistingWorkspace, deleteWorkspace } from '../../services/workspace/WorkspaceService.js';
 import { createLogger } from '../../utils/logger.js';
+import { applyPagination } from '../utils/pagination.js';
 
 const logger = createLogger('controllers/api/ProjectController');
 
@@ -38,7 +39,7 @@ export class ProjectController extends BaseController {
       const { sort = 'lastActivity', order = 'desc', limit = 50 } = req.query;
 
       const projects = await this.claudeDiscovery.getProjects({ userId });
-      const pagination = this._applyPagination(projects, { sort, order, limit });
+      const pagination = applyPagination(projects, { sort, order, limit });
 
       this._successWithPagination(res, pagination.items, pagination.meta);
     } catch (error) {
@@ -299,49 +300,6 @@ export class ProjectController extends BaseController {
     } catch (error) {
       this._handleError(error, req, res, next);
     }
-  }
-
-  /**
-   * 应用分页和排序
-   * @private
-   */
-  _applyPagination(items, options = {}) {
-    const { sort = 'lastActivity', order = 'desc', limit = 50 } = options;
-
-    let sorted = [...items];
-    if (sort) {
-      sorted.sort((a, b) => {
-        const aVal = a[sort];
-        const bVal = b[sort];
-
-        if (aVal == null && bVal == null) return 0;
-        if (aVal == null) return 1;
-        if (bVal == null) return -1;
-
-        if (typeof aVal === 'string' && typeof bVal === 'string') {
-          const aDate = new Date(aVal);
-          const bDate = new Date(bVal);
-          return order === 'desc' ? bDate - aDate : aDate - bDate;
-        }
-
-        return order === 'desc' ? bVal - aVal : aVal - bVal;
-      });
-    }
-
-    const total = sorted.length;
-    const paginated = sorted.slice(0, limit);
-
-    return {
-      items: paginated,
-      meta: {
-        pagination: {
-          page: 1,
-          limit,
-          total,
-          hasMore: limit < total
-        }
-      }
-    };
   }
 }
 

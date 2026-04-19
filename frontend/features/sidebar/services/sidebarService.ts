@@ -24,11 +24,87 @@ export class SidebarServiceError extends Error {
 }
 
 /**
+ * Options for executing API requests
+ */
+interface RequestOptions {
+  /** Error message prefix (e.g., "Failed to fetch projects") */
+  errorPrefix: string;
+  /** API endpoint URL for error reporting */
+  endpoint: string;
+  /** Whether to attempt parsing error response as JSON */
+  parseErrorResponse?: boolean;
+  /** Whether to attempt parsing error response as text */
+  parseErrorText?: boolean;
+  /** Optional response parser for successful responses */
+  responseParser?: (response: Response) => any;
+}
+
+/**
  * Sidebar Service Class
  *
  * Handles all API calls for the Sidebar feature.
  */
 export class SidebarService {
+  /**
+   * Private helper method to execute API requests with consistent error handling
+   *
+   * @param apiCall - Function that returns the Promise<Response>
+   * @param options - Request options
+   * @returns Promise<T> - Parsed response data
+   * @throws {SidebarServiceError} If the request fails
+   * @private
+   */
+  private async _executeRequest<T>(
+    apiCall: () => Promise<Response>,
+    options: RequestOptions
+  ): Promise<T> {
+    try {
+      const response = await apiCall();
+
+      if (!response.ok) {
+        let errorMessage = `${options.errorPrefix}: ${response.statusText}`;
+
+        // Try to parse error response as JSON or text
+        if (options.parseErrorResponse || options.parseErrorText) {
+          try {
+            if (options.parseErrorResponse) {
+              const contentType = response.headers.get('content-type');
+              if (contentType?.includes('application/json')) {
+                const error = await response.json();
+                errorMessage = error.error || errorMessage;
+              }
+            } else if (options.parseErrorText) {
+              const errorText = await response.text();
+              if (errorText) {
+                errorMessage = errorText;
+              }
+            }
+          } catch {
+            // Ignore parse errors
+          }
+        }
+
+        throw new SidebarServiceError(errorMessage, response.status, options.endpoint);
+      }
+
+      // Parse successful response if parser provided
+      if (options.responseParser) {
+        return options.responseParser(response);
+      }
+
+      return undefined as T;
+    } catch (error) {
+      if (error instanceof SidebarServiceError) {
+        throw error;
+      }
+      throw new SidebarServiceError(
+        `${options.errorPrefix}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        undefined,
+        options.endpoint
+      );
+    }
+  }
+
   /**
    * Get all projects
    *
@@ -36,29 +112,17 @@ export class SidebarService {
    * @throws {SidebarServiceError} If the request fails
    */
   async getProjects(): Promise<Project[]> {
-    try {
-      const response = await api.projects.list();
-
-      if (!response.ok) {
-        throw new SidebarServiceError(
-          `Failed to fetch projects: ${response.statusText}`,
-          response.status,
-          '/api/projects'
-        );
+    return this._executeRequest<Project[]>(
+      () => api.projects.list(),
+      {
+        errorPrefix: 'Failed to fetch projects',
+        endpoint: '/api/projects',
+        responseParser: async (response) => {
+          const data = await response.json();
+          return data.projects || data || [];
+        }
       }
-
-      const data = await response.json();
-      return data.projects || data || [];
-    } catch (error) {
-      if (error instanceof SidebarServiceError) {
-        throw error;
-      }
-      throw new SidebarServiceError(
-        `Failed to fetch projects: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        undefined,
-        '/api/projects'
-      );
-    }
+    );
   }
 
   /**
@@ -75,46 +139,36 @@ export class SidebarService {
     limit: number = 5,
     offset: number = 0
   ): Promise<PaginatedSessionsResponse> {
-    try {
-      logger.info('[SidebarService] Fetching sessions:', { projectName, limit, offset });
-      const response = await api.projects.sessions(projectName, limit, offset);
+    logger.info('[SidebarService] Fetching sessions:', { projectName, limit, offset });
 
-      if (!response.ok) {
-        throw new SidebarServiceError(
-          `Failed to fetch sessions: ${response.statusText}`,
-          response.status,
-          `/api/projects/${projectName}/sessions`
-        );
+    const result = await this._executeRequest<any>(
+      () => api.projects.sessions(projectName, limit, offset),
+      {
+        errorPrefix: 'Failed to fetch sessions',
+        endpoint: `/api/projects/${projectName}/sessions`,
+        responseParser: async (response) => {
+          const json = await response.json();
+          logger.info('[SidebarService] Received response:', json);
+          return json;
+        }
       }
+    );
 
-      const result = await response.json();
-      logger.info('[SidebarService] Received response:', result);
+    // Handle different response formats
+    // API returns: {success: true, data: [...], meta: {pagination: {...}}}
+    const sessions = Array.isArray(result.data) ? result.data : result.sessions || [];
+    const hasMore = result.meta?.pagination?.hasMore !== undefined
+      ? result.meta.pagination.hasMore
+      : result.hasMore !== undefined
+      ? result.hasMore
+      : undefined;
 
-      // Handle different response formats
-      // API returns: {success: true, data: [...], meta: {pagination: {...}}}
-      const sessions = Array.isArray(result.data) ? result.data : result.sessions || [];
-      const hasMore = result.meta?.pagination?.hasMore !== undefined
-        ? result.meta.pagination.hasMore
-        : result.hasMore !== undefined
-        ? result.hasMore
-        : undefined;
+    logger.info('[SidebarService] Parsed result:', { sessions, hasMore, sessionCount: sessions.length });
 
-      logger.info('[SidebarService] Parsed result:', { sessions, hasMore, sessionCount: sessions.length });
-
-      return {
-        sessions,
-        hasMore,
-      };
-    } catch (error) {
-      if (error instanceof SidebarServiceError) {
-        throw error;
-      }
-      throw new SidebarServiceError(
-        `Failed to fetch sessions: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        undefined,
-        `/api/projects/${projectName}/sessions`
-      );
-    }
+    return {
+      sessions,
+      hasMore,
+    };
   }
 
   /**
@@ -126,30 +180,14 @@ export class SidebarService {
    * @throws {SidebarServiceError} If the request fails
    */
   async renameProject(projectName: string, newName: string): Promise<void> {
-    try {
-      const response = await api.renameProject(projectName, newName);
-
-      if (!response.ok) {
-        let errorMessage = `Failed to rename project: ${response.statusText}`;
-        try {
-          const contentType = response.headers.get('content-type');
-          if (contentType?.includes('application/json')) {
-            const error = await response.json();
-            errorMessage = error.error || errorMessage;
-          }
-        } catch {
-          // Ignore JSON parse errors
-        }
-        throw new SidebarServiceError(errorMessage, response.status);
+    await this._executeRequest<void>(
+      () => api.renameProject(projectName, newName),
+      {
+        errorPrefix: 'Failed to rename project',
+        endpoint: undefined,
+        parseErrorResponse: true
       }
-    } catch (error) {
-      if (error instanceof SidebarServiceError) {
-        throw error;
-      }
-      throw new SidebarServiceError(
-        `Failed to rename project: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
+    );
   }
 
   /**
@@ -160,30 +198,14 @@ export class SidebarService {
    * @throws {SidebarServiceError} If the request fails
    */
   async deleteProject(projectName: string): Promise<void> {
-    try {
-      const response = await api.deleteProject(projectName);
-
-      if (!response.ok) {
-        let errorMessage = `Failed to delete project: ${response.statusText}`;
-        try {
-          const contentType = response.headers.get('content-type');
-          if (contentType?.includes('application/json')) {
-            const error = await response.json();
-            errorMessage = error.error || errorMessage;
-          }
-        } catch {
-          // Ignore JSON parse errors
-        }
-        throw new SidebarServiceError(errorMessage, response.status);
+    await this._executeRequest<void>(
+      () => api.deleteProject(projectName),
+      {
+        errorPrefix: 'Failed to delete project',
+        endpoint: undefined,
+        parseErrorResponse: true
       }
-    } catch (error) {
-      if (error instanceof SidebarServiceError) {
-        throw error;
-      }
-      throw new SidebarServiceError(
-        `Failed to delete project: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
+    );
   }
 
   /**
@@ -194,30 +216,18 @@ export class SidebarService {
    * @throws {SidebarServiceError} If the request fails
    */
   async createProject(path: string): Promise<Project> {
-    try {
-      const response = await api.createProject(path.trim());
-
-      if (!response.ok) {
-        let errorMessage = `Failed to create project: ${response.statusText}`;
-        try {
-          const error = await response.json();
-          errorMessage = error.error || errorMessage;
-        } catch {
-          // Ignore JSON parse errors
+    return this._executeRequest<Project>(
+      () => api.createProject(path.trim()),
+      {
+        errorPrefix: 'Failed to create project',
+        endpoint: undefined,
+        parseErrorResponse: true,
+        responseParser: async (response) => {
+          const result = await response.json();
+          return result.project || result;
         }
-        throw new SidebarServiceError(errorMessage, response.status);
       }
-
-      const result = await response.json();
-      return result.project || result;
-    } catch (error) {
-      if (error instanceof SidebarServiceError) {
-        throw error;
-      }
-      throw new SidebarServiceError(
-        `Failed to create project: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
+    );
   }
 
   /**
@@ -234,27 +244,14 @@ export class SidebarService {
     sessionId: string,
     newSummary: string
   ): Promise<void> {
-    try {
-      const response = await api.renameSession(projectName, sessionId, newSummary);
-
-      if (!response.ok) {
-        let errorMessage = `Failed to rename session: ${response.statusText}`;
-        try {
-          const error = await response.json();
-          errorMessage = error.error || errorMessage;
-        } catch {
-          // Ignore JSON parse errors
-        }
-        throw new SidebarServiceError(errorMessage, response.status);
+    await this._executeRequest<void>(
+      () => api.renameSession(projectName, sessionId, newSummary),
+      {
+        errorPrefix: 'Failed to rename session',
+        endpoint: undefined,
+        parseErrorResponse: true
       }
-    } catch (error) {
-      if (error instanceof SidebarServiceError) {
-        throw error;
-      }
-      throw new SidebarServiceError(
-        `Failed to rename session: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
+    );
   }
 
   /**
@@ -271,35 +268,20 @@ export class SidebarService {
     sessionId: string,
     provider: SessionProvider = 'claude'
   ): Promise<void> {
-    try {
-      let response: Response;
-
-      if (provider === 'codex') {
-        response = await api.deleteCodexSession(sessionId);
-      } else {
-        response = await api.deleteSession(projectName, sessionId);
-      }
-
-      if (!response.ok) {
-        let errorMessage = `Failed to delete session: ${response.statusText}`;
-        try {
-          const errorText = await response.text();
-          if (errorText) {
-            errorMessage = errorText;
-          }
-        } catch {
-          // Ignore text parse errors
+    await this._executeRequest<void>(
+      async () => {
+        if (provider === 'codex') {
+          return await api.deleteCodexSession(sessionId);
+        } else {
+          return await api.deleteSession(projectName, sessionId);
         }
-        throw new SidebarServiceError(errorMessage, response.status);
+      },
+      {
+        errorPrefix: 'Failed to delete session',
+        endpoint: undefined,
+        parseErrorText: true
       }
-    } catch (error) {
-      if (error instanceof SidebarServiceError) {
-        throw error;
-      }
-      throw new SidebarServiceError(
-        `Failed to delete session: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
+    );
   }
 }
 

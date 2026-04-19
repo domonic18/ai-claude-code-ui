@@ -24,6 +24,7 @@ import type { SidebarProps, ExpandedProjects, SessionProvider } from '../types/s
 import { useProjects } from '../hooks';
 import { useSessions } from '../hooks';
 import { useStarredProjects } from '../hooks';
+import { useDeleteConfirmation } from '../hooks/useDeleteConfirmation';
 import { logger } from '@/shared/utils/logger';
 
 /**
@@ -72,6 +73,19 @@ export const Sidebar = memo(function Sidebar({
     toggleStar,
   } = useStarredProjects();
 
+  // Delete confirmation hook
+  const {
+    deleteConfirmState,
+    isDeleting,
+    handleSessionDelete,
+    handleConfirmSessionDelete,
+    handleCancelSessionDelete,
+  } = useDeleteConfirmation({
+    deleteSession,
+    onSessionDelete,
+    onRefresh,
+  });
+
   // Sort projects
   const displayProjects = getSortedProjects(starredProjects);
 
@@ -84,20 +98,6 @@ export const Sidebar = memo(function Sidebar({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [editingSession, setEditingSession] = useState(null);
   const [editingSessionName, setEditingSessionName] = useState('');
-
-  // Delete confirmation dialog state
-  const [deleteConfirmState, setDeleteConfirmState] = useState<{
-    isOpen: boolean;
-    projectName: string;
-    sessionId: string;
-    provider?: SessionProvider;
-  }>({
-    isOpen: false,
-    projectName: '',
-    sessionId: '',
-    provider: undefined,
-  });
-  const [isDeleting, setIsDeleting] = useState(false);
 
   // Initialize hasMore state from project sessionMeta
   useEffect(() => {
@@ -230,69 +230,6 @@ export const Sidebar = memo(function Sidebar({
       onSessionSelect(session, projectName);
     }
   }, [onSessionSelect]);
-
-  const handleSessionDelete = useCallback(async (projectName: string, sessionId: string, provider?: SessionProvider) => {
-    // Open confirmation dialog instead of blocking with window.confirm
-    setDeleteConfirmState({
-      isOpen: true,
-      projectName,
-      sessionId,
-      provider,
-    });
-  }, []);
-
-  /**
-   * Handle the actual session deletion after confirmation
-   */
-  const handleConfirmSessionDelete = useCallback(async () => {
-    const { projectName, sessionId, provider } = deleteConfirmState;
-
-    setIsDeleting(true);
-    try {
-      await deleteSession(projectName, sessionId, provider);
-
-      // Only call parent callback if deletion was successful
-      if (onSessionDelete) {
-        onSessionDelete(projectName, sessionId, provider);
-      }
-
-      // Refresh projects to update the UI with latest session list
-      // This ensures the deleted session is removed from propProjects
-      if (onRefresh) {
-        await onRefresh();
-      }
-
-      // Close dialog on success
-      setDeleteConfirmState({
-        isOpen: false,
-        projectName: '',
-        sessionId: '',
-        provider: undefined,
-      });
-    } catch (error: unknown) {
-      logger.error('[Sidebar] Error deleting session:', error);
-
-      // Keep dialog open on error to allow user to see what happened
-      // You could add error state to the dialog here if needed
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete session. Please try again.';
-      // For now, log the error - in a real app you might want to show this in the dialog
-      logger.error(errorMessage);
-    } finally {
-      setIsDeleting(false);
-    }
-  }, [deleteConfirmState, deleteSession, onSessionDelete, onRefresh]);
-
-  /**
-   * Handle canceling the session deletion
-   */
-  const handleCancelSessionDelete = useCallback(() => {
-    setDeleteConfirmState({
-      isOpen: false,
-      projectName: '',
-      sessionId: '',
-      provider: undefined,
-    });
-  }, []);
 
   const handleUpdateSessionSummary = useCallback(async (projectName: string, sessionId: string, summary: string) => {
     try {
