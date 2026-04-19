@@ -11,6 +11,7 @@ import { createLogger } from '../../../utils/logger.js';
 import {
   createSession, extractTextFromEntry, _extractTextContent, processUserEntry, processAssistantEntry
 } from './jsonlHelpers.js';
+import { filterMemoryContext } from '../../../utils/memoryUtils.js';
 const logger = createLogger('services/core/utils/jsonl-parser');
 
 // ─── JsonlParser 类 ─────────────────────────────────────
