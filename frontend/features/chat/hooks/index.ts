@@ -21,3 +21,11 @@ export {
   type UseMessageSenderOptions,
   type UseMessageSenderResult,
 } from './useMessageSender';
+export {
+  useChatInterface,
+  type UseChatInterfaceOptions,
+  type UseChatInterfaceResult,
+} from './useChatInterface';
+export * from './useChatInputState';
+export * from './useChatInputMenus';
+export * from './useChatInputSetup';
