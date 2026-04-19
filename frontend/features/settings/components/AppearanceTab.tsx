@@ -29,6 +29,86 @@ const FONT_SIZE_OPTIONS = [
   { value: '20', label: '20px' },
 ];
 
+interface CodeEditorSettingsProps {
+  settings: {
+    theme: string;
+    wordWrap: boolean;
+    showMinimap: boolean;
+    lineNumbers: boolean;
+    fontSize: string;
+  };
+  setCodeEditorTheme: (theme: string) => void;
+  setCodeEditorWordWrap: (wrap: boolean) => void;
+  setCodeEditorShowMinimap: (show: boolean) => void;
+  setCodeEditorLineNumbers: (show: boolean) => void;
+  setCodeEditorFontSize: (size: string) => void;
+  t: (key: string) => string;
+}
+
+/**
+ * Code Editor Settings sub-component
+ */
+function CodeEditorSettings({
+  settings,
+  setCodeEditorTheme,
+  setCodeEditorWordWrap,
+  setCodeEditorShowMinimap,
+  setCodeEditorLineNumbers,
+  setCodeEditorFontSize,
+  t,
+}: CodeEditorSettingsProps) {
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-foreground">{t('settings.appearance.codeEditor')}</h3>
+
+      <SettingRow label={t('settings.appearance.editorTheme')} description={t('settings.appearance.editorThemeDescription')}>
+        <ToggleSwitch
+          checked={settings.theme === 'dark'}
+          onChange={() => setCodeEditorTheme(settings.theme === 'dark' ? 'light' : 'dark')}
+          ariaLabel={t('settings.appearance.toggleEditorTheme')}
+          icon="theme"
+        />
+      </SettingRow>
+
+      <SettingRow label={t('settings.appearance.wordWrap')} description={t('settings.appearance.wordWrapDescription')}>
+        <ToggleSwitch
+          checked={settings.wordWrap}
+          onChange={() => setCodeEditorWordWrap(!settings.wordWrap)}
+          ariaLabel={t('settings.appearance.toggleWordWrap')}
+        />
+      </SettingRow>
+
+      <SettingRow label={t('settings.appearance.showMinimap')} description={t('settings.appearance.showMinimapDescription')}>
+        <ToggleSwitch
+          checked={settings.showMinimap}
+          onChange={() => setCodeEditorShowMinimap(!settings.showMinimap)}
+          ariaLabel={t('settings.appearance.toggleMinimap')}
+        />
+      </SettingRow>
+
+      <SettingRow label={t('settings.appearance.showLineNumbers')} description={t('settings.appearance.showLineNumbersDescription')}>
+        <ToggleSwitch
+          checked={settings.lineNumbers}
+          onChange={() => setCodeEditorLineNumbers(!settings.lineNumbers)}
+          ariaLabel={t('settings.appearance.toggleLineNumbers')}
+        />
+      </SettingRow>
+
+      <SettingRow label={t('settings.appearance.fontSize')} description={t('settings.appearance.fontSizeDescription')}>
+        <select
+          value={settings.fontSize}
+          onChange={(e) => setCodeEditorFontSize(e.target.value)}
+          className="text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2 w-24"
+        >
+          {FONT_SIZE_OPTIONS.map(({ value, label }) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
+      </SettingRow>
+    </div>
+  );
+}
+
 /**
  * AppearanceTab Component
  */
@@ -72,54 +152,15 @@ export function AppearanceTab() {
       </div>
 
       {/* Code Editor Settings */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-foreground">{t('settings.appearance.codeEditor')}</h3>
-
-        <SettingRow label={t('settings.appearance.editorTheme')} description={t('settings.appearance.editorThemeDescription')}>
-          <ToggleSwitch
-            checked={settings.theme === 'dark'}
-            onChange={() => setCodeEditorTheme(settings.theme === 'dark' ? 'light' : 'dark')}
-            ariaLabel={t('settings.appearance.toggleEditorTheme')}
-            icon="theme"
-          />
-        </SettingRow>
-
-        <SettingRow label={t('settings.appearance.wordWrap')} description={t('settings.appearance.wordWrapDescription')}>
-          <ToggleSwitch
-            checked={settings.wordWrap}
-            onChange={() => setCodeEditorWordWrap(!settings.wordWrap)}
-            ariaLabel={t('settings.appearance.toggleWordWrap')}
-          />
-        </SettingRow>
-
-        <SettingRow label={t('settings.appearance.showMinimap')} description={t('settings.appearance.showMinimapDescription')}>
-          <ToggleSwitch
-            checked={settings.showMinimap}
-            onChange={() => setCodeEditorShowMinimap(!settings.showMinimap)}
-            ariaLabel={t('settings.appearance.toggleMinimap')}
-          />
-        </SettingRow>
-
-        <SettingRow label={t('settings.appearance.showLineNumbers')} description={t('settings.appearance.showLineNumbersDescription')}>
-          <ToggleSwitch
-            checked={settings.lineNumbers}
-            onChange={() => setCodeEditorLineNumbers(!settings.lineNumbers)}
-            ariaLabel={t('settings.appearance.toggleLineNumbers')}
-          />
-        </SettingRow>
-
-        <SettingRow label={t('settings.appearance.fontSize')} description={t('settings.appearance.fontSizeDescription')}>
-          <select
-            value={settings.fontSize}
-            onChange={(e) => setCodeEditorFontSize(e.target.value)}
-            className="text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2 w-24"
-          >
-            {FONT_SIZE_OPTIONS.map(({ value, label }) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        </SettingRow>
-      </div>
+      <CodeEditorSettings
+        settings={settings}
+        setCodeEditorTheme={setCodeEditorTheme}
+        setCodeEditorWordWrap={setCodeEditorWordWrap}
+        setCodeEditorShowMinimap={setCodeEditorShowMinimap}
+        setCodeEditorLineNumbers={setCodeEditorLineNumbers}
+        setCodeEditorFontSize={setCodeEditorFontSize}
+        t={t}
+      />
 
       {/* Product Tour */}
       <div className="space-y-4">

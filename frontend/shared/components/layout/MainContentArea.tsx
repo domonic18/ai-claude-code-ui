@@ -56,96 +56,95 @@ interface MainContentAreaProps {
   editorExpanded: boolean;
 }
 
-export function MainContentArea({
-  activeTab,
-  selectedProject,
-  selectedSession,
-  newSessionCounter,
-  ws,
-  sendMessage,
-  messages,
-  onFileOpen,
-  onInputFocusChange,
-  onSessionActive,
-  onSessionInactive,
-  onSessionProcessing,
-  onSessionNotProcessing,
-  processingSessions,
-  onReplaceTemporarySession,
-  onShowSettings,
-  autoExpandTools,
-  showRawParameters,
-  showThinking,
-  autoScrollToBottom,
-  sendByCtrlEnter,
-  externalMessageUpdate,
-  authenticatedFetch,
-  editingFile,
-  editorExpanded
-}: MainContentAreaProps) {
+/**
+ * Renders the chat tab with ChatInterface wrapped in ErrorBoundary
+ */
+function renderChatTab(props: MainContentAreaProps, chatProject: any, chatSession: any) {
+  return (
+    <div className={`h-full ${props.activeTab === 'chat' ? 'block' : 'hidden'}`}>
+      <ErrorBoundary showDetails={true}>
+        <ChatInterface
+          selectedProject={chatProject}
+          selectedSession={chatSession}
+          newSessionCounter={props.newSessionCounter}
+          ws={props.ws}
+          sendMessage={props.sendMessage}
+          wsMessages={props.messages}
+          onFileOpen={props.onFileOpen}
+          onInputFocusChange={props.onInputFocusChange}
+          onSessionActive={props.onSessionActive}
+          onSessionInactive={props.onSessionInactive}
+          onSessionProcessing={props.onSessionProcessing}
+          onSessionNotProcessing={props.onSessionNotProcessing}
+          processingSessions={props.processingSessions}
+          onReplaceTemporarySession={props.onReplaceTemporarySession}
+          onShowSettings={props.onShowSettings}
+          autoExpandTools={props.autoExpandTools}
+          showRawParameters={props.showRawParameters}
+          showThinking={props.showThinking}
+          autoScrollToBottom={props.autoScrollToBottom}
+          sendByCtrlEnter={props.sendByCtrlEnter}
+          externalMessageUpdate={props.externalMessageUpdate}
+          authenticatedFetch={props.authenticatedFetch}
+        />
+      </ErrorBoundary>
+    </div>
+  );
+}
+
+/**
+ * Renders the files tab with FileTree
+ */
+function renderFilesTab(props: MainContentAreaProps) {
+  if (props.activeTab !== 'files') return null;
+  return (
+    <div className="h-full overflow-hidden">
+      <FileTree selectedProject={props.selectedProject as any} />
+    </div>
+  );
+}
+
+/**
+ * Renders the shell tab with StandaloneShell
+ */
+function renderShellTab(props: MainContentAreaProps) {
+  if (props.activeTab !== 'shell') return null;
+  return (
+    <div className="h-full w-full overflow-hidden">
+      <StandaloneShell
+        project={props.selectedProject as any}
+        session={props.selectedSession as any}
+        showHeader={false}
+      />
+    </div>
+  );
+}
+
+export function MainContentArea(props: MainContentAreaProps) {
   // Memoize selectedProject for ChatInterface to prevent unnecessary re-renders
   const chatProject = React.useMemo(() => {
-    if (!selectedProject) return undefined;
+    if (!props.selectedProject) return undefined;
     return {
-      name: selectedProject.name,
-      path: selectedProject.fullPath
+      name: props.selectedProject.name,
+      path: props.selectedProject.fullPath
     };
-  }, [selectedProject?.name, selectedProject?.fullPath]);
+  }, [props.selectedProject?.name, props.selectedProject?.fullPath]);
 
   // Memoize selectedSession for ChatInterface to prevent unnecessary re-renders
   const chatSession = React.useMemo(() => {
-    if (!selectedSession) return undefined;
-    const id = (selectedSession as any).id || (selectedSession as any).summary || 'temp';
+    if (!props.selectedSession) return undefined;
+    const id = (props.selectedSession as any).id || (props.selectedSession as any).summary || 'temp';
     return {
       id,
-      __provider: selectedSession.__provider
+      __provider: props.selectedSession.__provider
     };
-  }, [selectedSession]);
+  }, [props.selectedSession]);
 
   return (
-    <div className={`flex-1 flex flex-col min-h-0 overflow-hidden ${editingFile ? 'mr-0' : ''} ${editorExpanded ? 'hidden' : ''}`}>
-      <div className={`h-full ${activeTab === 'chat' ? 'block' : 'hidden'}`}>
-        <ErrorBoundary showDetails={true}>
-          <ChatInterface
-            selectedProject={chatProject}
-            selectedSession={chatSession}
-            newSessionCounter={newSessionCounter}
-            ws={ws}
-            sendMessage={sendMessage}
-            wsMessages={messages}
-            onFileOpen={onFileOpen}
-            onInputFocusChange={onInputFocusChange}
-            onSessionActive={onSessionActive}
-            onSessionInactive={onSessionInactive}
-            onSessionProcessing={onSessionProcessing}
-            onSessionNotProcessing={onSessionNotProcessing}
-            processingSessions={processingSessions}
-            onReplaceTemporarySession={onReplaceTemporarySession}
-            onShowSettings={onShowSettings}
-            autoExpandTools={autoExpandTools}
-            showRawParameters={showRawParameters}
-            showThinking={showThinking}
-            autoScrollToBottom={autoScrollToBottom}
-            sendByCtrlEnter={sendByCtrlEnter}
-            externalMessageUpdate={externalMessageUpdate}
-            authenticatedFetch={authenticatedFetch}
-          />
-        </ErrorBoundary>
-      </div>
-      {activeTab === 'files' && (
-        <div className="h-full overflow-hidden">
-          <FileTree selectedProject={selectedProject as any} />
-        </div>
-      )}
-      {activeTab === 'shell' && (
-        <div className="h-full w-full overflow-hidden">
-          <StandaloneShell
-            project={selectedProject as any}
-            session={selectedSession as any}
-            showHeader={false}
-          />
-        </div>
-      )}
+    <div className={`flex-1 flex flex-col min-h-0 overflow-hidden ${props.editingFile ? 'mr-0' : ''} ${props.editorExpanded ? 'hidden' : ''}`}>
+      {renderChatTab(props, chatProject, chatSession)}
+      {renderFilesTab(props)}
+      {renderShellTab(props)}
     </div>
   );
 }

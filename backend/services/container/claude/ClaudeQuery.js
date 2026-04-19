@@ -69,6 +69,90 @@ async function loadMemoryContext(userId, options) {
 }
 
 /**
+ * 构建增强命令（添加记忆上下文）
+ * @param {string} command - 原始命令
+ * @param {string|null} memoryContext - 记忆上下文
+ * @returns {string} 增强后的命令
+ */
+function buildEnhancedCommand(command, memoryContext) {
+  if (!memoryContext) {
+    return command;
+  }
+
+  // Add memory to command at execution time
+  return `${command}${MEMORY_SEPARATOR}${MEMORY_SEPARATOR}${MEMORY_START}${MEMORY_SEPARATOR}${memoryContext}${MEMORY_SEPARATOR}${MEMORY_END}${MEMORY_SEPARATOR}${MEMORY_SEPARATOR}`;
+}
+
+/**
+ * 发送会话启动和记忆上下文消息
+ * @param {object} writer - WebSocket 写入器
+ * @param {string} sessionId - 会话 ID
+ * @param {string} containerId - 容器 ID
+ * @param {string|null} memoryContext - 记忆上下文
+ */
+function sendSessionStart(writer, sessionId, containerId, memoryContext) {
+  if (!writer) return;
+
+  // 发送记忆上下文消息（如果有）
+  if (memoryContext) {
+    logger.debug({ sessionId, memoryLength: memoryContext.length }, '[ClaudeQuery] Sending memory-context');
+    writer.send({
+      type: 'memory-context',
+      sessionId,
+      content: memoryContext
+    });
+  }
+
+  // 发送初始消息
+  logger.debug({ sessionId }, '[ClaudeQuery] Sending session_start');
+  writer.send({
+    type: 'session_start',
+    sessionId,
+    containerId: containerId,
+    message: 'Starting containerized Claude session...'
+  });
+}
+
+/**
+ * 处理查询错误
+ * @param {object} writer - WebSocket 写入器
+ * @param {string} sessionId - 会话 ID
+ * @param {Error} error - 错误对象
+ */
+function handleQueryError(writer, sessionId, error) {
+  updateSession(sessionId, {
+    status: 'error',
+    error: error.message,
+    endTime: Date.now()
+  });
+
+  if (writer) {
+    writer.send({
+      type: 'error',
+      sessionId,
+      error: error.message
+    });
+  }
+}
+
+/**
+ * 创建并配置会话
+ * @param {string} sessionId - 会话 ID
+ * @param {object} container - 容器对象
+ * @param {string} command - 用户命令
+ * @param {object} mappedOptions - 映射后的选项
+ */
+function setupSession(sessionId, container, command, mappedOptions) {
+  createSession(sessionId, {
+    userId: mappedOptions.userId,
+    containerId: container.id,
+    command: command,
+    options: mappedOptions
+  });
+  logger.info({ sessionId }, '[ClaudeQuery] Session created');
+}
+
+/**
  * 在用户容器内执行 Claude SDK 查询
  * @param {string} command - 用户命令
  * @param {object} options - 执行选项
@@ -118,52 +202,18 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
     };
 
     // 4. 创建会话
-    createSession(sessionId, {
-      userId,
-      containerId: container.id,
-      command: command,
-      options: mappedOptions
-    });
-    logger.info({ sessionId }, '[ClaudeQuery] Session created');
+    setupSession(sessionId, container, command, mappedOptions);
 
-    // 5. 发送记忆上下文消息（如果有）
-    if (writer && memoryContext) {
-      logger.debug({ sessionId, memoryLength: memoryContext.length }, '[ClaudeQuery] Sending memory-context');
-      writer.send({
-        type: 'memory-context',
-        sessionId,
-        content: memoryContext
-      });
-    }
+    // 5. 发送会话启动和记忆上下文消息
+    sendSessionStart(writer, sessionId, container.id, memoryContext);
 
-    // 6. 发送初始消息
-    if (writer) {
-      logger.debug({ sessionId }, '[ClaudeQuery] Sending session_start');
-      writer.send({
-        type: 'session_start',
-        sessionId,
-        containerId: container.id,
-        message: 'Starting containerized Claude session...'
-      });
-    }
-
-    // 7. Build enhanced command (original command + memory context) and execute
-    let enhancedCommand = command;
-    if (memoryContext) {
-      // Add memory to command at execution time
-      enhancedCommand = `${command}${MEMORY_SEPARATOR}${MEMORY_SEPARATOR}${MEMORY_START}${MEMORY_SEPARATOR}${memoryContext}${MEMORY_SEPARATOR}${MEMORY_END}${MEMORY_SEPARATOR}${MEMORY_SEPARATOR}`;
-    }
+    // 6. 构建增强命令并执行
+    const enhancedCommand = buildEnhancedCommand(command, memoryContext);
     logger.debug({ sessionId }, '[ClaudeQuery] Executing in container');
-    await executeInContainer(
-      userId,
-      enhancedCommand,
-      mappedOptions,
-      writer,
-      sessionId
-    );
+    await executeInContainer(userId, enhancedCommand, mappedOptions, writer, sessionId);
     logger.info({ sessionId }, '[ClaudeQuery] Execution completed');
 
-    // 8. 更新会话状态
+    // 7. 更新会话状态
     updateSession(sessionId, {
       status: 'completed',
       endTime: Date.now()
@@ -172,22 +222,7 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
     return sessionId;
 
   } catch (error) {
-    // 出错时更新会话状态
-    updateSession(sessionId, {
-      status: 'error',
-      error: error.message,
-      endTime: Date.now()
-    });
-
-    // 发送错误消息
-    if (writer) {
-      writer.send({
-        type: 'error',
-        sessionId,
-        error: error.message
-      });
-    }
-
+    handleQueryError(writer, sessionId, error);
     throw error;
   }
 }

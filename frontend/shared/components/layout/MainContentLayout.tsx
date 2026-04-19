@@ -8,6 +8,7 @@ import { MainContentArea } from './MainContentArea';
 import { CodeEditorSidebar } from './CodeEditorSidebar';
 
 interface Project {
+  name?: string;
   displayName?: string;
   fullPath?: string;
   [key: string]: any;
@@ -64,90 +65,63 @@ interface MainContentLayoutProps {
   onToggleExpand: () => void;
 }
 
-export function MainContentLayout({
-  isMobile,
-  activeTab,
-  selectedSession,
-  selectedProject,
-  onMenuClick,
-  setActiveTab,
-  newSessionCounter,
-  ws,
-  sendMessage,
-  messages,
-  onFileOpen,
-  onInputFocusChange,
-  onSessionActive,
-  onSessionInactive,
-  onSessionProcessing,
-  onSessionNotProcessing,
-  processingSessions,
-  onReplaceTemporarySession,
-  onShowSettings,
-  autoExpandTools,
-  showRawParameters,
-  showThinking,
-  autoScrollToBottom,
-  sendByCtrlEnter,
-  externalMessageUpdate,
-  authenticatedFetch,
-  editingFile,
-  editorExpanded,
-  editorWidth,
-  isResizing,
-  onMouseDown,
-  onClose,
-  onToggleExpand
-}: MainContentLayoutProps) {
+/**
+ * Sidebar-only props extracted from layout props
+ */
+function getSidebarProps(p: MainContentLayoutProps) {
+  return {
+    editingFile: p.editingFile,
+    isMobile: p.isMobile,
+    editorWidth: p.editorWidth,
+    editorExpanded: p.editorExpanded,
+    projectPath: p.selectedProject?.fullPath,
+    isResizing: p.isResizing,
+    onMouseDown: p.onMouseDown,
+    onClose: p.onClose,
+    onToggleExpand: p.onToggleExpand,
+  };
+}
+
+export function MainContentLayout(props: MainContentLayoutProps) {
+  const {
+    isMobile, activeTab, selectedSession, selectedProject,
+    onMenuClick, setActiveTab, /* header */
+    editingFile, editorExpanded, /* shared */
+    newSessionCounter, ws, sendMessage, messages, onFileOpen,
+    onInputFocusChange, onSessionActive, onSessionInactive,
+    onSessionProcessing, onSessionNotProcessing, processingSessions,
+    onReplaceTemporarySession, onShowSettings, autoExpandTools,
+    showRawParameters, showThinking, autoScrollToBottom,
+    sendByCtrlEnter, externalMessageUpdate, authenticatedFetch,
+  } = props;
+
   return (
     <div className="h-full flex flex-col">
       <MainContentHeader
-        isMobile={isMobile}
-        activeTab={activeTab}
-        selectedSession={selectedSession}
-        selectedProject={selectedProject}
-        onMenuClick={onMenuClick}
-        setActiveTab={setActiveTab}
+        isMobile={isMobile} activeTab={activeTab}
+        selectedSession={selectedSession} selectedProject={selectedProject}
+        onMenuClick={onMenuClick} setActiveTab={setActiveTab}
       />
       <div className="flex-1 flex min-h-0 overflow-hidden" data-editor-container>
         <MainContentArea
           activeTab={activeTab}
-          selectedProject={selectedProject}
-          selectedSession={selectedSession}
+          selectedProject={selectedProject as any}
+          selectedSession={selectedSession as any}
           newSessionCounter={newSessionCounter}
-          ws={ws}
-          sendMessage={sendMessage}
-          messages={messages}
-          onFileOpen={onFileOpen}
-          onInputFocusChange={onInputFocusChange}
-          onSessionActive={onSessionActive}
-          onSessionInactive={onSessionInactive}
-          onSessionProcessing={onSessionProcessing}
-          onSessionNotProcessing={onSessionNotProcessing}
+          ws={ws} sendMessage={sendMessage} messages={messages}
+          onFileOpen={onFileOpen} onInputFocusChange={onInputFocusChange}
+          onSessionActive={onSessionActive} onSessionInactive={onSessionInactive}
+          onSessionProcessing={onSessionProcessing} onSessionNotProcessing={onSessionNotProcessing}
           processingSessions={processingSessions}
           onReplaceTemporarySession={onReplaceTemporarySession}
-          onShowSettings={onShowSettings}
-          autoExpandTools={autoExpandTools}
-          showRawParameters={showRawParameters}
-          showThinking={showThinking}
-          autoScrollToBottom={autoScrollToBottom}
-          sendByCtrlEnter={sendByCtrlEnter}
+          onShowSettings={onShowSettings} autoExpandTools={autoExpandTools}
+          showRawParameters={showRawParameters} showThinking={showThinking}
+          autoScrollToBottom={autoScrollToBottom} sendByCtrlEnter={sendByCtrlEnter}
           externalMessageUpdate={externalMessageUpdate}
           authenticatedFetch={authenticatedFetch}
-          editingFile={editingFile}
-          editorExpanded={editorExpanded}
+          editingFile={editingFile} editorExpanded={editorExpanded}
         />
-        <CodeEditorSidebar
-          editingFile={editingFile}
-          isMobile={isMobile}
-          editorWidth={editorWidth}
-          editorExpanded={editorExpanded}
-          projectPath={selectedProject?.fullPath}
-          isResizing={isResizing}
-          onMouseDown={onMouseDown}
-          onClose={onClose}
-          onToggleExpand={onToggleExpand}
-        />
+        <CodeEditorSidebar {...getSidebarProps(props)} />
       </div>
     </div>
   );

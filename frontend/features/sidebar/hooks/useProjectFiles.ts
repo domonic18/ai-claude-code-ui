@@ -22,12 +22,47 @@ export interface UseProjectFilesReturn {
   renameFile: (oldPath: string, newPath: string) => Promise<void>;
 }
 
-export function useProjectFiles(project: Project | null): UseProjectFilesReturn {
-  const [files, setFiles] = useState<ProjectFile[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+/**
+ * Helper function to execute file operations with consistent error handling
+ */
+async function executeFileOperation(
+  project: Project | null,
+  operation: () => Promise<Response>,
+  refreshFiles: () => Promise<void>,
+  setIsLoading: (v: boolean) => void,
+  setError: (e: string | null) => void,
+  errorMsg: string
+) {
+  if (!project) return;
 
-  const refreshFiles = useCallback(async () => {
+  setIsLoading(true);
+  setError(null);
+  try {
+    const response = await operation();
+    if (response.ok) {
+      await refreshFiles();
+    } else {
+      throw new Error(errorMsg);
+    }
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    setError(errorMessage);
+    logger.error(`${errorMsg}:`, err);
+  } finally {
+    setIsLoading(false);
+  }
+}
+
+/**
+ * Creates a refreshFiles callback for the given project
+ */
+function createRefreshCallback(
+  project: Project | null,
+  setFiles: (files: ProjectFile[]) => void,
+  setIsLoading: (v: boolean) => void,
+  setError: (e: string | null) => void
+) {
+  return useCallback(async () => {
     if (!project) {
       setFiles([]);
       return;
@@ -50,82 +85,29 @@ export function useProjectFiles(project: Project | null): UseProjectFilesReturn 
     } finally {
       setIsLoading(false);
     }
-  }, [project]);
+  }, [project, setFiles, setIsLoading, setError]);
+}
+
+export function useProjectFiles(project: Project | null): UseProjectFilesReturn {
+  const [files, setFiles] = useState<ProjectFile[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refreshFiles = createRefreshCallback(project, setFiles, setIsLoading, setError);
 
   const createFile = useCallback(async (path: string) => {
-    if (!project) return;
-
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await api.projects.createFile(project.name, path);
-      if (response.ok) {
-        await refreshFiles();
-      } else {
-        throw new Error('Failed to create file');
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
-      logger.error('Failed to create file:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [project, refreshFiles]);
+    await executeFileOperation(project, () => api.projects.createFile(project!.name, path), refreshFiles, setIsLoading, setError, 'Failed to create file');
+  }, [project, refreshFiles, setIsLoading, setError]);
 
   const deleteFile = useCallback(async (path: string) => {
-    if (!project) return;
-
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await api.projects.deleteFile(project.name, path);
-      if (response.ok) {
-        await refreshFiles();
-      } else {
-        throw new Error('Failed to delete file');
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
-      logger.error('Failed to delete file:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [project, refreshFiles]);
+    await executeFileOperation(project, () => api.projects.deleteFile(project!.name, path), refreshFiles, setIsLoading, setError, 'Failed to delete file');
+  }, [project, refreshFiles, setIsLoading, setError]);
 
   const renameFile = useCallback(async (oldPath: string, newPath: string) => {
-    if (!project) return;
+    await executeFileOperation(project, () => api.projects.renameFile(project!.name, oldPath, newPath), refreshFiles, setIsLoading, setError, 'Failed to rename file');
+  }, [project, refreshFiles, setIsLoading, setError]);
 
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await api.projects.renameFile(project.name, oldPath, newPath);
-      if (response.ok) {
-        await refreshFiles();
-      } else {
-        throw new Error('Failed to rename file');
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
-      logger.error('Failed to rename file:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [project, refreshFiles]);
+  useEffect(() => { refreshFiles(); }, [project, refreshFiles]);
 
-  useEffect(() => {
-    refreshFiles();
-  }, [project, refreshFiles]);
-
-  return {
-    files,
-    isLoading,
-    error,
-    refreshFiles,
-    createFile,
-    deleteFile,
-    renameFile,
-  };
+  return { files, isLoading, error, refreshFiles, createFile, deleteFile, renameFile };
 }

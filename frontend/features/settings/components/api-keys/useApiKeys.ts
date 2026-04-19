@@ -8,32 +8,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { authenticatedFetch } from '@/shared/services';
 import { logger } from '@/shared/utils/logger';
 
-/** Manages API keys and GitHub tokens data fetching */
-export function useApiKeys() {
-  const [apiKeys, setApiKeys] = useState([]);
-  const [githubTokens, setGithubTokens] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [newlyCreatedKey, setNewlyCreatedKey] = useState(null);
-
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const apiKeysRes = await authenticatedFetch('/api/settings/api-keys');
-      const apiKeysData = await apiKeysRes.json();
-      setApiKeys(apiKeysData.apiKeys || []);
-
-      const githubRes = await authenticatedFetch('/api/settings/credentials?type=github_token');
-      const githubData = await githubRes.json();
-      setGithubTokens(githubData.credentials || []);
-    } catch (error) {
-      logger.error('Error fetching settings:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
-
+/**
+ * Creates API key CRUD operations
+ */
+function useApiKeyOperations(fetchData: () => void, setNewlyCreatedKey: (key: any) => void) {
   const createApiKey = useCallback(async (keyName: string, onSuccess: () => void) => {
     if (!keyName.trim()) return;
     try {
@@ -50,7 +28,7 @@ export function useApiKeys() {
     } catch (error) {
       logger.error('Error creating API key:', error);
     }
-  }, [fetchData]);
+  }, [fetchData, setNewlyCreatedKey]);
 
   const deleteApiKey = useCallback(async (keyId: string, confirmMsg: string) => {
     if (!confirm(confirmMsg)) return;
@@ -74,6 +52,13 @@ export function useApiKeys() {
     }
   }, [fetchData]);
 
+  return { createApiKey, deleteApiKey, toggleApiKey };
+}
+
+/**
+ * Creates GitHub token CRUD operations
+ */
+function useGithubTokenOperations(fetchData: () => void) {
   const createGithubToken = useCallback(async (name: string, value: string, onSuccess: () => void) => {
     if (!name.trim() || !value.trim()) return;
     try {
@@ -110,9 +95,41 @@ export function useApiKeys() {
     }
   }, [fetchData]);
 
+  return { createGithubToken, deleteGithubToken, toggleGithubToken };
+}
+
+/** Manages API keys and GitHub tokens data fetching */
+export function useApiKeys() {
+  const [apiKeys, setApiKeys] = useState([]);
+  const [githubTokens, setGithubTokens] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [newlyCreatedKey, setNewlyCreatedKey] = useState(null);
+
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const apiKeysRes = await authenticatedFetch('/api/settings/api-keys');
+      const apiKeysData = await apiKeysRes.json();
+      setApiKeys(apiKeysData.apiKeys || []);
+
+      const githubRes = await authenticatedFetch('/api/settings/credentials?type=github_token');
+      const githubData = await githubRes.json();
+      setGithubTokens(githubData.credentials || []);
+    } catch (error) {
+      logger.error('Error fetching settings:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const apiKeyOps = useApiKeyOperations(fetchData, setNewlyCreatedKey);
+  const githubTokenOps = useGithubTokenOperations(fetchData);
+
   return {
     apiKeys, githubTokens, loading, newlyCreatedKey, setNewlyCreatedKey,
-    createApiKey, deleteApiKey, toggleApiKey,
-    createGithubToken, deleteGithubToken, toggleGithubToken,
+    ...apiKeyOps,
+    ...githubTokenOps,
   };
 }

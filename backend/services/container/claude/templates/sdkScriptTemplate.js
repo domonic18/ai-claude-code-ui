@@ -6,6 +6,75 @@
  */
 
 /**
+ * Generate image handling code section
+ * @param {Array} imagePaths - Array of image paths
+ * @returns {string} Image handling code
+ */
+function generateImageHandling(imagePaths) {
+  const pathsArray = JSON.stringify(imagePaths);
+  return `    // 添加图片路径到命令（如果有）
+    const imagePaths = ${pathsArray};
+    if (imagePaths.length > 0) {
+      console.error("[SDK] Images available at:", imagePaths);
+      const imageNote = "\\n\\n[Images provided at the following paths:]\\n" +
+        imagePaths.map((p, i) => (i + 1) + ". " + p).join("\\n") +
+        "\\n\\nPlease use the Read tool to view these images and analyze them.";
+      command = command + imageNote;
+    }`;
+}
+
+/**
+ * Generate directory setup code section
+ * @returns {string} Directory setup code
+ */
+function generateDirectorySetup() {
+  return `    // 切换到项目目录，确保工具在正确的位置执行
+    if (options.cwd) {
+      const projectDir = options.cwd;
+      console.error("[SDK] Changing CWD to:", projectDir);
+      try {
+        process.chdir(projectDir);
+      } catch (chdirError) {
+        console.error("[SDK] Failed to change directory:", chdirError.message);
+      }
+    }`;
+}
+
+/**
+ * Generate error handling code section
+ * @param {string} tmpOptionsFile - Temporary options file path
+ * @param {string} tmpScriptFile - Temporary script file path
+ * @returns {string} Error handling code
+ */
+function generateErrorHandling(tmpOptionsFile, tmpScriptFile) {
+  return `  } catch (error) {
+    console.error("[SDK] Error occurred:", error.message);
+    console.error("[SDK] Stack:", error.stack);
+    console.error(JSON.stringify({
+      type: "error",
+      error: error.message,
+      stack: error.stack
+    }));
+    // 清理临时文件
+    try { unlinkSync("${tmpOptionsFile}"); } catch {}
+    try { unlinkSync("${tmpScriptFile}"); } catch {}
+    process.exit(1);
+  }`;
+}
+
+/**
+ * Generate cleanup code section
+ * @param {string} tmpOptionsFile - Temporary options file path
+ * @param {string} tmpScriptFile - Temporary script file path
+ * @returns {string} Cleanup code
+ */
+function generateCleanup(tmpOptionsFile, tmpScriptFile) {
+  return `    // 清理临时文件
+    try { unlinkSync("${tmpOptionsFile}"); } catch {}
+    try { unlinkSync("${tmpScriptFile}"); } catch {}`;
+}
+
+/**
  * Generate SDK script content
  * @param {string} tmpOptionsFile - Temporary options file path
  * @param {string} tmpScriptFile - Temporary script file path
@@ -35,29 +104,12 @@ async function execute() {
     // 从 base64 解码命令
     let command = Buffer.from("${commandBase64}", "base64").toString("utf-8");
 
-    // 添加图片路径到命令（如果有）
-    const imagePaths = ${JSON.stringify(imagePaths)};
-    if (imagePaths.length > 0) {
-      console.error("[SDK] Images available at:", imagePaths);
-      const imageNote = "\\n\\n[Images provided at the following paths:]\\n" +
-        imagePaths.map((p, i) => (i + 1) + ". " + p).join("\\n") +
-        "\\n\\nPlease use the Read tool to view these images and analyze them.";
-      command = command + imageNote;
-    }
+${generateImageHandling(imagePaths)}
 
     console.error("[SDK] Options model:", options.model);
     console.error("[SDK] Command:", command);
 
-    // 切换到项目目录，确保工具在正确的位置执行
-    if (options.cwd) {
-      const projectDir = options.cwd;
-      console.error("[SDK] Changing CWD to:", projectDir);
-      try {
-        process.chdir(projectDir);
-      } catch (chdirError) {
-        console.error("[SDK] Failed to change directory:", chdirError.message);
-      }
-    }
+${generateDirectorySetup()}
 
     // Claude SDK 接受一个对象参数：{ prompt, options }
     const result = query({
@@ -88,23 +140,9 @@ async function execute() {
       sessionId: "${sessionId}"
     }));
 
-    // 清理临时文件
-    try { unlinkSync("${tmpOptionsFile}"); } catch {}
-    try { unlinkSync("${tmpScriptFile}"); } catch {}
+${generateCleanup(tmpOptionsFile, tmpScriptFile)}
 
-  } catch (error) {
-    console.error("[SDK] Error occurred:", error.message);
-    console.error("[SDK] Stack:", error.stack);
-    console.error(JSON.stringify({
-      type: "error",
-      error: error.message,
-      stack: error.stack
-    }));
-    // 清理临时文件
-    try { unlinkSync("${tmpOptionsFile}"); } catch {}
-    try { unlinkSync("${tmpScriptFile}"); } catch {}
-    process.exit(1);
-  }
+${generateErrorHandling(tmpOptionsFile, tmpScriptFile)}
 }
 
 execute();

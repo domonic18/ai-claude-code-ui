@@ -72,6 +72,50 @@ function createPermissionsOperations(
 }
 
 /**
+ * Create MCP CRUD operation with reload
+ */
+function createMcpCrudOperation(
+  service: ReturnType<typeof getSettingsService>,
+  loadMcpServers: () => Promise<void>,
+  setLoading: (loading: boolean) => void,
+  setError: (error: string | null) => void
+) {
+  return async (operation: () => Promise<any>, errorMessage: string) => {
+    const result = await handleSettingsOperation(
+      operation,
+      errorMessage,
+      setLoading,
+      setError
+    );
+    if (result.success) {
+      await loadMcpServers();
+    }
+    return result;
+  };
+}
+
+/**
+ * Create MCP test/discover operation without reload
+ */
+function createMcpTestOperation(
+  service: ReturnType<typeof getSettingsService>,
+  setError: (error: string | null) => void,
+  errorMessage: string
+) {
+  return async (id: string, operation: (id: string) => Promise<any>) => {
+    try {
+      setError(null);
+      return await operation(id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : errorMessage;
+      setError(message);
+      logger.error('[useSettings] MCP operation error:', err);
+      return { success: false, error: message, message };
+    }
+  };
+}
+
+/**
  * Create MCP server operations
  */
 function createMcpServerOperations(
@@ -90,68 +134,44 @@ function createMcpServerOperations(
     setMcpServers(servers);
   }, [service, setMcpServers, setLoading, setError]);
 
+  const crudOperation = createMcpCrudOperation(
+    service,
+    loadMcpServers,
+    setLoading,
+    setError
+  );
+
+  const testOperation = createMcpTestOperation(service, setError, 'Failed to test MCP server');
+  const discoverOperation = createMcpTestOperation(service, setError, 'Failed to discover MCP tools');
+
   const createMcpServer = useCallback(async (server: Partial<McpServer>) => {
-    const result = await handleSettingsOperation(
+    return crudOperation(
       () => service.createMcpServer(server),
-      'Failed to create MCP server',
-      setLoading,
-      setError
+      'Failed to create MCP server'
     );
-    if (result.success) {
-      await loadMcpServers();
-    }
-    return result;
-  }, [service, loadMcpServers, setLoading, setError]);
+  }, [service, crudOperation]);
 
   const updateMcpServer = useCallback(async (id: string, server: Partial<McpServer>) => {
-    const result = await handleSettingsOperation(
+    return crudOperation(
       () => service.updateMcpServer(id, server),
-      'Failed to update MCP server',
-      setLoading,
-      setError
+      'Failed to update MCP server'
     );
-    if (result.success) {
-      await loadMcpServers();
-    }
-    return result;
-  }, [service, loadMcpServers, setLoading, setError]);
+  }, [service, crudOperation]);
 
   const deleteMcpServer = useCallback(async (id: string) => {
-    const result = await handleSettingsOperation(
+    return crudOperation(
       () => service.deleteMcpServer(id),
-      'Failed to delete MCP server',
-      setLoading,
-      setError
+      'Failed to delete MCP server'
     );
-    if (result.success) {
-      await loadMcpServers();
-    }
-    return result;
-  }, [service, loadMcpServers, setLoading, setError]);
+  }, [service, crudOperation]);
 
   const testMcpServer = useCallback(async (id: string) => {
-    try {
-      setError(null);
-      return await service.testMcpServer(id);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to test MCP server';
-      setError(message);
-      logger.error('[useSettings] Error testing MCP server:', err);
-      return { success: false, message };
-    }
-  }, [service, setError]);
+    return testOperation(id, service.testMcpServer.bind(service));
+  }, [testOperation, service]);
 
   const discoverMcpTools = useCallback(async (id: string) => {
-    try {
-      setError(null);
-      return await service.discoverMcpTools(id);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to discover MCP tools';
-      setError(message);
-      logger.error('[useSettings] Error discovering MCP tools:', err);
-      return { success: false, error: message };
-    }
-  }, [service, setError]);
+    return discoverOperation(id, service.discoverMcpTools.bind(service));
+  }, [discoverOperation, service]);
 
   return {
     loadMcpServers,

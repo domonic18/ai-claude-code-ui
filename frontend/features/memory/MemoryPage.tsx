@@ -76,6 +76,63 @@ function MemoryEditor({ content, isLoading, isSaving, onSave, onChange }: Memory
 }
 
 /**
+ * MemoryPage header component with back button, title, and success indicator
+ */
+interface MemoryPageHeaderProps {
+  saveSuccess: boolean;
+  t: (key: string) => string;
+}
+
+function MemoryPageHeader({ saveSuccess, t }: MemoryPageHeaderProps) {
+  return (
+    <header className="border-b border-border bg-card">
+      <div className="max-w-6xl mx-auto px-4 py-4">
+        <div className="flex items-center justify-between">
+          {/* Back button */}
+          <Link
+            to="/chat"
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span className="font-medium">{t('common.back') || 'Back'}</span>
+          </Link>
+
+          {/* Title */}
+          <div className="flex items-center gap-2">
+            <Brain className="w-5 h-5 text-primary" />
+            <h1 className="text-xl font-semibold">{t('memory.title')}</h1>
+          </div>
+
+          {/* Success indicator */}
+          {saveSuccess && (
+            <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+              <CheckCircle className="w-4 h-4" />
+              <span className="text-sm">{t('memory.saved')}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}
+
+/**
+ * Error message display component
+ */
+interface ErrorMessageProps {
+  error: string | null;
+}
+
+function ErrorMessage({ error }: ErrorMessageProps) {
+  if (!error) return null;
+  return (
+    <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+      <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+    </div>
+  );
+}
+
+/**
  * 记忆页面组件
  */
 export function MemoryPage() {
@@ -129,43 +186,12 @@ export function MemoryPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            {/* Back button */}
-            <Link
-              to="/chat"
-              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span className="font-medium">{t('common.back') || 'Back'}</span>
-            </Link>
-
-            {/* Title */}
-            <div className="flex items-center gap-2">
-              <Brain className="w-5 h-5 text-primary" />
-              <h1 className="text-xl font-semibold">{t('memory.title')}</h1>
-            </div>
-
-            {/* Success indicator */}
-            {saveSuccess && (
-              <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                <CheckCircle className="w-4 h-4" />
-                <span className="text-sm">{t('memory.saved')}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
+      <MemoryPageHeader saveSuccess={saveSuccess} t={t} />
 
       {/* Content */}
       <main className="max-w-6xl mx-auto px-4 py-8">
         {/* Error message */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-            <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
-          </div>
-        )}
+        <ErrorMessage error={error} />
 
         {/* Editor */}
         <MemoryEditor

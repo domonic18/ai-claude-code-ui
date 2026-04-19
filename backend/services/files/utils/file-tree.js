@@ -44,6 +44,78 @@ function cleanFileName(name) {
 }
 
 /**
+ * 解析文件树输出
+ * @param {string} output - 原始输出
+ * @param {string} containerPath - 容器路径
+ * @returns {Array} 解析后的文件项数组
+ */
+function parseFileTreeOutput(output, containerPath) {
+  const items = [];
+  const lines = output.trim().split('\n');
+
+  for (const line of lines) {
+    if (!line) continue;
+
+    const parts = line.split('|');
+    if (parts.length < 4) {
+      logger.warn('[FileTree] Skipping malformed line:', JSON.stringify(line));
+      continue;
+    }
+
+    const [rawName, type, size, mtime] = parts;
+
+    // 清理文件名
+    const name = cleanFileName(rawName);
+
+    // 跳过空文件名
+    if (!name || name === '' || name === '.') {
+      logger.warn('[FileTree] Skipping empty or invalid filename:', JSON.stringify(rawName));
+      continue;
+    }
+
+    // 跳过繁重的构建目录
+    if (name === 'node_modules' || name === 'dist' || name === 'build') {
+      continue;
+    }
+
+    // 解析和验证值
+    const parsedSize = parseInt(size, 10);
+    const parsedMtime = parseFloat(mtime);
+
+    if (isNaN(parsedSize) || isNaN(parsedMtime)) {
+      logger.warn('[FileTree] Skipping line with invalid values:', JSON.stringify(line));
+      continue;
+    }
+
+    const dateObj = new Date(parsedMtime * 1000);
+    if (isNaN(dateObj.getTime())) {
+      logger.warn('[FileTree] Skipping line with invalid date:', JSON.stringify(line));
+      continue;
+    }
+
+    const item = {
+      name,
+      path: `${containerPath}/${name}`,
+      type: type === 'd' ? 'directory' : 'file',
+      size: parsedSize,
+      modified: dateObj.toISOString()
+    };
+
+    items.push(item);
+  }
+
+  // 排序：目录优先，然后按字母顺序
+  items.sort((a, b) => {
+    if (a.type !== b.type) {
+      return a.type === 'directory' ? -1 : 1;
+    }
+    return a.name.localeCompare(b.name);
+  });
+
+  return items;
+}
+
+/**
  * 从容器内获取文件树
  * @param {number} userId - 用户 ID
  * @param {string} dirPath - 目录路径（相对于项目根目录）
@@ -102,68 +174,7 @@ export async function getFileTreeInContainer(userId, dirPath = '.', options = {}
 
       stream.on('end', () => {
         try {
-          const items = [];
-          const lines = output.trim().split('\n');
-
-          for (const line of lines) {
-            if (!line) continue;
-
-            const parts = line.split('|');
-            if (parts.length < 4) {
-              logger.warn('[FileTree] Skipping malformed line:', JSON.stringify(line));
-              continue;
-            }
-
-            const [rawName, type, size, mtime] = parts;
-
-            // 清理文件名
-            const name = cleanFileName(rawName);
-
-            // 跳过空文件名
-            if (!name || name === '' || name === '.') {
-              logger.warn('[FileTree] Skipping empty or invalid filename:', JSON.stringify(rawName));
-              continue;
-            }
-
-            // 跳过繁重的构建目录
-            if (name === 'node_modules' || name === 'dist' || name === 'build') {
-              continue;
-            }
-
-            // 解析和验证值
-            const parsedSize = parseInt(size, 10);
-            const parsedMtime = parseFloat(mtime);
-
-            if (isNaN(parsedSize) || isNaN(parsedMtime)) {
-              logger.warn('[FileTree] Skipping line with invalid values:', JSON.stringify(line));
-              continue;
-            }
-
-            const dateObj = new Date(parsedMtime * 1000);
-            if (isNaN(dateObj.getTime())) {
-              logger.warn('[FileTree] Skipping line with invalid date:', JSON.stringify(line));
-              continue;
-            }
-
-            const item = {
-              name,
-              path: `${containerPath}/${name}`,
-              type: type === 'd' ? 'directory' : 'file',
-              size: parsedSize,
-              modified: dateObj.toISOString()
-            };
-
-            items.push(item);
-          }
-
-          // 排序：目录优先，然后按字母顺序
-          items.sort((a, b) => {
-            if (a.type !== b.type) {
-              return a.type === 'directory' ? -1 : 1;
-            }
-            return a.name.localeCompare(b.name);
-          });
-
+          const items = parseFileTreeOutput(output, containerPath);
           resolve(items);
         } catch (parseError) {
           reject(new Error(`Failed to parse file tree: ${parseError.message}`));

@@ -9,6 +9,28 @@
 import React, { useRef, useEffect } from 'react';
 import type { SlashCommand } from '../hooks/useSlashCommands';
 
+/**
+ * Custom hook to scroll selected item into view
+ */
+function useScrollIntoView(
+  selectedItemRef: React.RefObject<HTMLDivElement>,
+  menuRef: React.RefObject<HTMLDivElement>,
+  selectedIndex: number
+) {
+  useEffect(() => {
+    if (selectedItemRef.current && menuRef.current) {
+      const menuRect = menuRef.current.getBoundingClientRect();
+      const itemRect = selectedItemRef.current.getBoundingClientRect();
+
+      if (itemRect.bottom > menuRect.bottom) {
+        selectedItemRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else if (itemRect.top < menuRect.top) {
+        selectedItemRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  }, [selectedIndex]);
+}
+
 interface CommandAutocompleteMenuProps {
   isOpen: boolean;
   position: { top: number; left: number; bottom?: number };
@@ -52,6 +74,49 @@ function getMenuPosition(position: { top: number; left: number; bottom?: number 
 }
 
 /**
+ * Render empty state menu
+ */
+function renderEmptyState(menuRef: React.RefObject<HTMLDivElement>, menuPosition: any) {
+  return (
+    <div
+      ref={menuRef}
+      className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 p-4"
+      style={menuPosition}
+    >
+      <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+        No commands available
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Render menu header
+ */
+function renderMenuHeader(query: string) {
+  return (
+    <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+      <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
+        Commands {query && `matching "${query}"`}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Render menu footer
+ */
+function renderMenuFooter() {
+  return (
+    <div className="px-3 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+      <p className="text-xs text-gray-500 dark:text-gray-400">
+        Use ↑↓ to navigate, Enter to select
+      </p>
+    </div>
+  );
+}
+
+/**
  * CommandAutocompleteMenu Component
  *
  * Renders the menu container with click-outside detection.
@@ -88,18 +153,7 @@ export function CommandAutocompleteMenu({
   }, [isOpen, onClose]);
 
   // Scroll selected item into view
-  useEffect(() => {
-    if (selectedItemRef.current && menuRef.current) {
-      const menuRect = menuRef.current.getBoundingClientRect();
-      const itemRect = selectedItemRef.current.getBoundingClientRect();
-
-      if (itemRect.bottom > menuRect.bottom) {
-        selectedItemRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      } else if (itemRect.top < menuRect.top) {
-        selectedItemRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      }
-    }
-  }, [selectedIndex]);
+  useScrollIntoView(selectedItemRef, menuRef, selectedIndex);
 
   if (!isOpen) {
     return null;
@@ -107,23 +161,8 @@ export function CommandAutocompleteMenu({
 
   // Show message if no commands available
   if (commands.length === 0) {
-    return (
-      <div
-        ref={menuRef}
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 p-4"
-        style={menuPosition}
-      >
-        <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-          No commands available
-        </p>
-      </div>
-    );
+    return renderEmptyState(menuRef, menuPosition);
   }
-
-  // Check if command is frequently used
-  const isFrequentCommand = (commandName: string) => {
-    return frequentCommands.some(cmd => cmd.name === commandName);
-  };
 
   return (
     <div
@@ -131,24 +170,14 @@ export function CommandAutocompleteMenu({
       className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden"
       style={menuPosition}
     >
-      {/* Header */}
-      <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-        <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
-          Commands {query && `matching "${query}"`}
-        </p>
-      </div>
+      {renderMenuHeader(query)}
 
       {/* Command list */}
       <div className="max-h-[300px] overflow-y-auto py-1">
         {children(selectedItemRef)}
       </div>
 
-      {/* Footer */}
-      <div className="px-3 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Use ↑↓ to navigate, Enter to select
-        </p>
-      </div>
+      {renderMenuFooter()}
     </div>
   );
 }

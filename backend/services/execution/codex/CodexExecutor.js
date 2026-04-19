@@ -127,6 +127,47 @@ function mapPermissionModeToCodexOptions(permissionMode) {
 }
 
 /**
+ * 处理 Codex 流式事件
+ * @param {AsyncIterable} streamedTurn - 流式事件迭代器
+ * @param {WebSocket|object} ws - WebSocket 连接或响应 writer
+ * @param {string} currentSessionId - 当前会话 ID
+ * @returns {Promise<void>}
+ */
+async function processStreamEvents(streamedTurn, ws, currentSessionId) {
+  for await (const event of streamedTurn.events) {
+    // 检查会话是否已中止
+    const session = activeCodexSessions.get(currentSessionId);
+    if (!session || session.status === 'aborted') {
+      break;
+    }
+
+    if (event.type === 'item.started' || event.type === 'item.updated') {
+      continue;
+    }
+
+    const transformed = transformCodexEvent(event);
+
+    sendMessage(ws, {
+      type: 'codex-response',
+      data: transformed,
+      sessionId: currentSessionId
+    });
+
+    // 提取并发送 token 使用情况（如果可用，标准化以匹配 Claude 格式）
+    if (event.type === 'turn.completed' && event.usage) {
+      const totalTokens = (event.usage.input_tokens || 0) + (event.usage.output_tokens || 0);
+      sendMessage(ws, {
+        type: 'token-budget',
+        data: {
+          used: totalTokens,
+          total: 200000 // Codex 模型的默认上下文窗口
+        }
+      });
+    }
+  }
+}
+
+/**
  * 使用流式执行 Codex 查询
  * @param {string} command - 要发送的提示
  * @param {object} options - 选项，包括 cwd、sessionId、model、permissionMode
@@ -189,37 +230,8 @@ export async function queryCodex(command, options = {}, ws) {
     // 使用流式执行
     const streamedTurn = await thread.runStreamed(command);
 
-    for await (const event of streamedTurn.events) {
-      // 检查会话是否已中止
-      const session = activeCodexSessions.get(currentSessionId);
-      if (!session || session.status === 'aborted') {
-        break;
-      }
-
-      if (event.type === 'item.started' || event.type === 'item.updated') {
-        continue;
-      }
-
-      const transformed = transformCodexEvent(event);
-
-      sendMessage(ws, {
-        type: 'codex-response',
-        data: transformed,
-        sessionId: currentSessionId
-      });
-
-      // 提取并发送 token 使用情况（如果可用，标准化以匹配 Claude 格式）
-      if (event.type === 'turn.completed' && event.usage) {
-        const totalTokens = (event.usage.input_tokens || 0) + (event.usage.output_tokens || 0);
-        sendMessage(ws, {
-          type: 'token-budget',
-          data: {
-            used: totalTokens,
-            total: 200000 // Codex 模型的默认上下文窗口
-          }
-        });
-      }
-    }
+    // 处理流式事件
+    await processStreamEvents(streamedTurn, ws, currentSessionId);
 
     // 发送完成事件
     sendMessage(ws, {

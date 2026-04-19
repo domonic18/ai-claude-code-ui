@@ -38,6 +38,117 @@ interface UseMessageStreamReturn {
   resetStream: () => void;
 }
 
+interface UseStreamBufferOptions {
+  /** Throttle interval for stream updates (ms) */
+  throttleInterval: number;
+  /** Callback when stream updates */
+  onStreamUpdate?: (content: string, thinking?: string) => void;
+  /** Callback when content is first added */
+  onHasContent?: () => void;
+}
+
+interface UseStreamBufferReturn {
+  /** Current streaming content */
+  streamingContent: string;
+  /** Current streaming thinking content */
+  streamingThinking: string;
+  /** Clear the stream timer */
+  clearStreamTimer: () => void;
+  /** Flush buffered content to state */
+  flushBuffer: () => void;
+  /** Update streaming content (throttled) */
+  updateStreamContent: (content: string) => void;
+  /** Update streaming thinking (throttled) */
+  updateStreamThinking: (thinking: string) => void;
+  /** Get buffer content */
+  getBufferContent: () => { content: string; thinking: string };
+  /** Reset buffers */
+  resetBuffers: () => void;
+}
+
+/**
+ * Sub-hook for managing stream buffering with throttled updates
+ *
+ * @param options - Buffer options
+ * @returns Buffer state and control functions
+ */
+function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn {
+  const { throttleInterval, onStreamUpdate, onHasContent } = options;
+
+  const [streamingContent, setStreamingContent] = useState('');
+  const [streamingThinking, setStreamingThinking] = useState('');
+  const streamBufferRef = useRef('');
+  const thinkingBufferRef = useRef('');
+  const streamTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearStreamTimer = useCallback(() => {
+    if (streamTimerRef.current) {
+      clearTimeout(streamTimerRef.current);
+      streamTimerRef.current = null;
+    }
+  }, []);
+
+  const flushBuffer = useCallback(() => {
+    if (streamBufferRef.current.length > 0) {
+      setStreamingContent(prev => prev + streamBufferRef.current);
+      streamBufferRef.current = '';
+    }
+    if (thinkingBufferRef.current.length > 0) {
+      setStreamingThinking(prev => prev + thinkingBufferRef.current);
+      thinkingBufferRef.current = '';
+    }
+  }, []);
+
+  const updateStreamContent = useCallback((content: string) => {
+    if (!content) return;
+
+    onHasContent?.();
+
+    streamBufferRef.current += content;
+    clearStreamTimer();
+
+    streamTimerRef.current = setTimeout(() => {
+      flushBuffer();
+      onStreamUpdate?.(streamingContent + streamBufferRef.current, streamingThinking);
+    }, throttleInterval);
+  }, [flushBuffer, clearStreamTimer, throttleInterval, onStreamUpdate, onHasContent, streamingContent, streamingThinking]);
+
+  const updateStreamThinking = useCallback((thinking: string) => {
+    if (!thinking) return;
+
+    thinkingBufferRef.current += thinking;
+    clearStreamTimer();
+
+    streamTimerRef.current = setTimeout(() => {
+      flushBuffer();
+      onStreamUpdate?.(streamingContent, streamingThinking + thinkingBufferRef.current);
+    }, throttleInterval);
+  }, [flushBuffer, clearStreamTimer, throttleInterval, onStreamUpdate, streamingContent, streamingThinking]);
+
+  const getBufferContent = useCallback(() => {
+    return {
+      content: streamingContent + streamBufferRef.current,
+      thinking: streamingThinking + thinkingBufferRef.current,
+    };
+  }, [streamingContent, streamingThinking]);
+
+  const resetBuffers = useCallback(() => {
+    streamBufferRef.current = '';
+    thinkingBufferRef.current = '';
+  }, []);
+
+  return {
+    streamingContent,
+    streamingThinking,
+    clearStreamTimer,
+    flushBuffer,
+    updateStreamContent,
+    updateStreamThinking,
+    getBufferContent,
+    resetBuffers,
+  };
+}
+
 /**
  * Hook for managing streaming message state
  *
@@ -51,141 +162,60 @@ export function useMessageStream(options: UseMessageStreamOptions = {}): UseMess
     onStreamUpdate,
   } = options;
 
-  const [streamingContent, setStreamingContent] = useState('');
-  const [streamingThinking, setStreamingThinking] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
-
-  // Refs for stream buffering
-  const streamBufferRef = useRef('');
-  const thinkingBufferRef = useRef('');
-  const streamTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasContentRef = useRef(false);
 
-  /**
-   * Clear the stream timer
-   */
-  const clearStreamTimer = useCallback(() => {
-    if (streamTimerRef.current) {
-      clearTimeout(streamTimerRef.current);
-      streamTimerRef.current = null;
-    }
+  const setHasContent = useCallback(() => {
+    hasContentRef.current = true;
   }, []);
 
-  /**
-   * Flush buffered content to state
-   */
-  const flushBuffer = useCallback(() => {
-    if (streamBufferRef.current.length > 0) {
-      setStreamingContent(prev => prev + streamBufferRef.current);
-      streamBufferRef.current = '';
-    }
-    if (thinkingBufferRef.current.length > 0) {
-      setStreamingThinking(prev => prev + thinkingBufferRef.current);
-      thinkingBufferRef.current = '';
-    }
-  }, []);
+  const buffer = useStreamBuffer({
+    throttleInterval,
+    onStreamUpdate,
+    onHasContent: setHasContent
+  });
 
-  /**
-   * Start a new stream
-   */
   const startStream = useCallback(() => {
     setIsStreaming(true);
     hasContentRef.current = false;
-    setStreamingContent('');
-    setStreamingThinking('');
-    streamBufferRef.current = '';
-    thinkingBufferRef.current = '';
-    clearStreamTimer();
-  }, [clearStreamTimer]);
+    buffer.resetBuffers();
+    buffer.clearStreamTimer();
+  }, [buffer]);
 
-  /**
-   * Update streaming content (throttled)
-   */
-  const updateStreamContent = useCallback((content: string) => {
-    if (!content) return;
-
-    hasContentRef.current = true;
-    streamBufferRef.current += content;
-
-    // Clear existing timer
-    clearStreamTimer();
-
-    // Set new timer to flush buffer
-    streamTimerRef.current = setTimeout(() => {
-      flushBuffer();
-      onStreamUpdate?.(streamingContent + streamBufferRef.current, streamingThinking);
-    }, throttleInterval);
-  }, [flushBuffer, clearStreamTimer, throttleInterval, onStreamUpdate, streamingContent, streamingThinking]);
-
-  /**
-   * Update streaming thinking (throttled)
-   */
-  const updateStreamThinking = useCallback((thinking: string) => {
-    if (!thinking) return;
-
-    thinkingBufferRef.current += thinking;
-
-    // Clear existing timer
-    clearStreamTimer();
-
-    // Set new timer to flush buffer
-    streamTimerRef.current = setTimeout(() => {
-      flushBuffer();
-      onStreamUpdate?.(streamingContent, streamingThinking + thinkingBufferRef.current);
-    }, throttleInterval);
-  }, [flushBuffer, clearStreamTimer, throttleInterval, onStreamUpdate, streamingContent, streamingThinking]);
-
-  /**
-   * Complete the stream
-   */
   const completeStream = useCallback(() => {
-    // Flush any remaining buffered content
-    flushBuffer();
-    clearStreamTimer();
+    buffer.flushBuffer();
+    buffer.clearStreamTimer();
 
     setIsStreaming(false);
 
-    // Clear streaming content to hide StreamingIndicator
-    // Content is already persisted in the messages array
-    setStreamingContent('');
-    setStreamingThinking('');
+    const finalContent = buffer.getBufferContent();
 
-    // Call completion callback with final content
     if (hasContentRef.current) {
-      onStreamComplete?.(streamingContent + streamBufferRef.current, streamingThinking + thinkingBufferRef.current);
+      onStreamComplete?.(finalContent.content, finalContent.thinking);
     }
-  }, [flushBuffer, clearStreamTimer, onStreamComplete, streamingContent, streamingThinking]);
+  }, [buffer, onStreamComplete]);
 
-  /**
-   * Reset stream state
-   */
   const resetStream = useCallback(() => {
-    flushBuffer();
-    clearStreamTimer();
+    buffer.flushBuffer();
+    buffer.clearStreamTimer();
     setIsStreaming(false);
-    setStreamingContent('');
-    setStreamingThinking('');
-    streamBufferRef.current = '';
-    thinkingBufferRef.current = '';
+    buffer.resetBuffers();
     hasContentRef.current = false;
-  }, [flushBuffer, clearStreamTimer]);
+  }, [buffer]);
 
-  /**
-   * Cleanup on unmount
-   */
   useEffect(() => {
     return () => {
-      clearStreamTimer();
+      buffer.clearStreamTimer();
     };
-  }, [clearStreamTimer]);
+  }, [buffer]);
 
   return {
-    streamingContent,
-    streamingThinking,
+    streamingContent: buffer.streamingContent,
+    streamingThinking: buffer.streamingThinking,
     isStreaming,
     startStream,
-    updateStreamContent,
-    updateStreamThinking,
+    updateStreamContent: buffer.updateStreamContent,
+    updateStreamThinking: buffer.updateStreamThinking,
     completeStream,
     resetStream,
   };

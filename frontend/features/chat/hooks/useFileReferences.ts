@@ -64,6 +64,37 @@ export interface UseFileReferencesReturn {
 }
 
 /**
+ * Traverse file tree recursively and build file list
+ * @param node - File tree node
+ * @param parentPath - Parent directory path
+ * @param fileList - Accumulated file list
+ */
+function traverseFileTree(node: any, parentPath: string, fileList: FileReference[]) {
+  if (!node) return;
+
+  const nodePath = parentPath ? `${parentPath}/${node.name}` : node.name;
+
+  if (node.type === 'file' || !node.children) {
+    const extension = node.name?.includes('.') ? node.name.split('.').pop() : '';
+    fileList.push({
+      path: nodePath,
+      name: node.name,
+      extension,
+      type: 'file',
+      relativePath: nodePath,
+    });
+  } else if (node.children) {
+    fileList.push({
+      path: nodePath,
+      name: node.name,
+      type: 'directory',
+      relativePath: nodePath,
+    });
+    node.children.forEach((child: any) => traverseFileTree(child, nodePath, fileList));
+  }
+}
+
+/**
  * Hook for managing file references
  */
 export function useFileReferences({
@@ -78,67 +109,25 @@ export function useFileReferences({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [atPosition, setAtPosition] = useState(-1);
 
-  // Reset selected index when menu opens or query changes
   useEffect(() => {
     if (showMenu) {
       setSelectedIndex(0);
     }
   }, [showMenu, query]);
 
-  /**
-   * Load files from project
-   */
   const loadFiles = useCallback(async () => {
-    if (!selectedProject || !authenticatedFetch) {
-      return;
-    }
-
+    if (!selectedProject || !authenticatedFetch) return;
     setIsLoading(true);
     try {
-      // Use correct API endpoint: /api/projects/:projectName/files
       const response = await authenticatedFetch(`/api/projects/${encodeURIComponent(selectedProject)}/files`);
-      if (!response.ok) {
-        throw new Error('Failed to load files');
-      }
+      if (!response.ok) throw new Error('Failed to load files');
 
       const data = await response.json();
-
-      // Handle file tree response format
       const fileList: FileReference[] = [];
-
-      function traverseFileTree(node: any, parentPath = '') {
-        if (!node) return;
-
-        const nodePath = parentPath ? `${parentPath}/${node.name}` : node.name;
-
-        if (node.type === 'file' || !node.children) {
-          const extension = node.name?.includes('.') ? node.name.split('.').pop() : '';
-          fileList.push({
-            path: nodePath,
-            name: node.name,
-            extension,
-            type: 'file',
-            relativePath: nodePath,
-          });
-        } else if (node.children) {
-          // Add directory
-          fileList.push({
-            path: nodePath,
-            name: node.name,
-            type: 'directory',
-            relativePath: nodePath,
-          });
-          // Recursively process children
-          node.children.forEach((child: any) => traverseFileTree(child, nodePath));
-        }
-      }
-
-      // Handle response format: could be { tree: [...] } or just [...]
       const treeData = data.tree || data.data || data;
       if (Array.isArray(treeData)) {
-        treeData.forEach(node => traverseFileTree(node));
+        treeData.forEach(node => traverseFileTree(node, '', fileList));
       }
-
       setFiles(fileList);
     } catch (error) {
       logger.error('Failed to load files:', error);
@@ -148,52 +137,24 @@ export function useFileReferences({
     }
   }, [selectedProject, authenticatedFetch]);
 
-  // Load files when project changes
-  useEffect(() => {
-    loadFiles();
-  }, [loadFiles]);
+  useEffect(() => { loadFiles(); }, [loadFiles]);
 
-  /**
-   * Filtered files based on query
-   */
   const filteredFiles = useCallback(() => {
-    if (!query) {
-      return files.slice(0, 20); // Limit to 20 files
-    }
-
+    if (!query) return files.slice(0, 20);
     const lowerQuery = query.toLowerCase();
     return files
-      .filter(file =>
-        file.name.toLowerCase().includes(lowerQuery) ||
-        file.relativePath.toLowerCase().includes(lowerQuery)
-      )
+      .filter(f => f.name.toLowerCase().includes(lowerQuery) || f.relativePath.toLowerCase().includes(lowerQuery))
       .slice(0, 20);
   }, [files, query]);
 
-  /**
-   * Handle file selection
-   */
   const handleFileSelect = useCallback((file: FileReference, index: number, isHover?: boolean) => {
-    if (isHover) {
-      setSelectedIndex(index);
-      return;
-    }
-    
+    if (isHover) { setSelectedIndex(index); return; }
     onFileReference?.(file);
   }, [onFileReference]);
 
   return {
-    files,
-    filteredFiles: filteredFiles(),
-    showMenu,
-    query,
-    selectedIndex,
-    atPosition,
-    isLoading,
-    setQuery,
-    setSelectedIndex,
-    setAtPosition,
-    setShowMenu,
-    handleFileSelect,
+    files, filteredFiles: filteredFiles(), showMenu, query, selectedIndex,
+    atPosition, isLoading, setQuery, setSelectedIndex, setAtPosition,
+    setShowMenu, handleFileSelect,
   };
 }
