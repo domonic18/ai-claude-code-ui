@@ -77,168 +77,106 @@ function extractDescription(ext, content) {
     }
 }
 
-// ─── 各类型读取函数 ───────────────────────────────────
+// ─── 泛型目录读取器 ───────────────────────────────────
 
 /**
- * 读取 agents 目录的元数据
- * @returns {Promise<Array<{filename: string, name: string, description: string}>>}
+ * 通用目录读取器——消除 readAgents/readCommands/readSkills/readHooks/readKnowledge 的重复结构
+ * @param {string} subDir - 相对于 EXTENSIONS_DIR 的子目录名
+ * @param {Object} options
+ * @param {Function} [options.filter] - 筛选目录项 (entry) => boolean
+ * @param {Function} [options.parseEntry] - 从目录项解析元数据 (entry, fullPath) => Promise<object>
+ * @returns {Promise<Array>}
  */
-async function readAgents() {
-    const agents = [];
-    const agentsDir = path.join(EXTENSIONS_DIR, 'agents');
-    if (!(await directoryExists(agentsDir))) return agents;
+async function readExtensionDir(subDir, { filter = () => true, parseEntry } = {}) {
+    const results = [];
+    const dirPath = path.join(EXTENSIONS_DIR, subDir);
+    if (!(await directoryExists(dirPath))) return results;
 
-    const entries = await fs.readdir(agentsDir, { withFileTypes: true });
+    const entries = await fs.readdir(dirPath, { withFileTypes: true });
     for (const entry of entries) {
-        if (entry.isFile() && entry.name.endsWith('.json')) {
-            const filePath = path.join(agentsDir, entry.name);
+        if (!filter(entry)) continue;
+        if (parseEntry) {
+            try {
+                const item = await parseEntry(entry, path.join(dirPath, entry.name));
+                if (item) results.push(item);
+            } catch {
+                results.push({ filename: entry.name, name: entry.name, description: '[解析失败]' });
+            }
+        }
+    }
+    return results;
+}
+
+// ─── 各类型读取函数（使用泛型读取器）────────────────────
+
+async function readAgents() {
+    return readExtensionDir('agents', {
+        filter: (entry) => entry.isFile() && entry.name.endsWith('.json'),
+        parseEntry: async (entry, filePath) => {
             try {
                 const content = JSON.parse(await fs.readFile(filePath, 'utf-8'));
-                agents.push({
-                    filename: entry.name,
-                    name: content.name || entry.name.replace('.json', ''),
-                    description: content.description || ''
-                });
+                return { filename: entry.name, name: content.name || entry.name.replace('.json', ''), description: content.description || '' };
             } catch {
-                agents.push({
-                    filename: entry.name,
-                    name: entry.name.replace('.json', ''),
-                    description: '[解析失败]'
-                });
+                return { filename: entry.name, name: entry.name.replace('.json', ''), description: '[解析失败]' };
             }
         }
-    }
-    return agents;
+    });
 }
 
-/**
- * 读取 commands 目录的元数据
- * @returns {Promise<Array<{filename: string, name: string}>>}
- */
 async function readCommands() {
-    const commands = [];
-    const commandsDir = path.join(EXTENSIONS_DIR, 'commands');
-    if (!(await directoryExists(commandsDir))) return commands;
-
-    const entries = await fs.readdir(commandsDir, { withFileTypes: true });
-    for (const entry of entries) {
-        if (entry.isFile() && entry.name.endsWith('.md')) {
-            commands.push({ filename: entry.name, name: entry.name.replace('.md', '') });
-        }
-    }
-    return commands;
+    return readExtensionDir('commands', {
+        filter: (entry) => entry.isFile() && entry.name.endsWith('.md'),
+        parseEntry: async (entry) => ({ filename: entry.name, name: entry.name.replace('.md', '') })
+    });
 }
 
-/**
- * 读取 skills 目录的元数据
- * @returns {Promise<Array<{name: string, description: string}>>}
- */
 async function readSkills() {
-    const skills = [];
-    const skillsDir = path.join(EXTENSIONS_DIR, 'skills');
-    if (!(await directoryExists(skillsDir))) return skills;
-
-    const entries = await fs.readdir(skillsDir, { withFileTypes: true });
-    for (const entry of entries) {
-        if (entry.isDirectory() && !entry.name.startsWith('.')) {
-            const skillMdPath = path.join(skillsDir, entry.name, 'SKILL.md');
+    return readExtensionDir('skills', {
+        filter: (entry) => entry.isDirectory() && !entry.name.startsWith('.'),
+        parseEntry: async (entry, filePath) => {
             let description = '';
+            const skillMdPath = path.join(filePath, 'SKILL.md');
             if (await fileExists(skillMdPath)) {
-                try {
-                    const content = await fs.readFile(skillMdPath, 'utf-8');
-                    description = extractMarkdownTitle(content);
-                } catch {
-                    description = '[无法读取]';
-                }
+                try { description = extractMarkdownTitle(await fs.readFile(skillMdPath, 'utf-8')); } catch { description = '[无法读取]'; }
             }
-            skills.push({ name: entry.name, description });
+            return { name: entry.name, description };
         }
-    }
-    return skills;
+    });
 }
 
-/**
- * 读取 hooks 目录的元数据
- * @returns {Promise<Array<{filename: string, name: string, type: string, description: string}>>}
- */
 async function readHooks() {
-    const hooks = [];
-    const hooksDir = path.join(EXTENSIONS_DIR, 'hooks');
-    if (!(await directoryExists(hooksDir))) return hooks;
-
     const allowedExts = FILE_EXTENSIONS.hooks;
-    const entries = await fs.readdir(hooksDir, { withFileTypes: true });
-
-    for (const entry of entries) {
-        if (!entry.isFile()) continue;
-        const ext = path.extname(entry.name);
-        if (!allowedExts.includes(ext)) continue;
-
-        const filePath = path.join(hooksDir, entry.name);
-        let description = '';
-
-        try {
-            const content = await fs.readFile(filePath, 'utf-8');
-            description = extractDescription(ext, content);
-        } catch {
-            description = extractDescription(ext, '');
+    return readExtensionDir('hooks', {
+        filter: (entry) => entry.isFile() && allowedExts.includes(path.extname(entry.name)),
+        parseEntry: async (entry, filePath) => {
+            let description = '';
+            try { description = extractDescription(path.extname(entry.name), await fs.readFile(filePath, 'utf-8')); } catch { description = extractDescription(path.extname(entry.name), ''); }
+            return { filename: entry.name, name: entry.name.replace(/\.(js|md|sh|py)$/, ''), type: path.extname(entry.name).substring(1), description };
         }
-
-        hooks.push({
-            filename: entry.name,
-            name: entry.name.replace(/\.(js|md|sh|py)$/, ''),
-            type: ext.substring(1),
-            description
-        });
-    }
-    return hooks;
+    });
 }
 
-/**
- * 读取 knowledge 目录的元数据
- * @returns {Promise<Array<{filename: string, name: string, type: string, description: string}>>}
- */
 async function readKnowledge() {
-    const knowledge = [];
-    const knowledgeDir = path.join(EXTENSIONS_DIR, 'knowledge');
-    if (!(await directoryExists(knowledgeDir))) return knowledge;
-
     const allowedExts = FILE_EXTENSIONS.knowledge;
-    const entries = await fs.readdir(knowledgeDir, { withFileTypes: true });
-
-    for (const entry of entries) {
-        if (entry.isFile()) {
-            const ext = path.extname(entry.name);
-            if (!allowedExts.includes(ext)) continue;
-
-            const filePath = path.join(knowledgeDir, entry.name);
-            let description = '';
-
-            try {
-                const content = await fs.readFile(filePath, 'utf-8');
-                description = ext === '.md'
-                    ? extractMarkdownTitle(content) || content.substring(0, 100).trim()
-                    : content.substring(0, 100).trim();
-            } catch {
-                description = 'Knowledge File';
+    return readExtensionDir('knowledge', {
+        filter: () => true,
+        parseEntry: async (entry, filePath) => {
+            if (entry.isFile()) {
+                const ext = path.extname(entry.name);
+                if (!allowedExts.includes(ext)) return null;
+                let description = '';
+                try {
+                    const content = await fs.readFile(filePath, 'utf-8');
+                    description = ext === '.md' ? (extractMarkdownTitle(content) || content.substring(0, 100).trim()) : content.substring(0, 100).trim();
+                } catch { description = 'Knowledge File'; }
+                return { filename: entry.name, name: entry.name.replace(/\.(md|txt)$/, ''), type: ext.substring(1), description };
             }
-
-            knowledge.push({
-                filename: entry.name,
-                name: entry.name.replace(/\.(md|txt)$/, ''),
-                type: ext.substring(1),
-                description
-            });
-        } else if (entry.isDirectory() && !entry.name.startsWith('.')) {
-            knowledge.push({
-                filename: entry.name + '/',
-                name: entry.name,
-                type: 'dir',
-                description: 'Knowledge Directory'
-            });
+            if (entry.isDirectory() && !entry.name.startsWith('.')) {
+                return { filename: entry.name + '/', name: entry.name, type: 'dir', description: 'Knowledge Directory' };
+            }
+            return null;
         }
-    }
-    return knowledge;
+    });
 }
 
 // ─── 公共 API ─────────────────────────────────────────
