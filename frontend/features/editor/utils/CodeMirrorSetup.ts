@@ -32,36 +32,27 @@ interface ToolbarPanelOptions {
 
 // ─── 语言扩展 ───────────────────────────────────────
 
+const JS_TS_EXTS = new Set(['js', 'jsx', 'ts', 'tsx']);
+const HTML_EXTS = new Set(['html', 'htm']);
+const CSS_EXTS = new Set(['css', 'scss', 'less']);
+const MD_EXTS = new Set(['md', 'markdown']);
+
 /**
  * 根据文件名获取 CodeMirror 语言扩展
  * @param {string} filename - 文件名（含扩展名）
  * @returns {Extension[]} 语言扩展数组
  */
 export function getLanguageExtension(filename: string): Extension[] {
-    const ext = filename.split('.').pop()?.toLowerCase();
-    switch (ext) {
-        case 'js':
-        case 'jsx':
-        case 'ts':
-        case 'tsx':
-            return [javascript({ jsx: true, typescript: ext.includes('ts') })];
-        case 'py':
-            return [python()];
-        case 'html':
-        case 'htm':
-            return [html()];
-        case 'css':
-        case 'scss':
-        case 'less':
-            return [css()];
-        case 'json':
-            return [json()];
-        case 'md':
-        case 'markdown':
-            return [markdown()];
-        default:
-            return [];
-    }
+    const ext = filename.split('.').pop()?.toLowerCase() || '';
+
+    if (JS_TS_EXTS.has(ext)) return [javascript({ jsx: true, typescript: ext.includes('ts') })];
+    if (ext === 'py') return [python()];
+    if (HTML_EXTS.has(ext)) return [html()];
+    if (CSS_EXTS.has(ext)) return [css()];
+    if (ext === 'json') return [json()];
+    if (MD_EXTS.has(ext)) return [markdown()];
+
+    return [];
 }
 
 // ─── Minimap 扩展 ────────────────────────────────────

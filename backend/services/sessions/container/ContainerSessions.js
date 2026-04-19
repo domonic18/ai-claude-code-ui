@@ -117,6 +117,78 @@ function getProjectDir(projectName) {
   return `${CONTAINER.paths.projects}/${encodedProjectName}`;
 }
 
+// ─── 会话分组辅助函数 ────────────────────────────────────
+
+/**
+ * 根据条目和会话数据构建会话分组
+ * 同一个 firstUserMsgId 关联的会话会被合并为一组
+ * @param {Array} allEntries - 所有解析后的条目
+ * @param {Map} allSessions - 所有会话 Map
+ * @returns {Map} firstUserMsgId → { latestSession, allSessions }
+ */
+function buildSessionGroups(allEntries, allSessions) {
+  const sessionGroups = new Map();
+  const sessionToFirstUserMsgId = new Map();
+
+  allEntries.forEach(entry => {
+    if (entry.sessionId && entry.type === 'user' && entry.parentUuid === null && entry.uuid) {
+      const firstUserMsgId = entry.uuid;
+
+      if (!sessionToFirstUserMsgId.has(entry.sessionId)) {
+        sessionToFirstUserMsgId.set(entry.sessionId, firstUserMsgId);
+
+        const session = allSessions.get(entry.sessionId);
+        if (session) {
+          if (!sessionGroups.has(firstUserMsgId)) {
+            sessionGroups.set(firstUserMsgId, {
+              latestSession: session,
+              allSessions: [session]
+            });
+          } else {
+            const group = sessionGroups.get(firstUserMsgId);
+            group.allSessions.push(session);
+
+            if (new Date(session.lastActivity) > new Date(group.latestSession.lastActivity)) {
+              group.latestSession = session;
+            }
+          }
+        }
+      }
+    }
+  });
+
+  return sessionGroups;
+}
+
+/**
+ * 合并分组会话和独立会话，返回排序后的完整列表
+ * @param {Map} sessionGroups - firstUserMsgId → { latestSession, allSessions }
+ * @param {Map} allSessions - 所有会话 Map
+ * @returns {Array} 排序后的会话列表
+ */
+function mergeGroupedAndStandalone(sessionGroups, allSessions) {
+  const groupedSessionIds = new Set();
+  sessionGroups.forEach(group => {
+    group.allSessions.forEach(session => groupedSessionIds.add(session.id));
+  });
+
+  const standaloneSessions = Array.from(allSessions.values())
+    .filter(session => !groupedSessionIds.has(session.id));
+
+  const latestFromGroups = Array.from(sessionGroups.values()).map(group => {
+    const session = { ...group.latestSession };
+    if (group.allSessions.length > 1) {
+      session.isGrouped = true;
+      session.groupSize = group.allSessions.length;
+      session.groupSessions = group.allSessions.map(s => s.id);
+    }
+    return session;
+  });
+
+  return [...latestFromGroups, ...standaloneSessions]
+    .sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
+}
+
 // ─── 会话查询 ────────────────────────────────────────────
 
 /**
@@ -135,7 +207,6 @@ async function getSessionsInContainer(userId, projectName, limit = 5, offset = 0
       return { sessions: [], hasMore: false, total: 0 };
     }
 
-    // 读取所有会话文件
     const allSessions = new Map();
     const allEntries = [];
     const projectDir = getProjectDir(projectName);
@@ -154,59 +225,8 @@ async function getSessionsInContainer(userId, projectName, limit = 5, offset = 0
       allEntries.push(...result.entries);
     });
 
-    // 构建会话分组（与主机模式相同逻辑）
-    const sessionGroups = new Map();
-    const sessionToFirstUserMsgId = new Map();
-
-    allEntries.forEach(entry => {
-      if (entry.sessionId && entry.type === 'user' && entry.parentUuid === null && entry.uuid) {
-        const firstUserMsgId = entry.uuid;
-
-        if (!sessionToFirstUserMsgId.has(entry.sessionId)) {
-          sessionToFirstUserMsgId.set(entry.sessionId, firstUserMsgId);
-
-          const session = allSessions.get(entry.sessionId);
-          if (session) {
-            if (!sessionGroups.has(firstUserMsgId)) {
-              sessionGroups.set(firstUserMsgId, {
-                latestSession: session,
-                allSessions: [session]
-              });
-            } else {
-              const group = sessionGroups.get(firstUserMsgId);
-              group.allSessions.push(session);
-
-              if (new Date(session.lastActivity) > new Date(group.latestSession.lastActivity)) {
-                group.latestSession = session;
-              }
-            }
-          }
-        }
-      }
-    });
-
-    // 收集独立会话
-    const groupedSessionIds = new Set();
-    sessionGroups.forEach(group => {
-      group.allSessions.forEach(session => groupedSessionIds.add(session.id));
-    });
-
-    const standaloneSessions = Array.from(allSessions.values())
-      .filter(session => !groupedSessionIds.has(session.id));
-
-    // 合并分组会话和独立会话
-    const latestFromGroups = Array.from(sessionGroups.values()).map(group => {
-      const session = { ...group.latestSession };
-      if (group.allSessions.length > 1) {
-        session.isGrouped = true;
-        session.groupSize = group.allSessions.length;
-        session.groupSessions = group.allSessions.map(s => s.id);
-      }
-      return session;
-    });
-
-    const visibleSessions = [...latestFromGroups, ...standaloneSessions]
-      .sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
+    const sessionGroups = buildSessionGroups(allEntries, allSessions);
+    const visibleSessions = mergeGroupedAndStandalone(sessionGroups, allSessions);
 
     const total = visibleSessions.length;
     const paginatedSessions = visibleSessions.slice(offset, offset + limit);

@@ -11,7 +11,7 @@ import { useDropzone } from 'react-dropzone';
 import { CommandAutocomplete } from './CommandAutocomplete';
 import { FileReferenceMenu } from './FileReferenceMenu';
 import { FileAttachmentsPreview } from './FileAttachmentsPreview';
-import { useMenuPosition, useKeyboardHandler } from '../hooks';
+import { useMenuPosition, useKeyboardHandler, useFileUpload } from '../hooks';
 import type { SlashCommand } from '../hooks/useSlashCommands';
 import type { FileReference } from '../hooks/useFileReferences';
 import type { ChatInputProps, FileAttachment } from '../types';

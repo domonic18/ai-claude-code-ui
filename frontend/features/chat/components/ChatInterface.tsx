@@ -30,6 +30,9 @@ import {
   useSessionLoader,
   useMessageSender,
 } from '../hooks';
+import { useModelsLoader } from '../hooks/useModelsLoader';
+import { useModelSwitchNotification } from '../hooks/useModelSwitchNotification';
+import { useSessionSync } from '../hooks/useSessionSync';
 import { ChatToolbar } from './ChatToolbar';
 import { getChatService } from '../services';
 import { handleWebSocketMessage } from '../services/websocketHandler';
@@ -149,51 +152,8 @@ export function ChatInterface({
   const [tasks, setTasks] = useState<any[]>([]);
   const [tokenBudget, setTokenBudget] = useState<any>(null);
   const [permissionMode, setPermissionMode] = useState<'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'>('default');
-  const [availableModels, setAvailableModels] = useState<Array<{ name: string; provider: string }>>([]);
-  const [modelSwitchNotification, setModelSwitchNotification] = useState<{ show: boolean; message: string }>({ show: false, message: '' });
-  // Load available models from API
-  useEffect(() => {
-    fetch('/api/models')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && Array.isArray(data.models)) {
-          setAvailableModels(data.models);
-        }
-      })
-      .catch(error => {
-        logger.error('[ChatInterface] Error loading models:', error);
-      });
-  }, []);
-
-  // 监听模型切换事件，显示通知
-  const notificationTimeoutRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    const handleModelSwitch = (event: CustomEvent) => {
-      const { newModel, reason } = event.detail;
-      if (reason === 'image-attachment') {
-        setModelSwitchNotification({
-          show: true,
-          message: `当前模型不支持图片，已切换到 ${newModel}`
-        });
-
-        // 3秒后自动隐藏通知
-        notificationTimeoutRef.current = window.setTimeout(() => {
-          setModelSwitchNotification({ show: false, message: '' });
-          notificationTimeoutRef.current = null;
-        }, 3000);
-      }
-    };
-
-    window.addEventListener('model-switch', handleModelSwitch as EventListener);
-    return () => {
-      window.removeEventListener('model-switch', handleModelSwitch as EventListener);
-      if (notificationTimeoutRef.current) {
-        window.clearTimeout(notificationTimeoutRef.current);
-        notificationTimeoutRef.current = null;
-      }
-    };
-  }, []);
+  const { availableModels } = useModelsLoader();
+  const modelSwitchNotification = useModelSwitchNotification();
 
   // Use model selection hook
   const { selectedModel, handleModelSelect } = useModelSelection({
@@ -325,48 +285,13 @@ export function ChatInterface({
     onSetMessages: setMessages,
   });
 
-  // Track previous session ID to detect actual session changes
-  const prevSelectedSessionIdRef = useRef<string | undefined>(selectedSession?.id);
-  
-  // Sync session ID when selected session changes (not when WebSocket updates currentSessionId)
-  useEffect(() => {
-    const prevId = prevSelectedSessionIdRef.current;
-    const newId = selectedSession?.id;
-
-    // Update ref
-    prevSelectedSessionIdRef.current = newId;
-
-    if (newId) {
-      // Session selected - update current session ID
-      if (currentSessionId !== newId) {
-        setCurrentSessionId(newId);
-        // Clear draft when switching to a different session
-        if (selectedProject?.name) {
-          const draftKey = STORAGE_KEYS.DRAFT_INPUT(selectedProject.name);
-          localStorage.removeItem(draftKey);
-        }
-      }
-    } else if (prevId !== undefined && newId === undefined) {
-      // Only clear when selectedSession actually changes FROM a session TO null
-      // (e.g., clicking "New Session" button), not when WebSocket updates currentSessionId
-      setCurrentSessionId(null);
-      setMessages([]);
-      // Clear draft when clearing session
-      if (selectedProject?.name) {
-        const draftKey = STORAGE_KEYS.DRAFT_INPUT(selectedProject.name);
-        localStorage.removeItem(draftKey);
-      }
-    }
-    // Note: Don't clear when both prevId and newId are undefined (staying in new session mode)
-  }, [selectedSession?.id, setMessages, currentSessionId, selectedProject?.name]); // Add currentSessionId and selectedProject to deps
-
-  // Update provider from session
-  useEffect(() => {
-    const provider = localStorage.getItem('selected-provider') || 'claude';
-    if (selectedSession?.__provider && selectedSession.__provider !== provider) {
-      localStorage.setItem('selected-provider', selectedSession.__provider);
-    }
-  }, [selectedSession]);
+  useSessionSync({
+    selectedSession,
+    selectedProject,
+    currentSessionId,
+    setCurrentSessionId,
+    setMessages,
+  });
 
   // Force state reset when new session counter changes (user clicked "New Session")
   useEffect(() => {
