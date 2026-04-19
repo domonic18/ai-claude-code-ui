@@ -7,7 +7,6 @@
  * @module projects/managers/ContainerProjectManager
  */
 
-import { PassThrough } from 'stream';
 import containerManager from '../../container/core/index.js';
 import { getSessionsInContainer } from '../../sessions/container/ContainerSessions.js';
 import { CONTAINER, FILE_TIMEOUTS } from '../../../config/config.js';
@@ -16,155 +15,132 @@ import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('services/projects/managers/ContainerProjectManager');
 
 /**
+ * 创建项目条目对象
+ * @param {string} projectName - 项目名称
+ * @param {string} displayName - 显示名称
+ * @returns {Object} 项目对象
+ */
+function createProjectEntry(projectName, displayName) {
+  return {
+    name: projectName,
+    path: projectName.replace(/-/g, '/'),
+    displayName: displayName || projectName,
+    fullPath: projectName,
+    isContainerProject: true,
+    sessions: [],
+    sessionMeta: { hasMore: false, total: 0 },
+    cursorSessions: [],
+    codexSessions: [],
+  };
+}
+
+/**
+ * 从 ls 输出解析项目列表
+ * @param {string} output - 命令输出
+ * @param {Object} projectConfig - 项目配置
+ * @returns {Array} 项目列表
+ */
+function parseProjectList(output, projectConfig) {
+  const projectList = [];
+  const lines = output.trim().split('\n');
+
+  for (const line of lines) {
+    let projectName = line.replace(/[\x00-\x1f\x7f]/g, '').trim();
+    if (!projectName || projectName.startsWith('.')) continue;
+
+    const customDisplayName = projectConfig[projectName]?.displayName;
+    projectList.push(createProjectEntry(projectName, customDisplayName));
+  }
+
+  return projectList;
+}
+
+/**
+ * 在容器内创建默认工作区
+ * @param {number} userId - 用户 ID
+ * @param {string} workspacePath - 工作空间路径
+ * @returns {Object|null} 创建的项目条目，失败返回 null
+ */
+async function createDefaultWorkspace(userId, workspacePath) {
+  logger.info('[ContainerProjectManager] No projects found, creating default workspace');
+  try {
+    const { stream: createStream } = await containerManager.execInContainer(
+      userId,
+      ['sh', '-c', 'mkdir -p "$1/my-workspace" && echo "created"', 'createDefault', workspacePath]
+    );
+
+    await new Promise((resolve) => {
+      let output = '';
+      createStream.on('data', (c) => output += c.toString());
+      createStream.on('end', () => resolve(output));
+      createStream.on('error', () => resolve(output));
+    });
+
+    logger.info('[ContainerProjectManager] Default workspace created: my-workspace');
+    return createProjectEntry('my-workspace', 'my-workspace');
+  } catch (error) {
+    logger.warn(`[ContainerProjectManager] Failed to create default workspace: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * 加载项目列表的会话信息
+ * @param {number} userId - 用户 ID
+ * @param {Array} projectList - 项目列表
+ */
+async function loadProjectSessions(userId, projectList) {
+  for (const project of projectList) {
+    try {
+      const sessionResult = await getSessionsInContainer(userId, project.name, 20, 0);
+      project.sessions = sessionResult.sessions || [];
+      project.sessionMeta = { hasMore: sessionResult.hasMore, total: sessionResult.total };
+    } catch {
+      project.sessions = [];
+      project.sessionMeta = { hasMore: false, total: 0 };
+    }
+  }
+}
+
+/**
  * 从容器内获取项目列表
- * 在容器模式下，项目存储在 /workspace 下
- * 如果用户没有项目，自动创建默认工作区
  * @param {number} userId - 用户 ID
  * @returns {Promise<Array>} 项目列表
  */
 export async function getProjectsInContainer(userId) {
   try {
-    // 获取容器（设置短超时，避免长时间阻塞前端请求）
-    // 如果容器正在创建中，快速返回空列表，让前端通过轮询获取
     let container;
     try {
       container = await containerManager.getOrCreateContainer(userId, {}, { wait: true, timeout: FILE_TIMEOUTS.quickRequest });
-    } catch (error) {
-      // 容器未就绪，返回空列表让前端继续轮询
+    } catch {
       return [];
     }
 
-    // 根据文档设计，项目直接在 /workspace 下，不在 .claude/projects 下
-    // 我们需要从 /workspace 列出所有目录，排除 .claude 等系统目录
     const workspacePath = CONTAINER.paths.workspace;
-
-    // 列出容器中的项目目录（排除 .claude 和 memory 等系统目录）
-    // 使用单个命令完成：列出目录 + 过滤 + 验证
-    const { stream, exec } = await containerManager.execInContainer(
+    const { stream } = await containerManager.execInContainer(
       userId,
       ['sh', '-c', 'ls -1 "$1" 2>/dev/null | grep -v "^\\.claude$" | grep -v "^memory$" || echo ""', 'listProjects', workspacePath]
     );
 
-    // 收集输出
-    const projects = await new Promise((resolve, reject) => {
-      let output = '';
-
-      // 收集流数据
-      stream.on('data', (chunk) => {
-        output += chunk.toString();
-      });
-
-      stream.on('error', (err) => {
-        logger.warn(`[ContainerProjectManager] Stream error: ${err.message}`);
-        resolve([]);
-      });
-
-      stream.on('end', async () => {
-        try {
-          const projectList = [];
-          const lines = output.trim().split('\n');
-
-          // 读取项目配置以获取自定义显示名称
-          let projectConfig = {};
-          try {
-            projectConfig = await loadProjectConfig();
-          } catch (configError) {
-            // 静默失败
-          }
-
-          for (const line of lines) {
-            let projectName = line.trim();
-
-            // 从项目名称中清理控制字符（移除所有控制字符 ASCII 0-31, 127）
-            projectName = projectName
-              .replace(/[\x00-\x1f\x7f]/g, '')
-              .trim();
-
-            // 跳过空行和隐藏目录（以 . 开头）
-            if (!projectName || projectName === '' || projectName.startsWith('.')) {
-              continue;
-            }
-
-            const decodedPath = projectName.replace(/-/g, '/');
-
-            // 优先使用自定义显示名称，否则使用项目名称
-            const customDisplayName = projectConfig[projectName]?.displayName;
-            const displayName = customDisplayName || projectName;
-
-            projectList.push({
-              name: projectName,
-              path: decodedPath,
-              displayName: displayName,
-              fullPath: projectName,
-              isContainerProject: true,
-              sessions: [],
-              sessionMeta: { hasMore: false, total: 0 },
-              cursorSessions: [],
-              codexSessions: []
-            });
-          }
-
-          // 如果没有项目，自动创建默认工作区
-          if (projectList.length === 0) {
-            logger.info(`[ContainerProjectManager] No projects found in container, creating default workspace`);
-            try {
-              // 在容器内创建 my-workspace 目录
-              const { stream: createStream } = await containerManager.execInContainer(
-                userId,
-                ['sh', '-c', 'mkdir -p "$1/my-workspace" && echo "created"', 'createDefault', workspacePath]
-              );
-
-              // 等待命令完成
-              await new Promise((resolveCreate) => {
-                let createOutput = '';
-                createStream.on('data', (c) => createOutput += c.toString());
-                createStream.on('end', () => resolveCreate(createOutput));
-                createStream.on('error', () => resolveCreate(createOutput));
-              });
-
-              // 添加默认工作区到列表
-              projectList.push({
-                name: 'my-workspace',
-                path: 'my-workspace',
-                displayName: 'my-workspace',
-                fullPath: 'my-workspace',
-                isContainerProject: true,
-                sessions: [],
-                sessionMeta: { hasMore: false, total: 0 },
-                cursorSessions: [],
-                codexSessions: []
-              });
-
-              logger.info(`[ContainerProjectManager] Default workspace created successfully: my-workspace`);
-            } catch (createError) {
-              logger.warn(`[ContainerProjectManager] Failed to create default workspace: ${createError.message}`);
-            }
-          }
-
-          // 加载每个项目的会话信息（初始加载 20 个）
-          for (const project of projectList) {
-            try {
-              const sessionResult = await getSessionsInContainer(userId, project.name, 20, 0);
-              project.sessions = sessionResult.sessions || [];
-              project.sessionMeta = {
-                hasMore: sessionResult.hasMore,
-                total: sessionResult.total
-              };
-            } catch (error) {
-              // 保持空会话列表
-              project.sessions = [];
-              project.sessionMeta = { hasMore: false, total: 0 };
-            }
-          }
-
-          resolve(projectList);
-        } catch (parseError) {
-          reject(new Error(`Failed to parse projects: ${parseError.message}`));
-        }
-      });
+    const output = await new Promise((resolve, reject) => {
+      let data = '';
+      stream.on('data', (chunk) => { data += chunk.toString(); });
+      stream.on('error', () => resolve(''));
+      stream.on('end', () => resolve(data));
     });
 
-    return projects;
+    let projectConfig = {};
+    try { projectConfig = await loadProjectConfig(); } catch { /* silent */ }
+
+    const projectList = parseProjectList(output, projectConfig);
+
+    if (projectList.length === 0) {
+      const defaultEntry = await createDefaultWorkspace(userId, workspacePath);
+      if (defaultEntry) projectList.push(defaultEntry);
+    }
+
+    await loadProjectSessions(userId, projectList);
+    return projectList;
   } catch (error) {
     throw new Error(`Failed to get projects in container: ${error.message}`);
   }
