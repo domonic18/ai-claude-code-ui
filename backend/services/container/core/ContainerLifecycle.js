@@ -215,29 +215,25 @@ export class ContainerLifecycleManager {
   async _createContainerWithStateMachine(userId, userConfig, stateMachine) {
     stateMachine.beginCreation();
     try {
-      // CREATING → STARTING → HEALTH_CHECKING → READY
-      for (const [from, to] of [
-        [null, ContainerState.CREATING],
-        [ContainerState.CREATING, ContainerState.STARTING],
-      ]) {
-        stateMachine.transitionTo(to);
-        await containerStateStore.save(stateMachine);
-        if (to === ContainerState.CREATING) {
-          const containerInfo = await this._doCreateContainer(userId, userConfig);
-          stateMachine.transitionTo(ContainerState.STARTING);
-          await containerStateStore.save(stateMachine);
-          this.containers.set(userId, containerInfo);
-        }
-      }
+      // Step 1: CREATING
+      stateMachine.transitionTo(ContainerState.CREATING);
+      await containerStateStore.save(stateMachine);
+      const containerInfo = await this._doCreateContainer(userId, userConfig);
+      this.containers.set(userId, containerInfo);
 
+      // Step 2: STARTING
+      stateMachine.transitionTo(ContainerState.STARTING);
+      await containerStateStore.save(stateMachine);
+
+      // Step 3: HEALTH_CHECKING → READY
       stateMachine.transitionTo(ContainerState.HEALTH_CHECKING);
       await containerStateStore.save(stateMachine);
-      await this.healthMonitor.waitForContainerReady(this.containers.get(userId).id);
+      await this.healthMonitor.waitForContainerReady(containerInfo.id);
 
       stateMachine.transitionTo(ContainerState.READY);
       await containerStateStore.save(stateMachine);
       logger.info(`Container claude-user-${userId} is ready`);
-      return this.containers.get(userId);
+      return containerInfo;
     } catch (error) {
       logger.error(`Container creation failed for user ${userId}:`, error);
       stateMachine.endCreation();
@@ -253,37 +249,61 @@ export class ContainerLifecycleManager {
 
   async _doCreateContainer(userId, userConfig) {
     const containerName = `claude-user-${userId}`;
-    const userDataDir = path.join(this.config.dataDir, 'users', `user_${userId}`, 'data');
+    const userDataDir = path.join(this.config.dataDir, 'users', `user_${userId}`, 'data`);
 
+    // 同步扩展到用户目录
+    await this._syncUserExtensions(userDataDir);
+
+    // 创建并启动容器
+    const container = await ContainerOps.createAndStartContainer(this.docker, {
+      containerName, userDataDir, userId, userConfig, image: this.config.image, network: this.config.network,
+    });
+
+    // 初始化容器内环境
+    await this._runSetup(container);
+
+    const containerInfo = { id: container.id, name: containerName, userId, status: 'running', createdAt: new Date(), lastActive: new Date() };
+    saveContainerToDb(Container, userId, containerInfo);
+    return containerInfo;
+  }
+
+  /** 同步扩展到用户目录（忽略错误，不影响主流程） */
+  async _syncUserExtensions(userDataDir) {
     try {
       const claudeDir = path.join(userDataDir, '.claude');
-      try { await syncExtensions(claudeDir, { overwriteUserFiles: true }); } catch (e) { logger.warn(`Failed to sync extensions:`, e.message); }
-
-      const container = await ContainerOps.createAndStartContainer(this.docker, {
-        containerName, userDataDir, userId, userConfig, image: this.config.image, network: this.config.network,
-      });
-
-      await this._runSetup(container, containerName);
-
-      const containerInfo = { id: container.id, name: containerName, userId, status: 'running', createdAt: new Date(), lastActive: new Date() };
-      saveContainerToDb(Container, userId, containerInfo);
-      return containerInfo;
-    } catch (error) {
-      throw new Error(`Container creation failed: ${error.message}`);
+      await syncExtensions(claudeDir, { overwriteUserFiles: true });
+    } catch (e) {
+      logger.warn(`Failed to sync extensions:`, e.message);
     }
   }
 
-  async _runSetup(container, containerName) {
-    // 1. 确保默认工作区（重试3次）
+  /** 初始化容器内环境 */
+  async _runSetup(container) {
+    await this._ensureWorkspaceWithRetry(container);
+    await this._syncContainerExtensions(container);
+    await this._createContainerReadme(container);
+  }
+
+  /** 确保默认工作区（重试3次） */
+  async _ensureWorkspaceWithRetry(container) {
     for (let i = 0; i < 3; i++) {
-      try { await ContainerSetup.ensureDefaultWorkspace(container); break; }
-      catch (e) { logger.warn(`Workspace ensure attempt ${i + 1} failed: ${e.message}`); if (i < 2) await new Promise(r => setTimeout(r, 1000)); }
+      try {
+        await ContainerSetup.ensureDefaultWorkspace(container);
+        return;
+      } catch (e) {
+        logger.warn(`Workspace ensure attempt ${i + 1} failed: ${e.message}`);
+        if (i < 2) await new Promise(r => setTimeout(r, 1000));
+      }
     }
+  }
 
-    // 2. 同步扩展
+  /** 同步扩展到容器（忽略错误） */
+  async _syncContainerExtensions(container) {
     try { await ContainerSetup.syncExtensionsToContainer(container); } catch (e) { logger.warn(`Failed to sync extensions:`, e.message); }
+  }
 
-    // 3. 创建 README
+  /** 创建 README（忽略错误） */
+  async _createContainerReadme(container) {
     try { await ContainerSetup.createReadmeInContainer(container); } catch (e) { logger.warn(`Failed to create README:`, e.message); }
   }
 
