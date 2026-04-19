@@ -7,6 +7,9 @@
 export { useAgentSettings } from './useAgentSettings';
 export type { UseAgentSettingsParams, UseAgentSettingsReturn } from './useAgentSettings';
 
+export { useAgentTab } from './useAgentTab';
+export type { AgentTabHandle, UseAgentTabReturn } from './useAgentTab';
+
 export { useCodeEditorSettings } from './useCodeEditorSettings';
 export type { UseCodeEditorSettingsReturn } from './useCodeEditorSettings';
 
