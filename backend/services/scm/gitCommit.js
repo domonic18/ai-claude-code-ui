@@ -220,6 +220,18 @@ function extractResponseText(data) {
 }
 
 async function queryAIProvider(prompt, projectPath, provider) {
+    /** AI provider registry — each provider implements a query function */
+    const AI_PROVIDERS = {
+        claude: (prompt, cwd, writer) => queryClaudeSDK(prompt, { cwd, permissionMode: 'bypassPermissions', model: 'sonnet' }, writer),
+        cursor: (prompt, cwd, writer) => spawnCursor(prompt, { cwd, skipPermissions: true }, writer),
+    };
+
+    const queryFn = AI_PROVIDERS[provider];
+    if (!queryFn) {
+        logger.warn({ provider }, '[git] Unknown AI provider, falling back to claude');
+        return '';
+    }
+
     let responseText = '';
     const writer = {
         send: (data) => {
@@ -228,12 +240,7 @@ async function queryAIProvider(prompt, projectPath, provider) {
         setSessionId: () => {},
     };
 
-    if (provider === 'claude') {
-        await queryClaudeSDK(prompt, { cwd: projectPath, permissionMode: 'bypassPermissions', model: 'sonnet' }, writer);
-    } else if (provider === 'cursor') {
-        await spawnCursor(prompt, { cwd: projectPath, skipPermissions: true }, writer);
-    }
-
+    await queryFn(prompt, projectPath, writer);
     return responseText;
 }
 
