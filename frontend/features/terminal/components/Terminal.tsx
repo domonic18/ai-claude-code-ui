@@ -12,6 +12,7 @@ import type { ShellProps } from '../types/terminal.types';
 import { logger } from '@/shared/utils/logger';
 import { useTerminalConnection } from '../hooks/useTerminalConnection';
 import { useTerminalSetup } from '../hooks/useTerminalSetup';
+import { TerminalToolbar } from './TerminalToolbar';
 
 /** Inject xterm style overrides at module load */
 const xtermStyles = `
@@ -102,20 +103,13 @@ function Shell({
   connectionSendRef.current = connectionSend;
 
   // Session display names
-  const sessionDisplayName = useMemo(() => {
+  const sessionDisplayNameLong = useMemo(() => {
     if (!selectedSession) return null;
-    return selectedSession.__provider === 'cursor'
+    const displayName = selectedSession.__provider === 'cursor'
       ? (selectedSession.name || 'Untitled Session')
       : (selectedSession.summary || 'New Session');
+    return displayName.slice(0, 50) ?? null;
   }, [selectedSession]);
-
-  const sessionDisplayNameShort = useMemo(() => {
-    return sessionDisplayName?.slice(0, 30) ?? null;
-  }, [sessionDisplayName]);
-
-  const sessionDisplayNameLong = useMemo(() => {
-    return sessionDisplayName?.slice(0, 50) ?? null;
-  }, [sessionDisplayName]);
 
   // Restart handler
   const restartShell = useCallback(() => {
@@ -186,53 +180,14 @@ function Shell({
 
   return (
     <div className="h-full flex flex-col bg-gray-900 w-full">
-      <div className="flex-shrink-0 bg-gray-800 border-b border-gray-700 px-4 py-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-            {selectedSession && (
-              <span className="text-xs text-blue-300">
-                ({sessionDisplayNameShort}...)
-              </span>
-            )}
-            {!selectedSession && (
-              <span className="text-xs text-gray-400">(New Session)</span>
-            )}
-            {!isInitialized && (
-              <span className="text-xs text-yellow-400">(Initializing...)</span>
-            )}
-            {isRestarting && (
-              <span className="text-xs text-blue-400">(Restarting...)</span>
-            )}
-          </div>
-          <div className="flex items-center space-x-3">
-            {isConnected && (
-              <button
-                onClick={disconnectFromShell}
-                className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 flex items-center space-x-1"
-                title="Disconnect from shell"
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                <span>Disconnect</span>
-              </button>
-            )}
-
-            <button
-              onClick={restartShell}
-              disabled={isRestarting || isConnected}
-              className="text-xs text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
-              title="Restart Shell (disconnect first)"
-            >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              <span>Restart</span>
-            </button>
-          </div>
-        </div>
-      </div>
+      <TerminalToolbar
+        isConnected={isConnected}
+        isInitialized={isInitialized}
+        isRestarting={isRestarting}
+        selectedSession={selectedSession}
+        onDisconnect={disconnectFromShell}
+        onRestart={restartShell}
+      />
 
       <div className="flex-1 p-2 overflow-hidden relative">
         <div ref={terminalRef} className="h-full w-full focus:outline-none" style={{ outline: 'none' }} />
