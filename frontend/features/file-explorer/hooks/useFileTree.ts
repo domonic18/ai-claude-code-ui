@@ -4,111 +4,13 @@
  * Custom hooks for file tree and file explorer functionality.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { FileNode, FileViewMode } from '../types';
+import { useFileTreeCallbacks } from './useFileTreeCallbacks';
 
 /**
  * Helper functions for file tree operations
  */
-
-/**
- * Fetch files from API
- */
-async function fetchFilesFromAPI(
-  selectedProject: { name: string; path: string } | null,
-  isMountedRef: React.RefObject<boolean>,
-  setFiles: React.Dispatch<React.SetStateAction<FileNode[]>>,
-  setLoading: React.Dispatch<React.SetStateAction<boolean>>,
-  setError: React.Dispatch<React.SetStateAction<Error | null>>,
-  onError?: (error: Error) => void
-): Promise<void> {
-  if (!selectedProject) {
-    setFiles([]);
-    return;
-  }
-
-  setLoading(true);
-  setError(null);
-
-  try {
-    const response = await fetch(`/api/projects/${selectedProject.name}/files`);
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch files: ${response.statusText}`);
-    }
-
-    const responseData = await response.json();
-    const data = responseData.data ?? responseData;
-    const fileList = Array.isArray(data) ? data : [];
-
-    if (isMountedRef.current) {
-      setFiles(fileList);
-    }
-  } catch (err) {
-    const error = err instanceof Error ? err : new Error('Unknown error');
-    if (isMountedRef.current) {
-      setError(error);
-      onError?.(error);
-    }
-  } finally {
-    if (isMountedRef.current) {
-      setLoading(false);
-    }
-  }
-}
-
-/**
- * Toggle directory expanded state
- */
-function toggleDirectoryState(
-  path: string,
-  expandedDirs: Set<string>
-): Set<string> {
-  const newExpanded = new Set(expandedDirs);
-  if (newExpanded.has(path)) {
-    newExpanded.delete(path);
-  } else {
-    newExpanded.add(path);
-  }
-  return newExpanded;
-}
-
-/**
- * Filter files based on search query
- */
-function filterFilesByQuery(
-  files: FileNode[],
-  searchQuery: string
-): FileNode[] {
-  if (!searchQuery.trim()) {
-    return files;
-  }
-
-  const query = searchQuery.toLowerCase();
-
-  const filterNodes = (nodes: FileNode[]): FileNode[] => {
-    return nodes.reduce<FileNode[]>((filtered, node) => {
-      const matchesName = node.name.toLowerCase().includes(query);
-      let filteredChildren: FileNode[] = [];
-
-      if (node.type === 'directory' && node.children) {
-        filteredChildren = filterNodes(node.children);
-      }
-
-      // Include if name matches or has matching children
-      if (matchesName || filteredChildren.length > 0) {
-        filtered.push({
-          ...node,
-          children: filteredChildren.length > 0 ? filteredChildren : node.children,
-        });
-      }
-
-      return filtered;
-    }, []);
-  };
-
-  return filterNodes(files);
-}
 
 /**
  * Expand directories containing matching files
@@ -126,21 +28,6 @@ function expandMatchingDirectories(
 }
 
 /**
- * Set view mode and persist to localStorage
- */
-function setViewModeWithPersistence(
-  mode: FileViewMode,
-  setViewMode: React.Dispatch<React.SetStateAction<FileViewMode>>
-): void {
-  setViewMode(mode);
-  try {
-    localStorage.setItem('file-tree-view-mode', mode);
-  } catch {
-    // Ignore localStorage errors
-  }
-}
-
-/**
  * Load view mode from localStorage
  */
 function loadViewModeFromStorage(): FileViewMode | null {
@@ -153,6 +40,65 @@ function loadViewModeFromStorage(): FileViewMode | null {
     // Ignore localStorage errors
   }
   return null;
+}
+
+/**
+ * Initialize view mode from localStorage
+ */
+function useViewModeInitialization(
+  setViewMode: React.Dispatch<React.SetStateAction<FileViewMode>>
+): void {
+  useEffect(() => {
+    const savedViewMode = loadViewModeFromStorage();
+    if (savedViewMode) {
+      setViewMode(savedViewMode);
+    }
+  }, [setViewMode]);
+}
+
+/**
+ * Auto-expand matching directories when searching
+ */
+function useSearchAutoExpand(
+  searchQuery: string,
+  filteredFiles: FileNode[],
+  setExpandedDirs: React.Dispatch<React.SetStateAction<Set<string>>>
+): void {
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      expandMatchingDirectories(filteredFiles, setExpandedDirs);
+    }
+  }, [searchQuery, filteredFiles]);
+}
+
+/**
+ * Initialize file tree state
+ */
+function useFileTreeState() {
+  const [files, setFiles] = useState<FileNode[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
+  const [selectedFile, setSelectedFile] = useState<FileNode | null>(null);
+  const [viewMode, setViewMode] = useState<FileViewMode>('detailed');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  return {
+    files,
+    setFiles,
+    loading,
+    setLoading,
+    error,
+    setError,
+    expandedDirs,
+    setExpandedDirs,
+    selectedFile,
+    setSelectedFile,
+    viewMode,
+    setViewMode,
+    searchQuery,
+    setSearchQuery,
+  };
 }
 
 /**
@@ -188,84 +134,39 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeReturn
   const { selectedProject, autoFetch = true, onError } = options;
 
   // State
-  const [files, setFiles] = useState<FileNode[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
-  const [selectedFile, setSelectedFile] = useState<FileNode | null>(null);
-  const [viewMode, setViewMode] = useState<FileViewMode>('detailed');
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const state = useFileTreeState();
 
   // Track if component is mounted
   const isMountedRef = useRef(true);
 
-  /**
-   * Fetch files from API
-   */
-  const fetchFiles = useCallback(async () => {
-    await fetchFilesFromAPI(
-      selectedProject,
-      isMountedRef,
-      setFiles,
-      setLoading,
-      setError,
-      onError
-    );
-  }, [selectedProject, onError]);
-
-  /**
-   * Toggle directory expanded state
-   */
-  const toggleDirectory = useCallback((path: string) => {
-    setExpandedDirs(prev => toggleDirectoryState(path, prev));
-  }, []);
-
-  /**
-   * Select a file
-   */
-  const selectFile = useCallback((file: FileNode | null) => {
-    setSelectedFile(file);
-  }, []);
-
-  /**
-   * Set view mode and persist to localStorage
-   */
-  const setViewModeWithPersist = useCallback((mode: FileViewMode) => {
-    setViewModeWithPersistence(mode, setViewMode);
-  }, []);
-
-  /**
-   * Refresh files
-   */
-  const refreshFiles = useCallback(async () => {
-    await fetchFiles();
-  }, [fetchFiles]);
-
-  /**
-   * Filter files based on search query
-   */
-  const filteredFiles = useCallback((): FileNode[] => {
-    return filterFilesByQuery(files, searchQuery);
-  }, [files, searchQuery]);
+  // Create callbacks
+  const callbacks = useFileTreeCallbacks({
+    isMountedRef,
+    selectedProject,
+    files: state.files,
+    searchQuery: state.searchQuery,
+    setFiles: state.setFiles,
+    setLoading: state.setLoading,
+    setError: state.setError,
+    setExpandedDirs: state.setExpandedDirs,
+    setViewMode: state.setViewMode,
+    setSelectedFile: state.setSelectedFile,
+    onError,
+  });
 
   /**
    * Auto-fetch on mount and project change
    */
   useEffect(() => {
     if (autoFetch && selectedProject) {
-      fetchFiles();
+      callbacks.fetchFiles();
     }
-  }, [autoFetch, selectedProject, fetchFiles]);
+  }, [autoFetch, selectedProject, callbacks.fetchFiles]);
 
   /**
    * Load view mode from localStorage on mount
    */
-  useEffect(() => {
-    const savedViewMode = loadViewModeFromStorage();
-    if (savedViewMode) {
-      setViewMode(savedViewMode);
-    }
-  }, []);
+  useViewModeInitialization(state.setViewMode);
 
   /**
    * Cleanup on unmount
@@ -280,27 +181,23 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeReturn
   /**
    * Auto-expand directories when searching
    */
-  useEffect(() => {
-    if (searchQuery.trim()) {
-      expandMatchingDirectories(filteredFiles(), setExpandedDirs);
-    }
-  }, [searchQuery, filteredFiles]);
+  useSearchAutoExpand(state.searchQuery, callbacks.filteredFiles(), state.setExpandedDirs);
 
   return {
-    files,
-    loading,
-    error,
-    expandedDirs,
-    selectedFile,
-    viewMode,
-    searchQuery,
-    filteredFiles: filteredFiles(),
-    fetchFiles,
-    toggleDirectory,
-    selectFile,
-    setViewMode: setViewModeWithPersist,
-    setSearchQuery,
-    refreshFiles,
+    files: state.files,
+    loading: state.loading,
+    error: state.error,
+    expandedDirs: state.expandedDirs,
+    selectedFile: state.selectedFile,
+    viewMode: state.viewMode,
+    searchQuery: state.searchQuery,
+    filteredFiles: callbacks.filteredFiles(),
+    fetchFiles: callbacks.fetchFiles,
+    toggleDirectory: callbacks.toggleDirectory,
+    selectFile: callbacks.selectFile,
+    setViewMode: callbacks.setViewModeWithPersist,
+    setSearchQuery: state.setSearchQuery,
+    refreshFiles: callbacks.refreshFiles,
   };
 }
 

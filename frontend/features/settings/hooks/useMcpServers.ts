@@ -49,6 +49,128 @@ function cleanupServerData<T>(
   return updated;
 }
 
+/**
+ * Create MCP server CRUD operations
+ */
+function createMcpCrudOperations(
+  service: ReturnType<typeof getSettingsService>,
+  fetchServers: () => Promise<void>,
+  setLoading: (loading: boolean) => void,
+  setTestResults: React.Dispatch<React.SetStateAction<Record<string, { success: boolean; message?: string }>>>,
+  setServerTools: React.Dispatch<React.SetStateAction<Record<string, any>>>,
+  setError: React.Dispatch<React.SetStateAction<string | null>>
+) {
+  const createServer = useCallback(async (server: Partial<McpServer>) => {
+    const result = await handleMcpOperation(
+      () => service.createMcpServer(server),
+      'Failed to create MCP server',
+      setLoading,
+      setError
+    );
+    if (result.success) {
+      await fetchServers();
+    }
+    return result;
+  }, [service, fetchServers, setLoading, setError]);
+
+  const updateServer = useCallback(async (id: string, server: Partial<McpServer>) => {
+    const result = await handleMcpOperation(
+      () => service.updateMcpServer(id, server),
+      'Failed to update MCP server',
+      setLoading,
+      setError
+    );
+    if (result.success) {
+      await fetchServers();
+    }
+    return result;
+  }, [service, fetchServers, setLoading, setError]);
+
+  const deleteServer = useCallback(async (id: string) => {
+    const result = await handleMcpOperation(
+      () => service.deleteMcpServer(id),
+      'Failed to delete MCP server',
+      setLoading,
+      setError
+    );
+    if (result.success) {
+      await fetchServers();
+      setTestResults(prev => cleanupServerData(prev, id));
+      setServerTools(prev => cleanupServerData(prev, id));
+    }
+    return result;
+  }, [service, fetchServers, setLoading, setTestResults, setServerTools, setError]);
+
+  const testServer = useCallback(async (id: string) => {
+    try {
+      setError(null);
+      const result = await service.testMcpServer(id);
+      setTestResults(prev => ({ ...prev, [id]: result }));
+      return result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to test MCP server';
+      setError(message);
+      return { success: false, message };
+    }
+  }, [service, setTestResults, setError]);
+
+  return {
+    createServer,
+    updateServer,
+    deleteServer,
+    testServer,
+  };
+}
+
+/**
+ * Create discover tools operation with loading state
+ */
+function createDiscoverToolsOperation(
+  service: ReturnType<typeof getSettingsService>,
+  setServerTools: React.Dispatch<React.SetStateAction<Record<string, any>>>,
+  setToolsLoading: React.Dispatch<React.SetStateAction<Record<string, boolean>>>,
+  setError: React.Dispatch<React.SetStateAction<string | null>>
+) {
+  return useCallback(async (id: string) => {
+    try {
+      setError(null);
+      setToolsLoading(prev => ({ ...prev, [id]: true }));
+      const result = await service.discoverMcpTools(id);
+      if (result.success) {
+        setServerTools(prev => ({ ...prev, [id]: result.data }));
+      }
+      return result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to discover MCP tools';
+      setError(message);
+      return { success: false, error: message };
+    } finally {
+      setToolsLoading(prev => ({ ...prev, [id]: false }));
+    }
+  }, [service, setServerTools, setToolsLoading, setError]);
+}
+
+/**
+ * Create helper functions
+ */
+function createHelperFunctions(
+  servers: McpServer[],
+  setError: React.Dispatch<React.SetStateAction<string | null>>
+) {
+  const getServerById = useCallback((id: string): McpServer | undefined => {
+    return servers.find(s => s.id === id);
+  }, [servers]);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, [setError]);
+
+  return {
+    getServerById,
+    clearError,
+  };
+}
+
 export interface McpServerState {
   servers: McpServer[];
   loading: boolean;
@@ -104,92 +226,26 @@ export function useMcpServers(): UseMcpServersReturn {
     setServers(data);
   }, [service]);
 
-  // Create server
-  const createServer = useCallback(async (server: Partial<McpServer>) => {
-    const result = await handleMcpOperation(
-      () => service.createMcpServer(server),
-      'Failed to create MCP server',
-      setLoading,
-      setError
-    );
-    if (result.success) {
-      await fetchServers();
-    }
-    return result;
-  }, [service, fetchServers]);
+  // Create CRUD operations
+  const crudOperations = createMcpCrudOperations(
+    service,
+    fetchServers,
+    setLoading,
+    setTestResults,
+    setServerTools,
+    setError
+  );
 
-  // Update server
-  const updateServer = useCallback(async (id: string, server: Partial<McpServer>) => {
-    const result = await handleMcpOperation(
-      () => service.updateMcpServer(id, server),
-      'Failed to update MCP server',
-      setLoading,
-      setError
-    );
-    if (result.success) {
-      await fetchServers();
-    }
-    return result;
-  }, [service, fetchServers]);
+  // Create discover tools operation
+  const discoverTools = createDiscoverToolsOperation(
+    service,
+    setServerTools,
+    setToolsLoading,
+    setError
+  );
 
-  // Delete server
-  const deleteServer = useCallback(async (id: string) => {
-    const result = await handleMcpOperation(
-      () => service.deleteMcpServer(id),
-      'Failed to delete MCP server',
-      setLoading,
-      setError
-    );
-    if (result.success) {
-      await fetchServers();
-      setTestResults(prev => cleanupServerData(prev, id));
-      setServerTools(prev => cleanupServerData(prev, id));
-    }
-    return result;
-  }, [service, fetchServers]);
-
-  // Test server
-  const testServer = useCallback(async (id: string) => {
-    try {
-      setError(null);
-      const result = await service.testMcpServer(id);
-      setTestResults(prev => ({ ...prev, [id]: result }));
-      return result;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to test MCP server';
-      setError(message);
-      return { success: false, message };
-    }
-  }, [service]);
-
-  // Discover tools
-  const discoverTools = useCallback(async (id: string) => {
-    try {
-      setError(null);
-      setToolsLoading(prev => ({ ...prev, [id]: true }));
-      const result = await service.discoverMcpTools(id);
-      if (result.success) {
-        setServerTools(prev => ({ ...prev, [id]: result.data }));
-      }
-      return result;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to discover MCP tools';
-      setError(message);
-      return { success: false, error: message };
-    } finally {
-      setToolsLoading(prev => ({ ...prev, [id]: false }));
-    }
-  }, [service]);
-
-  // Get server by ID
-  const getServerById = useCallback((id: string): McpServer | undefined => {
-    return servers.find(s => s.id === id);
-  }, [servers]);
-
-  // Clear error
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
+  // Create helper functions
+  const helpers = createHelperFunctions(servers, setError);
 
   return {
     // State
@@ -202,15 +258,11 @@ export function useMcpServers(): UseMcpServersReturn {
 
     // Operations
     fetchServers,
-    createServer,
-    updateServer,
-    deleteServer,
-    testServer,
+    ...crudOperations,
     discoverTools,
 
     // Helpers
-    getServerById,
-    clearError
+    ...helpers,
   };
 }
 

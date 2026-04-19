@@ -42,85 +42,84 @@ export interface UseSessionsReturn {
 }
 
 /**
- * useSessions Hook
+ * Initialize session state
  */
-export function useSessions(): UseSessionsReturn {
+function useSessionState() {
   const [sessions, setSessions] = useState<Record<string, Session[]>>({});
   const [loadingSessions, setLoadingSessions] = useState<Record<string, boolean>>({});
   const [additionalSessions, setAdditionalSessions] = useState<Record<string, Session[]>>({});
   const [hasMore, setHasMore] = useState<Record<string, boolean>>({});
-
-  const service = getSidebarService();
-
-  /**
-   * Load more sessions for a project (pagination)
-   */
-  const loadMoreSessions = useCallback(async (
-    projectName: string,
-    limit: number = SESSION_PAGINATION.LOAD_MORE_LIMIT,
-    offset: number = 0
-  ): Promise<void> => {
-    // Check if already loading
-    if (loadingSessions[projectName]) {
-      return;
-    }
-
-    setLoadingSessions(prev => ({ ...prev, [projectName]: true }));
-
-    try {
-      const result: PaginatedSessionsResponse = await service.getSessions(projectName, limit, offset);
-
-      // Update sessions
-      setAdditionalSessions(prev => {
-        const updated = {
-          ...prev,
-          [projectName]: [
-            ...(prev[projectName] || []),
-            ...result.sessions,
-          ],
-        };
-        return updated;
-      });
-
-      // Update hasMore status
-      if (result.hasMore !== undefined) {
-        setHasMore(prev => ({ ...prev, [projectName]: result.hasMore || false }));
-      }
-    } catch (err) {
-      logger.error(`Error loading more sessions for ${projectName}:`, err);
-      throw err;
-    } finally {
-      setLoadingSessions(prev => ({ ...prev, [projectName]: false }));
-    }
-  }, [service, loadingSessions]);
-
-  /**
-   * Initialize hasMore state from project sessionMeta
-   */
-  const initializeHasMore = useCallback((projectName: string, hasMoreValue: boolean) => {
-    setHasMore(prev => ({ ...prev, [projectName]: hasMoreValue }));
-  }, []);
-
-  // Use CRUD helpers
-  const { renameSession, deleteSession } = useSessionCRUDOperations(service, {
-    setSessions,
-    setAdditionalSessions,
-  });
-
-  /**
-   * Reset all session data (e.g., when projects list changes)
-   */
-  const reset = useCallback(() => {
-    setSessions({});
-    setAdditionalSessions({});
-    setHasMore({});
-  }, []);
 
   return {
     sessions,
     loadingSessions,
     additionalSessions,
     hasMore,
+    setSessions,
+    setLoadingSessions,
+    setAdditionalSessions,
+    setHasMore,
+  };
+}
+
+/**
+ * useSessions Hook
+ */
+export function useSessions(): UseSessionsReturn {
+  const state = useSessionState();
+  const service = getSidebarService();
+
+  const loadMoreSessions = useCallback(async (
+    projectName: string,
+    limit: number = SESSION_PAGINATION.LOAD_MORE_LIMIT,
+    offset: number = 0
+  ): Promise<void> => {
+    if (state.loadingSessions[projectName]) return;
+
+    state.setLoadingSessions(prev => ({ ...prev, [projectName]: true }));
+
+    try {
+      const result: PaginatedSessionsResponse = await service.getSessions(projectName, limit, offset);
+
+      state.setAdditionalSessions(prev => ({
+        ...prev,
+        [projectName]: [
+          ...(prev[projectName] || []),
+          ...result.sessions,
+        ],
+      }));
+
+      if (result.hasMore !== undefined) {
+        state.setHasMore(prev => ({ ...prev, [projectName]: result.hasMore || false }));
+      }
+    } catch (err) {
+      logger.error(`Error loading more sessions for ${projectName}:`, err);
+      throw err;
+    } finally {
+      state.setLoadingSessions(prev => ({ ...prev, [projectName]: false }));
+    }
+  }, [service, state.loadingSessions, state.setAdditionalSessions, state.setHasMore, state.setLoadingSessions]);
+
+  const initializeHasMore = useCallback((projectName: string, hasMoreValue: boolean) => {
+    state.setHasMore(prev => ({ ...prev, [projectName]: hasMoreValue }));
+  }, [state.setHasMore]);
+
+  const { renameSession, deleteSession } = useSessionCRUDOperations(service, {
+    setSessions: state.setSessions,
+    setAdditionalSessions: state.setAdditionalSessions,
+  });
+
+  const reset = useCallback(() => {
+    state.setSessions({});
+    state.setAdditionalSessions({});
+    state.setHasMore({});
+  }, [state.setSessions, state.setAdditionalSessions, state.setHasMore]);
+
+  return {
+    sessions: state.sessions,
+    loadingSessions: state.loadingSessions,
+    additionalSessions: state.additionalSessions,
+    hasMore: state.hasMore,
     loadMoreSessions,
     initializeHasMore,
     renameSession,

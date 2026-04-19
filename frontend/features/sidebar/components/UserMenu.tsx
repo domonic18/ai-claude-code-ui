@@ -9,13 +9,33 @@
  * - 菜单包含：用户信息、语言切换、版本信息、设置、退出登录
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { Settings, LogOut, Languages, ChevronUp, Shield, Brain } from 'lucide-react';
 import { LanguageSwitcher } from '@/shared/components/common/LanguageSwitcher';
 import { useAuth } from '@/shared/contexts/AuthContext';
 import { useUserRole } from '@/features/auth/hooks/useAuth';
+
+/**
+ * Custom hook for handling click outside to close dropdowns
+ */
+function useClickOutside(containerRef: React.RefObject<HTMLElement>, isOpen: boolean, onClose: () => void) {
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, onClose, containerRef]);
+}
 
 export interface UserMenuProps {
   onShowSettings?: () => void;
@@ -113,77 +133,59 @@ function UserMenuDropdown({
   );
 }
 
+/**
+ * User Menu Button - triggers the dropdown
+ */
+function UserMenuButton({ displayName, userInitial, isOpen, onClick }: {
+  displayName: string; userInitial: string; isOpen: boolean; onClick: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent transition-colors duration-200"
+      aria-label={t('common.userMenu')} aria-expanded={isOpen}
+    >
+      <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+        <span className="text-sm font-semibold text-white">{userInitial}</span>
+      </div>
+      <div className="flex-1 text-left min-w-0">
+        <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
+      </div>
+      <ChevronUp className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+    </button>
+  );
+}
+
 export const UserMenu = ({
   onShowSettings,
 }: UserMenuProps) => {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
   const { isAdmin } = useUserRole();
-  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // 点击外部关闭菜单
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
+  useClickOutside(menuRef, isOpen, () => setIsOpen(false));
 
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isOpen]);
-
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     await logout();
     setIsOpen(false);
-  };
+  }, [logout]);
 
-  // 获取用户名显示
   const displayName = user?.username || t('common.user') || 'User';
   const userInitial = displayName.charAt(0).toUpperCase();
 
   return (
     <div ref={menuRef} className="relative">
-      {/* 用户头像按钮 */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent transition-colors duration-200"
-        aria-label={t('common.userMenu')}
-        aria-expanded={isOpen}
-      >
-        {/* 用户头像 */}
-        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-          <span className="text-sm font-semibold text-white">{userInitial}</span>
-        </div>
-
-        {/* 用户名 */}
-        <div className="flex-1 text-left min-w-0">
-          <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
-        </div>
-
-        {/* 箭头图标 */}
-        <ChevronUp
-          className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${
-            isOpen ? 'rotate-180' : ''
-          }`}
-        />
-      </button>
-
-      {/* 下拉菜单 */}
+      <UserMenuButton
+        displayName={displayName} userInitial={userInitial}
+        isOpen={isOpen} onClick={() => setIsOpen(!isOpen)}
+      />
       {isOpen && (
         <UserMenuDropdown
-          displayName={displayName}
-          onShowSettings={onShowSettings}
-          isAdmin={isAdmin}
-          onClose={() => setIsOpen(false)}
-          onLogout={handleLogout}
+          displayName={displayName} onShowSettings={onShowSettings}
+          isAdmin={isAdmin} onClose={() => setIsOpen(false)} onLogout={handleLogout}
         />
       )}
     </div>

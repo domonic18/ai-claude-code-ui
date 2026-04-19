@@ -5,14 +5,10 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
+import type { Project, ProjectCreationOptions, ProjectFile, Session } from '../types/sidebar.types';
 import { api } from '@/shared/services';
-import type {
-  Project,
-  ProjectCreationOptions,
-  ProjectFile,
-  Session,
-} from '../types/sidebar.types';
 import { logger } from '@/shared/utils/logger';
+import { getProjectFiles, getProjectSessions } from '../helpers/projectApiHelpers';
 
 /**
  * Helper functions for project operations
@@ -217,35 +213,15 @@ export function useProject(): UseProjectReturn {
   /**
    * Get project files
    */
-  const getProjectFiles = useCallback(async (project: Project): Promise<ProjectFile[]> => {
-    try {
-      const response = await api.projects.files(project.name);
-      if (response.ok) {
-        const data = await response.json();
-        return data.data || [];
-      }
-      return [];
-    } catch (err) {
-      logger.error('Failed to get project files:', err);
-      return [];
-    }
+  const getProjectFilesCallback = useCallback(async (project: Project): Promise<ProjectFile[]> => {
+    return await getProjectFiles(project.name);
   }, []);
 
   /**
    * Get project sessions
    */
-  const getProjectSessions = useCallback(async (project: Project): Promise<Session[]> => {
-    try {
-      const response = await api.projects.sessions(project.name);
-      if (response.ok) {
-        const data = await response.json();
-        return data.data || [];
-      }
-      return [];
-    } catch (err) {
-      logger.error('Failed to get project sessions:', err);
-      return [];
-    }
+  const getProjectSessionsCallback = useCallback(async (project: Project): Promise<Session[]> => {
+    return await getProjectSessions(project.name);
   }, []);
 
   /**
@@ -265,7 +241,7 @@ export function useProject(): UseProjectReturn {
     createProject,
     deleteProject,
     renameProject,
-    getProjectFiles,
-    getProjectSessions,
+    getProjectFiles: getProjectFilesCallback,
+    getProjectSessions: getProjectSessionsCallback,
   };
 }

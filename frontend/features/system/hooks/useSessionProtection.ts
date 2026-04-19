@@ -108,46 +108,16 @@ function createSessionStateCallbacks(
   };
 }
 
-export function useSessionProtection(
+/**
+ * Replace temporary session ID with real session ID
+ */
+function createReplaceTemporarySession(
+  setActiveSessions: React.Dispatch<React.SetStateAction<Set<string>>>,
   selectedProject: Project | null,
   selectedSession: SidebarSession | null,
   onRefresh?: () => Promise<void>
-): UseSessionProtectionReturn {
-  const [activeSessions, setActiveSessions] = useState<Set<string>>(new Set());
-  const [processingSessions, setProcessingSessions] = useState<Set<string>>(new Set());
-  const [externalMessageUpdate, setExternalMessageUpdate] = useState(0);
-
-  // Create session state callbacks
-  const sessionCallbacks = createSessionStateCallbacks(setActiveSessions, setProcessingSessions);
-
-  /**
-   * Check if there's any active session
-   */
-  const hasActiveSession = useCallback((sessionId?: string): boolean => {
-    if (sessionId) {
-      return activeSessions.has(sessionId);
-    }
-    return activeSessions.size > 0;
-  }, [activeSessions]);
-
-  /**
-   * Check if a specific session is active
-   */
-  const isSessionActive = useCallback((sessionId: string): boolean => {
-    return activeSessions.has(sessionId);
-  }, [activeSessions]);
-
-  /**
-   * Check if a specific session is processing
-   */
-  const isSessionProcessing = useCallback((sessionId: string): boolean => {
-    return processingSessions.has(sessionId);
-  }, [processingSessions]);
-
-  /**
-   * Replace temporary session ID with real session ID
-   */
-  const replaceTemporarySession = useCallback(async (tempId: string, realSessionId: string) => {
+) {
+  return useCallback(async (tempId: string, realSessionId: string) => {
     if (realSessionId) {
       logger.info(`[SessionProtection] Replacing temporary session ${tempId} with: ${realSessionId}`);
 
@@ -175,11 +145,17 @@ export function useSessionProtection(
       }
     }
   }, [selectedProject, selectedSession, onRefresh]);
+}
 
-  /**
-   * Check if project update should be skipped due to active sessions
-   */
-  const shouldSkipUpdate = useCallback((
+/**
+ * Check if project update should be skipped due to active sessions
+ */
+function createShouldSkipUpdate(
+  activeSessions: Set<string>,
+  selectedProject: Project | null,
+  selectedSession: SidebarSession | null
+) {
+  return useCallback((
     currentProjects: Project[],
     updatedProjects: Project[]
   ): boolean => {
@@ -195,6 +171,62 @@ export function useSessionProtection(
 
     return false;
   }, [activeSessions, selectedProject, selectedSession]);
+}
+
+/**
+ * Create session check callbacks
+ */
+function createSessionCheckCallbacks(
+  activeSessions: Set<string>,
+  processingSessions: Set<string>
+) {
+  const hasActiveSession = useCallback((sessionId?: string): boolean => {
+    if (sessionId) {
+      return activeSessions.has(sessionId);
+    }
+    return activeSessions.size > 0;
+  }, [activeSessions]);
+
+  const isSessionActive = useCallback((sessionId: string): boolean => {
+    return activeSessions.has(sessionId);
+  }, [activeSessions]);
+
+  const isSessionProcessing = useCallback((sessionId: string): boolean => {
+    return processingSessions.has(sessionId);
+  }, [processingSessions]);
+
+  return {
+    hasActiveSession,
+    isSessionActive,
+    isSessionProcessing,
+  };
+}
+
+export function useSessionProtection(
+  selectedProject: Project | null,
+  selectedSession: SidebarSession | null,
+  onRefresh?: () => Promise<void>
+): UseSessionProtectionReturn {
+  const [activeSessions, setActiveSessions] = useState<Set<string>>(new Set());
+  const [processingSessions, setProcessingSessions] = useState<Set<string>>(new Set());
+  const [externalMessageUpdate, setExternalMessageUpdate] = useState(0);
+
+  // Create session state callbacks
+  const sessionCallbacks = createSessionStateCallbacks(setActiveSessions, setProcessingSessions);
+
+  // Create replace temporary session callback
+  const replaceTemporarySession = createReplaceTemporarySession(
+    setActiveSessions,
+    selectedProject,
+    selectedSession,
+    onRefresh
+  );
+
+  // Create should skip update callback
+  const shouldSkipUpdate = createShouldSkipUpdate(activeSessions, selectedProject, selectedSession);
+
+  // Create session check callbacks
+  const sessionCheckCallbacks = createSessionCheckCallbacks(activeSessions, processingSessions);
 
   /**
    * Auto-reset external message update counter
@@ -222,9 +254,7 @@ export function useSessionProtection(
     incrementExternalMessageUpdate,
     ...sessionCallbacks,
     replaceTemporarySession,
-    hasActiveSession,
-    isSessionActive,
-    isSessionProcessing,
+    ...sessionCheckCallbacks,
     shouldSkipUpdate,
   };
 }

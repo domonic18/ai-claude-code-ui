@@ -185,6 +185,43 @@ function DialogBody({
 }
 
 /**
+ * Custom hook for dialog side effects
+ * Handles focus management, escape key, and body scroll prevention
+ */
+function useDialogEffects(isOpen: boolean, isLoading: boolean, onCancel: () => void, confirmButtonRef: React.RefObject<HTMLButtonElement>) {
+  const previousActiveElementRef = useRef<HTMLElement | null>(null);
+
+  // Focus management: save and restore focus
+  useEffect(() => {
+    if (isOpen) {
+      previousActiveElementRef.current = document.activeElement as HTMLElement;
+      confirmButtonRef.current?.focus();
+    } else {
+      previousActiveElementRef.current?.focus();
+    }
+  }, [isOpen, confirmButtonRef]);
+
+  // Close on escape key and prevent body scroll
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isLoading) {
+        onCancel();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = '';
+    };
+  }, [isOpen, isLoading, onCancel]);
+}
+
+/**
  * ConfirmDialog Component
  *
  * @param props - ConfirmDialog props
@@ -202,48 +239,12 @@ export function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
-  const previousActiveElementRef = useRef<HTMLElement | null>(null);
 
   const handleConfirm = useCallback(async () => {
     await onConfirm();
   }, [onConfirm]);
 
-  // Focus management: save and restore focus
-  useEffect(() => {
-    if (isOpen) {
-      // Save currently focused element
-      previousActiveElementRef.current = document.activeElement as HTMLElement;
-      // Focus confirm button after dialog renders
-      confirmButtonRef.current?.focus();
-    } else {
-      // Restore focus when dialog closes
-      previousActiveElementRef.current?.focus();
-    }
-  }, [isOpen]);
-
-  // Close on escape key
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isLoading && isOpen) {
-        onCancel();
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
-      return () => document.removeEventListener('keydown', handleEscape);
-    }
-  }, [isOpen, isLoading, onCancel]);
-
-  // Prevent body scroll when dialog is open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = '';
-      };
-    }
-  }, [isOpen]);
+  useDialogEffects(isOpen, isLoading, onCancel, confirmButtonRef);
 
   if (!isOpen) return null;
 

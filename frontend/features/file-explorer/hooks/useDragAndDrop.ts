@@ -1,9 +1,8 @@
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api } from '@/shared/services';
 import type { FileNode } from '../types/file-explorer.types';
-import { extractRelativePath } from '../utils/fileTreeHelpers';
-import { logger } from '@/shared/utils/logger';
+import { canDrop, createDragStartHandler, createDragOverHandler, createDragLeaveHandler } from './dragAndDropHelpers';
+import { executeDropOperation } from './dropOperationExecutor';
 
 interface UseDragAndDropProps {
   selectedProject: { name: string; path: string };
@@ -38,60 +37,19 @@ export function useDragAndDrop({
   const [isMoving, setIsMoving] = useState(false);
 
   /**
-   * 检查是否可以放置
-   */
-  const canDrop = useCallback((source: FileNode, target: FileNode | null): boolean => {
-    if (!target) {
-      // 拖拽到根目录 - 总是允许，后端会处理已经在根目录的情况
-      return true;
-    }
-    if (target.type !== 'directory') return false;
-    if (source.path === target.path) return false;
-    if (target.path.startsWith(source.path + '/')) return false;
-    return true;
-  }, []);
-
-  /**
    * 处理拖拽开始
    */
-  const handleDragStart = useCallback((item: FileNode, e: React.DragEvent) => {
-    setDraggingItem(item);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', item.path);
-  }, []);
+  const handleDragStart = createDragStartHandler(setDraggingItem);
 
   /**
    * 处理拖拽悬停
    */
-  const handleDragOver = useCallback((item: FileNode | null, e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-
-    if (!draggingItem) return;
-
-    if (item === null) {
-      setIsDragOverRoot(true);
-      setDragOverItem(null);
-    } else {
-      setDragOverItem(item);
-      setIsDragOverRoot(false);
-    }
-  }, [draggingItem]);
+  const handleDragOver = createDragOverHandler(draggingItem, setDragOverItem, setIsDragOverRoot);
 
   /**
    * 处理拖拽离开滚动区域
    */
-  const handleScrollAreaDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const x = e.clientX;
-    const y = e.clientY;
-
-    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-      setIsDragOverRoot(false);
-      setDragOverItem(null);
-    }
-  }, []);
+  const handleScrollAreaDragLeave = createDragLeaveHandler(setIsDragOverRoot, setDragOverItem);
 
   /**
    * 处理放置
@@ -127,83 +85,6 @@ export function useDragAndDrop({
     handleScrollAreaDragLeave,
     handleDrop
   };
-}
-
-/**
- * Execute drop operation with validation and API call
- *
- * @param options - Drop operation options
- */
-async function executeDropOperation(options: {
-  draggingItem: FileNode;
-  targetItem: FileNode | null;
-  selectedProjectName: string;
-  canDrop: (source: FileNode, target: FileNode | null) => boolean;
-  t: (key: string, params?: Record<string, string>) => string;
-  fetchFiles: () => Promise<void>;
-  setIsMoving: (moving: boolean) => void;
-  setDraggingItem: (item: FileNode | null) => void;
-}): Promise<void> {
-  const {
-    draggingItem,
-    targetItem,
-    selectedProjectName,
-    canDrop,
-    t,
-    fetchFiles,
-    setIsMoving,
-    setDraggingItem,
-  } = options;
-
-  if (!canDrop(draggingItem, targetItem)) {
-    if (targetItem?.path === draggingItem.path) {
-      alert(t('fileExplorer.move.error.cannotMoveToSelf'));
-    } else if (targetItem && targetItem.path.startsWith(draggingItem.path + '/')) {
-      alert(t('fileExplorer.move.error.cannotMoveToChild'));
-    }
-    setDraggingItem(null);
-    return;
-  }
-
-  let targetPath = '';
-  if (targetItem) {
-    targetPath = extractRelativePath(targetItem.path, selectedProjectName);
-  }
-
-  const sourceName = draggingItem.name || '未知文件';
-  const targetName = targetItem?.name || '根目录';
-
-  const confirmMessage = targetItem
-    ? t('fileExplorer.move.confirm', { sourceName, targetName })
-    : t('fileExplorer.move.confirmToRoot', { sourceName });
-
-  if (!confirm(confirmMessage)) {
-    setDraggingItem(null);
-    return;
-  }
-
-  setIsMoving(true);
-
-  try {
-    const sourcePath = extractRelativePath(draggingItem.path, selectedProjectName);
-    const response = await api.moveFile(selectedProjectName, sourcePath, targetPath);
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      if (errorData.message?.includes('already exists')) {
-        throw new Error(t('fileExplorer.move.error.targetExists'));
-      }
-      throw new Error(errorData.error || errorData.message || 'Move failed');
-    }
-
-    await fetchFiles();
-  } catch (error) {
-    logger.error('[FileExplorer] Move error:', error);
-    alert(t('fileExplorer.move.error.generic', { message: error instanceof Error ? error.message : 'Unknown error' }));
-  } finally {
-    setIsMoving(false);
-    setDraggingItem(null);
-  }
 }
 
 export default useDragAndDrop;
