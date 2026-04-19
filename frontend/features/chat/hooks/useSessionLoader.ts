@@ -40,14 +40,24 @@ export function useSessionLoader(options: UseSessionLoaderOptions): void {
 
   // Ref to track which session's messages have been loaded
   const loadedSessionRef = useRef<string | null>(null);
+  // Track previous session ID to detect changes
+  const prevSessionIdRef = useRef<string | null>(null);
 
-  // Clear loaded session ref when session changes
+  // Clear loaded session ref when session changes (including switching between sessions)
   useEffect(() => {
-    if (!selectedSession?.id) {
-      // Clear loaded session ref when no session selected (new chat)
+    const currentId = selectedSession?.id || null;
+
+    // Session changed — clear cache so the new session gets loaded
+    if (prevSessionIdRef.current !== currentId) {
       loadedSessionRef.current = null;
+      prevSessionIdRef.current = currentId;
+
+      // Clear messages immediately when switching away from current session
+      if (currentId) {
+        onSetMessages([]);
+      }
     }
-  }, [selectedSession?.id]);
+  }, [selectedSession?.id, onSetMessages]);
 
   // Load session messages when session or project changes
   useEffect(() => {

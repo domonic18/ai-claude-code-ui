@@ -326,7 +326,7 @@ async function getSessionMessagesInContainer(userId, projectName, sessionId, lim
       };
     }
   } catch (error) {
-    logger.error(`[ContainerSessions] Error getting session messages:`, error);
+    logger.error({ err: error, projectName, sessionId, userId }, `[ContainerSessions] Error getting session messages`);
     return { messages: [], total: 0, hasMore: false };
   }
 }
