@@ -6,13 +6,12 @@
  * Terminal setup is in hooks/useTerminalSetup.ts
  */
 
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React, { useRef } from 'react';
 import '@xterm/xterm/css/xterm.css';
 import type { ShellProps } from '../types/terminal.types';
-import { logger } from '@/shared/utils/logger';
-import { useTerminalConnection } from '../hooks/useTerminalConnection';
-import { useTerminalSetup } from '../hooks/useTerminalSetup';
+import { useShellLogic } from '../hooks/useShellLogic';
 import { TerminalToolbar } from './TerminalToolbar';
+import { useTerminalSetup } from '../hooks/useTerminalSetup';
 
 /** Inject xterm style overrides at module load */
 const xtermStyles = `
@@ -30,6 +29,95 @@ if (typeof document !== 'undefined') {
   document.head.appendChild(styleSheet);
 }
 
+/**
+ * Empty state when no project is selected
+ */
+const NoProjectSelected: React.FC = () => (
+  <div className="h-full flex items-center justify-center">
+    <div className="text-center text-gray-500 dark:text-gray-400">
+      <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" />
+        </svg>
+      </div>
+      <h3 className="text-lg font-semibold mb-2">Select a Project</h3>
+      <p>Choose a project to open an interactive shell in that directory</p>
+    </div>
+  </div>
+);
+
+/**
+ * Overlay shown when terminal is connecting
+ */
+interface ConnectingOverlayProps {
+  isPlainShell: boolean;
+  initialCommand?: string;
+  displayName: string;
+}
+
+const ConnectingOverlay: React.FC<ConnectingOverlayProps> = ({
+  isPlainShell,
+  initialCommand,
+  displayName
+}) => (
+  <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-90 p-4">
+    <div className="text-center max-w-sm w-full">
+      <div className="flex items-center justify-center space-x-3 text-yellow-400">
+        <div className="w-6 h-6 animate-spin rounded-full border-2 border-yellow-400 border-t-transparent"></div>
+        <span className="text-base font-medium">Connecting to shell...</span>
+      </div>
+      <p className="text-gray-400 text-sm mt-3 px-2">
+        {isPlainShell ?
+          `Running ${initialCommand || 'command'} in ${displayName}` :
+          `Starting Claude CLI in ${displayName}`
+        }
+      </p>
+    </div>
+  </div>
+);
+
+/**
+ * Prompt shown when terminal is ready but not connected
+ */
+interface ConnectPromptProps {
+  onConnect: () => void;
+  isPlainShell: boolean;
+  initialCommand?: string;
+  displayName: string;
+  sessionDisplayName: string | null;
+}
+
+const ConnectPrompt: React.FC<ConnectPromptProps> = ({
+  onConnect,
+  isPlainShell,
+  initialCommand,
+  displayName,
+  sessionDisplayName
+}) => (
+  <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-90 p-4 z-40">
+    <div className="text-center max-w-sm w-full">
+      <button
+        onClick={onConnect}
+        className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 text-base font-medium w-full sm:w-auto"
+        title="Connect to shell"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+        <span>Continue in Shell</span>
+      </button>
+      <p className="text-gray-400 text-sm mt-3 px-2">
+        {isPlainShell ?
+          `Run ${initialCommand || 'command'} in ${displayName}` :
+          sessionDisplayName ?
+            `Resume session: ${sessionDisplayName}...` :
+            'Start a new Claude session'
+        }
+      </p>
+    </div>
+  </div>
+);
+
 function Shell({
   selectedProject,
   selectedSession,
@@ -40,209 +128,130 @@ function Shell({
   autoConnect = false,
   isActive = false
 }: ShellProps) {
-  // State
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [isRestarting, setIsRestarting] = useState(false);
-  const [lastSessionId, setLastSessionId] = useState<string | null>(null);
-
-  // Refs for stable callback access
-  const selectedProjectRef = useRef(selectedProject);
-  const selectedSessionRef = useRef(selectedSession);
-  const initialCommandRef = useRef(initialCommand);
-  const isPlainShellRef = useRef(isPlainShell);
-  const onProcessCompleteRef = useRef(onProcessComplete);
-
-  useEffect(() => {
-    selectedProjectRef.current = selectedProject;
-    selectedSessionRef.current = selectedSession;
-    initialCommandRef.current = initialCommand;
-    isPlainShellRef.current = isPlainShell;
-    onProcessCompleteRef.current = onProcessComplete;
-  });
-
-  // Connection hook — created first so its send function is available
-  const connectionSendRef = useRef<(data: object) => void>(() => {});
-
-  // Terminal setup hook
-  const { terminalRef, terminal, fitAddon } = useTerminalSetup({
-    initKey: selectedProject?.path || selectedProject?.fullPath || '',
-    isRestarting,
-    onInput: useCallback((data: string) => {
-      connectionSendRef.current({ type: 'input', data });
-    }, []),
-    onResize: useCallback((cols: number, rows: number) => {
-      connectionSendRef.current({ type: 'resize', cols, rows });
-    }, []),
+  const terminal = useRef<ReturnType<typeof useTerminalSetup>['terminal']['current']>(null);
+  const shellState = useShellLogic({
+    selectedProject,
+    selectedSession,
+    initialCommand,
+    isPlainShell,
+    onProcessComplete,
     autoConnect,
-    onInitialized: () => setIsInitialized(true),
-    send: (data: object) => {
-      connectionSendRef.current(data);
-    },
+    terminal
   });
-
-  // Connection hook
-  const { isConnected, isConnecting, userDisconnected, connect, disconnect, send: connectionSend } = useTerminalConnection({
-    onOutput: useCallback((output: string) => {
-      if (terminal.current) {
-        terminal.current.write(output);
-      }
-    }, [terminal]),
-    onUrlOpen: useCallback((url: string) => {
-      window.open(url, '_blank');
-    }, []),
-    selectedProjectRef,
-    selectedSessionRef,
-    initialCommandRef,
-    isPlainShellRef,
-    onProcessCompleteRef,
-    fitAddonRef: fitAddon,
-    terminalRef: terminal,
-  });
-
-  // Wire up the connection send function so setup hook callbacks can use it
-  connectionSendRef.current = connectionSend;
-
-  // Session display names
-  const sessionDisplayNameLong = useMemo(() => {
-    if (!selectedSession) return null;
-    const displayName = selectedSession.__provider === 'cursor'
-      ? (selectedSession.name || 'Untitled Session')
-      : (selectedSession.summary || 'New Session');
-    return displayName.slice(0, 50) ?? null;
-  }, [selectedSession]);
-
-  // Restart handler
-  const restartShell = useCallback(() => {
-    setIsRestarting(true);
-
-    disconnect();
-
-    if (terminal.current) {
-      terminal.current.dispose();
-      terminal.current = null;
-      fitAddon.current = null;
-    }
-
-    setIsInitialized(false);
-    setTimeout(() => setIsRestarting(false), 200);
-  }, [disconnect, terminal, fitAddon]);
-
-  // Disconnect with terminal clear
-  const disconnectFromShell = useCallback(() => {
-    disconnect();
-    if (terminal.current) {
-      terminal.current.clear();
-      terminal.current.write('\x1b[2J\x1b[H');
-    }
-  }, [disconnect, terminal]);
-
-  // Auto-reconnect on session change
-  useEffect(() => {
-    const currentSessionId = selectedSession?.id || null;
-    if (lastSessionId !== null && lastSessionId !== currentSessionId && isInitialized) {
-      disconnectFromShell();
-    }
-    setLastSessionId(currentSessionId);
-  }, [selectedSession?.id, isInitialized, disconnectFromShell, lastSessionId]);
-
-  // Auto-connect effect
-  useEffect(() => {
-    if (userDisconnected) return;
-    if (!autoConnect || !isInitialized || isConnecting || isConnected) return;
-    connect();
-  }, [autoConnect, isInitialized, isConnecting, isConnected, connect, userDisconnected]);
-
-  // --- Render ---
 
   if (!selectedProject) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center text-gray-500 dark:text-gray-400">
-          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-semibold mb-2">Select a Project</h3>
-          <p>Choose a project to open an interactive shell in that directory</p>
-        </div>
-      </div>
-    );
+    return <NoProjectSelected />;
   }
 
   if (minimal) {
-    return (
-      <div className="h-full w-full bg-gray-900">
-        <div ref={terminalRef} className="h-full w-full focus:outline-none" style={{ outline: 'none' }} />
-      </div>
-    );
+    return <MinimalTerminal terminalRef={shellState.terminalRef} />;
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-900 w-full">
-      <TerminalToolbar
-        isConnected={isConnected}
-        isInitialized={isInitialized}
-        isRestarting={isRestarting}
-        selectedSession={selectedSession}
-        onDisconnect={disconnectFromShell}
-        onRestart={restartShell}
-      />
-
-      <div className="flex-1 p-2 overflow-hidden relative">
-        <div ref={terminalRef} className="h-full w-full focus:outline-none" style={{ outline: 'none' }} />
-
-        {!isInitialized && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-90 z-50">
-            <div className="text-white">Loading terminal...</div>
-          </div>
-        )}
-
-        {isInitialized && !isConnected && !isConnecting && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-90 p-4 z-40">
-            <div className="text-center max-w-sm w-full">
-              <button
-                onClick={connect}
-                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 text-base font-medium w-full sm:w-auto"
-                title="Connect to shell"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                <span>Continue in Shell</span>
-              </button>
-              <p className="text-gray-400 text-sm mt-3 px-2">
-                {isPlainShell ?
-                  `Run ${initialCommand || 'command'} in ${selectedProject.displayName}` :
-                  selectedSession ?
-                    `Resume session: ${sessionDisplayNameLong}...` :
-                    'Start a new Claude session'
-                }
-              </p>
-            </div>
-          </div>
-        )}
-
-        {isConnecting && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-90 p-4">
-            <div className="text-center max-w-sm w-full">
-              <div className="flex items-center justify-center space-x-3 text-yellow-400">
-                <div className="w-6 h-6 animate-spin rounded-full border-2 border-yellow-400 border-t-transparent"></div>
-                <span className="text-base font-medium">Connecting to shell...</span>
-              </div>
-              <p className="text-gray-400 text-sm mt-3 px-2">
-                {isPlainShell ?
-                  `Running ${initialCommand || 'command'} in ${selectedProject.displayName}` :
-                  `Starting Claude CLI in ${selectedProject.displayName}`
-                }
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+    <TerminalShell
+      terminalRef={shellState.terminalRef}
+      isConnected={shellState.isConnected}
+      isInitialized={shellState.isInitialized}
+      isRestarting={shellState.isRestarting}
+      isConnecting={shellState.isConnecting}
+      selectedSession={selectedSession}
+      selectedProject={selectedProject}
+      isPlainShell={isPlainShell}
+      initialCommand={initialCommand}
+      sessionDisplayNameLong={shellState.sessionDisplayNameLong}
+      onDisconnect={shellState.disconnectFromShell}
+      onRestart={shellState.restartShell}
+      onConnect={shellState.connect}
+    />
   );
 }
+
+/**
+ * Minimal terminal view without toolbar
+ */
+interface MinimalTerminalProps {
+  terminalRef: React.RefObject<HTMLDivElement>;
+}
+
+const MinimalTerminal: React.FC<MinimalTerminalProps> = ({ terminalRef }) => (
+  <div className="h-full w-full bg-gray-900">
+    <div ref={terminalRef} className="h-full w-full focus:outline-none" style={{ outline: 'none' }} />
+  </div>
+);
+
+/**
+ * Full terminal view with toolbar and overlays
+ */
+interface TerminalShellProps {
+  terminalRef: React.RefObject<HTMLDivElement>;
+  isConnected: boolean;
+  isInitialized: boolean;
+  isRestarting: boolean;
+  isConnecting: boolean;
+  selectedSession: ShellProps['selectedSession'];
+  selectedProject: NonNullable<ShellProps['selectedProject']>;
+  isPlainShell: boolean;
+  initialCommand?: string;
+  sessionDisplayNameLong: string | null;
+  onDisconnect: () => void;
+  onRestart: () => void;
+  onConnect: () => void;
+}
+
+const TerminalShell: React.FC<TerminalShellProps> = ({
+  terminalRef,
+  isConnected,
+  isInitialized,
+  isRestarting,
+  isConnecting,
+  selectedSession,
+  selectedProject,
+  isPlainShell,
+  initialCommand,
+  sessionDisplayNameLong,
+  onDisconnect,
+  onRestart,
+  onConnect
+}) => (
+  <div className="h-full flex flex-col bg-gray-900 w-full">
+    <TerminalToolbar
+      isConnected={isConnected}
+      isInitialized={isInitialized}
+      isRestarting={isRestarting}
+      selectedSession={selectedSession}
+      onDisconnect={onDisconnect}
+      onRestart={onRestart}
+    />
+
+    <div className="flex-1 p-2 overflow-hidden relative">
+      <div ref={terminalRef} className="h-full w-full focus:outline-none" style={{ outline: 'none' }} />
+
+      {!isInitialized && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-90 z-50">
+          <div className="text-white">Loading terminal...</div>
+        </div>
+      )}
+
+      {isInitialized && !isConnected && !isConnecting && (
+        <ConnectPrompt
+          onConnect={onConnect}
+          isPlainShell={isPlainShell}
+          initialCommand={initialCommand}
+          displayName={selectedProject.displayName}
+          sessionDisplayName={sessionDisplayNameLong}
+        />
+      )}
+
+      {isConnecting && (
+        <ConnectingOverlay
+          isPlainShell={isPlainShell}
+          initialCommand={initialCommand}
+          displayName={selectedProject.displayName}
+        />
+      )}
+    </div>
+  </div>
+);
 
 export default Shell;
 export { Shell as Terminal, Shell };

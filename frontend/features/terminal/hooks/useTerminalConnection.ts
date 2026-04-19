@@ -45,6 +45,233 @@ interface UseTerminalConnectionOptions {
 }
 
 /**
+ * Create WebSocket message handler for terminal
+ */
+function createWebSocketMessageHandler(
+  isPlainShellRef: React.MutableRefObject<boolean>,
+  onProcessCompleteRef: React.MutableRefObject<((code: number) => void) | undefined>,
+  onOutput?: (output: string) => void,
+  onUrlOpen?: (url: string) => void
+) {
+  return (event: MessageEvent) => {
+    try {
+      const data = JSON.parse(event.data);
+
+      if (data.type === 'output') {
+        const output = data.data;
+
+        if (isPlainShellRef.current && onProcessCompleteRef.current) {
+          const cleanOutput = output.replace(/\x1b\[[0-9;]*m/g, '');
+          if (cleanOutput.includes('Process exited with code 0')) {
+            onProcessCompleteRef.current(0);
+          } else if (cleanOutput.match(/Process exited with code (\d+)/)) {
+            const exitCode = parseInt(cleanOutput.match(/Process exited with code (\d+)/)[1]);
+            if (exitCode !== 0) {
+              onProcessCompleteRef.current(exitCode);
+            }
+          }
+        }
+
+        onOutput?.(output);
+      } else if (data.type === 'url_open') {
+        onUrlOpen?.(data.url);
+      }
+    } catch (error) {
+      logger.error('[Shell] Error handling WebSocket message:', error, event.data);
+    }
+  };
+}
+
+/**
+ * Configure WebSocket event handlers
+ */
+function configureWebSocketHandlers(
+  ws: WebSocket,
+  params: WebSocketConnectionParams
+) {
+  ws.onopen = () => {
+    params.setIsConnected(true);
+    params.setIsConnecting(false);
+    params.isConnectingRef.current = false;
+
+    setTimeout(() => {
+      if (params.fitAddonRef.current && params.terminalRef.current && ws) {
+        params.fitAddonRef.current.fit();
+
+        ws.send(JSON.stringify({
+          type: 'init',
+          projectPath: params.selectedProjectRef.current.fullPath || params.selectedProjectRef.current.path,
+          sessionId: params.isPlainShellRef.current ? null : params.selectedSessionRef.current?.id,
+          hasSession: params.isPlainShellRef.current ? false : !!params.selectedSessionRef.current,
+          provider: params.isPlainShellRef.current ? 'plain-shell' : (params.selectedSessionRef.current?.__provider || 'claude'),
+          cols: params.terminalRef.current.cols,
+          rows: params.terminalRef.current.rows,
+          initialCommand: params.initialCommandRef.current,
+          isPlainShell: params.isPlainShellRef.current
+        }));
+      }
+    }, 100);
+  };
+
+  ws.onmessage = createWebSocketMessageHandler(
+    params.isPlainShellRef,
+    params.onProcessCompleteRef,
+    params.onOutput,
+    params.onUrlOpen
+  );
+
+  ws.onclose = () => {
+    params.setIsConnected(false);
+    params.setIsConnecting(false);
+    params.isConnectingRef.current = false;
+  };
+
+  ws.onerror = () => {
+    params.setIsConnected(false);
+    params.setIsConnecting(false);
+    params.isConnectingRef.current = false;
+  };
+}
+
+/**
+ * Establish WebSocket connection for terminal
+ */
+interface WebSocketConnectionParams {
+  isConnected: boolean;
+  isConnectingRef: React.MutableRefObject<boolean>;
+  setIsConnected: (state: boolean) => void;
+  setIsConnecting: (state: boolean) => void;
+  selectedProjectRef: React.MutableRefObject<any>;
+  selectedSessionRef: React.MutableRefObject<any>;
+  initialCommandRef: React.MutableRefObject<string | undefined>;
+  isPlainShellRef: React.MutableRefObject<boolean>;
+  fitAddonRef: React.MutableRefObject<any>;
+  terminalRef: React.MutableRefObject<any>;
+  onOutput?: (output: string) => void;
+  onUrlOpen?: (url: string) => void;
+  onProcessCompleteRef: React.MutableRefObject<((code: number) => void) | undefined>;
+}
+
+async function establishWebSocketConnection(
+  params: WebSocketConnectionParams
+): Promise<WebSocket | null> {
+  const {
+    isConnected,
+    isConnectingRef,
+    setIsConnected,
+    setIsConnecting,
+  } = params;
+
+  if (isConnectingRef.current || isConnected) {
+    return null;
+  }
+
+  isConnectingRef.current = true;
+  setIsConnecting(true);
+
+  try {
+    const ws = await createWebSocket();
+    if (!ws) {
+      setIsConnecting(false);
+      isConnectingRef.current = false;
+      return null;
+    }
+
+    configureWebSocketHandlers(ws, params);
+    return ws;
+  } catch {
+    setIsConnected(false);
+    setIsConnecting(false);
+    isConnectingRef.current = false;
+    return null;
+  }
+}
+
+/**
+ * Create WebSocket connection with proper URL and token
+ */
+async function createWebSocket(): Promise<WebSocket | null> {
+  const isPlatform = import.meta.env.VITE_IS_PLATFORM === 'true';
+  let wsUrl: string;
+
+  if (isPlatform) {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    wsUrl = `${protocol}//${window.location.host}/shell`;
+  } else {
+    let token: string | undefined;
+    try {
+      const response = await fetch('/api/auth/ws-token', { credentials: 'include' });
+      if (response.ok) {
+        const data = await response.json();
+        token = data.data?.token;
+      }
+    } catch (error) {
+      logger.error('[Shell] Error fetching ws-token:', error);
+      return null;
+    }
+
+    if (!token) {
+      return null;
+    }
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    wsUrl = `${protocol}//${window.location.host}/shell?token=${encodeURIComponent(token)}`;
+  }
+
+  return new WebSocket(wsUrl);
+}
+
+/**
+ * Custom hook for terminal WebSocket connection callbacks
+ */
+function useTerminalConnectionCallbacks(
+  wsRef: React.MutableRefObject<WebSocket | null>,
+  isConnected: boolean,
+  isConnectingRef: React.MutableRefObject<boolean>,
+  setIsConnected: (state: boolean) => void,
+  setIsConnecting: (state: boolean) => void,
+  setUserDisconnected: (state: boolean) => void,
+  params: WebSocketConnectionParams
+) {
+  const connectWebSocket = useCallback(async () => {
+    const ws = await establishWebSocketConnection(params);
+
+    if (ws) {
+      wsRef.current = ws;
+    }
+  }, [params, wsRef]);
+
+  const disconnect = useCallback(() => {
+    setUserDisconnected(true);
+    isConnectingRef.current = false;
+
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+
+    setIsConnected(false);
+    setIsConnecting(false);
+  }, [setUserDisconnected, setIsConnected, setIsConnecting]);
+
+  const send = useCallback((data: object) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(data));
+    }
+  }, [wsRef]);
+
+  const connect = useCallback(() => {
+    if (isConnectingRef.current || isConnected) {
+      return;
+    }
+    setUserDisconnected(false);
+    connectWebSocket();
+  }, [isConnected, isConnectingRef, setUserDisconnected, connectWebSocket]);
+
+  return { connect, disconnect, send };
+}
+
+/**
  * Custom hook for terminal WebSocket connection management
  */
 export function useTerminalConnection(options: UseTerminalConnectionOptions): TerminalConnection {
@@ -66,144 +293,31 @@ export function useTerminalConnection(options: UseTerminalConnectionOptions): Te
   const [userDisconnected, setUserDisconnected] = useState(false);
   const isConnectingRef = useRef(false);
 
-  const connectWebSocket = useCallback(async () => {
-    if (isConnectingRef.current || isConnected) {
-      return;
-    }
+  const wsParams: WebSocketConnectionParams = {
+    isConnected,
+    isConnectingRef,
+    setIsConnected,
+    setIsConnecting,
+    selectedProjectRef,
+    selectedSessionRef,
+    initialCommandRef,
+    isPlainShellRef,
+    fitAddonRef,
+    terminalRef,
+    onOutput,
+    onUrlOpen,
+    onProcessCompleteRef
+  };
 
-    isConnectingRef.current = true;
-    setIsConnecting(true);
-
-    try {
-      const isPlatform = import.meta.env.VITE_IS_PLATFORM === 'true';
-      let wsUrl: string;
-
-      if (isPlatform) {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        wsUrl = `${protocol}//${window.location.host}/shell`;
-      } else {
-        let token: string | undefined;
-        try {
-          const response = await fetch('/api/auth/ws-token', { credentials: 'include' });
-          if (response.ok) {
-            const data = await response.json();
-            token = data.data?.token;
-          }
-        } catch (error) {
-          logger.error('[Shell] Error fetching ws-token:', error);
-          setIsConnecting(false);
-          isConnectingRef.current = false;
-          return;
-        }
-
-        if (!token) {
-          setIsConnecting(false);
-          isConnectingRef.current = false;
-          return;
-        }
-
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        wsUrl = `${protocol}//${window.location.host}/shell?token=${encodeURIComponent(token)}`;
-      }
-
-      wsRef.current = new WebSocket(wsUrl);
-
-      wsRef.current.onopen = () => {
-        setIsConnected(true);
-        setIsConnecting(false);
-        isConnectingRef.current = false;
-
-        setTimeout(() => {
-          if (fitAddonRef.current && terminalRef.current && wsRef.current) {
-            fitAddonRef.current.fit();
-
-            wsRef.current!.send(JSON.stringify({
-              type: 'init',
-              projectPath: selectedProjectRef.current.fullPath || selectedProjectRef.current.path,
-              sessionId: isPlainShellRef.current ? null : selectedSessionRef.current?.id,
-              hasSession: isPlainShellRef.current ? false : !!selectedSessionRef.current,
-              provider: isPlainShellRef.current ? 'plain-shell' : (selectedSessionRef.current?.__provider || 'claude'),
-              cols: terminalRef.current.cols,
-              rows: terminalRef.current.rows,
-              initialCommand: initialCommandRef.current,
-              isPlainShell: isPlainShellRef.current
-            }));
-          }
-        }, 100);
-      };
-
-      wsRef.current.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-
-          if (data.type === 'output') {
-            const output = data.data;
-
-            if (isPlainShellRef.current && onProcessCompleteRef.current) {
-              const cleanOutput = output.replace(/\x1b\[[0-9;]*m/g, '');
-              if (cleanOutput.includes('Process exited with code 0')) {
-                onProcessCompleteRef.current(0);
-              } else if (cleanOutput.match(/Process exited with code (\d+)/)) {
-                const exitCode = parseInt(cleanOutput.match(/Process exited with code (\d+)/)[1]);
-                if (exitCode !== 0) {
-                  onProcessCompleteRef.current(exitCode);
-                }
-              }
-            }
-
-            onOutput?.(output);
-          } else if (data.type === 'url_open') {
-            onUrlOpen?.(data.url);
-          }
-        } catch (error) {
-          logger.error('[Shell] Error handling WebSocket message:', error, event.data);
-        }
-      };
-
-      wsRef.current.onclose = () => {
-        setIsConnected(false);
-        setIsConnecting(false);
-        isConnectingRef.current = false;
-      };
-
-      wsRef.current.onerror = () => {
-        setIsConnected(false);
-        setIsConnecting(false);
-        isConnectingRef.current = false;
-      };
-    } catch {
-      setIsConnected(false);
-      setIsConnecting(false);
-      isConnectingRef.current = false;
-    }
-  }, [isConnected, onOutput, onUrlOpen, fitAddonRef, terminalRef, selectedProjectRef, selectedSessionRef, initialCommandRef, isPlainShellRef, onProcessCompleteRef]);
-
-  const disconnect = useCallback(() => {
-    setUserDisconnected(true);
-    isConnectingRef.current = false;
-
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-
-    setIsConnected(false);
-    setIsConnecting(false);
-  }, []);
-
-  const send = useCallback((data: object) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(data));
-    }
-  }, []);
-
-  const connect = useCallback(() => {
-    if (isConnectingRef.current || isConnected) {
-      return;
-    }
-    setUserDisconnected(false);
-    connectWebSocket();
-  }, [isConnected, connectWebSocket]);
+  const { connect, disconnect, send } = useTerminalConnectionCallbacks(
+    wsRef,
+    isConnected,
+    isConnectingRef,
+    setIsConnected,
+    setIsConnecting,
+    setUserDisconnected,
+    wsParams
+  );
 
   // Cleanup on unmount
   useEffect(() => {

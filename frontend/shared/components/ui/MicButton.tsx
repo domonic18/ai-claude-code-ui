@@ -1,9 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Loader2, Brain } from 'lucide-react';
-import { transcribeWithWhisper } from '@/shared/utils/audio';
 import { logger } from '@/shared/utils/logger';
-import { getRecordingErrorMessage } from './micButtonHelpers';
-import type { MicState } from './micButtonHelpers';
+import {
+  getRecordingErrorMessage,
+  getButtonAppearance,
+  handleRecordingComplete,
+  checkMicrophoneSupport,
+  stopRecording as stopRecordingHelper,
+  canHandleClick,
+  cleanupStream,
+  getSupportedMimeType,
+  setupRecorderHandlers,
+  startRecording as startRecordingHelper,
+  type MicState
+} from './micButtonHelpers';
 
 export interface MicButtonProps {
   onTranscript?: (text: string) => void;
@@ -21,109 +30,14 @@ export function MicButton({ onTranscript, className = '' }: MicButtonProps) {
   const lastTapRef = useRef(0);
 
   useEffect(() => {
-    const checkSupport = () => {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setIsSupported(false);
-        setError('Microphone not supported. Please use HTTPS or a modern browser.');
-        return;
-      }
-
-      if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-        setIsSupported(false);
-        setError('Microphone requires HTTPS. Please use a secure connection.');
-        return;
-      }
-
-      setIsSupported(true);
-      setError(null);
-    };
-
-    checkSupport();
+    const { isSupported, error } = checkMicrophoneSupport();
+    setIsSupported(isSupported);
+    setError(error);
   }, []);
 
-  const startRecording = async () => {
-    try {
-      logger.info('Starting recording...');
-      setError(null);
-      chunksRef.current = [];
+  const startRecording = () => startRecordingHelper(chunksRef, mediaRecorderRef, streamRef, setState, onTranscript, setError);
 
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Microphone access not available. Please use HTTPS or a supported browser.');
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
-      const recorder = new MediaRecorder(stream, { mimeType });
-      mediaRecorderRef.current = recorder;
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunksRef.current.push(e.data);
-        }
-      };
-
-      recorder.onstop = async () => {
-        logger.info('Recording stopped, creating blob...');
-        const blob = new Blob(chunksRef.current, { type: mimeType });
-
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach(track => track.stop());
-          streamRef.current = null;
-        }
-
-        setState('transcribing');
-
-        const whisperMode = window.localStorage.getItem('whisperMode') || 'default';
-        const isEnhancementMode = whisperMode === 'prompt' || whisperMode === 'vibe' || whisperMode === 'instructions' || whisperMode === 'architect';
-
-        let processingTimer: ReturnType<typeof setTimeout> | undefined;
-        if (isEnhancementMode) {
-          processingTimer = setTimeout(() => {
-            setState('processing');
-          }, 2000);
-        }
-
-        try {
-          const text = await transcribeWithWhisper(blob);
-          if (text && onTranscript) {
-            onTranscript(text);
-          }
-        } catch (err: any) {
-          logger.error('Transcription error:', err);
-          setError(err.message);
-        } finally {
-          if (processingTimer) {
-            clearTimeout(processingTimer);
-          }
-          setState('idle');
-        }
-      };
-
-      recorder.start();
-      setState('recording');
-      logger.info('Recording started successfully');
-    } catch (err: any) {
-      logger.error('Failed to start recording:', err);
-      setError(getRecordingErrorMessage(err));
-      setState('idle');
-    }
-  };
-
-  const stopRecording = () => {
-    logger.info('Stopping recording...');
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop();
-    } else {
-      logger.info('Recorder not in recording state, forcing cleanup');
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-        streamRef.current = null;
-      }
-      setState('idle');
-    }
-  };
+  const stopRecording = () => stopRecordingHelper(mediaRecorderRef, streamRef, setState);
 
   const handleClick = (e: React.MouseEvent | React.TouchEvent) => {
     if (e) {
@@ -131,16 +45,9 @@ export function MicButton({ onTranscript, className = '' }: MicButtonProps) {
       e.stopPropagation();
     }
 
-    if (!isSupported) {
+    if (!canHandleClick(isSupported, lastTapRef)) {
       return;
     }
-
-    const now = Date.now();
-    if (now - lastTapRef.current < 300) {
-      logger.info('Ignoring rapid tap');
-      return;
-    }
-    lastTapRef.current = now;
 
     logger.info('Button clicked, current state:', state);
 
@@ -153,51 +60,37 @@ export function MicButton({ onTranscript, className = '' }: MicButtonProps) {
 
   useEffect(() => {
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
+      cleanupStream(streamRef);
     };
   }, []);
 
-  const getButtonAppearance = () => {
-    if (!isSupported) {
-      return {
-        icon: <Mic className="w-5 h-5" />,
-        className: 'bg-gray-400 cursor-not-allowed',
-        disabled: true
-      };
-    }
+  const { icon, className: buttonClass, disabled } = getButtonAppearance(state, isSupported);
 
-    switch (state) {
-      case 'recording':
-        return {
-          icon: <Mic className="w-5 h-5 text-white" />,
-          className: 'bg-red-500 hover:bg-red-600 animate-pulse',
-          disabled: false
-        };
-      case 'transcribing':
-        return {
-          icon: <Loader2 className="w-5 h-5 animate-spin" />,
-          className: 'bg-blue-500 hover:bg-blue-600',
-          disabled: true
-        };
-      case 'processing':
-        return {
-          icon: <Brain className="w-5 h-5 animate-pulse" />,
-          className: 'bg-purple-500 hover:bg-purple-600',
-          disabled: true
-        };
-      default:
-        return {
-          icon: <Mic className="w-5 h-5" />,
-          className: 'bg-gray-700 hover:bg-gray-600',
-          disabled: false
-        };
-    }
-  };
+  return (
+    <MicButtonView
+      state={state}
+      icon={icon}
+      disabled={disabled}
+      error={error}
+      handleClick={handleClick}
+      className={className}
+    />
+  );
+}
 
-  const { icon, className: buttonClass, disabled } = getButtonAppearance();
+/**
+ * MicButton 视图组件 - 负责渲染 UI
+ */
+interface MicButtonViewProps {
+  state: MicState;
+  icon: React.ReactNode;
+  disabled: boolean;
+  error: string | null;
+  handleClick: (e: React.MouseEvent | React.TouchEvent) => void;
+  className: string;
+}
 
+function MicButtonView({ state, icon, disabled, error, handleClick, className }: MicButtonViewProps) {
   return (
     <div className="relative">
       <button

@@ -7,15 +7,14 @@ function tryParseJSON(str) {
 
 function extractTokenBudget(sdkMessage) {
   if (sdkMessage.type !== 'result' || !sdkMessage.modelUsage) return null;
-  const modelKey = Object.keys(sdkMessage.modelUsage)[0];
-  const modelData = sdkMessage.modelUsage[modelKey];
+  const modelData = Object.values(sdkMessage.modelUsage)[0];
   if (!modelData) return null;
 
-  const inputTokens = modelData.inputTokens || modelData.cumulativeInputTokens || 0;
-  const outputTokens = modelData.outputTokens || modelData.cumulativeOutputTokens || 0;
-  const cacheReadTokens = modelData.cacheReadInputTokens || modelData.cumulativeCacheReadInputTokens || 0;
-  const cacheCreationTokens = modelData.cacheCreationInputTokens || modelData.cumulativeCacheCreationInputTokens || 0;
-  const totalUsed = inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens;
+  const totalUsed =
+    (modelData.inputTokens ?? modelData.cumulativeInputTokens ?? 0) +
+    (modelData.outputTokens ?? modelData.cumulativeOutputTokens ?? 0) +
+    (modelData.cacheReadInputTokens ?? modelData.cumulativeCacheReadInputTokens ?? 0) +
+    (modelData.cacheCreationInputTokens ?? modelData.cumulativeCacheCreationInputTokens ?? 0);
   const contextWindow = parseInt(process.env.CONTEXT_WINDOW) || 200000;
 
   return { used: totalUsed, total: contextWindow };

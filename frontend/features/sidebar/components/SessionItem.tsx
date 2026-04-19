@@ -35,100 +35,83 @@ function getSessionLogo(provider?: string) {
 }
 
 /**
- * SessionItem Component
+ * SessionItemRenaming Component
+ *
+ * Renders the rename input UI with save/cancel buttons.
  */
-export const SessionItem = memo(function SessionItem({
+function SessionItemRenaming({
+  SessionLogo,
+  localValue,
+  handleChange,
+  handleKeyDown,
+  handleSaveClick,
+  handleCancelClick,
+}: {
+  SessionLogo: React.ComponentType<{ className?: string }>;
+  localValue: string;
+  handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleKeyDown: (e: KeyboardEvent<HTMLInputElement>) => void;
+  handleSaveClick: (e: React.MouseEvent) => void;
+  handleCancelClick: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2 p-2 rounded-md bg-accent/50 relative z-10">
+      <div className="w-3 h-3 flex-shrink-0">
+        <SessionLogo className="w-full h-full" />
+      </div>
+      <input
+        type="text"
+        value={localValue}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        className="flex-1 min-w-0 px-2 py-1 text-sm border border-border rounded bg-background text-foreground focus:ring-2 focus:ring-primary/20"
+        autoFocus
+        onClick={(e) => e.stopPropagation()}
+      />
+      <div
+        className="w-6 h-6 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20 flex items-center justify-center rounded cursor-pointer transition-colors flex-shrink-0"
+        onClick={handleSaveClick}
+        title="Save"
+      >
+        <Check className="w-3.5 h-3.5" />
+      </div>
+      <div
+        className="w-6 h-6 text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-center rounded cursor-pointer transition-colors flex-shrink-0"
+        onClick={handleCancelClick}
+        title="Cancel"
+      >
+        <X className="w-3.5 h-3.5" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * SessionItemNormal Component
+ *
+ * Renders the normal session display with hover actions (edit/delete buttons).
+ */
+function SessionItemNormal({
   session,
   isSelected,
   isActive,
   timeAgo,
   onClick,
+  onDoubleClick,
   onDelete,
   onStartRename,
-  isRenaming,
-  renameValue,
-  onRenameChange,
-  onRenameSave,
-  onRenameCancel,
-}: SessionItemProps) {
-  // Use local value for input to ensure immediate updates
-  const [localValue, setLocalValue] = useState(renameValue);
-
-  // Sync local value when renameValue prop changes (e.g., when starting edit mode)
-  useEffect(() => {
-    setLocalValue(renameValue);
-  }, [renameValue]);
-
-  const handleDoubleClick = useCallback(() => {
-    if (!isRenaming) {
-      onStartRename();
-      setLocalValue(session.summary || '');
-    }
-  }, [isRenaming, onStartRename, session.summary]);
-
-  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      onRenameSave();
-    } else if (e.key === 'Escape') {
-      onRenameCancel();
-      setLocalValue(session.summary || '');
-    }
-  }, [onRenameSave, onRenameCancel, session.summary]);
-
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    setLocalValue(newValue);
-    onRenameChange(newValue);
-  }, [onRenameChange]);
-
-  // Handle save button click (defined before conditional render)
-  const handleSaveClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    onRenameSave();
-  }, [onRenameSave]);
-
-  // Handle cancel button click (defined before conditional render)
-  const handleCancelClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    onRenameCancel();
-    setLocalValue(session.summary || '');
-  }, [onRenameCancel, session.summary]);
-
-  const SessionLogo = getSessionLogo(session.__provider);
-
-  if (isRenaming) {
-    return (
-      <div className="flex items-center gap-2 p-2 rounded-md bg-accent/50 relative z-10">
-        <div className="w-3 h-3 flex-shrink-0">
-          <SessionLogo className="w-full h-full" />
-        </div>
-        <input
-          type="text"
-          value={localValue}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          className="flex-1 min-w-0 px-2 py-1 text-sm border border-border rounded bg-background text-foreground focus:ring-2 focus:ring-primary/20"
-          autoFocus
-          onClick={(e) => e.stopPropagation()}
-        />
-        <div
-          className="w-6 h-6 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20 flex items-center justify-center rounded cursor-pointer transition-colors flex-shrink-0"
-          onClick={handleSaveClick}
-          title="Save"
-        >
-          <Check className="w-3.5 h-3.5" />
-        </div>
-        <div
-          className="w-6 h-6 text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-center rounded cursor-pointer transition-colors flex-shrink-0"
-          onClick={handleCancelClick}
-          title="Cancel"
-        >
-          <X className="w-3.5 h-3.5" />
-        </div>
-      </div>
-    );
-  }
-
+  SessionLogo,
+}: {
+  session: SessionItemProps['session'];
+  isSelected: boolean;
+  isActive: boolean;
+  timeAgo: string;
+  onClick: () => void;
+  onDoubleClick: () => void;
+  onDelete: () => void;
+  onStartRename: () => void;
+  SessionLogo: React.ComponentType<{ className?: string }>;
+}) {
   return (
     <div className="group relative">
       <div
@@ -138,7 +121,7 @@ export const SessionItem = memo(function SessionItem({
           isSelected && "bg-accent text-accent-foreground"
         )}
         onClick={onClick}
-        onDoubleClick={handleDoubleClick}
+        onDoubleClick={onDoubleClick}
         title={session.summary || 'Untitled session'}
       >
         {/* Session Logo */}
@@ -183,7 +166,6 @@ export const SessionItem = memo(function SessionItem({
             onClick={(e) => {
               e.stopPropagation();
               onStartRename();
-              setLocalValue(session.summary || '');
             }}
             title="Manually edit session name"
           >
@@ -228,6 +210,130 @@ export const SessionItem = memo(function SessionItem({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Custom hook for managing session item rename handlers
+ */
+function useSessionItemHandlers(params: {
+  isRenaming: boolean;
+  onStartRename: () => void;
+  session: SessionItemProps['session'];
+  onRenameSave: () => void;
+  onRenameCancel: () => void;
+  onRenameChange: (value: string) => void;
+  renameValue: string;
+}) {
+  const { isRenaming, onStartRename, session, onRenameSave, onRenameCancel, onRenameChange, renameValue } = params;
+
+  // Use local value for input to ensure immediate updates
+  const [localValue, setLocalValue] = useState(renameValue);
+
+  // Sync local value when renameValue prop changes (e.g., when starting edit mode)
+  useEffect(() => {
+    setLocalValue(renameValue);
+  }, [renameValue]);
+
+  const handleDoubleClick = useCallback(() => {
+    if (!isRenaming) {
+      onStartRename();
+      setLocalValue(session.summary || '');
+    }
+  }, [isRenaming, onStartRename, session.summary]);
+
+  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      onRenameSave();
+    } else if (e.key === 'Escape') {
+      onRenameCancel();
+      setLocalValue(session.summary || '');
+    }
+  }, [onRenameSave, onRenameCancel, session.summary]);
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setLocalValue(newValue);
+    onRenameChange(newValue);
+  }, [onRenameChange]);
+
+  // Handle save button click (defined before conditional render)
+  const handleSaveClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onRenameSave();
+  }, [onRenameSave]);
+
+  // Handle cancel button click (defined before conditional render)
+  const handleCancelClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onRenameCancel();
+    setLocalValue(session.summary || '');
+  }, [onRenameCancel, session.summary]);
+
+  return {
+    localValue,
+    handleDoubleClick,
+    handleKeyDown,
+    handleChange,
+    handleSaveClick,
+    handleCancelClick
+  };
+}
+
+/**
+ * SessionItem Component
+ */
+export const SessionItem = memo(function SessionItem({
+  session,
+  isSelected,
+  isActive,
+  timeAgo,
+  onClick,
+  onDelete,
+  onStartRename,
+  isRenaming,
+  renameValue,
+  onRenameChange,
+  onRenameSave,
+  onRenameCancel,
+}: SessionItemProps) {
+  const handlers = useSessionItemHandlers({
+    isRenaming,
+    onStartRename,
+    session,
+    onRenameSave,
+    onRenameCancel,
+    onRenameChange,
+    renameValue
+  });
+
+  const SessionLogo = getSessionLogo(session.__provider);
+
+  if (isRenaming) {
+    return (
+      <SessionItemRenaming
+        SessionLogo={SessionLogo}
+        localValue={handlers.localValue}
+        handleChange={handlers.handleChange}
+        handleKeyDown={handlers.handleKeyDown}
+        handleSaveClick={handlers.handleSaveClick}
+        handleCancelClick={handlers.handleCancelClick}
+      />
+    );
+  }
+
+  return (
+    <SessionItemNormal
+      session={session}
+      isSelected={isSelected}
+      isActive={isActive}
+      timeAgo={timeAgo}
+      onClick={onClick}
+      onDoubleClick={handlers.handleDoubleClick}
+      onDelete={onDelete}
+      onStartRename={onStartRename}
+      SessionLogo={SessionLogo}
+    />
   );
 });
 

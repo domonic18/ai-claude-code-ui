@@ -117,7 +117,7 @@ interface UseChatInterfaceResult {
   setCommandQuery: (query: string) => void;
   setSelectedCommandIndex: (index: number) => void;
   setShowCommandMenu: (show: boolean) => void;
-  handleCommandSelectWrapper: (command: any) => void;
+  handleCommandSelectWrapper: (command: any, index: number, isHover?: boolean) => void;
   handleCommandMenuClose: () => void;
   // File reference system
   filteredFileReferences: any[];
@@ -129,11 +129,11 @@ interface UseChatInterfaceResult {
   setFileQuery: (query: string) => void;
   setSelectedFileIndex: (index: number) => void;
   setShowFileMenu: (show: boolean) => void;
-  handleFileSelectWrapper: (file: any, index: number, isHover?: boolean) => void;
+  handleFileSelectWrapper: (file: any, index: number, input: string, atPosition: number, fileQuery: string, isHover?: boolean) => void;
   handleFileMenuClose: () => void;
   // Handlers
   handleSend: () => void;
-  handleInputChangeWithCommands: (value: string) => void;
+  handleInputChangeWithCommands: (value: string, cursorPos: number) => void;
   handleAddFile: (file: FileAttachment) => void;
   handleRemoveFile: (fileId: string) => void;
   handleInputFocusChange: (isFocused: boolean) => void;

@@ -45,6 +45,255 @@ interface AgentPermissionsProps {
   setNewDisallowedTool: (value: string) => void;
 }
 
+interface SkipPermissionsSectionProps {
+  skipPermissions: boolean;
+  setSkipPermissions: (value: boolean) => void;
+}
+
+interface AllowedToolsSectionProps {
+  allowedTools: string[];
+  newAllowedTool: string;
+  setNewAllowedTool: (value: string) => void;
+  onAddTool: (tool: string) => void;
+  onRemoveTool: (tool: string) => void;
+}
+
+interface DisallowedToolsSectionProps {
+  disallowedTools: string[];
+  newDisallowedTool: string;
+  setNewDisallowedTool: (value: string) => void;
+  onAddTool: (tool: string) => void;
+  onRemoveTool: (tool: string) => void;
+}
+
+/**
+ * SkipPermissionsSection - Toggle for skipping permission prompts
+ */
+const SkipPermissionsSection: React.FC<SkipPermissionsSectionProps> = ({
+  skipPermissions,
+  setSkipPermissions
+}) => {
+  const { t } = useTranslation();
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <AlertTriangle className="w-5 h-5 text-orange-500" />
+        <h3 className="text-lg font-medium text-foreground">
+          {t('agentPermissions.title')}
+        </h3>
+      </div>
+      <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
+        <label className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            checked={skipPermissions}
+            onChange={(e) => setSkipPermissions(e.target.checked)}
+            className="w-4 h-4 text-blue-600 bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+          />
+          <div>
+            <div className="font-medium text-orange-900 dark:text-orange-100">
+              {t('agentPermissions.skipPrompts')}
+            </div>
+            <div className="text-sm text-orange-700 dark:text-orange-300">
+              {t('agentPermissions.skipPromptsDescription')}
+            </div>
+          </div>
+        </label>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * AllowedToolsSection - Manages allowed tools list with quick-add functionality
+ */
+const AllowedToolsSection: React.FC<AllowedToolsSectionProps> = ({
+  allowedTools,
+  newAllowedTool,
+  setNewAllowedTool,
+  onAddTool,
+  onRemoveTool
+}) => {
+  const { t } = useTranslation();
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Shield className="w-5 h-5 text-green-500" />
+        <h3 className="text-lg font-medium text-foreground">
+          {t('agentPermissions.allowedTools')}
+        </h3>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        {t('agentPermissions.allowedToolsDescription')}
+      </p>
+
+      <div className="flex flex-col sm:flex-row gap-2">
+        <Input
+          value={newAllowedTool}
+          onChange={(e) => setNewAllowedTool(e.target.value)}
+          placeholder={t('agentPermissions.placeholder')}
+          onKeyPress={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              onAddTool(newAllowedTool);
+            }
+          }}
+          className="flex-1 h-10"
+        />
+        <Button
+          onClick={() => onAddTool(newAllowedTool)}
+          disabled={!newAllowedTool}
+          size="sm"
+          className="h-10 px-4"
+        >
+          <Plus className="w-4 h-4 mr-2 sm:mr-0" />
+          <span className="sm:hidden">{t('agentPermissions.add')}</span>
+        </Button>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          {t('agentPermissions.quickAdd')}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {commonClaudeTools.map(tool => (
+            <Button
+              key={tool}
+              variant="outline"
+              size="sm"
+              onClick={() => onAddTool(tool)}
+              disabled={allowedTools.includes(tool)}
+              className="text-xs h-8"
+            >
+              {tool}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {allowedTools.map(tool => (
+          <div key={tool} className="flex items-center justify-between bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+            <span className="font-mono text-sm text-green-800 dark:text-green-200">
+              {tool}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onRemoveTool(tool)}
+              className="text-green-600 hover:text-green-700"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        ))}
+        {allowedTools.length === 0 && (
+          <div className="text-center py-6 text-gray-500 dark:text-gray-400">
+            {t('agentPermissions.noAllowedTools')}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * DisallowedToolsSection - Manages blocked tools list
+ */
+const DisallowedToolsSection: React.FC<DisallowedToolsSectionProps> = ({
+  disallowedTools,
+  newDisallowedTool,
+  setNewDisallowedTool,
+  onAddTool,
+  onRemoveTool
+}) => {
+  const { t } = useTranslation();
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <AlertTriangle className="w-5 h-5 text-red-500" />
+        <h3 className="text-lg font-medium text-foreground">
+          {t('agentPermissions.blockedTools')}
+        </h3>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        {t('agentPermissions.blockedToolsDescription')}
+      </p>
+
+      <div className="flex flex-col sm:flex-row gap-2">
+        <Input
+          value={newDisallowedTool}
+          onChange={(e) => setNewDisallowedTool(e.target.value)}
+          placeholder={t('agentPermissions.blockedPlaceholder')}
+          onKeyPress={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              onAddTool(newDisallowedTool);
+            }
+          }}
+          className="flex-1 h-10"
+        />
+        <Button
+          onClick={() => onAddTool(newDisallowedTool)}
+          disabled={!newDisallowedTool}
+          size="sm"
+          className="h-10 px-4"
+        >
+          <Plus className="w-4 h-4 mr-2 sm:mr-0" />
+          <span className="sm:hidden">{t('agentPermissions.add')}</span>
+        </Button>
+      </div>
+
+      <div className="space-y-2">
+        {disallowedTools.map(tool => (
+          <div key={tool} className="flex items-center justify-between bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+            <span className="font-mono text-sm text-red-800 dark:text-red-200">
+              {tool}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onRemoveTool(tool)}
+              className="text-red-600 hover:text-red-700"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        ))}
+        {disallowedTools.length === 0 && (
+          <div className="text-center py-6 text-gray-500 dark:text-gray-400">
+            {t('agentPermissions.noBlockedTools')}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * HelpSection - Displays examples and help text for tool patterns
+ */
+const HelpSection: React.FC = () => {
+  const { t } = useTranslation();
+
+  return (
+    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+      <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
+        {t('agentPermissions.examples.title')}
+      </h4>
+      <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+        <li><code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">"Bash(git log:*)"</code> - {t('agentPermissions.examples.gitLog')}</li>
+        <li><code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">"Bash(git diff:*)"</code> - {t('agentPermissions.examples.gitDiff')}</li>
+        <li><code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">"Write"</code> - {t('agentPermissions.examples.write')}</li>
+        <li><code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">"Bash(rm:*)"</code> - {t('agentPermissions.examples.rm')}</li>
+      </ul>
+    </div>
+  );
+};
+
 /**
  * AgentPermissions - Claude tool permissions configuration
  */
@@ -60,7 +309,6 @@ const AgentPermissions: React.FC<AgentPermissionsProps> = ({
   newDisallowedTool,
   setNewDisallowedTool
 }) => {
-  const { t } = useTranslation();
   const addAllowedTool = (tool: string) => {
     if (tool && !allowedTools.includes(tool)) {
       setAllowedTools([...allowedTools, tool]);
@@ -85,187 +333,25 @@ const AgentPermissions: React.FC<AgentPermissionsProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Skip Permissions */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-orange-500" />
-          <h3 className="text-lg font-medium text-foreground">
-            {t('agentPermissions.title')}
-          </h3>
-        </div>
-        <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
-          <label className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              checked={skipPermissions}
-              onChange={(e) => setSkipPermissions(e.target.checked)}
-              className="w-4 h-4 text-blue-600 bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
-            />
-            <div>
-              <div className="font-medium text-orange-900 dark:text-orange-100">
-                {t('agentPermissions.skipPrompts')}
-              </div>
-              <div className="text-sm text-orange-700 dark:text-orange-300">
-                {t('agentPermissions.skipPromptsDescription')}
-              </div>
-            </div>
-          </label>
-        </div>
-      </div>
-
-      {/* Allowed Tools */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <Shield className="w-5 h-5 text-green-500" />
-          <h3 className="text-lg font-medium text-foreground">
-            {t('agentPermissions.allowedTools')}
-          </h3>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          {t('agentPermissions.allowedToolsDescription')}
-        </p>
-
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Input
-            value={newAllowedTool}
-            onChange={(e) => setNewAllowedTool(e.target.value)}
-            placeholder={t('agentPermissions.placeholder')}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                addAllowedTool(newAllowedTool);
-              }
-            }}
-            className="flex-1 h-10"
-          />
-          <Button
-            onClick={() => addAllowedTool(newAllowedTool)}
-            disabled={!newAllowedTool}
-            size="sm"
-            className="h-10 px-4"
-          >
-            <Plus className="w-4 h-4 mr-2 sm:mr-0" />
-            <span className="sm:hidden">{t('agentPermissions.add')}</span>
-          </Button>
-        </div>
-
-        {/* Quick add buttons */}
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            {t('agentPermissions.quickAdd')}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {commonClaudeTools.map(tool => (
-              <Button
-                key={tool}
-                variant="outline"
-                size="sm"
-                onClick={() => addAllowedTool(tool)}
-                disabled={allowedTools.includes(tool)}
-                className="text-xs h-8"
-              >
-                {tool}
-              </Button>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          {allowedTools.map(tool => (
-            <div key={tool} className="flex items-center justify-between bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
-              <span className="font-mono text-sm text-green-800 dark:text-green-200">
-                {tool}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => removeAllowedTool(tool)}
-                className="text-green-600 hover:text-green-700"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-          ))}
-          {allowedTools.length === 0 && (
-            <div className="text-center py-6 text-gray-500 dark:text-gray-400">
-              {t('agentPermissions.noAllowedTools')}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Disallowed Tools */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-red-500" />
-          <h3 className="text-lg font-medium text-foreground">
-            {t('agentPermissions.blockedTools')}
-          </h3>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          {t('agentPermissions.blockedToolsDescription')}
-        </p>
-
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Input
-            value={newDisallowedTool}
-            onChange={(e) => setNewDisallowedTool(e.target.value)}
-            placeholder={t('agentPermissions.blockedPlaceholder')}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                addDisallowedTool(newDisallowedTool);
-              }
-            }}
-            className="flex-1 h-10"
-          />
-          <Button
-            onClick={() => addDisallowedTool(newDisallowedTool)}
-            disabled={!newDisallowedTool}
-            size="sm"
-            className="h-10 px-4"
-          >
-            <Plus className="w-4 h-4 mr-2 sm:mr-0" />
-            <span className="sm:hidden">{t('agentPermissions.add')}</span>
-          </Button>
-        </div>
-
-        <div className="space-y-2">
-          {disallowedTools.map(tool => (
-            <div key={tool} className="flex items-center justify-between bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
-              <span className="font-mono text-sm text-red-800 dark:text-red-200">
-                {tool}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => removeDisallowedTool(tool)}
-                className="text-red-600 hover:text-red-700"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-          ))}
-          {disallowedTools.length === 0 && (
-            <div className="text-center py-6 text-gray-500 dark:text-gray-400">
-              {t('agentPermissions.noBlockedTools')}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Help Section */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-        <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
-          {t('agentPermissions.examples.title')}
-        </h4>
-        <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-          <li><code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">"Bash(git log:*)"</code> - {t('agentPermissions.examples.gitLog')}</li>
-          <li><code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">"Bash(git diff:*)"</code> - {t('agentPermissions.examples.gitDiff')}</li>
-          <li><code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">"Write"</code> - {t('agentPermissions.examples.write')}</li>
-          <li><code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">"Bash(rm:*)"</code> - {t('agentPermissions.examples.rm')}</li>
-        </ul>
-      </div>
+      <SkipPermissionsSection
+        skipPermissions={skipPermissions}
+        setSkipPermissions={setSkipPermissions}
+      />
+      <AllowedToolsSection
+        allowedTools={allowedTools}
+        newAllowedTool={newAllowedTool}
+        setNewAllowedTool={setNewAllowedTool}
+        onAddTool={addAllowedTool}
+        onRemoveTool={removeAllowedTool}
+      />
+      <DisallowedToolsSection
+        disallowedTools={disallowedTools}
+        newDisallowedTool={newDisallowedTool}
+        setNewDisallowedTool={setNewDisallowedTool}
+        onAddTool={addDisallowedTool}
+        onRemoveTool={removeDisallowedTool}
+      />
+      <HelpSection />
     </div>
   );
 };

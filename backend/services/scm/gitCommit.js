@@ -200,23 +200,30 @@ Generate the commit message:`;
 }
 
 /**
- * 调用 AI 提供者并收集响应文本
- * @param {string} prompt - prompt 文本
- * @param {string} projectPath - 项目路径
- * @param {string} provider - AI 提供者
- * @returns {Promise<string>} AI 响应文本
+ * AI 响应类型 → 文本提取器
+ * 每种响应类型对应一个提取函数，返回文本或空字符串
+ */
+const RESPONSE_EXTRACTORS = {
+  'claude-response': (parsed) => {
+    const message = parsed.data?.message || parsed.data;
+    return message?.content
+      ?.filter(i => i.type === 'text' && i.text)
+      ?.map(i => i.text)
+      ?.join('') ?? '';
+  },
+  'cursor-output': (parsed) => parsed.output ?? '',
+  'text': (parsed) => parsed.text ?? '',
+};
+
+/**
+ * 从 AI 提供者的原始响应中提取文本
+ * @param {string|Object} data - 原始响应数据
+ * @returns {string} 提取的文本
  */
 function extractResponseText(data) {
     const parsed = typeof data === 'string' ? JSON.parse(data) : data;
-    if (parsed.type === 'claude-response' && parsed.data) {
-        const message = parsed.data.message || parsed.data;
-        if (message.content && Array.isArray(message.content)) {
-            return message.content.filter(i => i.type === 'text' && i.text).map(i => i.text).join('');
-        }
-    }
-    if (parsed.type === 'cursor-output' && parsed.output) return parsed.output;
-    if (parsed.type === 'text' && parsed.text) return parsed.text;
-    return '';
+    const extractor = RESPONSE_EXTRACTORS[parsed.type];
+    return extractor ? extractor(parsed) : '';
 }
 
 async function queryAIProvider(prompt, projectPath, provider) {
