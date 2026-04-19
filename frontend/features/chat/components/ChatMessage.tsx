@@ -26,31 +26,17 @@ function getProvider(): string {
 }
 
 /**
- * ChatMessage Component
- *
- * Memoized component that delegates to specialized sub-components.
+ * Custom hook for auto-expanding tools on scroll into view
  */
-export const ChatMessage = memo(function ChatMessage({
-  message,
-  prevMessage,
-  onFileOpen,
-  onShowSettings,
-  autoExpandTools = false,
-  showThinking = true,
-}: ChatMessageProps) {
-  const messageRef = useRef<HTMLDivElement>(null);
+function useToolAutoExpand(
+  messageRef: React.RefObject<HTMLDivElement>,
+  isToolUse: boolean,
+  autoExpandTools: boolean
+) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Check if message should be grouped with previous
-  const isGrouped = prevMessage && prevMessage.type === message.type &&
-    ((prevMessage.type === 'assistant') ||
-      (prevMessage.type === 'user') ||
-      (prevMessage.type === 'tool') ||
-      (prevMessage.type === 'error'));
-
-  // Auto-expand tools on scroll into view
   useEffect(() => {
-    if (!autoExpandTools || !messageRef.current || !message.isToolUse) return;
+    if (!autoExpandTools || !messageRef.current || !isToolUse) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -74,11 +60,34 @@ export const ChatMessage = memo(function ChatMessage({
         observer.unobserve(messageRef.current);
       }
     };
-  }, [autoExpandTools, isExpanded, message.isToolUse]);
+  }, [autoExpandTools, isExpanded, isToolUse, messageRef]);
 
-  /**
-   * Render user message
-   */
+  return isExpanded;
+}
+
+/**
+ * ChatMessage Component
+ *
+ * Memoized component that delegates to specialized sub-components.
+ */
+export const ChatMessage = memo(function ChatMessage({
+  message,
+  prevMessage,
+  onFileOpen,
+  onShowSettings,
+  autoExpandTools = false,
+  showThinking = true,
+}: ChatMessageProps) {
+  const messageRef = useRef<HTMLDivElement>(null);
+
+  const isGrouped = prevMessage && prevMessage.type === message.type &&
+    ((prevMessage.type === 'assistant') ||
+      (prevMessage.type === 'user') ||
+      (prevMessage.type === 'tool') ||
+      (prevMessage.type === 'error'));
+
+  useToolAutoExpand(messageRef, message.isToolUse || false, autoExpandTools);
+
   if (message.type === 'user') {
     return (
       <div ref={messageRef}>

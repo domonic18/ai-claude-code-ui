@@ -116,6 +116,82 @@ function updateFrequentCommands(
   }
 }
 
+/**
+ * Filter commands based on search query
+ */
+function filterCommandsByQuery(
+  commands: SlashCommand[],
+  query: string
+): SlashCommand[] {
+  if (!query) {
+    return commands;
+  }
+
+  const lowerQuery = query.toLowerCase();
+  return commands.filter(cmd =>
+    cmd.name.toLowerCase().includes(lowerQuery) ||
+    (cmd.description && cmd.description.toLowerCase().includes(lowerQuery))
+  );
+}
+
+/**
+ * Update command history in localStorage
+ */
+function updateCommandHistory(
+  commandName: string,
+  projectName: string
+): void {
+  const historyKey = `command_history_${projectName}`;
+  const history = safeLocalStorage.getItem(historyKey);
+  let parsedHistory: Record<string, number> = {};
+
+  try {
+    parsedHistory = history ? JSON.parse(history) : {};
+  } catch (e) {
+    logger.error('Error parsing command history:', e);
+  }
+
+  parsedHistory[commandName] = (parsedHistory[commandName] || 0) + 1;
+  safeLocalStorage.setItem(historyKey, JSON.stringify(parsedHistory));
+}
+
+/**
+ * Initialize command loading effect
+ */
+function useCommandLoading(
+  selectedProject: { name: string; path: string } | null,
+  authenticatedFetch: (url: string, options?: RequestInit) => Promise<Response>,
+  setCommands: React.Dispatch<React.SetStateAction<SlashCommand[]>>,
+  setFrequentCommands: React.Dispatch<React.SetStateAction<SlashCommand[]>>,
+  setIsLoading: React.Dispatch<React.SetStateAction<boolean>>
+): void {
+  useEffect(() => {
+    const fetchCommands = async () => {
+      if (!selectedProject) {
+        setCommands([]);
+        setFrequentCommands([]);
+        return;
+      }
+
+      setIsLoading(true);
+
+      try {
+        const { commands: loadedCommands } = await loadCommandsFromApi(selectedProject, authenticatedFetch);
+        setCommands(loadedCommands);
+        setFrequentCommands(updateFrequentCommands(loadedCommands, selectedProject.name));
+      } catch (error) {
+        logger.error('Error fetching slash commands:', error);
+        setCommands([]);
+        setFrequentCommands([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCommands();
+  }, [selectedProject?.name, authenticatedFetch, setCommands, setFrequentCommands, setIsLoading]);
+}
+
 export interface SlashCommand {
   name: string;
   description?: string;
@@ -175,45 +251,11 @@ export function useSlashCommands({
   }, [showMenu, query]);
 
   // Load commands from API
-  useEffect(() => {
-    const fetchCommands = async () => {
-      if (!selectedProject) {
-        setCommands([]);
-        setFrequentCommands([]);
-        return;
-      }
-
-      setIsLoading(true);
-
-      try {
-        const { commands: loadedCommands } = await loadCommandsFromApi(selectedProject, authenticatedFetch);
-        setCommands(loadedCommands);
-        setFrequentCommands(updateFrequentCommands(loadedCommands, selectedProject.name));
-      } catch (error) {
-        logger.error('Error fetching slash commands:', error);
-        setCommands([]);
-        setFrequentCommands([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchCommands();
-  }, [selectedProject?.name, authenticatedFetch]);
+  useCommandLoading(selectedProject, authenticatedFetch, setCommands, setFrequentCommands, setIsLoading);
 
   // Filter commands based on query
   useEffect(() => {
-    if (!query) {
-      setFilteredCommands(commands);
-      return;
-    }
-
-    const lowerQuery = query.toLowerCase();
-    const filtered = commands.filter(cmd =>
-      cmd.name.toLowerCase().includes(lowerQuery) ||
-      (cmd.description && cmd.description.toLowerCase().includes(lowerQuery))
-    );
-    setFilteredCommands(filtered);
+    setFilteredCommands(filterCommandsByQuery(commands, query));
   }, [query, commands]);
 
   // Command selection callback with history tracking
@@ -227,18 +269,7 @@ export function useSlashCommands({
     }
 
     // Update command history
-    const historyKey = `command_history_${selectedProject.name}`;
-    const history = safeLocalStorage.getItem(historyKey);
-    let parsedHistory: Record<string, number> = {};
-
-    try {
-      parsedHistory = history ? JSON.parse(history) : {};
-    } catch (e) {
-      logger.error('Error parsing command history:', e);
-    }
-
-    parsedHistory[command.name] = (parsedHistory[command.name] || 0) + 1;
-    safeLocalStorage.setItem(historyKey, JSON.stringify(parsedHistory));
+    updateCommandHistory(command.name, selectedProject.name);
 
     // Update frequent commands
     setFrequentCommands(updateFrequentCommands(commands, selectedProject.name));

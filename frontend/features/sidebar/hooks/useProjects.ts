@@ -24,113 +24,10 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { getSidebarService } from '../services';
 import { requestDeduplicator } from '@/shared/utils';
 import type { Project } from '../types';
-import { STORAGE_KEYS } from '../constants';
 import type { ProjectSortOrder, StarredProjects } from '../types';
 import { logger } from '@/shared/utils/logger';
-
-/**
- * Helper functions for CRUD operations
- */
-
-/**
- * Create a new project
- */
-async function createProjectOperation(
-  service: ReturnType<typeof getSidebarService>,
-  path: string,
-  setError: React.Dispatch<React.SetStateAction<string | null>>
-): Promise<Project> {
-  setError(null);
-
-  try {
-    const newProject = await service.createProject(path);
-    return newProject;
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Failed to create project';
-    setError(errorMessage);
-    throw err;
-  }
-}
-
-/**
- * Rename a project
- */
-async function renameProjectOperation(
-  service: ReturnType<typeof getSidebarService>,
-  projectName: string,
-  newName: string,
-  setError: React.Dispatch<React.SetStateAction<string | null>>
-): Promise<void> {
-  setError(null);
-
-  try {
-    await service.renameProject(projectName, newName);
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Failed to rename project';
-    setError(errorMessage);
-    throw err;
-  }
-}
-
-/**
- * Delete a project
- */
-async function deleteProjectOperation(
-  service: ReturnType<typeof getSidebarService>,
-  projectName: string,
-  setError: React.Dispatch<React.SetStateAction<string | null>>
-): Promise<void> {
-  setError(null);
-
-  try {
-    await service.deleteProject(projectName);
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Failed to delete project';
-    setError(errorMessage);
-    throw err;
-  }
-}
-
-/**
- * Sort projects by specified order
- */
-function sortProjectsByOrder(
-  projects: Project[],
-  sortOrder: ProjectSortOrder,
-  starredProjects: StarredProjects
-): Project[] {
-  const sorted = [...projects];
-
-  sorted.sort((a, b) => {
-    // Starred projects first
-    const aStarred = starredProjects.has(a.name);
-    const bStarred = starredProjects.has(b.name);
-
-    if (aStarred && !bStarred) return -1;
-    if (!aStarred && bStarred) return 1;
-
-    // Then by sort order
-    if (sortOrder === 'name') {
-      const aName = a.displayName || a.name;
-      const bName = b.displayName || b.name;
-      return aName.localeCompare(bName);
-    } else if (sortOrder === 'recent') {
-      const aTime = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
-      const bTime = b.lastActivity ? new Date(b.lastActivity).getTime() : 0;
-      if (aTime !== bTime) {
-        return bTime - aTime;
-      }
-      // Tiebreaker: name
-      const aName = a.displayName || a.name;
-      const bName = b.displayName || b.name;
-      return aName.localeCompare(bName);
-    }
-
-    return 0;
-  });
-
-  return sorted;
-}
+import { sortProjectsByOrder, loadSortOrder, saveSortOrder } from '../helpers/projectSortHelpers';
+import { createProjectOperation, renameProjectOperation, deleteProjectOperation } from '../helpers/projectApiHelpers';
 
 /**
  * Hook return type
@@ -161,165 +58,75 @@ export interface UseProjectsReturn {
 }
 
 /**
- * Load project sort order from localStorage
- */
-function loadSortOrder(): ProjectSortOrder {
-  try {
-    const savedSettings = localStorage.getItem(STORAGE_KEYS.CLAUDE_SETTINGS);
-    if (savedSettings) {
-      const settings = JSON.parse(savedSettings);
-      return settings.projectSortOrder || 'name';
-    }
-  } catch (error) {
-    logger.error('Error loading sort order:', error);
-  }
-  return 'name';
-}
-
-/**
- * Save project sort order to localStorage
- */
-function saveSortOrder(order: ProjectSortOrder): void {
-  try {
-    const savedSettings = localStorage.getItem(STORAGE_KEYS.CLAUDE_SETTINGS);
-    const settings = savedSettings ? JSON.parse(savedSettings) : {};
-    settings.projectSortOrder = order;
-    localStorage.setItem(STORAGE_KEYS.CLAUDE_SETTINGS, JSON.stringify(settings));
-  } catch (error) {
-    logger.error('Error saving sort order:', error);
-  }
-}
-
-/**
  * useProjects Hook
  */
 export function useProjects(initialProjects?: Project[] | null): UseProjectsReturn {
-  // Ensure initial state is always an array, even if initialProjects is not an array
   const safeInitialProjects = Array.isArray(initialProjects) ? initialProjects : [];
   const [projects, setProjects] = useState<Project[]>(safeInitialProjects);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sortOrder, setSortOrderState] = useState<ProjectSortOrder>(loadSortOrder);
-
   const service = getSidebarService();
 
-  // Load sort order on mount
-  useEffect(() => {
-    setSortOrderState(loadSortOrder());
-  }, []);
+  // Sync sort order on mount
+  useEffect(() => { setSortOrderState(loadSortOrder()); }, []);
 
-  // Sync projects when initialProjects prop changes
-  // Use a ref to track previous value and only update when actual data changes
+  // Sync projects from props when reference changes
   const prevProjectsRef = useRef<Project[] | null>(null);
   useEffect(() => {
-    if (initialProjects) {
-      const newProjects = Array.isArray(initialProjects) ? initialProjects : [];
-      // Only update if the array reference actually changed (not just a re-render with same data)
-      if (initialProjects !== prevProjectsRef.current) {
-        logger.info('[useProjects] Syncing projects from props:', newProjects);
-        setProjects(newProjects);
-        prevProjectsRef.current = newProjects;
-      }
+    if (initialProjects && initialProjects !== prevProjectsRef.current) {
+      const arr = Array.isArray(initialProjects) ? initialProjects : [];
+      logger.info('[useProjects] Syncing projects from props:', arr);
+      setProjects(arr); prevProjectsRef.current = arr;
     }
   }, [initialProjects]);
 
-  // Set sort order and persist
   const setSortOrder = useCallback((order: ProjectSortOrder) => {
-    setSortOrderState(order);
-    saveSortOrder(order);
+    setSortOrderState(order); saveSortOrder(order);
   }, []);
 
-  /**
-   * Fetch/refresh projects
-   *
-   * 注意：此函数通常不会被直接调用，因为 Sidebar 的 handleRefresh
-   * 优先使用父组件传入的 onRefresh (即 useProjectManager.handleSidebarRefresh)。
-   * 此函数作为 fallback，用于没有传入 onRefresh 的场景。
-   */
+  // Fetch/refresh projects (fallback when no parent onRefresh provided)
   const refresh = useCallback(async () => {
-    // 使用统一的请求去重器，key: 'sidebar:refresh'
     return requestDeduplicator.dedupe('sidebar:refresh', async () => {
       setIsLoading(true);
       setError(null);
-
       try {
-        const fetchedProjects = await service.getProjects();
-        setProjects(fetchedProjects);
+        setProjects(await service.getProjects());
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to fetch projects';
-        setError(errorMessage);
+        setError(err instanceof Error ? err.message : 'Failed to fetch projects');
         logger.error('Error fetching projects:', err);
-      } finally {
-        setIsLoading(false);
-      }
+      } finally { setIsLoading(false); }
     });
   }, [service]);
 
-  // Create project
   const createProject = useCallback(async (path: string): Promise<Project> => {
-    const newProject = await createProjectOperation(service, path, setError);
-    // Refresh project list after creation
-    await refresh();
-    return newProject;
-  }, [service, refresh]);
+    const p = await createProjectOperation(path, setError);
+    await refresh(); return p;
+  }, [refresh]);
 
-  // Rename project
-  const renameProject = useCallback(async (projectName: string, newName: string): Promise<void> => {
-    await renameProjectOperation(service, projectName, newName, setError);
-    // Update local state
-    setProjects(prev => prev.map(p =>
-      p.name === projectName ? { ...p, displayName: newName } : p
-    ));
-  }, [service]);
-
-  // Delete project
-  const deleteProject = useCallback(async (projectName: string): Promise<void> => {
-    await deleteProjectOperation(service, projectName, setError);
-    // Remove from local state
-    setProjects(prev => prev.filter(p => p.name !== projectName));
-  }, [service]);
-
-  /**
-   * Update session summary in local state (optimistic update).
-   * Updates the summary field of a session across all session arrays
-   * (sessions, cursorSessions, codexSessions) within the matching project.
-   */
-  const updateSessionSummary = useCallback((projectName: string, sessionId: string, newSummary: string) => {
-    setProjects(prev =>
-      prev.map(project => {
-        if (project.name !== projectName) return project;
-
-        const updateArray = (arr: any[] | undefined) =>
-          arr ? arr.map(s => (s.id === sessionId ? { ...s, summary: newSummary } : s)) : arr;
-
-        return {
-          ...project,
-          sessions: updateArray(project.sessions),
-          cursorSessions: updateArray(project.cursorSessions),
-          codexSessions: updateArray(project.codexSessions),
-        };
-      })
-    );
+  const renameProject = useCallback(async (projectName: string, newName: string) => {
+    await renameProjectOperation(projectName, newName, setError);
+    setProjects(prev => prev.map(p => p.name === projectName ? { ...p, displayName: newName } : p));
   }, []);
 
-  // Get sorted projects
+  const deleteProject = useCallback(async (projectName: string) => {
+    await deleteProjectOperation(projectName, setError);
+    setProjects(prev => prev.filter(p => p.name !== projectName));
+  }, []);
+
+  const updateSessionSummary = useCallback((projectName: string, sessionId: string, newSummary: string) => {
+    const updateArr = (arr: any[] | undefined) =>
+      arr ? arr.map(s => (s.id === sessionId ? { ...s, summary: newSummary } : s)) : arr;
+    setProjects(prev => prev.map(p => p.name !== projectName ? p : { ...p,
+      sessions: updateArr(p.sessions), cursorSessions: updateArr(p.cursorSessions), codexSessions: updateArr(p.codexSessions) }));
+  }, []);
+
   const getSortedProjects = useCallback((starredProjects: StarredProjects): Project[] => {
     return sortProjectsByOrder(Array.isArray(projects) ? projects : [], sortOrder, starredProjects);
   }, [projects, sortOrder]);
 
-  return {
-    projects,
-    isLoading,
-    error,
-    sortOrder,
-    setSortOrder,
-    refresh,
-    createProject,
-    renameProject,
-    deleteProject,
-    updateSessionSummary,
-    getSortedProjects,
-  };
+  return { projects, isLoading, error, sortOrder, setSortOrder, refresh,
+    createProject, renameProject, deleteProject, updateSessionSummary, getSortedProjects };
 }
 
 export default useProjects;

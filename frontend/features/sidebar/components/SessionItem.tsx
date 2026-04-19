@@ -148,6 +148,39 @@ function SessionItemActions({ isCursorProvider, onEdit, onDelete }: SessionItemA
 }
 
 /**
+ * Session Info Component
+ *
+ * Renders the session name and metadata (time, active status).
+ */
+interface SessionInfoProps {
+  session: SessionItemProps['session'];
+  isActive: boolean;
+  timeAgo: string;
+}
+
+function SessionInfo({ session, isActive, timeAgo }: SessionInfoProps) {
+  return (
+    <div className="flex-1 min-w-0">
+      <div className="text-xs font-medium truncate text-foreground">
+        {session.summary || 'Untitled session'}
+      </div>
+
+      <div className="flex items-center gap-1 mt-0.5">
+        <Clock className="w-2.5 h-2.5 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">{timeAgo}</span>
+      </div>
+
+      {isActive && (
+        <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+          <span className="w-1.5 h-1.5 bg-current rounded-full animate-pulse" />
+          Active
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
  * SessionItemNormal Component
  *
  * Renders the normal session display with hover actions (edit/delete buttons).
@@ -185,37 +218,15 @@ function SessionItemNormal({
         onDoubleClick={onDoubleClick}
         title={session.summary || 'Untitled session'}
       >
-        {/* Session Logo */}
         <div className="w-3 h-3 mt-0.5 flex-shrink-0">
           <SessionLogo className="w-full h-full" />
         </div>
 
-        {/* Session Info */}
-        <div className="flex-1 min-w-0">
-          {/* Session Name */}
-          <div className="text-xs font-medium truncate text-foreground">
-            {session.summary || 'Untitled session'}
-          </div>
-
-          {/* Metadata Row */}
-          <div className="flex items-center gap-1 mt-0.5">
-            {/* Clock Icon */}
-            <Clock className="w-2.5 h-2.5 text-muted-foreground" />
-
-            {/* Time Ago */}
-            <span className="text-xs text-muted-foreground">
-              {timeAgo}
-            </span>
-          </div>
-
-          {/* Active Indicator */}
-          {isActive && (
-            <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-              <span className="w-1.5 h-1.5 bg-current rounded-full animate-pulse" />
-              Active
-            </span>
-          )}
-        </div>
+        <SessionInfo
+          session={session}
+          isActive={isActive}
+          timeAgo={timeAgo}
+        />
       </div>
 
       <SessionItemActions

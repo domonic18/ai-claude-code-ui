@@ -9,9 +9,9 @@
  * - Empty state
  */
 
-import { useEffect, useMemo, memo } from 'react';
+import { useEffect, memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChatMessage } from './ChatMessage';
+import { ChatMessageListContent } from './ChatMessageListContent';
 import { useChatScroll } from '../hooks';
 import type { ChatMessage as ChatMessageType } from '../types';
 
@@ -133,14 +133,6 @@ export const ChatMessageList = memo(function ChatMessageList({
     isStreaming,
   });
 
-  // Limit visible messages for performance
-  const displayMessages = useMemo(() => {
-    if (messages.length <= visibleMessageCount) {
-      return messages;
-    }
-    return messages.slice(-visibleMessageCount);
-  }, [messages, visibleMessageCount]);
-
   // Scroll to bottom on mount
   useEffect(() => {
     scrollToBottom('auto');
@@ -170,36 +162,21 @@ export const ChatMessageList = memo(function ChatMessageList({
         aria-label="Chat messages"
         aria-live="polite"
       >
-      {/* Show indicator if messages are hidden */}
-      {messages.length > visibleMessageCount && (
-        <div className="text-center py-2 text-xs text-gray-500 dark:text-gray-400">
-          Showing last {visibleMessageCount} of {messages.length} messages
-        </div>
-      )}
+        <ChatMessageListContent
+          messages={messages}
+          visibleMessageCount={visibleMessageCount}
+          autoExpandTools={autoExpandTools}
+          showRawParameters={showRawParameters}
+          showThinking={showThinking}
+          selectedProject={selectedProject}
+          onFileOpen={onFileOpen}
+          onShowSettings={onShowSettings}
+        />
 
-      {/* Render messages */}
-      {displayMessages.map((message, index) => {
-        const prevMessage = index > 0 ? displayMessages[index - 1] : undefined;
-        return (
-          <ChatMessage
-            key={message.id || index}
-            message={message}
-            index={index}
-            prevMessage={prevMessage}
-            onFileOpen={onFileOpen}
-            onShowSettings={onShowSettings}
-            autoExpandTools={autoExpandTools}
-            showRawParameters={showRawParameters}
-            showThinking={showThinking}
-            selectedProject={selectedProject}
-          />
-        );
-      })}
-
-      {/* Scroll anchor */}
-      <div ref={messagesEndRef} className="h-1" />
-    </div>
-  </>
+        {/* Scroll anchor */}
+        <div ref={messagesEndRef} className="h-1" />
+      </div>
+    </>
   );
 });
 

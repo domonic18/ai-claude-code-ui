@@ -11,6 +11,102 @@ import { MAX_FILE_SIZE, STORAGE_KEYS } from '../constants';
 import type { FileAttachment } from '../types';
 import { useFileUploadHandler } from './useFileUploadHandler';
 
+/**
+ * Manage draft input persistence to localStorage
+ */
+function useDraftPersistence(
+  projectName: string,
+  value: string,
+  onChange: (value: string, cursorPosition: number) => void
+): void {
+  // Load draft from localStorage on mount
+  useEffect(() => {
+    if (projectName && typeof window !== 'undefined') {
+      const draft = localStorage.getItem(STORAGE_KEYS.DRAFT_INPUT(projectName));
+      if (draft && !value) {
+        onChange(draft, draft.length);
+      }
+    }
+  }, [projectName, onChange, value]);
+
+  // Save draft to localStorage
+  useEffect(() => {
+    if (projectName && typeof window !== 'undefined' && value) {
+      localStorage.setItem(STORAGE_KEYS.DRAFT_INPUT(projectName), value);
+    }
+  }, [value, projectName]);
+}
+
+/**
+ * Manage textarea auto-resize behavior
+ */
+function useTextareaAutoResize(
+  textareaRef: React.RefObject<HTMLTextAreaElement>,
+  value: string,
+  minRows: number,
+  maxRows: number
+): void {
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = 'auto';
+
+    const lineHeight = parseInt(window.getComputedStyle(textarea).lineHeight);
+    const minHeight = lineHeight * minRows;
+    const maxHeight = lineHeight * maxRows;
+    const scrollHeight = textarea.scrollHeight;
+
+    let newHeight = Math.max(minHeight, scrollHeight);
+    if (maxRows > 0) {
+      newHeight = Math.min(newHeight, maxHeight);
+    }
+
+    textarea.style.height = `${newHeight}px`;
+  }, [value, minRows, maxRows, textareaRef]);
+}
+
+/**
+ * Create input event handlers
+ */
+function useInputHandlers(
+  onFocusChange?: (isFocused: boolean) => void,
+  onRemoveFile?: (fileId: string) => void,
+  onChange?: (value: string, cursorPosition: number) => void
+) {
+  const [isFocused, setIsFocused] = useState(false);
+  const [cursorPosition, setCursorPosition] = useState(0);
+
+  const handleFocus = useCallback(() => {
+    setIsFocused(true);
+    onFocusChange?.(true);
+  }, [onFocusChange]);
+
+  const handleBlur = useCallback(() => {
+    setIsFocused(false);
+    onFocusChange?.(false);
+  }, [onFocusChange]);
+
+  const handleRemoveFile = useCallback((fileId: string) => {
+    onRemoveFile?.(fileId);
+  }, [onRemoveFile]);
+
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const pos = e.target.selectionStart;
+    setCursorPosition(pos);
+    onChange?.(e.target.value, pos);
+  }, [onChange]);
+
+  return {
+    isFocused,
+    cursorPosition,
+    handleFocus,
+    handleBlur,
+    handleRemoveFile,
+    handleInputChange,
+  };
+}
+
 interface UseChatInputStateOptions {
   /** Current input value */
   value: string;
@@ -62,45 +158,15 @@ export function useChatInputState({
   selectedProject,
 }: UseChatInputStateOptions) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [isFocused, setIsFocused] = useState(false);
-  const [cursorPosition, setCursorPosition] = useState(0);
 
-  // Load draft from localStorage on mount
-  useEffect(() => {
-    if (projectName && typeof window !== 'undefined') {
-      const draft = localStorage.getItem(STORAGE_KEYS.DRAFT_INPUT(projectName));
-      if (draft && !value) {
-        onChange(draft, draft.length);
-      }
-    }
-  }, [projectName, onChange]);
-
-  // Save draft to localStorage
-  useEffect(() => {
-    if (projectName && typeof window !== 'undefined' && value) {
-      localStorage.setItem(STORAGE_KEYS.DRAFT_INPUT(projectName), value);
-    }
-  }, [value, projectName]);
+  // Draft persistence
+  useDraftPersistence(projectName, value, onChange);
 
   // Auto-resize textarea
-  useEffect(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
+  useTextareaAutoResize(textareaRef, value, minRows, maxRows);
 
-    textarea.style.height = 'auto';
-
-    const lineHeight = parseInt(window.getComputedStyle(textarea).lineHeight);
-    const minHeight = lineHeight * minRows;
-    const maxHeight = lineHeight * maxRows;
-    const scrollHeight = textarea.scrollHeight;
-
-    let newHeight = Math.max(minHeight, scrollHeight);
-    if (maxRows > 0) {
-      newHeight = Math.min(newHeight, maxHeight);
-    }
-
-    textarea.style.height = `${newHeight}px`;
-  }, [value, minRows, maxRows]);
+  // Input handlers
+  const inputHandlers = useInputHandlers(onFocusChange, onRemoveFile, onChange);
 
   // Focus textarea on mount
   useEffect(() => {
@@ -108,35 +174,6 @@ export function useChatInputState({
       textareaRef.current.focus();
     }
   }, [disabled]);
-
-  /**
-   * Handle focus change
-   */
-  const handleFocus = useCallback(() => {
-    setIsFocused(true);
-    onFocusChange?.(true);
-  }, [onFocusChange]);
-
-  const handleBlur = useCallback(() => {
-    setIsFocused(false);
-    onFocusChange?.(false);
-  }, [onFocusChange]);
-
-  /**
-   * Handle remove file
-   */
-  const handleRemoveFile = useCallback((fileId: string) => {
-    onRemoveFile?.(fileId);
-  }, [onRemoveFile]);
-
-  /**
-   * Handle input change with cursor position tracking
-   */
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const pos = e.target.selectionStart;
-    setCursorPosition(pos);
-    onChange(e.target.value, pos);
-  }, [onChange]);
 
   // File upload handling
   const { isDragActive, getRootProps, getInputProps } = useFileUploadHandler({
@@ -150,15 +187,10 @@ export function useChatInputState({
 
   return {
     textareaRef,
-    isFocused,
-    cursorPosition,
     isDragActive,
     canSend,
     getRootProps,
     getInputProps,
-    handleFocus,
-    handleBlur,
-    handleRemoveFile,
-    handleInputChange,
+    ...inputHandlers,
   };
 }

@@ -33,6 +33,136 @@ async function handleSettingsOperation<T>(
   }
 }
 
+/**
+ * Create permissions operations
+ */
+function createPermissionsOperations(
+  service: ReturnType<typeof getSettingsService>,
+  setPermissions: React.Dispatch<React.SetStateAction<ClaudePermissions>>,
+  setLoading: (loading: boolean) => void,
+  setError: (error: string | null) => void
+) {
+  const loadPermissions = useCallback(async () => {
+    const data = await handleSettingsOperation(
+      () => service.getPermissions(),
+      'Failed to load permissions',
+      setLoading,
+      setError
+    );
+    setPermissions(data);
+  }, [service, setPermissions, setLoading, setError]);
+
+  const updatePermissionsCallback = useCallback(async (data: ClaudePermissions) => {
+    const result = await handleSettingsOperation(
+      () => service.updatePermissions(data),
+      'Failed to update permissions',
+      setLoading,
+      setError
+    );
+    if (result.success) {
+      setPermissions(data);
+    }
+    return result;
+  }, [service, setPermissions, setLoading, setError]);
+
+  return {
+    loadPermissions,
+    updatePermissions: updatePermissionsCallback,
+  };
+}
+
+/**
+ * Create MCP server operations
+ */
+function createMcpServerOperations(
+  service: ReturnType<typeof getSettingsService>,
+  setMcpServers: React.Dispatch<React.SetStateAction<McpServer[]>>,
+  setLoading: (loading: boolean) => void,
+  setError: (error: string | null) => void
+) {
+  const loadMcpServers = useCallback(async () => {
+    const servers = await handleSettingsOperation(
+      () => service.getMcpServers(),
+      'Failed to load MCP servers',
+      setLoading,
+      setError
+    );
+    setMcpServers(servers);
+  }, [service, setMcpServers, setLoading, setError]);
+
+  const createMcpServer = useCallback(async (server: Partial<McpServer>) => {
+    const result = await handleSettingsOperation(
+      () => service.createMcpServer(server),
+      'Failed to create MCP server',
+      setLoading,
+      setError
+    );
+    if (result.success) {
+      await loadMcpServers();
+    }
+    return result;
+  }, [service, loadMcpServers, setLoading, setError]);
+
+  const updateMcpServer = useCallback(async (id: string, server: Partial<McpServer>) => {
+    const result = await handleSettingsOperation(
+      () => service.updateMcpServer(id, server),
+      'Failed to update MCP server',
+      setLoading,
+      setError
+    );
+    if (result.success) {
+      await loadMcpServers();
+    }
+    return result;
+  }, [service, loadMcpServers, setLoading, setError]);
+
+  const deleteMcpServer = useCallback(async (id: string) => {
+    const result = await handleSettingsOperation(
+      () => service.deleteMcpServer(id),
+      'Failed to delete MCP server',
+      setLoading,
+      setError
+    );
+    if (result.success) {
+      await loadMcpServers();
+    }
+    return result;
+  }, [service, loadMcpServers, setLoading, setError]);
+
+  const testMcpServer = useCallback(async (id: string) => {
+    try {
+      setError(null);
+      return await service.testMcpServer(id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to test MCP server';
+      setError(message);
+      logger.error('[useSettings] Error testing MCP server:', err);
+      return { success: false, message };
+    }
+  }, [service, setError]);
+
+  const discoverMcpTools = useCallback(async (id: string) => {
+    try {
+      setError(null);
+      return await service.discoverMcpTools(id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to discover MCP tools';
+      setError(message);
+      logger.error('[useSettings] Error discovering MCP tools:', err);
+      return { success: false, error: message };
+    }
+  }, [service, setError]);
+
+  return {
+    loadMcpServers,
+    createMcpServer,
+    updateMcpServer,
+    deleteMcpServer,
+    testMcpServer,
+    discoverMcpTools,
+  };
+}
+
 export interface SettingsState {
   permissions: ClaudePermissions;
   mcpServers: McpServer[];
@@ -75,109 +205,21 @@ export function useSettings(): UseSettingsReturn {
 
   const service = getSettingsService();
 
-  // Load permissions
-  const loadPermissions = useCallback(async () => {
-    const data = await handleSettingsOperation(
-      () => service.getPermissions(),
-      'Failed to load permissions',
-      setLoading,
-      setError
-    );
-    setPermissions(data);
-  }, [service]);
+  // Create permissions operations
+  const permissionsOps = createPermissionsOperations(
+    service,
+    setPermissions,
+    setLoading,
+    setError
+  );
 
-  // Update permissions
-  const updatePermissionsCallback = useCallback(async (data: ClaudePermissions) => {
-    const result = await handleSettingsOperation(
-      () => service.updatePermissions(data),
-      'Failed to update permissions',
-      setLoading,
-      setError
-    );
-    if (result.success) {
-      setPermissions(data);
-    }
-    return result;
-  }, [service]);
-
-  // Load MCP servers
-  const loadMcpServers = useCallback(async () => {
-    const servers = await handleSettingsOperation(
-      () => service.getMcpServers(),
-      'Failed to load MCP servers',
-      setLoading,
-      setError
-    );
-    setMcpServers(servers);
-  }, [service]);
-
-  // Create MCP server
-  const createMcpServer = useCallback(async (server: Partial<McpServer>) => {
-    const result = await handleSettingsOperation(
-      () => service.createMcpServer(server),
-      'Failed to create MCP server',
-      setLoading,
-      setError
-    );
-    if (result.success) {
-      await loadMcpServers();
-    }
-    return result;
-  }, [service, loadMcpServers]);
-
-  // Update MCP server
-  const updateMcpServer = useCallback(async (id: string, server: Partial<McpServer>) => {
-    const result = await handleSettingsOperation(
-      () => service.updateMcpServer(id, server),
-      'Failed to update MCP server',
-      setLoading,
-      setError
-    );
-    if (result.success) {
-      await loadMcpServers();
-    }
-    return result;
-  }, [service, loadMcpServers]);
-
-  // Delete MCP server
-  const deleteMcpServer = useCallback(async (id: string) => {
-    const result = await handleSettingsOperation(
-      () => service.deleteMcpServer(id),
-      'Failed to delete MCP server',
-      setLoading,
-      setError
-    );
-    if (result.success) {
-      await loadMcpServers();
-    }
-    return result;
-  }, [service, loadMcpServers]);
-
-  // Test MCP server
-  const testMcpServer = useCallback(async (id: string) => {
-    try {
-      setError(null);
-      return await service.testMcpServer(id);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to test MCP server';
-      setError(message);
-      logger.error('[useSettings] Error testing MCP server:', err);
-      return { success: false, message };
-    }
-  }, [service]);
-
-  // Discover MCP tools
-  const discoverMcpTools = useCallback(async (id: string) => {
-    try {
-      setError(null);
-      return await service.discoverMcpTools(id);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to discover MCP tools';
-      setError(message);
-      logger.error('[useSettings] Error discovering MCP tools:', err);
-      return { success: false, error: message };
-    }
-  }, [service]);
+  // Create MCP server operations
+  const mcpOps = createMcpServerOperations(
+    service,
+    setMcpServers,
+    setLoading,
+    setError
+  );
 
   return {
     // State
@@ -187,16 +229,10 @@ export function useSettings(): UseSettingsReturn {
     error,
 
     // Permissions operations
-    loadPermissions,
-    updatePermissions: updatePermissionsCallback,
+    ...permissionsOps,
 
     // MCP servers operations
-    loadMcpServers,
-    createMcpServer,
-    updateMcpServer,
-    deleteMcpServer,
-    testMcpServer,
-    discoverMcpTools
+    ...mcpOps,
   };
 }
 
