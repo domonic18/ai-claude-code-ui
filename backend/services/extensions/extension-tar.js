@@ -226,6 +226,20 @@ async function createTarArchive(sourceDir, outputPath) {
 }
 
 /**
+ * Count non-hidden entries in a directory
+ * @param {string} dirPath - Directory path
+ * @returns {Promise<number>} Count of non-hidden entries
+ */
+async function countNonHiddenEntries(dirPath) {
+  try {
+    const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
+    return entries.filter(e => !e.name.startsWith('.')).length;
+  } catch (_error) {
+    return 0;
+  }
+}
+
+/**
  * Get extension statistics
  * @returns {Promise<Object>} Extension statistics
  */
@@ -243,19 +257,7 @@ export async function getExtensionStats() {
     const types = ['skills', 'agents', 'commands', 'hooks', 'knowledge'];
 
     for (const type of types) {
-      const dirPath = path.join(EXTENSIONS_DIR, type);
-
-      try {
-        const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
-
-        for (const entry of entries) {
-          if (!entry.name.startsWith('.')) {
-            stats[type]++;
-          }
-        }
-      } catch (error) {
-        // Directory doesn't exist
-      }
+      stats[type] = await countNonHiddenEntries(path.join(EXTENSIONS_DIR, type));
     }
 
     return stats;

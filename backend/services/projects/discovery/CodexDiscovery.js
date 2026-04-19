@@ -34,6 +34,42 @@ export class CodexDiscovery extends BaseDiscovery {
   }
 
   /**
+   * 将会话数据添加到项目 Map 中
+   * @param {Map} projectMap - 项目映射
+   * @param {Object} sessionData - 会话数据
+   * @private
+   */
+  _addSessionToProject(projectMap, sessionData) {
+    const projectPath = sessionData.cwd;
+
+    if (!projectMap.has(projectPath)) {
+      projectMap.set(projectPath, {
+        id: projectPath,
+        name: path.basename(projectPath),
+        path: projectPath,
+        displayName: path.basename(projectPath),
+        sessionCount: 0,
+        lastActivity: null,
+        sessions: []
+      });
+    }
+
+    const project = projectMap.get(projectPath);
+    project.sessionCount++;
+    project.sessions.push(this._normalizeSession({
+      id: sessionData.id,
+      summary: sessionData.summary,
+      messageCount: sessionData.messageCount,
+      lastActivity: sessionData.timestamp
+    }));
+
+    const sessionTime = new Date(sessionData.timestamp).getTime();
+    if (!project.lastActivity || sessionTime > new Date(project.lastActivity).getTime()) {
+      project.lastActivity = sessionData.timestamp;
+    }
+  }
+
+  /**
    * 获取项目列表
    * @param {Object} options - 选项
    * @returns {Promise<Array>} 项目列表
@@ -58,34 +94,7 @@ export class CodexDiscovery extends BaseDiscovery {
         try {
           const sessionData = await parseCodexSessionFile(filePath);
           if (sessionData && sessionData.cwd) {
-            const projectPath = sessionData.cwd;
-
-            if (!projectMap.has(projectPath)) {
-              projectMap.set(projectPath, {
-                id: projectPath,
-                name: path.basename(projectPath),
-                path: projectPath,
-                displayName: path.basename(projectPath),
-                sessionCount: 0,
-                lastActivity: null,
-                sessions: []
-              });
-            }
-
-            const project = projectMap.get(projectPath);
-            project.sessionCount++;
-            project.sessions.push(this._normalizeSession({
-              id: sessionData.id,
-              summary: sessionData.summary,
-              messageCount: sessionData.messageCount,
-              lastActivity: sessionData.timestamp
-            }));
-
-            // 更新最新活动时间
-            const sessionTime = new Date(sessionData.timestamp).getTime();
-            if (!project.lastActivity || sessionTime > new Date(project.lastActivity).getTime()) {
-              project.lastActivity = sessionData.timestamp;
-            }
+            this._addSessionToProject(projectMap, sessionData);
           }
         } catch (error) {
           logger.warn(`Could not parse Codex session file ${filePath}:`, error.message);

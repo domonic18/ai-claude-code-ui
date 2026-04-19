@@ -46,6 +46,38 @@ interface RequestOptions {
  */
 export class SidebarService {
   /**
+   * Parse error message from failed response
+   * @private
+   */
+  private async _parseErrorMessage(
+    response: Response,
+    options: RequestOptions
+  ): Promise<string> {
+    const fallback = `${options.errorPrefix}: ${response.statusText}`;
+
+    if (!options.parseErrorResponse && !options.parseErrorText) {
+      return fallback;
+    }
+
+    try {
+      if (options.parseErrorResponse) {
+        const contentType = response.headers.get('content-type');
+        if (contentType?.includes('application/json')) {
+          const error = await response.json();
+          return error.error || fallback;
+        }
+      } else if (options.parseErrorText) {
+        const errorText = await response.text();
+        if (errorText) return errorText;
+      }
+    } catch {
+      // Ignore parse errors
+    }
+
+    return fallback;
+  }
+
+  /**
    * Private helper method to execute API requests with consistent error handling
    *
    * @param apiCall - Function that returns the Promise<Response>
@@ -62,28 +94,7 @@ export class SidebarService {
       const response = await apiCall();
 
       if (!response.ok) {
-        let errorMessage = `${options.errorPrefix}: ${response.statusText}`;
-
-        // Try to parse error response as JSON or text
-        if (options.parseErrorResponse || options.parseErrorText) {
-          try {
-            if (options.parseErrorResponse) {
-              const contentType = response.headers.get('content-type');
-              if (contentType?.includes('application/json')) {
-                const error = await response.json();
-                errorMessage = error.error || errorMessage;
-              }
-            } else if (options.parseErrorText) {
-              const errorText = await response.text();
-              if (errorText) {
-                errorMessage = errorText;
-              }
-            }
-          } catch {
-            // Ignore parse errors
-          }
-        }
-
+        const errorMessage = await this._parseErrorMessage(response, options);
         throw new SidebarServiceError(errorMessage, response.status, options.endpoint);
       }
 

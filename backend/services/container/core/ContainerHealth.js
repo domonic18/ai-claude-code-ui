@@ -51,31 +51,19 @@ export class ContainerHealthMonitor {
     while (Date.now() - startTime < timeout) {
       try {
         const info = await container.inspect();
-        if (info.State.Status === 'running') {
-          // 检查健康端点（如果可用）
-          if (info.Config.Healthcheck) {
-            // 有健康检查配置
-            const health = info.State.Health;
-            // 如果健康状态为 null（StartPeriod 期间）或 starting，继续等待
-            // 如果状态为 healthy，准备就绪
-            // 如果状态为 unhealthy，抛出错误
-            if (!health) {
-              // StartPeriod 期间，健康状态尚未初始化，继续等待
-            } else if (health.Status === 'healthy') {
-              logger.info(`[HealthCheck] Container ${containerId.substring(0, 12)} is healthy`);
-              return true;
-            } else if (health.Status === 'unhealthy') {
-              throw new Error(`Container ${containerId} is unhealthy`);
-            } else if (health.Status === 'starting') {
-              // 健康检查正在进行中，继续等待（静默等待，减少日志噪音）
-            }
-          } else {
-            // 没有健康检查，容器运行即视为准备就绪
-            return true;
-          }
-        } else if (info.State.Status === 'exited') {
-          // 容器已退出，抛出错误
+
+        if (info.State.Status === 'exited') {
           throw new Error(`Container ${containerId} exited with code ${info.State.ExitCode}`);
+        }
+
+        if (info.State.Status !== 'running') {
+          // Not running yet, wait and retry
+        } else if (info.Config.Healthcheck) {
+          const ready = this._evaluateHealthStatus(info.State.Health, containerId);
+          if (ready === true) return true;
+          if (ready === false) throw new Error(`Container ${containerId} is unhealthy`);
+        } else {
+          return true;
         }
       } catch (error) {
         // 如果是我们抛出的错误，直接抛出
@@ -116,6 +104,24 @@ export class ContainerHealthMonitor {
     } catch (error) {
       return false;
     }
+  }
+
+  /**
+   * 评估容器健康状态
+   * @param {Object|null} health - Docker 健康状态对象
+   * @param {string} containerId - 容器 ID
+   * @returns {boolean|null} true=healthy, false=unhealthy, null=still starting
+   * @private
+   */
+  _evaluateHealthStatus(health, containerId) {
+    if (!health) return null; // StartPeriod, 尚未初始化
+    if (health.Status === 'healthy') {
+      logger.info(`[HealthCheck] Container ${containerId.substring(0, 12)} is healthy`);
+      return true;
+    }
+    if (health.Status === 'unhealthy') return false;
+    // starting 或其他状态，继续等待
+    return null;
   }
 
   /**

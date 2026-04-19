@@ -14,6 +14,38 @@ import { createLogger } from '../../utils/logger.js';
 const logger = createLogger('commands/scanner');
 
 /**
+ * Parse a single command file and return command metadata
+ * @param {string} fullPath - Full path to the .md file
+ * @param {string} baseDir - Base directory for relative path calculation
+ * @param {string} namespace - Command namespace
+ * @returns {Promise<Object|null>} Command object or null if parse fails
+ */
+async function parseCommandFile(fullPath, baseDir, namespace) {
+  try {
+    const content = await fs.readFile(fullPath, 'utf8');
+    const { data: frontmatter, content: commandContent } = matter(content);
+
+    const relativePath = path.relative(baseDir, fullPath);
+    const commandName = '/' + relativePath.replace(/\.md$/, '').replace(/\\/g, '/');
+
+    const description = frontmatter.description
+      || commandContent.trim().split('\n')[0].replace(/^#+\s*/, '').trim();
+
+    return {
+      name: commandName,
+      path: fullPath,
+      relativePath,
+      description,
+      namespace,
+      metadata: frontmatter
+    };
+  } catch (err) {
+    logger.error(`Error parsing command file ${fullPath}:`, err.message);
+    return null;
+  }
+}
+
+/**
  * Recursively scan directory for command files (.md)
  * @param {string} dir - Directory to scan
  * @param {string} baseDir - Base directory for relative path calculation
@@ -35,30 +67,8 @@ export async function scanCommandsDirectory(dir, baseDir, namespace) {
         const subCommands = await scanCommandsDirectory(fullPath, baseDir, namespace);
         commands.push(...subCommands);
       } else if (entry.isFile() && entry.name.endsWith('.md')) {
-        try {
-          const content = await fs.readFile(fullPath, 'utf8');
-          const { data: frontmatter, content: commandContent } = matter(content);
-
-          const relativePath = path.relative(baseDir, fullPath);
-          const commandName = '/' + relativePath.replace(/\.md$/, '').replace(/\\/g, '/');
-
-          let description = frontmatter.description || '';
-          if (!description) {
-            const firstLine = commandContent.trim().split('\n')[0];
-            description = firstLine.replace(/^#+\s*/, '').trim();
-          }
-
-          commands.push({
-            name: commandName,
-            path: fullPath,
-            relativePath,
-            description,
-            namespace,
-            metadata: frontmatter
-          });
-        } catch (err) {
-          logger.error(`Error parsing command file ${fullPath}:`, err.message);
-        }
+        const cmd = await parseCommandFile(fullPath, baseDir, namespace);
+        if (cmd) commands.push(cmd);
       }
     }
   } catch (err) {

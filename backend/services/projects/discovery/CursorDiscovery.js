@@ -18,6 +18,30 @@ import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('services/projects/discovery/CursorDiscovery');
 
 /**
+ * 解析 Cursor SQLite meta 表的行数据为元数据对象
+ * @param {Array<{key: string, value: string}>} metaRows - meta 表原始行
+ * @returns {Object} 解析后的元数据
+ */
+function decodeMetaRows(metaRows) {
+  const metadata = {};
+  for (const row of metaRows) {
+    if (!row.value) continue;
+    try {
+      const strValue = row.value.toString();
+      if (/^[0-9a-fA-F]+$/.test(strValue)) {
+        const jsonStr = Buffer.from(row.value, 'hex').toString('utf8');
+        metadata[row.key] = JSON.parse(jsonStr);
+      } else {
+        metadata[row.key] = strValue;
+      }
+    } catch (_e) {
+      metadata[row.key] = row.value.toString();
+    }
+  }
+  return metadata;
+}
+
+/**
  * Cursor 项目发现器
  * Cursor 使用 MD5 哈希作为项目目录名，使用 SQLite 存储会话
  */
@@ -253,26 +277,9 @@ export class CursorDiscovery extends BaseDiscovery {
         mode: sqlite3.OPEN_READONLY
       });
 
-      // 读取元数据
+      // 读取并解析元数据
       const metaRows = await db.all('SELECT key, value FROM meta');
-
-      // 解析元数据
-      let metadata = {};
-      for (const row of metaRows) {
-        if (row.value) {
-          try {
-            const hexMatch = row.value.toString().match(/^[0-9a-fA-F]+$/);
-            if (hexMatch) {
-              const jsonStr = Buffer.from(row.value, 'hex').toString('utf8');
-              metadata[row.key] = JSON.parse(jsonStr);
-            } else {
-              metadata[row.key] = row.value.toString();
-            }
-          } catch (e) {
-            metadata[row.key] = row.value.toString();
-          }
-        }
-      }
+      const metadata = decodeMetaRows(metaRows);
 
       // 获取消息数量
       const messageCountResult = await db.get('SELECT COUNT(*) as count FROM blobs');

@@ -77,23 +77,28 @@ export function decodeHexJson(hexValue) {
 export function parseMetadata(metaRows) {
     const metadata = {};
     for (const row of metaRows) {
-        if (row.value) {
-            try {
-                const strValue = row.value.toString();
-                if (isHexString(strValue)) {
-                    const decoded = decodeHexJson(strValue);
-                    if (decoded !== null) {
-                        metadata[row.key] = decoded;
-                        continue;
-                    }
-                }
-                metadata[row.key] = strValue;
-            } catch {
-                metadata[row.key] = row.value.toString();
-            }
-        }
+        if (!row.value) continue;
+        metadata[row.key] = decodeMetadataValue(row.value);
     }
     return metadata;
+}
+
+/**
+ * 解析单行 metadata value
+ * @param {*} rawValue - 原始值
+ * @returns {string|Object} 解析后的值
+ */
+function decodeMetadataValue(rawValue) {
+    try {
+        const strValue = rawValue.toString();
+        if (isHexString(strValue)) {
+            const decoded = decodeHexJson(strValue);
+            if (decoded !== null) return decoded;
+        }
+        return strValue;
+    } catch {
+        return rawValue.toString();
+    }
 }
 
 // ============================================================================

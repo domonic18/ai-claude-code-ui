@@ -45,6 +45,19 @@ interface UseTerminalConnectionOptions {
 }
 
 /**
+ * Extract process exit code from terminal output
+ * @param output - Raw terminal output
+ * @returns Exit code number or null if no exit detected
+ */
+function extractExitCode(output: string): number | null {
+  const cleanOutput = output.replace(/\x1b\[[0-9;]*m/g, '');
+  if (cleanOutput.includes('Process exited with code 0')) return 0;
+  const match = cleanOutput.match(/Process exited with code (\d+)/);
+  const code = match ? parseInt(match[1]) : null;
+  return code !== null && code !== 0 ? code : null;
+}
+
+/**
  * Create WebSocket message handler for terminal
  */
 function createWebSocketMessageHandler(
@@ -61,15 +74,8 @@ function createWebSocketMessageHandler(
         const output = data.data;
 
         if (isPlainShellRef.current && onProcessCompleteRef.current) {
-          const cleanOutput = output.replace(/\x1b\[[0-9;]*m/g, '');
-          if (cleanOutput.includes('Process exited with code 0')) {
-            onProcessCompleteRef.current(0);
-          } else if (cleanOutput.match(/Process exited with code (\d+)/)) {
-            const exitCode = parseInt(cleanOutput.match(/Process exited with code (\d+)/)[1]);
-            if (exitCode !== 0) {
-              onProcessCompleteRef.current(exitCode);
-            }
-          }
+          const exitCode = extractExitCode(output);
+          if (exitCode !== null) onProcessCompleteRef.current(exitCode);
         }
 
         onOutput?.(output);
