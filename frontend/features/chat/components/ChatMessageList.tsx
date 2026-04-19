@@ -41,6 +41,70 @@ interface ChatMessageListProps {
 }
 
 /**
+ * Empty State Component
+ *
+ * Displays a friendly empty state when there are no messages.
+ */
+interface EmptyStateProps {
+  title: string;
+  description: string;
+}
+
+function EmptyState({ title, description }: EmptyStateProps) {
+  return (
+    <div className="flex-1 flex items-center justify-center px-4">
+      <div className="text-center max-w-md">
+        <div className="mb-4">
+          <svg
+            className="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+            />
+          </svg>
+        </div>
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+          {title}
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          {description}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Scroll to Bottom Button Component
+ *
+ * Floating button that appears when user scrolls up.
+ */
+interface ScrollToBottomButtonProps {
+  onClick: () => void;
+}
+
+function ScrollToBottomButton({ onClick }: ScrollToBottomButtonProps) {
+  return (
+    <button
+      onClick={onClick}
+      className="fixed bottom-20 right-8 z-50 w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:ring-offset-gray-800"
+      title="滚动到底部"
+      type="button"
+    >
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+      </svg>
+    </button>
+  );
+}
+
+/**
  * ChatMessageList Component
  *
  * Renders a scrollable list of chat messages with auto-scroll behavior.
@@ -82,36 +146,13 @@ export const ChatMessageList = memo(function ChatMessageList({
     scrollToBottom('auto');
   }, [scrollToBottom]);
 
-  /**
-   * Render empty state
-   */
+  // Render empty state
   if (messages.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center px-4">
-        <div className="text-center max-w-md">
-          <div className="mb-4">
-            <svg
-              className="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-              />
-            </svg>
-          </div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-            {t('chat.emptyState.title')}
-          </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            {t('chat.emptyState.description')}
-          </p>
-        </div>
-      </div>
+      <EmptyState
+        title={t('chat.emptyState.title')}
+        description={t('chat.emptyState.description')}
+      />
     );
   }
 
@@ -119,16 +160,7 @@ export const ChatMessageList = memo(function ChatMessageList({
     <>
       {/* Scroll to bottom button - fixed position */}
       {isUserScrolledUp && messages.length > 0 && (
-        <button
-          onClick={() => scrollToBottom('smooth')}
-          className="fixed bottom-20 right-8 z-50 w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:ring-offset-gray-800"
-          title="滚动到底部"
-          type="button"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-          </svg>
-        </button>
+        <ScrollToBottomButton onClick={() => scrollToBottom('smooth')} />
       )}
 
       <div

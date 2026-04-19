@@ -19,6 +19,77 @@ import SessionList from './SessionList';
 import { SKELETON_COUNT } from '../constants/sidebar.constants';
 
 /**
+ * ProjectListItem - Renders a single project with its sessions
+ */
+interface ProjectListItemProps {
+  project: Project;
+  selectedSession: Session | null;
+  hasMoreSessions: Record<string, boolean | undefined>;
+  loadingSessions: Record<string, boolean | undefined>;
+  currentTime: Date;
+  initialSessionsLoaded: boolean;
+  editingSession: Session | null;
+  editingSessionName: string;
+  onSessionClick: (session: Session, projectName: string) => void;
+  onSessionDelete: (projectName: string, sessionId: string, provider?: SessionProvider) => Promise<void>;
+  onSessionRename: (projectName: string, sessionId: string, summary: string) => Promise<void>;
+  onLoadMoreSessions: (project: Project) => Promise<void>;
+  onSetEditingSession: (session: Session | null) => void;
+  onSetEditingSessionName: (name: string) => void;
+  onNewSession: (projectName: string) => void;
+}
+
+const ProjectListItem = memo(function ProjectListItem({
+  project,
+  selectedSession,
+  hasMoreSessions,
+  loadingSessions,
+  currentTime,
+  initialSessionsLoaded,
+  editingSession,
+  editingSessionName,
+  onSessionClick,
+  onSessionDelete,
+  onSessionRename,
+  onLoadMoreSessions,
+  onSetEditingSession,
+  onSetEditingSessionName,
+  onNewSession,
+}: ProjectListItemProps) {
+  const allSessions = getAllSessions(project);
+  const hasMoreSessionsForProject = hasMoreSessions[project.name] !== false;
+  const isLoadingSessionsForProject = loadingSessions[project.name];
+
+  // Skip projects with no sessions
+  if (allSessions.length === 0 && !isLoadingSessionsForProject) {
+    return null;
+  }
+
+  return (
+    <SessionList
+      projectName={project.name}
+      sessions={project.sessions}
+      cursorSessions={project.cursorSessions}
+      codexSessions={project.codexSessions}
+      selectedSessionId={selectedSession?.id}
+      currentTime={currentTime}
+      isLoadingSessions={isLoadingSessionsForProject}
+      initialSessionsLoaded={initialSessionsLoaded}
+      hasMoreSessions={hasMoreSessionsForProject}
+      onSessionClick={(session: Session) => onSessionClick(session, project.name)}
+      onSessionDelete={onSessionDelete}
+      onSessionRename={onSessionRename}
+      onLoadMoreSessions={() => onLoadMoreSessions(project)}
+      editingSession={editingSession}
+      onSetEditingSession={onSetEditingSession}
+      editingSessionName={editingSessionName}
+      onSetEditingSessionName={onSetEditingSessionName}
+      onNewSession={() => onNewSession(project.name)}
+    />
+  );
+});
+
+/**
  * ProjectList Component
  */
 export const ProjectList = memo(function ProjectList({
@@ -140,42 +211,26 @@ export const ProjectList = memo(function ProjectList({
           </div>
         ) : (
           // Display all sessions from all projects in a flat list
-          projects.map((project) => {
-            const allSessions = getAllSessions(project);
-            const hasMoreSessionsForProject = hasMoreSessions[project.name] !== false;
-            const isLoadingSessionsForProject = loadingSessions[project.name];
-
-            // Skip projects with no sessions
-            if (allSessions.length === 0 && !isLoadingSessionsForProject) {
-              return null;
-            }
-
-            return (
-              <SessionList
-                key={project.name}
-                projectName={project.name}
-                sessions={project.sessions}
-                cursorSessions={project.cursorSessions}
-                codexSessions={project.codexSessions}
-                selectedSessionId={selectedSession?.id}
-                currentTime={currentTime}
-                isLoadingSessions={isLoadingSessionsForProject}
-                initialSessionsLoaded={initialSessionsLoaded.has(project.name)}
-                hasMoreSessions={hasMoreSessionsForProject}
-                onSessionClick={(session: Session) => handleSessionClick(session, project.name)}
-                onSessionDelete={(projectName: string, sessionId: string, provider?: SessionProvider) =>
-                  handleSessionDelete(projectName, sessionId, provider)}
-                onSessionRename={(projectName: string, sessionId: string, summary: string) =>
-                  handleSessionRename(projectName, sessionId, summary)}
-                onLoadMoreSessions={() => handleLoadMoreSessions(project)}
-                editingSession={editingSession}
-                onSetEditingSession={onSetEditingSession}
-                editingSessionName={editingSessionName}
-                onSetEditingSessionName={onSetEditingSessionName}
-                onNewSession={() => handleNewSession(project.name)}
-              />
-            );
-          })
+          projects.map((project) => (
+            <ProjectListItem
+              key={project.name}
+              project={project}
+              selectedSession={selectedSession}
+              hasMoreSessions={hasMoreSessions}
+              loadingSessions={loadingSessions}
+              currentTime={currentTime}
+              initialSessionsLoaded={initialSessionsLoaded.has(project.name)}
+              editingSession={editingSession}
+              editingSessionName={editingSessionName}
+              onSessionClick={handleSessionClick}
+              onSessionDelete={handleSessionDelete}
+              onSessionRename={handleSessionRename}
+              onLoadMoreSessions={handleLoadMoreSessions}
+              onSetEditingSession={onSetEditingSession}
+              onSetEditingSessionName={onSetEditingSessionName}
+              onNewSession={handleNewSession}
+            />
+          ))
         )}
       </div>
     </ScrollArea>

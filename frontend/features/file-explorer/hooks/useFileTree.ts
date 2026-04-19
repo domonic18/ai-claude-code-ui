@@ -8,6 +8,154 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { FileNode, FileViewMode } from '../types';
 
 /**
+ * Helper functions for file tree operations
+ */
+
+/**
+ * Fetch files from API
+ */
+async function fetchFilesFromAPI(
+  selectedProject: { name: string; path: string } | null,
+  isMountedRef: React.RefObject<boolean>,
+  setFiles: React.Dispatch<React.SetStateAction<FileNode[]>>,
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>,
+  setError: React.Dispatch<React.SetStateAction<Error | null>>,
+  onError?: (error: Error) => void
+): Promise<void> {
+  if (!selectedProject) {
+    setFiles([]);
+    return;
+  }
+
+  setLoading(true);
+  setError(null);
+
+  try {
+    const response = await fetch(`/api/projects/${selectedProject.name}/files`);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch files: ${response.statusText}`);
+    }
+
+    const responseData = await response.json();
+    const data = responseData.data ?? responseData;
+    const fileList = Array.isArray(data) ? data : [];
+
+    if (isMountedRef.current) {
+      setFiles(fileList);
+    }
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error('Unknown error');
+    if (isMountedRef.current) {
+      setError(error);
+      onError?.(error);
+    }
+  } finally {
+    if (isMountedRef.current) {
+      setLoading(false);
+    }
+  }
+}
+
+/**
+ * Toggle directory expanded state
+ */
+function toggleDirectoryState(
+  path: string,
+  expandedDirs: Set<string>
+): Set<string> {
+  const newExpanded = new Set(expandedDirs);
+  if (newExpanded.has(path)) {
+    newExpanded.delete(path);
+  } else {
+    newExpanded.add(path);
+  }
+  return newExpanded;
+}
+
+/**
+ * Filter files based on search query
+ */
+function filterFilesByQuery(
+  files: FileNode[],
+  searchQuery: string
+): FileNode[] {
+  if (!searchQuery.trim()) {
+    return files;
+  }
+
+  const query = searchQuery.toLowerCase();
+
+  const filterNodes = (nodes: FileNode[]): FileNode[] => {
+    return nodes.reduce<FileNode[]>((filtered, node) => {
+      const matchesName = node.name.toLowerCase().includes(query);
+      let filteredChildren: FileNode[] = [];
+
+      if (node.type === 'directory' && node.children) {
+        filteredChildren = filterNodes(node.children);
+      }
+
+      // Include if name matches or has matching children
+      if (matchesName || filteredChildren.length > 0) {
+        filtered.push({
+          ...node,
+          children: filteredChildren.length > 0 ? filteredChildren : node.children,
+        });
+      }
+
+      return filtered;
+    }, []);
+  };
+
+  return filterNodes(files);
+}
+
+/**
+ * Expand directories containing matching files
+ */
+function expandMatchingDirectories(
+  items: FileNode[],
+  setExpandedDirs: React.Dispatch<React.SetStateAction<Set<string>>>
+): void {
+  items.forEach(item => {
+    if (item.type === 'directory' && item.children && item.children.length > 0) {
+      setExpandedDirs(prev => new Set(prev).add(item.path));
+      expandMatchingDirectories(item.children, setExpandedDirs);
+    }
+  });
+}
+
+/**
+ * Set view mode and persist to localStorage
+ */
+function setViewModeWithPersistence(
+  mode: FileViewMode,
+  setViewMode: React.Dispatch<React.SetStateAction<FileViewMode>>
+): void {
+  setViewMode(mode);
+  try {
+    localStorage.setItem('file-tree-view-mode', mode);
+  } catch {
+    // Ignore localStorage errors
+  }
+}
+
+/**
+ * Load view mode from localStorage
+ */
+function loadViewModeFromStorage(): FileViewMode | null {
+  try {
+    const savedViewMode = localStorage.getItem('file-tree-view-mode');
+    if (savedViewMode && ['simple', 'detailed', 'compact'].includes(savedViewMode)) {
+      return savedViewMode as FileViewMode;
+    }
+  } catch {
+    // Ignore localStorage errors
+  }
+  return null;
+}
+
+/**
  * Hook for managing file tree state and operations
  */
 export interface UseFileTreeOptions {
@@ -55,54 +203,21 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeReturn
    * Fetch files from API
    */
   const fetchFiles = useCallback(async () => {
-    if (!selectedProject) {
-      setFiles([]);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(`/api/projects/${selectedProject.name}/files`);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch files: ${response.statusText}`);
-      }
-
-      const responseData = await response.json();
-      const data = responseData.data ?? responseData;
-      const fileList = Array.isArray(data) ? data : [];
-
-      if (isMountedRef.current) {
-        setFiles(fileList);
-      }
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Unknown error');
-      if (isMountedRef.current) {
-        setError(error);
-        onError?.(error);
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setLoading(false);
-      }
-    }
+    await fetchFilesFromAPI(
+      selectedProject,
+      isMountedRef,
+      setFiles,
+      setLoading,
+      setError,
+      onError
+    );
   }, [selectedProject, onError]);
 
   /**
    * Toggle directory expanded state
    */
   const toggleDirectory = useCallback((path: string) => {
-    setExpandedDirs(prev => {
-      const newExpanded = new Set(prev);
-      if (newExpanded.has(path)) {
-        newExpanded.delete(path);
-      } else {
-        newExpanded.add(path);
-      }
-      return newExpanded;
-    });
+    setExpandedDirs(prev => toggleDirectoryState(path, prev));
   }, []);
 
   /**
@@ -116,12 +231,7 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeReturn
    * Set view mode and persist to localStorage
    */
   const setViewModeWithPersist = useCallback((mode: FileViewMode) => {
-    setViewMode(mode);
-    try {
-      localStorage.setItem('file-tree-view-mode', mode);
-    } catch {
-      // Ignore localStorage errors
-    }
+    setViewModeWithPersistence(mode, setViewMode);
   }, []);
 
   /**
@@ -135,34 +245,7 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeReturn
    * Filter files based on search query
    */
   const filteredFiles = useCallback((): FileNode[] => {
-    if (!searchQuery.trim()) {
-      return files;
-    }
-
-    const query = searchQuery.toLowerCase();
-
-    const filterNodes = (nodes: FileNode[]): FileNode[] => {
-      return nodes.reduce<FileNode[]>((filtered, node) => {
-        const matchesName = node.name.toLowerCase().includes(query);
-        let filteredChildren: FileNode[] = [];
-
-        if (node.type === 'directory' && node.children) {
-          filteredChildren = filterNodes(node.children);
-        }
-
-        // Include if name matches or has matching children
-        if (matchesName || filteredChildren.length > 0) {
-          filtered.push({
-            ...node,
-            children: filteredChildren.length > 0 ? filteredChildren : node.children,
-          });
-        }
-
-        return filtered;
-      }, []);
-    };
-
-    return filterNodes(files);
+    return filterFilesByQuery(files, searchQuery);
   }, [files, searchQuery]);
 
   /**
@@ -178,13 +261,9 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeReturn
    * Load view mode from localStorage on mount
    */
   useEffect(() => {
-    try {
-      const savedViewMode = localStorage.getItem('file-tree-view-mode');
-      if (savedViewMode && ['simple', 'detailed', 'compact'].includes(savedViewMode)) {
-        setViewMode(savedViewMode as FileViewMode);
-      }
-    } catch {
-      // Ignore localStorage errors
+    const savedViewMode = loadViewModeFromStorage();
+    if (savedViewMode) {
+      setViewMode(savedViewMode);
     }
   }, []);
 
@@ -203,15 +282,7 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeReturn
    */
   useEffect(() => {
     if (searchQuery.trim()) {
-      const expandMatches = (items: FileNode[]) => {
-        items.forEach(item => {
-          if (item.type === 'directory' && item.children && item.children.length > 0) {
-            setExpandedDirs(prev => new Set(prev).add(item.path));
-            expandMatches(item.children);
-          }
-        });
-      };
-      expandMatches(filteredFiles());
+      expandMatchingDirectories(filteredFiles(), setExpandedDirs);
     }
   }, [searchQuery, filteredFiles]);
 
@@ -242,6 +313,58 @@ export interface UseFileOperationsOptions {
   onSuccess?: (operation: string, result: unknown) => void;
 }
 
+/**
+ * Helper function to execute file operation with error handling
+ *
+ * @param endpoint - API endpoint
+ * @param method - HTTP method
+ * @param projectId - Project ID
+ * @param body - Request body
+ * @param operation - Operation name for callbacks
+ * @param setLoading - Set loading state
+ * @param setError - Set error state
+ * @param onSuccess - Success callback
+ * @param onError - Error callback
+ * @returns Response data
+ */
+async function executeFileOperation<T = unknown>(
+  endpoint: string,
+  method: string,
+  projectId: string | undefined,
+  body: object,
+  operation: string,
+  setLoading: (loading: boolean) => void,
+  setError: (error: Error | null) => void,
+  onSuccess?: (operation: string, result: T) => void,
+  onError?: (error: Error) => void
+): Promise<T> {
+  setLoading(true);
+  setError(null);
+
+  try {
+    const response = await fetch(`/api/projects/${projectId}/${endpoint}`, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to ${operation}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    onSuccess?.(operation, data);
+    return data;
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(`Failed to ${operation}`);
+    setError(error);
+    onError?.(error);
+    throw error;
+  } finally {
+    setLoading(false);
+  }
+}
+
 export function useFileOperations(options: UseFileOperationsOptions = {}) {
   const { projectId, onError, onSuccess } = options;
   const [loading, setLoading] = useState<boolean>(false);
@@ -251,122 +374,70 @@ export function useFileOperations(options: UseFileOperationsOptions = {}) {
    * Read file content
    */
   const readFile = useCallback(async (filePath: string): Promise<string> => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(`/api/projects/${projectId}/files/read`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: filePath }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to read file: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      onSuccess?.('read', data);
-      return data.content;
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to read file');
-      setError(error);
-      onError?.(error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId, onError, onSuccess]);
+    const data = await executeFileOperation(
+      'files/read',
+      'POST',
+      projectId,
+      { path: filePath },
+      'read file',
+      setLoading,
+      setError,
+      onSuccess,
+      onError
+    );
+    return (data as { content: string }).content;
+  }, [projectId, onSuccess, onError]);
 
   /**
    * Write file content
    */
   const writeFile = useCallback(async (filePath: string, content: string): Promise<void> => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(`/api/projects/${projectId}/files/write`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: filePath, content }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to write file: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      onSuccess?.('write', data);
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to write file');
-      setError(error);
-      onError?.(error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId, onError, onSuccess]);
+    await executeFileOperation(
+      'files/write',
+      'POST',
+      projectId,
+      { path: filePath, content },
+      'write file',
+      setLoading,
+      setError,
+      onSuccess,
+      onError
+    );
+  }, [projectId, onSuccess, onError]);
 
   /**
    * Delete file
    */
   const deleteFile = useCallback(async (filePath: string): Promise<void> => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(`/api/projects/${projectId}/files/delete`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: filePath }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to delete file: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      onSuccess?.('delete', data);
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to delete file');
-      setError(error);
-      onError?.(error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId, onError, onSuccess]);
+    await executeFileOperation(
+      'files/delete',
+      'DELETE',
+      projectId,
+      { path: filePath },
+      'delete file',
+      setLoading,
+      setError,
+      onSuccess,
+      onError
+    );
+  }, [projectId, onSuccess, onError]);
 
   /**
    * Create directory
    */
   const createDirectory = useCallback(async (dirPath: string): Promise<void> => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(`/api/projects/${projectId}/files/mkdir`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: dirPath }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to create directory: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      onSuccess?.('mkdir', data);
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to create directory');
-      setError(error);
-      onError?.(error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId, onError, onSuccess]);
+    await executeFileOperation(
+      'files/mkdir',
+      'POST',
+      projectId,
+      { path: dirPath },
+      'create directory',
+      setLoading,
+      setError,
+      onSuccess,
+      onError
+    );
+  }, [projectId, onSuccess, onError]);
 
   return {
     loading,

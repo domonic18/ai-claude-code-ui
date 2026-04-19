@@ -117,6 +117,107 @@ async function processImageUpload(req, res) {
 }
 
 /**
+ * Transcribe audio using Whisper API
+ */
+async function transcribeAudio(req, apiKey, fileMimetype) {
+  const FormData = (await import('form-data')).default;
+  const formData = new FormData();
+  formData.append('file', req.file.buffer, {
+    filename: req.file.originalname,
+    contentType: fileMimetype
+  });
+  formData.append('model', getValidatedModelName('WHISPER_MODEL', 'whisper-1'));
+  formData.append('response_format', 'json');
+  formData.append('language', 'en');
+
+  // 向 OpenAI 兼容 API 发出请求（URL 经过 https 校验）
+  const whisperApiUrl = getValidatedWhisperUrl();
+  const fetch = (await import('node-fetch')).default;
+  const response = await fetch(whisperApiUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      ...formData.getHeaders()
+    },
+    body: formData
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error?.message || `Whisper API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.text || '';
+}
+
+/**
+ * Enhance transcribed text using GPT
+ */
+async function enhanceTranscription(transcribedText, mode, apiKey) {
+  const OpenAI = (await import('openai')).default;
+  const openai = new OpenAI({ apiKey });
+
+  let prompt, systemMessage, temperature = 0.7, maxTokens = 800;
+
+  switch (mode) {
+    case 'prompt':
+      systemMessage = 'You are an expert prompt engineer who creates clear, detailed, and effective prompts.';
+      prompt = `You are an expert prompt engineer. Transform the following rough instruction into a clear, detailed, and context-aware AI prompt.
+
+Your enhanced prompt should:
+1. Be specific and unambiguous
+2. Include relevant context and constraints
+3. Specify the desired output format
+4. Use clear, actionable language
+5. Include examples where helpful
+6. Consider edge cases and potential ambiguities
+
+Transform this rough instruction into a well-crafted prompt:
+"${transcribedText}"
+
+Enhanced prompt:`;
+      break;
+
+    case 'vibe':
+    case 'instructions':
+    case 'architect':
+      systemMessage = 'You are a helpful assistant that formats ideas into clear, actionable instructions for AI agents.';
+      temperature = 0.5;
+      prompt = `Transform the following idea into clear, well-structured instructions that an AI agent can easily understand and execute.
+
+IMPORTANT RULES:
+- Format as clear, step-by-step instructions
+- Add reasonable implementation details based on common patterns
+- Only include details directly related to what was asked
+- Do NOT add features or functionality not mentioned
+- Keep the original intent and scope intact
+- Use clear, actionable language an agent can follow
+
+Transform this idea into agent-friendly instructions:
+"${transcribedText}"
+
+Agent instructions:`;
+      break;
+
+    default:
+      return transcribedText;
+  }
+
+  const completion = await openai.chat.completions.create({
+    model: getValidatedModelName('OPENAI_ENHANCE_MODEL', 'gpt-4o-mini'),
+    messages: [
+      { role: 'system', content: systemMessage },
+      { role: 'user', content: prompt }
+    ],
+    temperature: temperature,
+    max_tokens: maxTokens
+  });
+
+  return completion.choices[0].message.content || transcribedText;
+}
+
+/**
  * Handle audio transcription with optional enhancement
  */
 async function handleTranscription(req, res) {
@@ -140,36 +241,8 @@ async function handleTranscription(req, res) {
       });
     }
 
-    // 为 OpenAI 创建表单数据
-    const FormData = (await import('form-data')).default;
-    const formData = new FormData();
-    formData.append('file', req.file.buffer, {
-      filename: req.file.originalname,
-      contentType: fileMimetype
-    });
-    formData.append('model', getValidatedModelName('WHISPER_MODEL', 'whisper-1'));
-    formData.append('response_format', 'json');
-    formData.append('language', 'en');
-
-    // 向 OpenAI 兼容 API 发出请求（URL 经过 https 校验）
-    const whisperApiUrl = getValidatedWhisperUrl();
-    const fetch = (await import('node-fetch')).default;
-    const response = await fetch(whisperApiUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        ...formData.getHeaders()
-      },
-      body: formData
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || `Whisper API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    let transcribedText = data.text || '';
+    // Transcribe audio
+    let transcribedText = await transcribeAudio(req, apiKey, fileMimetype);
 
     // 检查是否启用了增强模式
     const mode = req.body.mode || 'default';
@@ -186,71 +259,7 @@ async function handleTranscription(req, res) {
 
     // 处理不同的增强模式
     try {
-      const OpenAI = (await import('openai')).default;
-      const openai = new OpenAI({ apiKey });
-
-      let prompt, systemMessage, temperature = 0.7, maxTokens = 800;
-
-      switch (mode) {
-        case 'prompt':
-          systemMessage = 'You are an expert prompt engineer who creates clear, detailed, and effective prompts.';
-          prompt = `You are an expert prompt engineer. Transform the following rough instruction into a clear, detailed, and context-aware AI prompt.
-
-Your enhanced prompt should:
-1. Be specific and unambiguous
-2. Include relevant context and constraints
-3. Specify the desired output format
-4. Use clear, actionable language
-5. Include examples where helpful
-6. Consider edge cases and potential ambiguities
-
-Transform this rough instruction into a well-crafted prompt:
-"${transcribedText}"
-
-Enhanced prompt:`;
-          break;
-
-        case 'vibe':
-        case 'instructions':
-        case 'architect':
-          systemMessage = 'You are a helpful assistant that formats ideas into clear, actionable instructions for AI agents.';
-          temperature = 0.5; // 降低温度以获得更受控的输出
-          prompt = `Transform the following idea into clear, well-structured instructions that an AI agent can easily understand and execute.
-
-IMPORTANT RULES:
-- Format as clear, step-by-step instructions
-- Add reasonable implementation details based on common patterns
-- Only include details directly related to what was asked
-- Do NOT add features or functionality not mentioned
-- Keep the original intent and scope intact
-- Use clear, actionable language an agent can follow
-
-Transform this idea into agent-friendly instructions:
-"${transcribedText}"
-
-Agent instructions:`;
-          break;
-
-        default:
-          // 无需增强
-          break;
-      }
-
-      // 仅在有提示时调用 GPT
-      if (prompt) {
-        const completion = await openai.chat.completions.create({
-          model: getValidatedModelName('OPENAI_ENHANCE_MODEL', 'gpt-4o-mini'),
-          messages: [
-            { role: 'system', content: systemMessage },
-            { role: 'user', content: prompt }
-          ],
-          temperature: temperature,
-          max_tokens: maxTokens
-        });
-
-        transcribedText = completion.choices[0].message.content || transcribedText;
-      }
-
+      transcribedText = await enhanceTranscription(transcribedText, mode, apiKey);
     } catch (gptError) {
       logger.error('GPT processing error:', gptError);
       // 如果 GPT 失败，回退到原始转录

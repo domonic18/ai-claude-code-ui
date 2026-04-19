@@ -87,6 +87,70 @@ export function useProjectManager(
     setNewSessionCounter,
   });
 
+  // Use handler helpers
+  const {
+    handleProjectSelect,
+    handleNewSession,
+    handleSessionDelete,
+    handleProjectDelete,
+  } = useProjectManagerHandlers({
+    projects,
+    config,
+    selectedProjectRef,
+    selectedSessionRef,
+    setSelectedProject,
+    setSelectedSession,
+    setNewSessionCounter,
+    handleSessionSelect,
+  });
+
+  return {
+    projects,
+    selectedProject,
+    selectedSession,
+    isLoadingProjects,
+    newSessionCounter,
+    fetchProjects,
+    handleProjectSelect,
+    handleSessionSelect,
+    setSelectedSession,
+    handleNewSession,
+    handleSessionDelete,
+    handleSidebarRefresh,
+    handleProjectDelete,
+    updateProjectsFromWebSocket,
+  };
+}
+
+/**
+ * useProjectManagerHandlers Hook
+ *
+ * Extracts project and session handlers for better organization.
+ *
+ * @param options - Handler options
+ * @returns Handler functions
+ */
+function useProjectManagerHandlers(options: {
+  projects: Project[];
+  config: ProjectManagerConfig;
+  selectedProjectRef: React.MutableRefObject<Project | null>;
+  selectedSessionRef: React.MutableRefObject<Session | null>;
+  setSelectedProject: (project: Project | null) => void;
+  setSelectedSession: (session: Session | null) => void;
+  setNewSessionCounter: React.Dispatch<React.SetStateAction<number>>;
+  handleSessionSelect: (session: Session, projectName?: string) => void;
+}) {
+  const {
+    projects,
+    config,
+    selectedProjectRef,
+    selectedSessionRef,
+    setSelectedProject,
+    setSelectedSession,
+    setNewSessionCounter,
+    handleSessionSelect,
+  } = options;
+
   /**
    * Handle project selection
    */
@@ -115,7 +179,7 @@ export function useProjectManager(
     if (config.onProjectSelect) {
       config.onProjectSelect(project);
     }
-  }, [config, handleSessionSelect]);
+  }, [config, handleSessionSelect, setSelectedProject, setSelectedSession]);
 
   /**
    * Handle new session creation
@@ -132,19 +196,12 @@ export function useProjectManager(
         config.onProjectSelect(project);
       }
     }
-  }, [projects, config]);
+  }, [projects, config, setSelectedProject, setSelectedSession, setNewSessionCounter]);
 
   /**
    * Handle session deletion
-   * 跨 projects/sessions 边界的操作，保留在组合层
    */
   const handleSessionDelete = useCallback((deletedSessionId: string) => {
-    let nextSessionToSelect: Session | null = null;
-    let targetProject: Project | null = null;
-
-    // Note: projects is from useProjects return, but we need setProjects too
-    // Since handleSessionDelete crosses project/session boundaries, we keep it in the composition layer
-    // The actual project list update will be handled by the sidebar refresh after deletion
     const currentSession = selectedSessionRef.current;
 
     if (currentSession?.id === deletedSessionId) {
@@ -152,7 +209,7 @@ export function useProjectManager(
       localStorage.removeItem('lastSessionId');
       localStorage.removeItem('lastProjectName');
     }
-  }, []);
+  }, [selectedSessionRef, setSelectedSession]);
 
   /**
    * Handle project deletion
@@ -164,22 +221,12 @@ export function useProjectManager(
       localStorage.removeItem('lastSessionId');
       localStorage.removeItem('lastProjectName');
     }
-  }, []);
+  }, [selectedProjectRef, setSelectedProject, setSelectedSession]);
 
   return {
-    projects,
-    selectedProject,
-    selectedSession,
-    isLoadingProjects,
-    newSessionCounter,
-    fetchProjects,
     handleProjectSelect,
-    handleSessionSelect,
-    setSelectedSession,
     handleNewSession,
     handleSessionDelete,
-    handleSidebarRefresh,
     handleProjectDelete,
-    updateProjectsFromWebSocket,
   };
 }

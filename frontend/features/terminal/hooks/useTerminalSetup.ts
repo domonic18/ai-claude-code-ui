@@ -44,6 +44,109 @@ interface UseTerminalSetupOptions {
 }
 
 /**
+ * Create and configure terminal instance with addons
+ */
+function createTerminalInstance(
+  terminalRef: React.RefObject<HTMLDivElement>,
+  send: (data: object) => void,
+  onResize?: (cols: number, rows: number) => void,
+  onInput?: (data: string) => void
+): { terminal: Terminal; fitAddon: FitAddon; resizeObserver: ResizeObserver } {
+  const terminal = new Terminal({
+    cursorBlink: true,
+    fontSize: 14,
+    fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+    allowProposedApi: true,
+    allowTransparency: false,
+    convertEol: true,
+    scrollback: 10000,
+    tabStopWidth: 4,
+    windowsMode: false,
+    macOptionIsMeta: true,
+    macOptionClickForcesSelection: false,
+    theme: {
+      background: '#1e1e1e',
+      foreground: '#d4d4d4',
+      cursor: '#ffffff',
+      cursorAccent: '#1e1e1e',
+      black: '#000000',
+      red: '#cd3131',
+      green: '#0dbc79',
+      yellow: '#e5e510',
+      blue: '#2472c8',
+      magenta: '#bc3fbc',
+      cyan: '#11a8cd',
+      white: '#e5e5e5',
+      brightBlack: '#666666',
+      brightRed: '#f14c4c',
+      brightGreen: '#23d18b',
+      brightYellow: '#f5f543',
+      brightBlue: '#3b8eea',
+      brightMagenta: '#d670d6',
+      brightCyan: '#29b8db',
+      brightWhite: '#ffffff'
+    } as any
+  });
+
+  const fitAddon = new FitAddon();
+  const webglAddon = new WebglAddon();
+  const webLinksAddon = new WebLinksAddon();
+
+  terminal.loadAddon(fitAddon);
+  terminal.loadAddon(webLinksAddon);
+
+  try {
+    terminal.loadAddon(webglAddon);
+  } catch {
+    logger.warn('[Shell] WebGL renderer unavailable, using Canvas fallback');
+  }
+
+  terminal.open(terminalRef.current!);
+
+  // Custom keyboard handling
+  terminal.attachCustomKeyEventHandler((event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'c' && terminal.hasSelection()) {
+      document.execCommand('copy');
+      return false;
+    }
+
+    if ((event.ctrlKey || event.metaKey) && event.key === 'v') {
+      navigator.clipboard.readText().then(text => {
+        send({ type: 'input', data: text });
+      }).catch(() => {});
+      return false;
+    }
+
+    return true;
+  });
+
+  // Initial fit
+  setTimeout(() => {
+    fitAddon.fit();
+    onResize?.(terminal.cols, terminal.rows);
+  }, 100);
+
+  // Data input handler
+  terminal.onData((data) => {
+    onInput?.(data);
+  });
+
+  // Resize observer
+  const resizeObserver = new ResizeObserver(() => {
+    setTimeout(() => {
+      fitAddon.fit();
+      onResize?.(terminal.cols, terminal.rows);
+    }, 50);
+  });
+
+  if (terminalRef.current) {
+    resizeObserver.observe(terminalRef.current);
+  }
+
+  return { terminal, fitAddon, resizeObserver };
+}
+
+/**
  * Custom hook for terminal instance setup and lifecycle management
  */
 export function useTerminalSetup(options: UseTerminalSetupOptions): TerminalSetup {
@@ -66,103 +169,15 @@ export function useTerminalSetup(options: UseTerminalSetupOptions): TerminalSetu
       return;
     }
 
-    terminal.current = new Terminal({
-      cursorBlink: true,
-      fontSize: 14,
-      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-      allowProposedApi: true,
-      allowTransparency: false,
-      convertEol: true,
-      scrollback: 10000,
-      tabStopWidth: 4,
-      windowsMode: false,
-      macOptionIsMeta: true,
-      macOptionClickForcesSelection: false,
-      theme: {
-        background: '#1e1e1e',
-        foreground: '#d4d4d4',
-        cursor: '#ffffff',
-        cursorAccent: '#1e1e1e',
-        black: '#000000',
-        red: '#cd3131',
-        green: '#0dbc79',
-        yellow: '#e5e510',
-        blue: '#2472c8',
-        magenta: '#bc3fbc',
-        cyan: '#11a8cd',
-        white: '#e5e5e5',
-        brightBlack: '#666666',
-        brightRed: '#f14c4c',
-        brightGreen: '#23d18b',
-        brightYellow: '#f5f543',
-        brightBlue: '#3b8eea',
-        brightMagenta: '#d670d6',
-        brightCyan: '#29b8db',
-        brightWhite: '#ffffff'
-      } as any
-    });
+    const { terminal: termInstance, fitAddon: fitInstance, resizeObserver } = createTerminalInstance(
+      terminalRef,
+      send,
+      onResize,
+      onInput
+    );
 
-    fitAddon.current = new FitAddon();
-    const webglAddon = new WebglAddon();
-    const webLinksAddon = new WebLinksAddon();
-
-    terminal.current.loadAddon(fitAddon.current);
-    terminal.current.loadAddon(webLinksAddon);
-
-    try {
-      terminal.current.loadAddon(webglAddon);
-    } catch {
-      logger.warn('[Shell] WebGL renderer unavailable, using Canvas fallback');
-    }
-
-    terminal.current.open(terminalRef.current);
-
-    // Custom keyboard handling
-    terminal.current.attachCustomKeyEventHandler((event) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === 'c' && terminal.current!.hasSelection()) {
-        document.execCommand('copy');
-        return false;
-      }
-
-      if ((event.ctrlKey || event.metaKey) && event.key === 'v') {
-        navigator.clipboard.readText().then(text => {
-          send({ type: 'input', data: text });
-        }).catch(() => {});
-        return false;
-      }
-
-      return true;
-    });
-
-    // Initial fit
-    setTimeout(() => {
-      if (fitAddon.current) {
-        fitAddon.current.fit();
-        if (terminal.current) {
-          onResize?.(terminal.current.cols, terminal.current.rows);
-        }
-      }
-    }, 100);
-
-    // Data input handler
-    terminal.current.onData((data) => {
-      onInput?.(data);
-    });
-
-    // Resize observer
-    const resizeObserver = new ResizeObserver(() => {
-      if (fitAddon.current && terminal.current) {
-        setTimeout(() => {
-          fitAddon.current!.fit();
-          onResize?.(terminal.current!.cols, terminal.current!.rows);
-        }, 50);
-      }
-    });
-
-    if (terminalRef.current) {
-      resizeObserver.observe(terminalRef.current);
-    }
-
+    terminal.current = termInstance;
+    fitAddon.current = fitInstance;
     isInitializedRef.current = true;
     onInitialized();
 
@@ -176,7 +191,7 @@ export function useTerminalSetup(options: UseTerminalSetupOptions): TerminalSetu
       fitAddon.current = null;
       isInitializedRef.current = false;
     };
-  }, [initKey, isRestarting]);
+  }, [initKey, isRestarting, send, onResize, onInput, onInitialized]);
 
   return {
     terminalRef,

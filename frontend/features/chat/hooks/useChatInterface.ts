@@ -15,27 +15,22 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   useChatMessages,
   useMessageStream,
-  useSlashCommands,
-  useFileReferences,
   useModelSelection,
-  useCommandExecutor,
-  useInputHandler,
-  useSessionLoader,
   useMessageSender,
 } from './index';
 import { useModelsLoader } from './useModelsLoader';
 import { useModelSwitchNotification } from './useModelSwitchNotification';
-import { useSessionSync } from './useSessionSync';
 import { getChatService } from '../services';
-import { handleWebSocketMessage } from '../services/websocketHandler';
 import type { ChatMessage, FileAttachment } from '../types';
 import { calculateDiff } from '../utils/diffUtils';
-import { logger } from '@/shared/utils/logger';
+import { useChatWebSocketProcessor } from './useChatWebSocketProcessor';
+import { useChatMenuSystem } from './useChatMenuSystem';
+import { useChatSessionManagement } from './useChatSessionManagement';
 
 // Stable empty array reference to prevent unnecessary effect triggers
 const EMPTY_WS_MESSAGES: any[] = [];
 
-interface UseChatInterfaceOptions {
+export interface UseChatInterfaceOptions {
   /** Selected project */
   selectedProject?: {
     name: string;
@@ -82,7 +77,7 @@ interface UseChatInterfaceOptions {
   sendMessage?: (message: any) => void;
 }
 
-interface UseChatInterfaceResult {
+export interface UseChatInterfaceResult {
   // State
   input: string;
   setInput: (value: string) => void;
@@ -166,14 +161,7 @@ export function useChatInterface({
   ws,
   sendMessage,
 }: UseChatInterfaceOptions): UseChatInterfaceResult {
-  // Use stable reference for wsMessages to prevent unnecessary effect triggers
   const wsMessages = useMemo(() => rawWsMessages ?? EMPTY_WS_MESSAGES, [rawWsMessages]);
-
-  // Track previous new session counter to detect when user clicks "New Session"
-  const prevNewSessionCounterRef = useRef(0);
-  const processedCountRef = useRef(0);
-
-  // State
   const [input, setInput] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<FileAttachment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -181,328 +169,42 @@ export function useChatInterface({
   const [tasks, setTasks] = useState<any[]>([]);
   const [tokenBudget, setTokenBudget] = useState<any>(null);
   const [permissionMode, setPermissionMode] = useState<'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'>('default');
-
-  // Load available models
   const { availableModels } = useModelsLoader();
   const modelSwitchNotification = useModelSwitchNotification();
-
-  // Use model selection hook
-  const { selectedModel, handleModelSelect } = useModelSelection({
-    availableModels,
-    hasImageAttachment: attachedFiles.length > 0 && attachedFiles.some(f => f.type?.startsWith('image/'))
-  });
-
-  // Hooks
-  const {
-    messages,
-    addMessage,
-    updateMessage,
-    setMessages,
-  } = useChatMessages({
-    projectName: selectedProject?.name,
-    externalMessages,
-  });
-
-  const {
-    streamingContent,
-    streamingThinking,
-    isStreaming,
-    startStream,
-    updateStreamContent,
-    updateStreamThinking,
-    completeStream,
-    resetStream,
-  } = useMessageStream();
-
+  const { selectedModel, handleModelSelect } = useModelSelection({ availableModels, hasImageAttachment: attachedFiles.some(f => f.type?.startsWith('image/')) });
+  const { messages, addMessage, updateMessage, setMessages } = useChatMessages({ projectName: selectedProject?.name, externalMessages });
+  const stream = useMessageStream();
   const chatService = useRef(getChatService({ projectName: selectedProject?.name }));
-
-  // Update service config when project name changes
-  useEffect(() => {
-    if (selectedProject?.name) {
-      chatService.current.setConfig({ projectName: selectedProject.name });
-    }
-  }, [selectedProject?.name]);
-
-  // Authenticated fetch function for API calls
+  useEffect(() => { if (selectedProject?.name) chatService.current.setConfig({ projectName: selectedProject.name }); }, [selectedProject?.name]);
   const authenticatedFetch = useCallback(async (url: string, options?: RequestInit) => {
     const token = localStorage.getItem('auth_token');
-    return fetch(url, {
-      ...options,
-      headers: {
-        ...options?.headers,
-        Authorization: token ? `Bearer ${token}` : '',
-      },
-    });
+    return fetch(url, { ...options, headers: { ...options?.headers, Authorization: token ? `Bearer ${token}` : '' } });
   }, []);
-
-  // Use command executor hook
-  const { handleCommandExecute } = useCommandExecutor({
-    selectedProject,
-    onShowSettings,
-    onShowAllTasks,
-    onSetMessages: setMessages,
+  const menu = useChatMenuSystem({ selectedProject, authenticatedFetch, onShowSettings, onShowAllTasks, onSetMessages: setMessages, setInput });
+  useChatSessionManagement({ selectedProject, selectedSession, newSessionCounter, currentSessionId, authenticatedFetch, setCurrentSessionId, setMessages, setInput });
+  useChatWebSocketProcessor({
+    wsMessages, currentSessionId, selectedProjectName: selectedProject?.name,
+    addMessage, updateMessage, setMessages, setIsLoading, setCurrentSessionId,
+    onReplaceTemporarySession, onSessionActive, onSessionInactive, onSessionProcessing, onSessionNotProcessing,
+    onSetTokenBudget: (b) => { setTokenBudget(b); onSetTokenBudget?.(b); }, setTasks,
+    ...stream,
   });
-
-  // Command system integration
-  const {
-    filteredCommands,
-    frequentCommands,
-    showMenu: showCommandMenu,
-    query: commandQuery,
-    selectedIndex: selectedCommandIndex,
-    slashPosition,
-    setQuery: setCommandQuery,
-    setSelectedIndex: setSelectedCommandIndex,
-    setSlashPosition: setSlashPositionValue,
-    setShowMenu: setShowCommandMenuValue,
-    handleCommandSelect,
-  } = useSlashCommands({
-    selectedProject: selectedProject || null,
-    onCommandExecute: handleCommandExecute,
-    authenticatedFetch,
-  });
-
-  // File reference system integration
-  const {
-    filteredFiles: filteredFileReferences,
-    showMenu: showFileMenu,
-    query: fileQuery,
-    selectedIndex: selectedFileIndex,
-    atPosition,
-    isLoading: filesLoading,
-    setQuery: setFileQuery,
-    setSelectedIndex: setSelectedFileIndex,
-    setAtPosition: setAtPositionValue,
-    setShowMenu: setShowFileMenuValue,
-    handleFileSelect,
-  } = useFileReferences({
-    selectedProject: selectedProject?.name,
-    authenticatedFetch,
-    onFileReference: (file) => {
-      // File referenced callback
-    },
-  });
-
-  // Use input handler hook
-  const {
-    handleInputChangeWithCommands,
-    handleCommandSelectWrapper,
-    handleCommandMenuClose,
-    handleFileSelectWrapper,
-    handleFileMenuClose,
-  } = useInputHandler({
-    commandMenu: {
-      setSlashPosition: setSlashPositionValue,
-      setQuery: setCommandQuery,
-      setSelectedIndex: setSelectedCommandIndex,
-      setShowMenu: setShowCommandMenuValue,
-      handleCommandSelect,
-    },
-    fileMenu: {
-      setAtPosition: setAtPositionValue,
-      setQuery: setFileQuery,
-      setSelectedIndex: setSelectedFileIndex,
-      setShowMenu: setShowFileMenuValue,
-      handleFileSelect,
-    },
-    setInput,
-  });
-
-  // Use session loader hook
-  useSessionLoader({
-    selectedProject,
-    selectedSession,
-    authenticatedFetch,
-    onSetMessages: setMessages,
-  });
-
-  useSessionSync({
-    selectedSession,
-    selectedProject,
-    currentSessionId,
-    setCurrentSessionId,
-    setMessages,
-  });
-
-  // Force state reset when new session counter changes (user clicked "New Session")
-  useEffect(() => {
-    if (newSessionCounter > prevNewSessionCounterRef.current) {
-      prevNewSessionCounterRef.current = newSessionCounter;
-      setCurrentSessionId(null);
-      setMessages([]);
-      setInput('');
-      // Reset processed message count
-      processedCountRef.current = 0;
-    }
-  }, [newSessionCounter, setMessages]);
-
-  // Handle WebSocket messages
-  useEffect(() => {
-    if (wsMessages.length === 0) return;
-
-    // Process all new messages since last render
-    const newMessages = wsMessages.slice(processedCountRef.current);
-    if (newMessages.length === 0) return;
-
-    for (const message of newMessages) {
-      // Handle the message using our WebSocket handler service
-      handleWebSocketMessage(message, {
-        onAddMessage: addMessage,
-        onUpdateMessage: updateMessage,
-        onSetMessages: setMessages,
-        onSetLoading: setIsLoading,
-        onSetSessionId: setCurrentSessionId,
-        onReplaceTemporarySession: onReplaceTemporarySession,
-        onSessionActive: onSessionActive,
-        onSessionInactive: onSessionInactive,
-        onSessionProcessing: onSessionProcessing,
-        onSessionNotProcessing: onSessionNotProcessing,
-        onSetTokenBudget: (budget) => {
-          setTokenBudget(budget);
-          onSetTokenBudget?.(budget);
-        },
-        onSetTasks: setTasks,
-        // Streaming callbacks
-        completeStream: () => {
-          completeStream();
-        },
-        resetStream: () => {
-          resetStream();
-        },
-        updateStreamContent: (content) => {
-          updateStreamContent(content);
-        },
-        updateStreamThinking: (thinking) => {
-          updateStreamThinking(thinking);
-        },
-        onMemoryContext: (content, sessionId) => {
-          // Memory context is received but not displayed in chat
-          // Used for debugging/monitoring purposes only
-          logger.info('[ChatInterface] Memory context received:', content?.length, 'chars for session:', sessionId);
-        },
-        getCurrentSessionId: () => currentSessionId,
-        getSelectedProjectName: () => selectedProject?.name,
-      });
-    }
-
-    // Update processed count
-    processedCountRef.current = wsMessages.length;
-  }, [wsMessages, currentSessionId, addMessage, updateMessage, completeStream, resetStream, updateStreamContent, updateStreamThinking]);
-
-  // Use message sender hook
   const { handleSend } = useMessageSender({
-    input,
-    isLoading,
-    currentSessionId,
-    attachedFiles,
-    selectedModel,
-    selectedProject,
-    ws,
-    sendMessage,
-    onAddMessage: addMessage,
-    onStartStream: startStream,
-    onSetLoading: setIsLoading,
-    onSetInput: setInput,
-    onSetAttachedFiles: setAttachedFiles,
-    onSessionActive,
-    onSessionProcessing,
-    permissionMode,
+    input, isLoading, currentSessionId, attachedFiles, selectedModel, selectedProject, ws, sendMessage,
+    onAddMessage: addMessage, onStartStream: stream.startStream, onSetLoading: setIsLoading,
+    onSetInput: setInput, onSetAttachedFiles: setAttachedFiles, onSessionActive, onSessionProcessing, permissionMode,
   });
-
-  /**
-   * Create diff for Edit tool
-   */
-  const createDiff = useCallback((oldStr: string, newStr: string) => {
-    return calculateDiff(oldStr, newStr);
-  }, []);
-
-  /**
-   * Handle file add
-   */
   const handleAddFile = useCallback((file: FileAttachment) => {
-    setAttachedFiles(prev => {
-      // Check if file with same ID already exists, update it
-      const existingIndex = prev.findIndex(f => f.id === file.id);
-      if (existingIndex >= 0) {
-        const updated = [...prev];
-        updated[existingIndex] = file;
-        return updated;
-      }
-      // Otherwise add as new
-      return [...prev, file];
-    });
+    setAttachedFiles(prev => { const i = prev.findIndex(f => f.id === file.id); if (i >= 0) { const u = [...prev]; u[i] = file; return u; } return [...prev, file]; });
   }, []);
-
-  /**
-   * Handle file remove
-   */
-  const handleRemoveFile = useCallback((fileId: string) => {
-    setAttachedFiles(prev => prev.filter(f => f.id !== fileId));
-  }, []);
-
-  /**
-   * Handle input focus change
-   */
-  const handleInputFocusChange = useCallback((isFocused: boolean) => {
-    onInputFocusChange?.(isFocused);
-  }, [onInputFocusChange]);
-
   return {
-    // State
-    input,
-    setInput,
-    attachedFiles,
-    setAttachedFiles,
-    isLoading,
-    setIsLoading,
-    currentSessionId,
-    setCurrentSessionId,
-    tasks,
-    setTasks,
-    tokenBudget,
-    setTokenBudget,
-    permissionMode,
-    setPermissionMode,
-    selectedModel,
-    handleModelSelect,
-    messages,
-    setMessages,
-    streamingContent,
-    streamingThinking,
-    isStreaming,
-    resetStream,
-    modelSwitchNotification,
-    // Command system
-    filteredCommands,
-    frequentCommands,
-    showCommandMenu,
-    commandQuery,
-    selectedCommandIndex,
-    slashPosition,
-    setCommandQuery,
-    setSelectedCommandIndex,
-    setShowCommandMenu: setShowCommandMenuValue,
-    handleCommandSelectWrapper,
-    handleCommandMenuClose,
-    // File reference system
-    filteredFileReferences,
-    showFileMenu,
-    fileQuery,
-    selectedFileIndex,
-    atPosition,
-    filesLoading,
-    setFileQuery,
-    setSelectedFileIndex,
-    setShowFileMenu: setShowFileMenuValue,
-    handleFileSelectWrapper,
-    handleFileMenuClose,
-    // Handlers
-    handleSend,
-    handleInputChangeWithCommands,
-    handleAddFile,
-    handleRemoveFile,
-    handleInputFocusChange,
-    createDiff,
-    authenticatedFetch,
+    input, setInput, attachedFiles, setAttachedFiles, isLoading, setIsLoading, currentSessionId, setCurrentSessionId,
+    tasks, setTasks, tokenBudget, setTokenBudget, permissionMode, setPermissionMode,
+    selectedModel, handleModelSelect, messages, setMessages,
+    streamingContent: stream.streamingContent, streamingThinking: stream.streamingThinking, isStreaming: stream.isStreaming, resetStream: stream.resetStream,
+    modelSwitchNotification, ...menu, handleSend, handleInputChangeWithCommands: menu.handleInputChangeWithCommands,
+    handleAddFile, handleRemoveFile: useCallback((id: string) => setAttachedFiles(prev => prev.filter(f => f.id !== id)), []),
+    handleInputFocusChange: useCallback((f: boolean) => onInputFocusChange?.(f), [onInputFocusChange]),
+    createDiff: useCallback((o: string, n: string) => calculateDiff(o, n), []), authenticatedFetch,
   };
 }

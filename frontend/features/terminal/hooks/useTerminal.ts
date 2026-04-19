@@ -19,6 +19,242 @@ import { logger } from '@/shared/utils/logger';
 const EMPTY_ARGS: string[] = [];
 
 /**
+ * Helper functions for terminal operations
+ */
+
+/**
+ * Generate unique output ID
+ */
+function generateOutputId(): string {
+  return `output-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * Create connection management callbacks
+ */
+function createConnectionCallbacks(
+  wsRef: React.MutableRefObject<WebSocket | null>,
+  setIsConnected: React.Dispatch<React.SetStateAction<boolean>>,
+  setIsConnecting: React.Dispatch<React.SetStateAction<boolean>>
+) {
+  const disconnect = useCallback(() => {
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    setIsConnected(false);
+    setIsConnecting(false);
+  }, [wsRef, setIsConnected, setIsConnecting]);
+
+  const reconnect = useCallback(() => {
+    disconnect();
+  }, [disconnect]);
+
+  return { disconnect, reconnect };
+}
+
+/**
+ * Create terminal operations callbacks
+ */
+function createTerminalOperations(
+  wsRef: React.RefObject<WebSocket>,
+  isConnected: boolean,
+  process: TerminalProcess | null,
+  args: string[],
+  cwd: string | undefined,
+  env: Record<string, string> | undefined,
+  setProcess: React.Dispatch<React.SetStateAction<TerminalProcess | null>>,
+  setIsLoading: React.Dispatch<React.SetStateAction<boolean>>,
+  setError: React.Dispatch<React.SetStateAction<Error | null>>,
+  setOutputs: React.Dispatch<React.SetStateAction<TerminalOutput[]>>,
+  isMountedRef: React.RefObject<boolean>,
+  onError?: (error: Error) => void,
+  onOutput?: (output: TerminalOutput) => void
+) {
+  const addOutputCallback = useCallback((output: Omit<TerminalOutput, 'id' | 'timestamp'>) => {
+    addOutput(output, isMountedRef, setOutputs, onOutput);
+  }, [onOutput]);
+
+  const executeCommandCallback = useCallback(async (command: string, cmdArgs?: string[]) => {
+    await executeCommandViaWebSocket(
+      wsRef,
+      isConnected,
+      command,
+      cmdArgs || args,
+      cwd,
+      env,
+      process,
+      setProcess,
+      setIsLoading,
+      setError,
+      onError
+    );
+  }, [isConnected, cwd, env, args, process, onError]);
+
+  const writeInputCallback = useCallback((input: string) => {
+    writeInputToWebSocket(wsRef, isConnected, input);
+  }, [isConnected]);
+
+  const resizeTerminalCallback = useCallback((cols: number, rows: number) => {
+    resizeTerminalWebSocket(wsRef, isConnected, cols, rows);
+  }, [isConnected]);
+
+  const killProcessCallback = useCallback(() => {
+    killProcessViaWebSocket(wsRef, isConnected);
+  }, [isConnected]);
+
+  return {
+    addOutput: addOutputCallback,
+    executeCommand: executeCommandCallback,
+    writeInput: writeInputCallback,
+    resizeTerminal: resizeTerminalCallback,
+    killProcess: killProcessCallback,
+  };
+}
+
+/**
+ * Add output to state
+ */
+function addOutput(
+  output: Omit<TerminalOutput, 'id' | 'timestamp'>,
+  isMountedRef: React.RefObject<boolean>,
+  setOutputs: React.Dispatch<React.SetStateAction<TerminalOutput[]>>,
+  onOutput?: (output: TerminalOutput) => void
+): void {
+  const newOutput: TerminalOutput = {
+    id: generateOutputId(),
+    timestamp: new Date(),
+    ...output,
+  };
+
+  if (isMountedRef.current) {
+    setOutputs(prev => [...prev, newOutput]);
+    onOutput?.(newOutput);
+  }
+}
+
+/**
+ * Execute command through WebSocket
+ */
+async function executeCommandViaWebSocket(
+  wsRef: React.RefObject<WebSocket>,
+  isConnected: boolean,
+  command: string,
+  args: string[],
+  cwd: string | undefined,
+  env: Record<string, string> | undefined,
+  process: TerminalProcess | null,
+  setProcess: React.Dispatch<React.SetStateAction<TerminalProcess | null>>,
+  setIsLoading: React.Dispatch<React.SetStateAction<boolean>>,
+  setError: React.Dispatch<React.SetStateAction<Error | null>>,
+  onError?: (error: Error) => void
+): Promise<void> {
+  if (!wsRef.current || !isConnected) {
+    const error = new Error('Terminal not connected');
+    setError(error);
+    onError?.(error);
+    throw error;
+  }
+
+  setIsLoading(true);
+  setError(null);
+
+  const newProcess: TerminalProcess = {
+    id: `process-${Date.now()}`,
+    command,
+    args,
+    status: 'running',
+    cwd: cwd || process?.cwd,
+    env: env || process?.env,
+  };
+
+  setProcess(newProcess);
+
+  try {
+    wsRef.current.send(JSON.stringify({
+      type: 'command',
+      command,
+      args,
+      cwd,
+      env,
+    }));
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error('Failed to execute command');
+    setError(error);
+    onError?.(error);
+    setIsLoading(false);
+    throw error;
+  }
+}
+
+/**
+ * Send input to terminal
+ */
+function writeInputToWebSocket(
+  wsRef: React.RefObject<WebSocket>,
+  isConnected: boolean,
+  input: string
+): void {
+  if (!wsRef.current || !isConnected) {
+    return;
+  }
+
+  try {
+    wsRef.current.send(JSON.stringify({
+      type: 'input',
+      data: input,
+    }));
+  } catch (err) {
+    logger.error('Failed to write input:', err);
+  }
+}
+
+/**
+ * Resize terminal
+ */
+function resizeTerminalWebSocket(
+  wsRef: React.RefObject<WebSocket>,
+  isConnected: boolean,
+  cols: number,
+  rows: number
+): void {
+  if (!wsRef.current || !isConnected) {
+    return;
+  }
+
+  try {
+    wsRef.current.send(JSON.stringify({
+      type: 'resize',
+      cols,
+      rows,
+    }));
+  } catch (err) {
+    logger.error('Failed to resize terminal:', err);
+  }
+}
+
+/**
+ * Kill process
+ */
+function killProcessViaWebSocket(
+  wsRef: React.RefObject<WebSocket>,
+  isConnected: boolean
+): void {
+  if (!wsRef.current || !isConnected) {
+    return;
+  }
+
+  try {
+    wsRef.current.send(JSON.stringify({
+      type: 'signal',
+      signal: 'SIGTERM',
+    }));
+  } catch (err) {
+    logger.error('Failed to kill process:', err);
+  }
+}
+
+/**
  * Hook for terminal functionality
  */
 export interface UseTerminalOptions {
@@ -75,153 +311,30 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
   const wsRef = useRef<WebSocket | null>(null);
   const isMountedRef = useRef(true);
 
-  /**
-   * Generate unique output ID
-   */
-  const generateOutputId = useCallback(() => {
-    return `output-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  }, []);
+  // Create terminal operations
+  const operations = createTerminalOperations(
+    wsRef,
+    isConnected,
+    process,
+    args,
+    cwd,
+    env,
+    setProcess,
+    setIsLoading,
+    setError,
+    setOutputs,
+    isMountedRef,
+    onError,
+    onOutput
+  );
 
-  /**
-   * Add output to state
-   */
-  const addOutput = useCallback((output: Omit<TerminalOutput, 'id' | 'timestamp'>) => {
-    const newOutput: TerminalOutput = {
-      id: generateOutputId(),
-      timestamp: new Date(),
-      ...output,
-    };
+  // Create connection callbacks
+  const connection = createConnectionCallbacks(wsRef, setIsConnected, setIsConnecting);
 
-    if (isMountedRef.current) {
-      setOutputs(prev => [...prev, newOutput]);
-      onOutput?.(newOutput);
-    }
-  }, [generateOutputId, onOutput]);
-
-  /**
-   * Execute command
-   */
-  const executeCommand = useCallback(async (command: string, cmdArgs?: string[]) => {
-    if (!wsRef.current || !isConnected) {
-      const error = new Error('Terminal not connected');
-      setError(error);
-      onError?.(error);
-      throw error;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    const newProcess: TerminalProcess = {
-      id: `process-${Date.now()}`,
-      command,
-      args: cmdArgs || args,
-      status: 'running',
-      cwd: cwd || process?.cwd,
-      env: env || process?.env,
-    };
-
-    setProcess(newProcess);
-
-    try {
-      wsRef.current.send(JSON.stringify({
-        type: 'command',
-        command,
-        args: cmdArgs || args,
-        cwd,
-        env,
-      }));
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to execute command');
-      setError(error);
-      onError?.(error);
-      setIsLoading(false);
-      throw error;
-    }
-  }, [isConnected, cwd, env, args, process, onError]);
-
-  /**
-   * Write input to terminal
-   */
-  const writeInput = useCallback((input: string) => {
-    if (!wsRef.current || !isConnected) {
-      return;
-    }
-
-    try {
-      wsRef.current.send(JSON.stringify({
-        type: 'input',
-        data: input,
-      }));
-    } catch (err) {
-      logger.error('Failed to write input:', err);
-    }
-  }, [isConnected]);
-
-  /**
-   * Resize terminal
-   */
-  const resizeTerminal = useCallback((cols: number, rows: number) => {
-    if (!wsRef.current || !isConnected) {
-      return;
-    }
-
-    try {
-      wsRef.current.send(JSON.stringify({
-        type: 'resize',
-        cols,
-        rows,
-      }));
-    } catch (err) {
-      logger.error('Failed to resize terminal:', err);
-    }
-  }, [isConnected]);
-
-  /**
-   * Clear output
-   */
+  // Simple operations
   const clearOutput = useCallback(() => {
     setOutputs([]);
   }, []);
-
-  /**
-   * Disconnect terminal
-   */
-  const disconnect = useCallback(() => {
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-    setIsConnected(false);
-    setIsConnecting(false);
-  }, []);
-
-  /**
-   * Reconnect terminal
-   */
-  const reconnect = useCallback(() => {
-    disconnect();
-    // Connection logic would be handled by connectWebSocket
-    // This is a placeholder for reconnection logic
-  }, [disconnect]);
-
-  /**
-   * Kill process
-   */
-  const killProcess = useCallback(() => {
-    if (!wsRef.current || !isConnected) {
-      return;
-    }
-
-    try {
-      wsRef.current.send(JSON.stringify({
-        type: 'signal',
-        signal: 'SIGTERM',
-      }));
-    } catch (err) {
-      logger.error('Failed to kill process:', err);
-    }
-  }, [isConnected]);
 
   return {
     process,
@@ -230,13 +343,13 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
     isLoading,
     isConnecting,
     error,
-    executeCommand,
-    writeInput,
-    resizeTerminal,
+    executeCommand: operations.executeCommand,
+    writeInput: operations.writeInput,
+    resizeTerminal: operations.resizeTerminal,
     clearOutput,
-    disconnect,
-    reconnect,
-    killProcess,
+    disconnect: connection.disconnect,
+    reconnect: connection.reconnect,
+    killProcess: operations.killProcess,
   };
 }
 

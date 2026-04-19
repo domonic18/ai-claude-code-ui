@@ -10,6 +10,29 @@ import { getSettingsService, type ClaudePermissions } from '../services/settings
 import type { McpServer } from '../types/settings.types';
 import { logger } from '@/shared/utils/logger';
 
+/**
+ * Handle settings operations with consistent error handling
+ */
+async function handleSettingsOperation<T>(
+  operation: () => Promise<T>,
+  errorMessage: string,
+  setLoading: (loading: boolean) => void,
+  setError: (error: string | null) => void
+): Promise<T> {
+  try {
+    setLoading(true);
+    setError(null);
+    return await operation();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : errorMessage;
+    setError(message);
+    logger.error('[handleSettingsOperation]', err);
+    throw err;
+  } finally {
+    setLoading(false);
+  }
+}
+
 export interface SettingsState {
   permissions: ClaudePermissions;
   mcpServers: McpServer[];
@@ -54,114 +77,80 @@ export function useSettings(): UseSettingsReturn {
 
   // Load permissions
   const loadPermissions = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await service.getPermissions();
-      setPermissions(data);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load permissions';
-      setError(message);
-      logger.error('[useSettings] Error loading permissions:', err);
-    } finally {
-      setLoading(false);
-    }
+    const data = await handleSettingsOperation(
+      () => service.getPermissions(),
+      'Failed to load permissions',
+      setLoading,
+      setError
+    );
+    setPermissions(data);
   }, [service]);
 
   // Update permissions
   const updatePermissionsCallback = useCallback(async (data: ClaudePermissions) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await service.updatePermissions(data);
-      if (result.success) {
-        setPermissions(data);
-      }
-      return result;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to update permissions';
-      setError(message);
-      logger.error('[useSettings] Error updating permissions:', err);
-      return { success: false };
-    } finally {
-      setLoading(false);
+    const result = await handleSettingsOperation(
+      () => service.updatePermissions(data),
+      'Failed to update permissions',
+      setLoading,
+      setError
+    );
+    if (result.success) {
+      setPermissions(data);
     }
+    return result;
   }, [service]);
 
   // Load MCP servers
   const loadMcpServers = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const servers = await service.getMcpServers();
-      setMcpServers(servers);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load MCP servers';
-      setError(message);
-      logger.error('[useSettings] Error loading MCP servers:', err);
-    } finally {
-      setLoading(false);
-    }
+    const servers = await handleSettingsOperation(
+      () => service.getMcpServers(),
+      'Failed to load MCP servers',
+      setLoading,
+      setError
+    );
+    setMcpServers(servers);
   }, [service]);
 
   // Create MCP server
   const createMcpServer = useCallback(async (server: Partial<McpServer>) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await service.createMcpServer(server);
-      if (result.success) {
-        await loadMcpServers();
-      }
-      return result;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create MCP server';
-      setError(message);
-      logger.error('[useSettings] Error creating MCP server:', err);
-      return { success: false, error: message };
-    } finally {
-      setLoading(false);
+    const result = await handleSettingsOperation(
+      () => service.createMcpServer(server),
+      'Failed to create MCP server',
+      setLoading,
+      setError
+    );
+    if (result.success) {
+      await loadMcpServers();
     }
+    return result;
   }, [service, loadMcpServers]);
 
   // Update MCP server
   const updateMcpServer = useCallback(async (id: string, server: Partial<McpServer>) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await service.updateMcpServer(id, server);
-      if (result.success) {
-        await loadMcpServers();
-      }
-      return result;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to update MCP server';
-      setError(message);
-      logger.error('[useSettings] Error updating MCP server:', err);
-      return { success: false, error: message };
-    } finally {
-      setLoading(false);
+    const result = await handleSettingsOperation(
+      () => service.updateMcpServer(id, server),
+      'Failed to update MCP server',
+      setLoading,
+      setError
+    );
+    if (result.success) {
+      await loadMcpServers();
     }
+    return result;
   }, [service, loadMcpServers]);
 
   // Delete MCP server
   const deleteMcpServer = useCallback(async (id: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await service.deleteMcpServer(id);
-      if (result.success) {
-        await loadMcpServers();
-      }
-      return result;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to delete MCP server';
-      setError(message);
-      logger.error('[useSettings] Error deleting MCP server:', err);
-      return { success: false, error: message };
-    } finally {
-      setLoading(false);
+    const result = await handleSettingsOperation(
+      () => service.deleteMcpServer(id),
+      'Failed to delete MCP server',
+      setLoading,
+      setError
+    );
+    if (result.success) {
+      await loadMcpServers();
     }
+    return result;
   }, [service, loadMcpServers]);
 
   // Test MCP server

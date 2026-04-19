@@ -5,6 +5,110 @@ import { useAuth } from '@/shared/contexts/AuthContext';
 import { MessageSquare } from 'lucide-react';
 import { LanguageSwitcher } from '@/shared/components/common/LanguageSwitcher';
 
+/**
+ * Registration form fields component
+ */
+interface RegistrationFormFieldsProps {
+  username: string;
+  password: string;
+  confirmPassword: string;
+  isLoading: boolean;
+  onUsernameChange: (value: string) => void;
+  onPasswordChange: (value: string) => void;
+  onConfirmPasswordChange: (value: string) => void;
+  t: (key: string) => string;
+}
+
+function RegistrationFormFields({
+  username,
+  password,
+  confirmPassword,
+  isLoading,
+  onUsernameChange,
+  onPasswordChange,
+  onConfirmPasswordChange,
+  t,
+}: RegistrationFormFieldsProps) {
+  return (
+    <>
+      <div>
+        <label htmlFor="username" className="block text-sm font-medium text-foreground mb-1">
+          {t('login.username')}
+        </label>
+        <input
+          type="text"
+          id="username"
+          value={username}
+          onChange={(e) => onUsernameChange(e.target.value)}
+          className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          placeholder={t('login.usernamePlaceholder')}
+          autoComplete="username"
+          required
+          disabled={isLoading}
+        />
+      </div>
+
+      <div>
+        <label htmlFor="password" className="block text-sm font-medium text-foreground mb-1">
+          {t('register.password')}
+        </label>
+        <input
+          type="password"
+          id="password"
+          value={password}
+          onChange={(e) => onPasswordChange(e.target.value)}
+          className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          placeholder={t('register.passwordPlaceholder')}
+          autoComplete="new-password"
+          required
+          disabled={isLoading}
+        />
+      </div>
+
+      <div>
+        <label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground mb-1">
+          {t('register.confirmPassword')}
+        </label>
+        <input
+          type="password"
+          id="confirmPassword"
+          value={confirmPassword}
+          onChange={(e) => onConfirmPasswordChange(e.target.value)}
+          className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          placeholder={t('register.confirmPasswordPlaceholder')}
+          autoComplete="new-password"
+          required
+          disabled={isLoading}
+        />
+      </div>
+    </>
+  );
+}
+
+/**
+ * Validate registration form
+ */
+function validateRegistrationForm(
+  username: string,
+  password: string,
+  confirmPassword: string,
+  t: (key: string) => string
+): string | null {
+  if (password !== confirmPassword) {
+    return t('register.passwordMismatch');
+  }
+
+  if (username.length < 3) {
+    return t('register.usernameTooShort');
+  }
+
+  if (password.length < 6) {
+    return t('register.passwordTooShort');
+  }
+
+  return null;
+}
+
 const SetupForm: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -20,18 +124,9 @@ const SetupForm: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    if (password !== confirmPassword) {
-      setError(t('register.passwordMismatch'));
-      return;
-    }
-
-    if (username.length < 3) {
-      setError(t('register.usernameTooShort'));
-      return;
-    }
-
-    if (password.length < 6) {
-      setError(t('register.passwordTooShort'));
+    const validationError = validateRegistrationForm(username, password, confirmPassword, t);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -72,56 +167,16 @@ const SetupForm: React.FC = () => {
 
           {/* Setup Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-foreground mb-1">
-                {t('login.username')}
-              </label>
-              <input
-                type="text"
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder={t('login.usernamePlaceholder')}
-                autoComplete="username"
-                required
-                disabled={isLoading}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-foreground mb-1">
-                {t('register.password')}
-              </label>
-              <input
-                type="password"
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder={t('register.passwordPlaceholder')}
-                autoComplete="new-password"
-                required
-                disabled={isLoading}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground mb-1">
-                {t('register.confirmPassword')}
-              </label>
-              <input
-                type="password"
-                id="confirmPassword"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder={t('register.confirmPasswordPlaceholder')}
-                autoComplete="new-password"
-                required
-                disabled={isLoading}
-              />
-            </div>
+            <RegistrationFormFields
+              username={username}
+              password={password}
+              confirmPassword={confirmPassword}
+              isLoading={isLoading}
+              onUsernameChange={setUsername}
+              onPasswordChange={setPassword}
+              onConfirmPasswordChange={setConfirmPassword}
+              t={t}
+            />
 
             {error && (
               <div className="p-3 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-800 rounded-md">

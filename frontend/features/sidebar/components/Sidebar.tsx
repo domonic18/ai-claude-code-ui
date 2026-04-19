@@ -12,190 +12,68 @@
  */
 
 import { memo } from 'react';
-import { useTranslation } from 'react-i18next';
-import { createPortal } from 'react-dom';
 import SidebarHeader from './SidebarHeader';
 import ProjectList from './ProjectList';
-import ProjectCreationWizard from './ProjectCreationWizard';
 import UserMenu from './UserMenu';
-import { ConfirmDialog } from '@/shared/components/ui';
+import { SidebarModals } from './SidebarModals';
 import type { SidebarProps } from '../types/sidebar.types';
-import { useProjects } from '../hooks';
-import { useSessions } from '../hooks';
-import { useStarredProjects } from '../hooks';
+import { useProjects, useSessions, useStarredProjects } from '../hooks';
 import { useDeleteConfirmation } from '../hooks/useDeleteConfirmation';
 import { useSidebarState } from '../hooks/useSidebarState';
-import { logger } from '@/shared/utils/logger';
 
 /**
  * Sidebar Component
  */
 export const Sidebar = memo(function Sidebar({
-  projects: propProjects,
-  selectedProject,
-  selectedSession,
-  isLoading,
-  onProjectSelect,
-  onSessionSelect,
-  onSessionDelete,
-  onProjectDelete,
-  onRefresh,
-  onNewSession,
-  onShowSettings,
-  isPWA,
-  isMobile,
-  onToggleSidebar,
+  projects: propProjects, selectedProject, selectedSession, isLoading,
+  onProjectSelect, onSessionSelect, onSessionDelete, onProjectDelete,
+  onRefresh, onNewSession, onShowSettings, isPWA, isMobile, onToggleSidebar,
 }: SidebarProps) {
-  const { t } = useTranslation();
-
-  // Initialize all custom hooks
   const projectsHook = useProjects(propProjects);
   const sessionsHook = useSessions();
   const { starredProjects, toggleStar } = useStarredProjects();
+  const { deleteConfirmState, isDeleting, handleSessionDelete,
+    handleConfirmSessionDelete, handleCancelSessionDelete,
+  } = useDeleteConfirmation({ deleteSession: sessionsHook.deleteSession, onSessionDelete, onRefresh });
 
-  // Delete confirmation hook
-  const {
-    deleteConfirmState,
-    isDeleting,
-    handleSessionDelete,
-    handleConfirmSessionDelete,
-    handleCancelSessionDelete,
-  } = useDeleteConfirmation({
-    deleteSession: sessionsHook.deleteSession,
-    onSessionDelete,
-    onRefresh,
-  });
-
-  // Consolidate all state management in custom hook
-  const {
-    expandedProjects,
-    editingProject,
-    editingName,
-    currentTime,
-    showNewProject,
-    isRefreshing,
-    editingSession,
-    editingSessionName,
-    mergedProjects,
-    loadingSessions,
-    hasMore,
-    setShowNewProject,
-    setEditingName,
-    setEditingSession,
-    setEditingSessionName,
-    handleRefresh,
-    handleToggleProject,
-    handleStartEditing,
-    handleCancelEditing,
-    handleSaveProjectName,
-    handleDeleteProject,
-    handleSelectProject,
-    handleSessionClick,
-    handleUpdateSessionSummary,
-    handleLoadMoreSessions,
-    handleNewSession,
-    createProject,
-  } = useSidebarState(
+  const state = useSidebarState(
+    { selectedProject, selectedSession, onRefresh, onProjectSelect, onProjectDelete, onSessionSelect, onNewSession, onSessionDelete, isLoading: isLoading ?? false, onShowSettings, isPWA, isMobile, projects: propProjects, onToggleSidebar },
     {
-      selectedProject,
-      selectedSession,
-      onRefresh,
-      onProjectSelect,
-      onProjectDelete,
-      onSessionSelect,
-      onNewSession,
-    },
-    {
-      ...projectsHook,
-      ...sessionsHook,
-      starredProjects,
-      toggleStar,
+      refreshProjects: projectsHook.refresh, createProject: projectsHook.createProject,
+      renameProject: projectsHook.renameProject, deleteProject: projectsHook.deleteProject,
+      updateSessionSummary: projectsHook.updateSessionSummary, getSortedProjects: projectsHook.getSortedProjects,
+      loadingSessions: sessionsHook.loadingSessions, loadMoreSessions: sessionsHook.loadMoreSessions,
+      renameSession: sessionsHook.renameSession, additionalSessions: sessionsHook.additionalSessions,
+      hasMore: sessionsHook.hasMore, initializeHasMore: sessionsHook.initializeHasMore,
+      starredProjects, toggleStar,
     }
   );
 
   return (
     <>
-      {/* Project Creation Wizard Modal */}
-      {showNewProject && createPortal(
-        <ProjectCreationWizard
-          isOpen={showNewProject}
-          onClose={() => setShowNewProject(false)}
-          onProjectCreated={async (newProject) => {
-            try {
-              const created = await createProject(newProject.fullPath || (newProject as any).path);
-              if (onProjectSelect && created) {
-                onProjectSelect(created);
-              }
-              setShowNewProject(false);
-            } catch (error) {
-              logger.error('Error creating project:', error);
-            }
-          }}
-        />,
-        document.body
-      )}
-
-      {/* Delete Session Confirmation Dialog */}
-      <ConfirmDialog
-        isOpen={deleteConfirmState.isOpen}
-        title={t('sidebar.confirmDeleteSession') || 'Delete Session'}
-        message={t('sidebar.confirmDeleteSessionMessage') || 'Are you sure you want to delete this session? This action cannot be undone.'}
-        confirmLabel={t('sidebar.delete') || 'Delete'}
-        cancelLabel={t('sidebar.cancel') || 'Cancel'}
-        type="danger"
-        isLoading={isDeleting}
-        onConfirm={handleConfirmSessionDelete}
-        onCancel={handleCancelSessionDelete}
-      />
-
-      <div
-        className="h-full flex flex-col bg-card md:select-none"
-        data-tour="sidebar"
-        style={isPWA && isMobile ? { paddingTop: '44px' } : {}}
-      >
-        {/* Header */}
-        <SidebarHeader
-          isRefreshing={isRefreshing}
-          onRefresh={handleRefresh}
-          onNewSession={handleNewSession}
-          isPWA={isPWA}
-          isMobile={isMobile}
-          onToggleSidebar={onToggleSidebar}
-        />
-
-        {/* Project List */}
-        <ProjectList
-          projects={mergedProjects}
-          selectedProject={selectedProject}
-          selectedSession={selectedSession}
-          expandedProjects={expandedProjects}
-          starredProjects={starredProjects}
-          editingProject={editingProject}
-          editingName={editingName}
-          loadingSessions={loadingSessions}
-          hasMoreSessions={hasMore}
-          currentTime={currentTime}
-          isLoading={isLoading}
-          onToggleProject={handleToggleProject}
-          onStartEditing={handleStartEditing}
-          onCancelEditing={handleCancelEditing}
-          onSaveProjectName={handleSaveProjectName}
-          onSetEditingName={setEditingName}
-          onToggleStar={toggleStar}
-          onDeleteProject={handleDeleteProject}
-          onSelectProject={handleSelectProject}
-          onSessionClick={handleSessionClick}
-          onDeleteSession={handleSessionDelete}
-          onUpdateSessionSummary={handleUpdateSessionSummary}
-          onLoadMoreSessions={handleLoadMoreSessions}
-          onSetEditingSession={setEditingSession}
-          onSetEditingSessionName={setEditingSessionName}
-          editingSession={editingSession}
-          editingSessionName={editingSessionName}
-          onNewSession={onNewSession}
-        />
-
-        {/* User Menu Footer */}
+      <SidebarModals showNewProject={state.showNewProject} setShowNewProject={state.setShowNewProject}
+        createProject={state.createProject} onProjectSelect={onProjectSelect}
+        deleteConfirmState={deleteConfirmState} isDeleting={isDeleting}
+        handleConfirmSessionDelete={handleConfirmSessionDelete} handleCancelSessionDelete={handleCancelSessionDelete} />
+      <div className="h-full flex flex-col bg-card md:select-none" data-tour="sidebar"
+        style={isPWA && isMobile ? { paddingTop: '44px' } : {}}>
+        <SidebarHeader isRefreshing={state.isRefreshing} onRefresh={state.handleRefresh}
+          onNewSession={state.handleNewSession} isPWA={isPWA} isMobile={isMobile} onToggleSidebar={onToggleSidebar} />
+        <ProjectList {...{
+          projects: state.mergedProjects, selectedProject, selectedSession,
+          expandedProjects: state.expandedProjects, starredProjects, editingProject: state.editingProject,
+          editingName: state.editingName, loadingSessions: state.loadingSessions, hasMoreSessions: state.hasMore,
+          currentTime: state.currentTime, isLoading, onToggleProject: state.handleToggleProject,
+          onStartEditing: state.handleStartEditing, onCancelEditing: state.handleCancelEditing,
+          onSaveProjectName: state.handleSaveProjectName, onSetEditingName: state.setEditingName,
+          onToggleStar: toggleStar, onDeleteProject: state.handleDeleteProject, onSelectProject: state.handleSelectProject,
+          onSessionClick: state.handleSessionClick, onDeleteSession: async (...args) => handleSessionDelete(...args),
+          onUpdateSessionSummary: state.handleUpdateSessionSummary, onLoadMoreSessions: state.handleLoadMoreSessions,
+          onSetEditingSession: (session) => state.setEditingSession(session?.id ?? null),
+          onSetEditingSessionName: state.setEditingSessionName,
+          editingSession: state.editingSession ? { id: state.editingSession } as any : null,
+          editingSessionName: state.editingSessionName, onNewSession,
+        }} />
         <div className="p-2 border-t border-border flex-shrink-0">
           <UserMenu onShowSettings={onShowSettings} />
         </div>

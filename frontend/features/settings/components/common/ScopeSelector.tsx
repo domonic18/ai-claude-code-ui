@@ -82,76 +82,106 @@ export const ScopeSelector: React.FC<ScopeSelectorProps> = ({
 
   return (
     <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-foreground mb-2">
-          Scope *
-        </label>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => handleChange('user', '')}
-            className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
-              uiScope === 'user'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-            }`}
-          >
-            <div className="flex items-center justify-center gap-2">
-              <Globe className="w-4 h-4" />
-              <span>User (Global)</span>
-            </div>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleChange('local', '')}
-            className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
-              uiScope === 'local'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-            }`}
-          >
-            <div className="flex items-center justify-center gap-2">
-              <FolderOpen className="w-4 h-4" />
-              <span>Project (Local)</span>
-            </div>
-          </button>
-        </div>
-        <p className="text-xs text-muted-foreground mt-2">
-          {uiScope === 'user'
-            ? 'User scope: Available across all projects on your machine'
-            : 'Local scope: Only available in the selected project'
-          }
-        </p>
-      </div>
-
-      {/* Project Selection for Local Scope */}
-      {uiScope === 'local' && (
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
-            Project *
-          </label>
-          <select
-            value={projectPath}
-            onChange={(e) => handleChange('local', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-            required
-          >
-            <option value="">Select a project...</option>
-            {projects.map(project => (
-              <option key={project.name} value={project.path || project.fullPath}>
-                {project.displayName || project.name}
-              </option>
-            ))}
-          </select>
-          {projectPath && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Path: {projectPath}
-            </p>
-          )}
-        </div>
-      )}
+      {renderScopeButtons(uiScope, handleChange)}
+      {uiScope === 'local' && renderProjectSelector(projectPath, projects, handleChange)}
     </div>
   );
 };
+
+/**
+ * Render scope selection buttons
+ *
+ * @param uiScope - Current UI scope
+ * @param handleChange - Change handler
+ * @returns Scope buttons JSX
+ */
+function renderScopeButtons(
+  uiScope: UiScope,
+  handleChange: (scope: UiScope, projectPath: string) => void
+): JSX.Element {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-foreground mb-2">
+        Scope *
+      </label>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => handleChange('user', '')}
+          className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+            uiScope === 'user'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+          }`}
+        >
+          <div className="flex items-center justify-center gap-2">
+            <Globe className="w-4 h-4" />
+            <span>User (Global)</span>
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={() => handleChange('local', '')}
+          className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+            uiScope === 'local'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+          }`}
+        >
+          <div className="flex items-center justify-center gap-2">
+            <FolderOpen className="w-4 h-4" />
+            <span>Project (Local)</span>
+          </div>
+        </button>
+      </div>
+      <p className="text-xs text-muted-foreground mt-2">
+        {uiScope === 'user'
+          ? 'User scope: Available across all projects on your machine'
+          : 'Local scope: Only available in the selected project'
+        }
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Render project selector dropdown
+ *
+ * @param projectPath - Current project path
+ * @param projects - List of projects
+ * @param handleChange - Change handler
+ * @returns Project selector JSX
+ */
+function renderProjectSelector(
+  projectPath: string,
+  projects: Project[],
+  handleChange: (scope: UiScope, projectPath: string) => void
+): JSX.Element {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-foreground mb-2">
+        Project *
+      </label>
+      <select
+        value={projectPath}
+        onChange={(e) => handleChange('local', e.target.value)}
+        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+        required
+      >
+        <option value="">Select a project...</option>
+        {projects.map(project => (
+          <option key={project.name} value={project.path || project.fullPath}>
+            {project.displayName || project.name}
+          </option>
+        ))}
+      </select>
+      {projectPath && (
+        <p className="text-xs text-muted-foreground mt-1">
+          Path: {projectPath}
+        </p>
+      )}
+    </div>
+  );
+}
 
 export default ScopeSelector;

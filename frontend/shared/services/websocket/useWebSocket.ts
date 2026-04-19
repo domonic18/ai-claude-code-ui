@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { WebSocketMessage } from '@/shared/types';
 import { logger } from '@/shared/utils/logger';
+import { connect, type WebSocketConnectionRefs } from './useWebSocketConnection';
 
 export interface UseWebSocketResult {
   ws: WebSocket | null;
@@ -20,6 +21,7 @@ export function useWebSocket(isEnabled = true): UseWebSocketResult {
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [messages, setMessages] = useState<WebSocketMessage[]>([]);
   const [isConnected, setIsConnected] = useState<boolean>(false);
+
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const isEnabledRef = useRef<boolean>(isEnabled);
@@ -31,122 +33,39 @@ export function useWebSocket(isEnabled = true): UseWebSocketResult {
     isEnabledRef.current = isEnabled;
   }, [isEnabled]);
 
-  const connect = useCallback(async () => {
-    // Prevent duplicate connections
-    if (isConnectingRef.current || wsRef.current?.readyState === WebSocket.OPEN) {
-      return;
-    }
+  // Memoized connect function that uses refs to avoid dependency issues
+  const connectCallback = useCallback(() => {
+    const refs: WebSocketConnectionRefs = {
+      wsRef,
+      reconnectTimeoutRef,
+      isConnectingRef,
+      isUnmountedRef,
+      isEnabledRef
+    };
 
-    // Don't connect if not enabled
-    if (!isEnabledRef.current) {
-      return;
-    }
-
-    isConnectingRef.current = true;
-
-    // Clear previous connections
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-    }
-
-    try {
-      const isPlatform = import.meta.env.VITE_IS_PLATFORM === 'true';
-
-      // Construct WebSocket URL
-      let wsUrl: string;
-
-      if (isPlatform) {
-        // Platform mode: Use same domain as the page (goes through proxy)
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        wsUrl = `${protocol}//${window.location.host}/ws`;
-      } else {
-        // OSS mode: Get token from server for WebSocket authentication
-        let token: string | undefined;
-        try {
-          const response = await fetch('/api/auth/ws-token', {
-            credentials: 'include' // Send cookie
-          });
-          if (response.ok) {
-            const data = await response.json();
-            // Backend returns {success: true, data: {token}}
-            token = data.data?.token;
-          } else {
-            logger.warn('[WebSocket] Failed to get ws-token:', response.status, response.statusText);
-            isConnectingRef.current = false;
-            return;
-          }
-        } catch (error) {
-          logger.error('[WebSocket] Error fetching ws-token:', error);
-          isConnectingRef.current = false;
-          return;
-        }
-
-        if (!token) {
-          logger.warn('[WebSocket] No token received from server');
-          isConnectingRef.current = false;
-          return;
-        }
-
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        wsUrl = `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}`;
-      }
-
-      logger.info('[WebSocket] Connecting to:', wsUrl.replace(/token=[^&]+/, 'token=***'));
-
-      const websocket = new WebSocket(wsUrl);
-
-      websocket.onopen = () => {
-        logger.info('[WebSocket] Connected successfully');
+    const callbacks = {
+      onConnected: (websocket: WebSocket) => {
         setIsConnected(true);
         setWs(websocket);
         wsRef.current = websocket;
-        isConnectingRef.current = false;
-      };
-
-      websocket.onmessage = (event: MessageEvent) => {
-        try {
-          const data = JSON.parse(event.data);
-          setMessages(prev => [...prev, data]);
-        } catch (error) {
-          logger.error('[WebSocket] Error parsing message:', error);
-        }
-      };
-
-      websocket.onclose = (event: CloseEvent) => {
-        logger.info('[WebSocket] Disconnected, code:', event.code, 'reason:', event.reason);
+      },
+      onMessage: (data: any) => {
+        setMessages(prev => [...prev, data]);
+      },
+      onDisconnected: () => {
         setIsConnected(false);
         setWs(null);
         wsRef.current = null;
-        isConnectingRef.current = false;
+      }
+    };
 
-        // Attempt reconnection if not a normal close, still enabled, and not unmounted
-        if (event.code !== 1000 && isEnabledRef.current && !isUnmountedRef.current) {
-          reconnectTimeoutRef.current = setTimeout(() => {
-            logger.info('[WebSocket] Attempting to reconnect...');
-            connect();
-          }, 3000);
-        }
-      };
-
-      websocket.onerror = (error: Event) => {
-        logger.error('[WebSocket] Error:', error);
-        isConnectingRef.current = false;
-      };
-
-    } catch (error) {
-      logger.error('[WebSocket] Error creating connection:', error);
-      isConnectingRef.current = false;
-    }
-  }, []); // Empty dependency array, connect function created once
+    connect(refs, callbacks);
+  }, []); // Empty deps - refs are stable, callbacks created fresh each call
 
   // Connect/disconnect when isEnabled changes
   useEffect(() => {
-    // Initial connection
     if (isEnabled) {
-      connect();
+      connectCallback();
     }
 
     return () => {
@@ -159,7 +78,7 @@ export function useWebSocket(isEnabled = true): UseWebSocketResult {
         wsRef.current.close(1000, 'Component unmounted');
       }
     };
-  }, [isEnabled, connect]);
+  }, [isEnabled, connectCallback]);
 
   const sendMessage = useCallback((message: any) => {
     // Use wsRef.current instead of ws state because state updates are async

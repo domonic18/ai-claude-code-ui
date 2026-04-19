@@ -29,6 +29,93 @@ const safeLocalStorage = {
   }
 };
 
+/**
+ * Load commands from API
+ */
+async function loadCommandsFromApi(
+  selectedProject: { path: string; name: string } | null,
+  authenticatedFetch: (url: string, options?: RequestInit) => Promise<Response>
+): Promise<{ commands: any[]; frequentCommands: any[] }> {
+  if (!selectedProject) {
+    return { commands: [], frequentCommands: [] };
+  }
+
+  const response = await authenticatedFetch('/api/commands/list', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      projectPath: selectedProject.path
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch commands');
+  }
+
+  const data = await response.json();
+
+  // Combine built-in and custom commands
+  const allCommands = [
+    ...(data.builtIn || []).map((cmd: any) => ({ ...cmd, type: 'built-in' as const })),
+    ...(data.custom || []).map((cmd: any) => ({ ...cmd, type: 'custom' as const }))
+  ];
+
+  // Load command history and sort by frequency
+  const historyKey = `command_history_${selectedProject.name}`;
+  const history = safeLocalStorage.getItem(historyKey);
+
+  if (history) {
+    try {
+      const parsedHistory = JSON.parse(history);
+      const sortedCommands = allCommands.sort((a, b) => {
+        const aCount = parsedHistory[a.name] || 0;
+        const bCount = parsedHistory[b.name] || 0;
+        return bCount - aCount;
+      });
+      return { commands: sortedCommands, frequentCommands: [] };
+    } catch (e) {
+      logger.error('Error parsing command history:', e);
+    }
+  }
+
+  return { commands: allCommands, frequentCommands: [] };
+}
+
+/**
+ * Update frequent commands based on history
+ */
+function updateFrequentCommands(
+  allCommands: any[],
+  projectName: string
+): any[] {
+  const historyKey = `command_history_${projectName}`;
+  const history = safeLocalStorage.getItem(historyKey);
+
+  if (!history) {
+    return [];
+  }
+
+  try {
+    const parsedHistory = JSON.parse(history);
+
+    const commandsWithUsage = allCommands
+      .map(cmd => ({
+        ...cmd,
+        usageCount: parsedHistory[cmd.name] || 0
+      }))
+      .filter(cmd => cmd.usageCount > 0)
+      .sort((a, b) => b.usageCount - a.usageCount)
+      .slice(0, 5);
+
+    return commandsWithUsage;
+  } catch (e) {
+    logger.error('Error parsing command history:', e);
+    return [];
+  }
+}
+
 export interface SlashCommand {
   name: string;
   description?: string;
@@ -92,61 +179,20 @@ export function useSlashCommands({
     const fetchCommands = async () => {
       if (!selectedProject) {
         setCommands([]);
+        setFrequentCommands([]);
         return;
       }
 
       setIsLoading(true);
 
       try {
-        const response = await authenticatedFetch('/api/commands/list', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            projectPath: selectedProject.path
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch commands');
-        }
-
-        const data = await response.json();
-
-        // Combine built-in and custom commands
-        const allCommands: SlashCommand[] = [
-          ...(data.builtIn || []).map((cmd: any) => ({ ...cmd, type: 'built-in' as const })),
-          ...(data.custom || []).map((cmd: any) => ({ ...cmd, type: 'custom' as const }))
-        ];
-
-        // Load command history and sort by frequency
-        const historyKey = `command_history_${selectedProject.name}`;
-        const history = safeLocalStorage.getItem(historyKey);
-
-        if (history) {
-          try {
-            const parsedHistory = JSON.parse(history);
-            const sortedCommands = allCommands.sort((a, b) => {
-              const aCount = parsedHistory[a.name] || 0;
-              const bCount = parsedHistory[b.name] || 0;
-              return bCount - aCount;
-            });
-            setCommands(sortedCommands);
-          } catch (e) {
-            logger.error('Error parsing command history:', e);
-            setCommands(allCommands);
-          }
-        } else {
-          setCommands(allCommands);
-        }
-
-        // Update frequent commands
-        updateFrequentCommands(allCommands, selectedProject.name);
-
+        const { commands: loadedCommands } = await loadCommandsFromApi(selectedProject, authenticatedFetch);
+        setCommands(loadedCommands);
+        setFrequentCommands(updateFrequentCommands(loadedCommands, selectedProject.name));
       } catch (error) {
         logger.error('Error fetching slash commands:', error);
         setCommands([]);
+        setFrequentCommands([]);
       } finally {
         setIsLoading(false);
       }
@@ -154,35 +200,6 @@ export function useSlashCommands({
 
     fetchCommands();
   }, [selectedProject?.name, authenticatedFetch]);
-
-  // Update frequent commands
-  const updateFrequentCommands = useCallback((allCommands: SlashCommand[], projectName: string) => {
-    const historyKey = `command_history_${projectName}`;
-    const history = safeLocalStorage.getItem(historyKey);
-
-    if (!history) {
-      setFrequentCommands([]);
-      return;
-    }
-
-    try {
-      const parsedHistory = JSON.parse(history);
-
-      const commandsWithUsage = allCommands
-        .map(cmd => ({
-          ...cmd,
-          usageCount: parsedHistory[cmd.name] || 0
-        }))
-        .filter(cmd => cmd.usageCount > 0)
-        .sort((a, b) => b.usageCount - a.usageCount)
-        .slice(0, 5);
-
-      setFrequentCommands(commandsWithUsage);
-    } catch (e) {
-      logger.error('Error parsing command history:', e);
-      setFrequentCommands([]);
-    }
-  }, []);
 
   // Filter commands based on query
   useEffect(() => {
@@ -224,7 +241,7 @@ export function useSlashCommands({
     safeLocalStorage.setItem(historyKey, JSON.stringify(parsedHistory));
 
     // Update frequent commands
-    updateFrequentCommands(commands, selectedProject.name);
+    setFrequentCommands(updateFrequentCommands(commands, selectedProject.name));
 
     // Execute the command
     onCommandExecute(command);
@@ -233,7 +250,7 @@ export function useSlashCommands({
     setShowMenu(false);
     setQuery('');
     setSelectedIndex(-1);
-  }, [selectedProject, commands, onCommandExecute, updateFrequentCommands]);
+  }, [selectedProject, commands, onCommandExecute]);
 
   return {
     commands,

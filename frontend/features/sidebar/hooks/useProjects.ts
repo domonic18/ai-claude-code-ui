@@ -29,6 +29,110 @@ import type { ProjectSortOrder, StarredProjects } from '../types';
 import { logger } from '@/shared/utils/logger';
 
 /**
+ * Helper functions for CRUD operations
+ */
+
+/**
+ * Create a new project
+ */
+async function createProjectOperation(
+  service: ReturnType<typeof getSidebarService>,
+  path: string,
+  setError: React.Dispatch<React.SetStateAction<string | null>>
+): Promise<Project> {
+  setError(null);
+
+  try {
+    const newProject = await service.createProject(path);
+    return newProject;
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Failed to create project';
+    setError(errorMessage);
+    throw err;
+  }
+}
+
+/**
+ * Rename a project
+ */
+async function renameProjectOperation(
+  service: ReturnType<typeof getSidebarService>,
+  projectName: string,
+  newName: string,
+  setError: React.Dispatch<React.SetStateAction<string | null>>
+): Promise<void> {
+  setError(null);
+
+  try {
+    await service.renameProject(projectName, newName);
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Failed to rename project';
+    setError(errorMessage);
+    throw err;
+  }
+}
+
+/**
+ * Delete a project
+ */
+async function deleteProjectOperation(
+  service: ReturnType<typeof getSidebarService>,
+  projectName: string,
+  setError: React.Dispatch<React.SetStateAction<string | null>>
+): Promise<void> {
+  setError(null);
+
+  try {
+    await service.deleteProject(projectName);
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Failed to delete project';
+    setError(errorMessage);
+    throw err;
+  }
+}
+
+/**
+ * Sort projects by specified order
+ */
+function sortProjectsByOrder(
+  projects: Project[],
+  sortOrder: ProjectSortOrder,
+  starredProjects: StarredProjects
+): Project[] {
+  const sorted = [...projects];
+
+  sorted.sort((a, b) => {
+    // Starred projects first
+    const aStarred = starredProjects.has(a.name);
+    const bStarred = starredProjects.has(b.name);
+
+    if (aStarred && !bStarred) return -1;
+    if (!aStarred && bStarred) return 1;
+
+    // Then by sort order
+    if (sortOrder === 'name') {
+      const aName = a.displayName || a.name;
+      const bName = b.displayName || b.name;
+      return aName.localeCompare(bName);
+    } else if (sortOrder === 'recent') {
+      const aTime = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
+      const bTime = b.lastActivity ? new Date(b.lastActivity).getTime() : 0;
+      if (aTime !== bTime) {
+        return bTime - aTime;
+      }
+      // Tiebreaker: name
+      const aName = a.displayName || a.name;
+      const bName = b.displayName || b.name;
+      return aName.localeCompare(bName);
+    }
+
+    return 0;
+  });
+
+  return sorted;
+}
+
+/**
  * Hook return type
  */
 export interface UseProjectsReturn {
@@ -153,50 +257,26 @@ export function useProjects(initialProjects?: Project[] | null): UseProjectsRetu
 
   // Create project
   const createProject = useCallback(async (path: string): Promise<Project> => {
-    setError(null);
-
-    try {
-      const newProject = await service.createProject(path);
-      // Refresh project list after creation
-      await refresh();
-      return newProject;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create project';
-      setError(errorMessage);
-      throw err;
-    }
+    const newProject = await createProjectOperation(service, path, setError);
+    // Refresh project list after creation
+    await refresh();
+    return newProject;
   }, [service, refresh]);
 
   // Rename project
   const renameProject = useCallback(async (projectName: string, newName: string): Promise<void> => {
-    setError(null);
-
-    try {
-      await service.renameProject(projectName, newName);
-      // Update local state
-      setProjects(prev => prev.map(p =>
-        p.name === projectName ? { ...p, displayName: newName } : p
-      ));
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to rename project';
-      setError(errorMessage);
-      throw err;
-    }
+    await renameProjectOperation(service, projectName, newName, setError);
+    // Update local state
+    setProjects(prev => prev.map(p =>
+      p.name === projectName ? { ...p, displayName: newName } : p
+    ));
   }, [service]);
 
   // Delete project
   const deleteProject = useCallback(async (projectName: string): Promise<void> => {
-    setError(null);
-
-    try {
-      await service.deleteProject(projectName);
-      // Remove from local state
-      setProjects(prev => prev.filter(p => p.name !== projectName));
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete project';
-      setError(errorMessage);
-      throw err;
-    }
+    await deleteProjectOperation(service, projectName, setError);
+    // Remove from local state
+    setProjects(prev => prev.filter(p => p.name !== projectName));
   }, [service]);
 
   /**
@@ -224,40 +304,7 @@ export function useProjects(initialProjects?: Project[] | null): UseProjectsRetu
 
   // Get sorted projects
   const getSortedProjects = useCallback((starredProjects: StarredProjects): Project[] => {
-    // Defensive check: ensure projects is an array
-    const projectsToSort = Array.isArray(projects) ? projects : [];
-    const sorted = [...projectsToSort];
-
-    // Sort based on sort order
-    sorted.sort((a, b) => {
-      // Starred projects first
-      const aStarred = starredProjects.has(a.name);
-      const bStarred = starredProjects.has(b.name);
-
-      if (aStarred && !bStarred) return -1;
-      if (!aStarred && bStarred) return 1;
-
-      // Then by sort order
-      if (sortOrder === 'name') {
-        const aName = a.displayName || a.name;
-        const bName = b.displayName || b.name;
-        return aName.localeCompare(bName);
-      } else if (sortOrder === 'recent') {
-        const aTime = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
-        const bTime = b.lastActivity ? new Date(b.lastActivity).getTime() : 0;
-        if (aTime !== bTime) {
-          return bTime - aTime;
-        }
-        // Tiebreaker: name
-        const aName = a.displayName || a.name;
-        const bName = b.displayName || b.name;
-        return aName.localeCompare(bName);
-      }
-
-      return 0;
-    });
-
-    return sorted;
+    return sortProjectsByOrder(Array.isArray(projects) ? projects : [], sortOrder, starredProjects);
   }, [projects, sortOrder]);
 
   return {

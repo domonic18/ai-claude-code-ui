@@ -13,11 +13,14 @@
  * 使用 requestDeduplicator 防止 React StrictMode 导致的双重请求
  */
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import { api } from '@/shared/services';
-import { requestDeduplicator } from '@/shared/utils';
+import React, { createContext, useContext, useState } from 'react';
 import type { User } from '@/shared/types';
-import { logger } from '@/shared/utils/logger';
+import {
+  useAuthStatusCheck,
+  createLoginOperation,
+  createRegisterOperation,
+  createLogoutOperation
+} from './authOperations';
 
 export interface AuthResult {
   success: boolean;
@@ -54,150 +57,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState<boolean>(true); // 初始为 true，防止闪烁
   const [needsSetup, setNeedsSetup] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  // 使用 ref 存储检查状态，避免 checkAuthStatus 因状态变化而重新创建
-  const hasCheckedRef = useRef<boolean>(false);
 
-  /**
-   * 初始化时检查认证状态
-   *
-   * 调用时序：
-   * 1. AuthProvider 挂载 → useEffect 执行
-   * 2. 检查 Platform 模式 → 如果是则直接设置用户
-   * 3. 否则调用 checkAuthStatus() → requestDeduplicator 确保不重复
-   */
-  useEffect(() => {
-    if (import.meta.env.VITE_IS_PLATFORM === 'true') {
-      setUser({ username: 'platform-user', id: 'platform' });
-      setNeedsSetup(false);
-      setIsLoading(false);
-      hasCheckedRef.current = true;
-      return;
-    }
-
-    // 使用 requestDeduplicator 防止 StrictMode 导致的双重调用
-    if (!hasCheckedRef.current) {
-      checkAuthStatus();
-    }
-  }, []);
-
-  /**
-   * 检查认证状态
-   *
-   * 使用 requestDeduplicator 确保并发调用只执行一次请求。
-   * 这比使用 ref 更优雅，因为它基于 Promise 共享机制。
-   *
-   * 使用 useCallback 包装以避免在 ProtectedRoute 中触发无限循环。
-   *
-   * @param {boolean} force - 强制重新检查，忽略 hasChecked 标志
-   */
-  const checkAuthStatus = useCallback(async (force = false) => {
-    // 如果已经检查过且不强制重新检查，直接返回
-    if (hasCheckedRef.current && !force) {
-      return;
-    }
-
-    // 使用统一的请求去重器，key: 'auth:checkStatus'
-    // 当 force=true 时，使用不同的 key 来避免缓存
-    const dedupeKey = force ? 'auth:checkStatus:force' : 'auth:checkStatus';
-
-    return requestDeduplicator.dedupe(dedupeKey, async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        const statusResponse = await api.auth.status();
-        const statusData = await statusResponse.json();
-
-        if (statusData.data?.needsSetup) {
-          setNeedsSetup(true);
-          hasCheckedRef.current = true;
-          setIsLoading(false);
-          return;
-        }
-
-        try {
-          const userResponse = await api.auth.user();
-
-          if (userResponse.ok) {
-            const userData = await userResponse.json();
-            setUser(userData.data);
-            setNeedsSetup(false);
-          } else {
-            setUser(null);
-          }
-        } catch (err) {
-          setUser(null);
-        }
-      } catch (err) {
-        logger.error('Auth status check failed:', err);
-        setError('Failed to check authentication status');
-      } finally {
-        setIsLoading(false);
-        hasCheckedRef.current = true;
-      }
-    });
-  }, []);
-
-  const login = useCallback(async (username: string, password: string): Promise<AuthResult> => {
-    try {
-      setError(null);
-      const response = await api.auth.login(username, password);
-
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const errorMessage = 'Server error. Please check the server logs.';
-        setError(errorMessage);
-        return { success: false, error: errorMessage };
-      }
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setUser(data.data);
-        return { success: true };
-      } else {
-        setError(data.error || 'Login failed');
-        return { success: false, error: data.error || 'Login failed' };
-      }
-    } catch (err) {
-      logger.error('Login error:', err);
-      const errorMessage = 'Network error. Please try again.';
-      setError(errorMessage);
-      return { success: false, error: errorMessage };
-    }
-  }, []);
-
-  const register = useCallback(async (username: string, password: string): Promise<AuthResult> => {
-    try {
-      setError(null);
-      const response = await api.auth.register(username, password);
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setUser(data.data);
-        setNeedsSetup(false);
-        return { success: true };
-      } else {
-        setError(data.error || 'Registration failed');
-        return { success: false, error: data.error || 'Registration failed' };
-      }
-    } catch (err) {
-      logger.error('Registration error:', err);
-      const errorMessage = 'Network error. Please try again.';
-      setError(errorMessage);
-      return { success: false, error: errorMessage };
-    }
-  }, []);
-
-  const logout = useCallback(async () => {
-    setUser(null);
-    try {
-      await api.auth.logout();
-    } catch (err) {
-      logger.error('Logout endpoint error:', err);
-    }
-  }, []);
+  // 使用提取的钩子和操作创建器
+  const checkAuthStatus = useAuthStatusCheck(setUser, setIsLoading, setNeedsSetup, setError);
+  const login = createLoginOperation(setUser, setError);
+  const register = createRegisterOperation(setUser, setNeedsSetup, setError);
+  const logout = createLogoutOperation(setUser);
 
   const value: AuthContextValue = {
     user,
