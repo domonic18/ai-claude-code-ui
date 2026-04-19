@@ -41,7 +41,7 @@ export interface ProjectManagementState {
  * Project management actions
  */
 export interface ProjectManagementActions {
-  fetchProjects: (isRetry?: boolean) => Promise<void>;
+  fetchProjects: (isRetry?: boolean, retryCount?: number) => Promise<Project[] | undefined>;
   handleProjectSelect: (project: Project, shouldNavigate?: boolean, preventAutoSession?: boolean) => void;
   handleSessionSelect: (session: Session, projectName?: string) => void;
   setSelectedSession: (session: Session | null) => void;

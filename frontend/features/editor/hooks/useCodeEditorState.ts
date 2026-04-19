@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { api } from '@/shared/services';
 import { logger } from '@/shared/utils/logger';
-import type { CodeEditorFile } from '../types/editor.types';
+import type { EditorFile } from '../types/editor.types';
 
 interface UseCodeEditorStateProps {
-    file: CodeEditorFile;
+    file: EditorFile;
     projectPath: string;
     onClose: () => void;
 }

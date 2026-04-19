@@ -65,50 +65,19 @@ interface WebSocketMessage {
   changedFile?: string;
 }
 
-// Main App component with routing
-function AppContent() {
-  const { user } = useAuth();
-  const layout = useAppLayout();
-
-  // Auto-refresh interval from localStorage
-  const autoRefreshInterval = layout.autoRefreshInterval;
-
-  // Product Tour
-  const TOTAL_TOUR_STEPS = 3;
-  const { isTourActive, startTour, completeTour, nextStep, currentStep } = useProductTour(TOTAL_TOUR_STEPS);
-
-  // Stable config object for useProjectManager
-  const projectManagerConfig = useMemo(() => ({
-    isMobile: layout.isMobile,
-    activeTab: layout.activeTab,
-  }), [layout.isMobile, layout.activeTab]);
-
-  const {
-    projects, selectedProject, selectedSession, isLoadingProjects,
-    newSessionCounter, fetchProjects, handleProjectSelect, handleSessionSelect,
-    setSelectedSession, handleNewSession, handleSessionDelete, handleSidebarRefresh,
-    handleProjectDelete, updateProjectsFromWebSocket,
-  } = useProjectManager(user, projectManagerConfig);
-
-  const {
-    activeSessions, processingSessions, externalMessageUpdate,
-    incrementExternalMessageUpdate, markSessionAsActive, markSessionAsInactive,
-    markSessionAsProcessing, markSessionAsNotProcessing, replaceTemporarySession,
-    shouldSkipUpdate,
-  } = useSessionProtection(selectedProject, selectedSession as SidebarSession | null, handleSidebarRefresh);
-
-  const { ws, sendMessage, messages } = useWebSocketContext();
-
-  // Auto-refresh projects periodically
-  useEffect(() => {
-    if (!autoRefreshInterval || autoRefreshInterval <= 0) return;
-    const intervalId = setInterval(() => {
-      if (activeSessions.size === 0) fetchProjects();
-    }, autoRefreshInterval * 1000);
-    return () => clearInterval(intervalId);
-  }, [autoRefreshInterval, activeSessions, fetchProjects]);
-
-  // Handle WebSocket messages for real-time project updates
+/**
+ * Custom hook to handle WebSocket project updates and external session changes
+ */
+function useWebSocketProjectUpdates(
+  messages: any[],
+  selectedProject: any,
+  selectedSession: any,
+  activeSessions: Set<string>,
+  shouldSkipUpdate: (projects: Project[], updatedProjects: Project[]) => boolean,
+  updateProjectsFromWebSocket: (projects: Project[]) => void,
+  incrementExternalMessageUpdate: () => void,
+  projects: Project[]
+) {
   useEffect(() => {
     if (messages.length === 0) return;
 
@@ -133,16 +102,68 @@ function AppContent() {
       updateProjectsFromWebSocket(updatedProjects);
     }
   }, [messages, selectedProject, selectedSession, shouldSkipUpdate, updateProjectsFromWebSocket, projects, activeSessions, incrementExternalMessageUpdate]);
+}
+
+/**
+ * Custom hook to manage app data fetching and synchronization
+ */
+function useAppDataSync(
+  user: any,
+  layout: any,
+  activeSessions: Set<string>,
+  fetchProjects: () => void,
+  selectedSession: any,
+  messages: any[],
+  selectedProject: any,
+  shouldSkipUpdate: (projects: Project[], updatedProjects: Project[]) => boolean,
+  updateProjectsFromWebSocket: (projects: Project[]) => void,
+  incrementExternalMessageUpdate: () => void,
+  projects: Project[]
+) {
+  // Auto-refresh projects periodically
+  useEffect(() => {
+    if (!layout.autoRefreshInterval || layout.autoRefreshInterval <= 0) return;
+    const intervalId = setInterval(() => {
+      if (activeSessions.size === 0) fetchProjects();
+    }, layout.autoRefreshInterval * 1000);
+    return () => clearInterval(intervalId);
+  }, [layout.autoRefreshInterval, activeSessions, fetchProjects]);
+
+  // Handle WebSocket messages for real-time project updates
+  useWebSocketProjectUpdates(
+    messages,
+    selectedProject,
+    selectedSession,
+    activeSessions,
+    shouldSkipUpdate,
+    updateProjectsFromWebSocket,
+    incrementExternalMessageUpdate,
+    projects
+  );
 
   // Reset activeTab to 'chat' when session changes
   useEffect(() => {
     if (selectedSession) layout.setActiveTab('chat');
-  }, [selectedSession?.id]);
+  }, [selectedSession?.id, layout]);
+}
 
-  const tourContextValue = useMemo(() => ({ startTour }), [startTour]);
-
-  // Shared sidebar props
-  const sidebarCommonProps = {
+/**
+ * Compute common sidebar props
+ */
+function useSidebarCommonProps(
+  projects: Project[],
+  selectedProject: any,
+  selectedSession: any,
+  handleProjectSelect: (project: Project) => void,
+  handleSessionSelect: (session: Session) => void,
+  handleNewSession: (projectName?: string) => void,
+  handleSessionDelete: (sessionId: string) => void,
+  handleProjectDelete: (projectPath: string) => void,
+  isLoadingProjects: boolean,
+  handleSidebarRefresh: () => void,
+  layout: any
+) {
+  return useMemo(() => ({
     projects,
     selectedProject,
     selectedSession: selectedSession as SidebarSession | null,
@@ -155,106 +176,238 @@ function AppContent() {
     onRefresh: handleSidebarRefresh,
     onShowSettings: () => layout.setShowSettings(true),
     isPWA: layout.isPWA,
-  };
+  }), [
+    projects,
+    selectedProject,
+    selectedSession,
+    handleProjectSelect,
+    handleSessionSelect,
+    handleNewSession,
+    handleSessionDelete,
+    handleProjectDelete,
+    isLoadingProjects,
+    handleSidebarRefresh,
+    layout
+  ]);
+}
+
+/**
+ * Compute props for MainContent component
+ */
+function useMainContentProps(
+  selectedProject: any,
+  selectedSession: any,
+  newSessionCounter: any,
+  layout: any,
+  ws: any,
+  sendMessage: any,
+  messages: any[],
+  isLoadingProjects: boolean,
+  processingSessions: Set<string>,
+  externalMessageUpdate: number,
+  markSessionAsActive: (sessionId: string) => void,
+  markSessionAsInactive: (sessionId: string) => void,
+  markSessionAsProcessing: (sessionId: string) => void,
+  markSessionAsNotProcessing: (sessionId: string) => void,
+  replaceTemporarySession: (tempId: string, realId: string) => void
+) {
+  return useMemo(() => ({
+    selectedProject,
+    selectedSession,
+    newSessionCounter,
+    activeTab: layout.activeTab,
+    setActiveTab: layout.setActiveTab,
+    ws,
+    sendMessage,
+    messages,
+    isMobile: layout.isMobile,
+    isPWA: layout.isPWA,
+    onMenuClick: () => layout.setSidebarOpen(true),
+    isLoading: isLoadingProjects,
+    authenticatedFetch,
+    onInputFocusChange: layout.setIsInputFocused,
+    onSessionActive: markSessionAsActive,
+    onSessionInactive: markSessionAsInactive,
+    onSessionProcessing: markSessionAsProcessing,
+    onSessionNotProcessing: markSessionAsNotProcessing,
+    processingSessions,
+    onReplaceTemporarySession: replaceTemporarySession,
+    onShowSettings: () => layout.setShowSettings(true),
+    autoExpandTools: layout.autoExpandTools,
+    showRawParameters: layout.showRawParameters,
+    showThinking: layout.showThinking,
+    autoScrollToBottom: layout.autoScrollToBottom,
+    sendByCtrlEnter: layout.sendByCtrlEnter,
+    externalMessageUpdate,
+  }), [
+    selectedProject,
+    selectedSession,
+    newSessionCounter,
+    layout,
+    ws,
+    sendMessage,
+    messages,
+    isLoadingProjects,
+    processingSessions,
+    externalMessageUpdate,
+    markSessionAsActive,
+    markSessionAsInactive,
+    markSessionAsProcessing,
+    markSessionAsNotProcessing,
+    replaceTemporarySession,
+  ]);
+}
+
+/**
+ * Compute props for QuickSettingsPanel component
+ */
+function useQuickSettingsProps(layout: any) {
+  return useMemo(() => ({
+    isOpen: layout.showQuickSettings,
+    onToggle: layout.setShowQuickSettings,
+    autoExpandTools: layout.autoExpandTools,
+    onAutoExpandChange: layout.setAutoExpandTools,
+    showRawParameters: layout.showRawParameters,
+    onShowRawParametersChange: layout.setShowRawParameters,
+    showThinking: layout.showThinking,
+    onShowThinkingChange: layout.setShowThinking,
+    autoScrollToBottom: layout.autoScrollToBottom,
+    onAutoScrollChange: layout.setAutoScrollToBottom,
+    sendByCtrlEnter: layout.sendByCtrlEnter,
+    onSendByCtrlEnterChange: layout.setSendByCtrlEnter,
+    isMobile: layout.isMobile,
+  }), [
+    layout.showQuickSettings,
+    layout.setShowQuickSettings,
+    layout.autoExpandTools,
+    layout.setAutoExpandTools,
+    layout.showRawParameters,
+    layout.setShowRawParameters,
+    layout.showThinking,
+    layout.setShowThinking,
+    layout.autoScrollToBottom,
+    layout.setAutoScrollToBottom,
+    layout.sendByCtrlEnter,
+    layout.setSendByCtrlEnter,
+    layout.isMobile,
+  ]);
+}
+
+/**
+ * Compute props for DesktopSidebar component
+ */
+function useDesktopSidebarProps(sidebarCommonProps: any, layout: any) {
+  return useMemo(() => ({
+    ...sidebarCommonProps,
+    sidebarVisible: layout.sidebarVisible,
+    onToggleSidebar: layout.setSidebarVisible,
+  }), [sidebarCommonProps, layout.sidebarVisible, layout.setSidebarVisible]);
+}
+
+/**
+ * Compute props for MobileSidebarOverlay component
+ */
+function useMobileSidebarProps(sidebarCommonProps: any, layout: any) {
+  return useMemo(() => ({
+    ...sidebarCommonProps,
+    sidebarOpen: layout.sidebarOpen,
+    onClose: () => layout.setSidebarOpen(false),
+  }), [sidebarCommonProps, layout.sidebarOpen, layout.setSidebarOpen]);
+}
+
+/**
+ * Compute props for MobileNav component
+ */
+function useMobileNavProps(layout: any) {
+  return useMemo(() => ({
+    activeTab: layout.activeTab,
+    setActiveTab: layout.setActiveTab,
+    isInputFocused: layout.isInputFocused,
+  }), [layout.activeTab, layout.setActiveTab, layout.isInputFocused]);
+}
+
+/**
+ * Compute props for Settings modal
+ */
+function useSettingsProps(layout: any) {
+  return useMemo(() => ({
+    isOpen: layout.showSettings,
+    onClose: () => layout.setShowSettings(false),
+    initialTab: layout.settingsInitialTab,
+  }), [layout.showSettings, layout.setShowSettings, layout.settingsInitialTab]);
+}
+
+/**
+ * Compute props for ProductTour component
+ */
+function useProductTourProps(
+  isTourActive: boolean,
+  currentStep: number,
+  totalSteps: number,
+  nextStep: () => void,
+  completeTour: () => void
+) {
+  return useMemo(() => ({
+    isActive: isTourActive,
+    currentStep,
+    totalSteps,
+    onNext: nextStep,
+    onComplete: completeTour,
+  }), [isTourActive, currentStep, totalSteps, nextStep, completeTour]);
+}
+
+// Main App component with routing
+function AppContent() {
+  const { user } = useAuth();
+  const layout = useAppLayout();
+  const TOTAL_TOUR_STEPS = 3;
+  const { isTourActive, startTour, completeTour, nextStep, currentStep } = useProductTour(TOTAL_TOUR_STEPS);
+  const projectManagerConfig = useMemo(() => ({
+    isMobile: layout.isMobile,
+    activeTab: layout.activeTab,
+  }), [layout.isMobile, layout.activeTab]);
+
+  const {
+    projects, selectedProject, selectedSession, isLoadingProjects,
+    newSessionCounter, fetchProjects, handleProjectSelect, handleSessionSelect,
+    setSelectedSession, handleNewSession, handleSessionDelete, handleSidebarRefresh,
+    handleProjectDelete, updateProjectsFromWebSocket,
+  } = useProjectManager(user, projectManagerConfig);
+
+  const {
+    activeSessions, processingSessions, externalMessageUpdate,
+    incrementExternalMessageUpdate, markSessionAsActive, markSessionAsInactive,
+    markSessionAsProcessing, markSessionAsNotProcessing, replaceTemporarySession,
+    shouldSkipUpdate,
+  } = useSessionProtection(selectedProject, selectedSession as SidebarSession | null, handleSidebarRefresh);
+
+  const { ws, sendMessage, messages } = useWebSocketContext();
+
+  useAppDataSync(user, layout, activeSessions, fetchProjects, selectedSession, messages, selectedProject, shouldSkipUpdate, updateProjectsFromWebSocket, incrementExternalMessageUpdate, projects);
+
+  const tourContextValue = useMemo(() => ({ startTour }), [startTour]);
+  const sidebarCommonProps = useSidebarCommonProps(projects, selectedProject, selectedSession, handleProjectSelect, handleSessionSelect, handleNewSession, handleSessionDelete, handleProjectDelete, isLoadingProjects, handleSidebarRefresh, layout);
+  const mainContentProps = useMainContentProps(selectedProject, selectedSession, newSessionCounter, layout, ws, sendMessage, messages, isLoadingProjects, processingSessions, externalMessageUpdate, markSessionAsActive, markSessionAsInactive, markSessionAsProcessing, markSessionAsNotProcessing, replaceTemporarySession);
+  const quickSettingsProps = useQuickSettingsProps(layout);
+  const desktopSidebarProps = useDesktopSidebarProps(sidebarCommonProps, layout);
+  const mobileSidebarProps = useMobileSidebarProps(sidebarCommonProps, layout);
+  const mobileNavProps = useMobileNavProps(layout);
+  const settingsProps = useSettingsProps(layout);
+  const productTourProps = useProductTourProps(isTourActive, currentStep, TOTAL_TOUR_STEPS, nextStep, completeTour);
 
   return (
     <TourContext.Provider value={tourContextValue}>
-    <div className="fixed inset-0 flex bg-background">
-      {/* Desktop Sidebar */}
-      {!layout.isMobile && (
-        <DesktopSidebar
-          {...sidebarCommonProps}
-          sidebarVisible={layout.sidebarVisible}
-          onToggleSidebar={layout.setSidebarVisible}
-        />
-      )}
-
-      {/* Mobile Sidebar Overlay */}
-      {layout.isMobile && (
-        <MobileSidebarOverlay
-          {...sidebarCommonProps}
-          sidebarOpen={layout.sidebarOpen}
-          onClose={() => layout.setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Main Content Area */}
-      <div className={`flex-1 flex flex-col min-w-0 ${layout.isMobile && !layout.isInputFocused ? 'pb-mobile-nav' : ''}`}>
-        <MainContent
-          selectedProject={selectedProject}
-          selectedSession={selectedSession}
-          newSessionCounter={newSessionCounter}
-          activeTab={layout.activeTab}
-          setActiveTab={layout.setActiveTab}
-          ws={ws}
-          sendMessage={sendMessage}
-          messages={messages}
-          isMobile={layout.isMobile}
-          isPWA={layout.isPWA}
-          onMenuClick={() => layout.setSidebarOpen(true)}
-          isLoading={isLoadingProjects}
-          authenticatedFetch={authenticatedFetch}
-          onInputFocusChange={layout.setIsInputFocused}
-          onSessionActive={markSessionAsActive}
-          onSessionInactive={markSessionAsInactive}
-          onSessionProcessing={markSessionAsProcessing}
-          onSessionNotProcessing={markSessionAsNotProcessing}
-          processingSessions={processingSessions}
-          onReplaceTemporarySession={replaceTemporarySession}
-          onShowSettings={() => layout.setShowSettings(true)}
-          autoExpandTools={layout.autoExpandTools}
-          showRawParameters={layout.showRawParameters}
-          showThinking={layout.showThinking}
-          autoScrollToBottom={layout.autoScrollToBottom}
-          sendByCtrlEnter={layout.sendByCtrlEnter}
-          externalMessageUpdate={externalMessageUpdate}
-        />
+      <div className="fixed inset-0 flex bg-background">
+        {!layout.isMobile && <DesktopSidebar {...desktopSidebarProps} />}
+        {layout.isMobile && <MobileSidebarOverlay {...mobileSidebarProps} />}
+        <div className={`flex-1 flex flex-col min-w-0 ${layout.isMobile && !layout.isInputFocused ? 'pb-mobile-nav' : ''}`}>
+          <MainContent {...mainContentProps} />
+        </div>
+        {layout.isMobile && <MobileNav {...mobileNavProps} />}
+        {layout.activeTab === 'chat' && <QuickSettingsPanel {...quickSettingsProps} />}
+        <Settings {...settingsProps} />
+        <ProductTour {...productTourProps} />
       </div>
-
-      {/* Mobile Bottom Navigation */}
-      {layout.isMobile && (
-        <MobileNav
-          activeTab={layout.activeTab}
-          setActiveTab={layout.setActiveTab}
-          isInputFocused={layout.isInputFocused}
-        />
-      )}
-
-      {/* Quick Settings Panel */}
-      {layout.activeTab === 'chat' && (
-        <QuickSettingsPanel
-          isOpen={layout.showQuickSettings}
-          onToggle={layout.setShowQuickSettings}
-          autoExpandTools={layout.autoExpandTools}
-          onAutoExpandChange={layout.setAutoExpandTools}
-          showRawParameters={layout.showRawParameters}
-          onShowRawParametersChange={layout.setShowRawParameters}
-          showThinking={layout.showThinking}
-          onShowThinkingChange={layout.setShowThinking}
-          autoScrollToBottom={layout.autoScrollToBottom}
-          onAutoScrollChange={layout.setAutoScrollToBottom}
-          sendByCtrlEnter={layout.sendByCtrlEnter}
-          onSendByCtrlEnterChange={layout.setSendByCtrlEnter}
-          isMobile={layout.isMobile}
-        />
-      )}
-
-      {/* Settings Modal */}
-      <Settings
-        isOpen={layout.showSettings}
-        onClose={() => layout.setShowSettings(false)}
-        initialTab={layout.settingsInitialTab}
-      />
-
-      {/* Product Tour */}
-      <ProductTour
-        isActive={isTourActive}
-        currentStep={currentStep}
-        totalSteps={TOTAL_TOUR_STEPS}
-        onNext={nextStep}
-        onComplete={completeTour}
-      />
-    </div>
     </TourContext.Provider>
   );
 }
