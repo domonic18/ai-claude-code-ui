@@ -249,7 +249,7 @@ export class ContainerLifecycleManager {
 
   async _doCreateContainer(userId, userConfig) {
     const containerName = `claude-user-${userId}`;
-    const userDataDir = path.join(this.config.dataDir, 'users', `user_${userId}`, 'data`);
+    const userDataDir = path.join(this.config.dataDir, 'users', `user_${userId}`, 'data');
 
     // 同步扩展到用户目录
     await this._syncUserExtensions(userDataDir);
