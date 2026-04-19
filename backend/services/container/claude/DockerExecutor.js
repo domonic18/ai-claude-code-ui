@@ -74,7 +74,17 @@ async function saveImagesLocally(images, tempDir) {
  * @param {string} cwd - 容器内工作目录
  */
 async function createAndUploadArchive(container, tempDir, imagePaths, cwd) {
-  // 创建 images 子目录并移动文件
+  await organizeImageFiles(tempDir, imagePaths, cwd);
+  await uploadTarToContainer(container, tempDir, cwd);
+}
+
+/**
+ * 组织图片文件到 images 子目录并设置容器路径
+ * @param {string} tempDir - 临时目录
+ * @param {Array} imagePaths - 图片路径信息
+ * @param {string} cwd - 容器工作目录
+ */
+async function organizeImageFiles(tempDir, imagePaths, cwd) {
   const imagesDir = path.join(tempDir, 'images');
   await fs.mkdir(imagesDir, { recursive: true });
 
@@ -83,15 +93,40 @@ async function createAndUploadArchive(container, tempDir, imagePaths, cwd) {
     await fs.rename(img.localPath, newPath);
     img.containerPath = `${cwd}/.tmp/images/${img.filename}`;
   }
+}
 
+/**
+ * 将 tar 归档上传到容器
+ * @param {object} container - Docker 容器实例
+ * @param {string} tempDir - 临时目录
+ * @param {string} cwd - 容器工作目录
+ */
+async function uploadTarToContainer(container, tempDir, cwd) {
   // 创建 tar 文件
   const tarPath = path.join(tempDir, 'images.tar');
   await tar.c({ file: tarPath, cwd: tempDir, gzip: false }, ['images']);
   const tarBuffer = await fs.readFile(tarPath);
 
   // 确保容器内 .tmp 目录存在
+  await ensureContainerDir(container, `${cwd}/.tmp`);
+
+  // 上传 tar 到容器
+  await new Promise((resolve, reject) => {
+    container.putArchive(tarBuffer, { path: `${cwd}/.tmp` }, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
+
+/**
+ * 确保容器内目录存在
+ * @param {object} container - Docker 容器实例
+ * @param {string} dirPath - 容器内目录路径
+ */
+async function ensureContainerDir(container, dirPath) {
   const mkdirExec = await container.exec({
-    Cmd: ['mkdir', '-p', `${cwd}/.tmp`],
+    Cmd: ['mkdir', '-p', dirPath],
     AttachStdout: true,
     AttachStderr: true
   });
@@ -106,14 +141,6 @@ async function createAndUploadArchive(container, tempDir, imagePaths, cwd) {
       } else {
         resolve();
       }
-    });
-  });
-
-  // 上传 tar 到容器
-  await new Promise((resolve, reject) => {
-    container.putArchive(tarBuffer, { path: `${cwd}/.tmp` }, (err) => {
-      if (err) reject(err);
-      else resolve();
     });
   });
 }
@@ -212,11 +239,40 @@ function handleStreamProcessing(stream, stdout, stderr, writer, sessionId) {
   let dataCount = 0;
   const state = { sessionCreatedSent: false };
 
-  // 监听 stdout（SDK 输出）
+  setupStdoutHandler(stdout, stdoutChunks, writer, sessionId, state, () => { dataCount++; });
+  setupStderrHandler(stderr, stderrChunks, sessionId);
+
+  return new Promise((resolve, reject) => {
+    const context = createStreamContext(stream, stdout, stderr, resolve, reject);
+
+    setupExecutionTimeout(context, sessionId);
+    setupStreamEndHandler(context, stdoutChunks, stderrChunks, sessionId, dataCount);
+    setupStreamErrorHandler(context, sessionId);
+  });
+}
+
+/**
+ * 创建流处理上下文（共享 settled 状态和 timeout handle）
+ */
+function createStreamContext(stream, stdout, stderr, resolve, reject) {
+  return {
+    stream, stdout, stderr, resolve, reject,
+    settled: false,
+    timeoutHandle: null,
+    settle(fn, value) {
+      if (!this.settled) { this.settled = true; fn(value); }
+    },
+  };
+}
+
+/**
+ * 设置 stdout 数据处理
+ */
+function setupStdoutHandler(stdout, chunks, writer, sessionId, state, onChunk) {
   stdout.on('data', (chunk) => {
-    dataCount++;
+    onChunk();
     const output = chunk.toString();
-    stdoutChunks.push(output);
+    chunks.push(output);
 
     if (writer) {
       try {
@@ -228,11 +284,15 @@ function handleStreamProcessing(stream, stdout, stderr, writer, sessionId) {
       logger.warn('[DockerExecutor] Writer not available');
     }
   });
+}
 
-  // 监听 stderr（错误和调试信息）
+/**
+ * 设置 stderr 数据处理
+ */
+function setupStderrHandler(stderr, chunks, sessionId) {
   stderr.on('data', (chunk) => {
     const stderrText = chunk.toString();
-    stderrChunks.push(stderrText);
+    chunks.push(stderrText);
 
     if (hasRealError(stderrText)) {
       logger.error({ sessionId, stderr: stderrText.substring(0, 2000) }, '[DockerExecutor] STDERR error detected');
@@ -240,61 +300,67 @@ function handleStreamProcessing(stream, stdout, stderr, writer, sessionId) {
       logger.debug({ sessionId, stderr: stderrText.substring(0, 500) }, '[DockerExecutor] STDERR debug output');
     }
   });
+}
 
-  return new Promise((resolve, reject) => {
-    // 超时保护（可配置，0 表示禁用）
-    const timeoutMs = SDK.executionTimeout;
-    let timeoutHandle = null;
-    let settled = false;
+/**
+ * 设置执行超时保护
+ */
+function setupExecutionTimeout(ctx, sessionId) {
+  const timeoutMs = SDK.executionTimeout;
+  if (timeoutMs <= 0) {
+    logger.info('[DockerExecutor] Execution timeout disabled (SDK_EXECUTION_TIMEOUT=0)');
+    return;
+  }
 
-    const settle = (fn, value) => {
-      if (!settled) { settled = true; fn(value); }
-    };
+  const timeoutMinutes = Math.round(timeoutMs / 60000);
+  logger.info(`[DockerExecutor] Setting execution timeout: ${timeoutMinutes} minutes`);
 
-    if (timeoutMs > 0) {
-      const timeoutMinutes = Math.round(timeoutMs / 60000);
-      logger.info(`[DockerExecutor] Setting execution timeout: ${timeoutMinutes} minutes`);
-      timeoutHandle = setTimeout(() => {
-        logger.error(`[DockerExecutor] Execution timeout after ${timeoutMinutes} minutes`);
-        stdout.destroy();
-        stderr.destroy();
-        stream.destroy();
-        settle(reject, new Error(`SDK execution timeout (${timeoutMinutes} minutes)`));
-      }, timeoutMs);
-    } else {
-      logger.info('[DockerExecutor] Execution timeout disabled (SDK_EXECUTION_TIMEOUT=0)');
+  ctx.timeoutHandle = setTimeout(() => {
+    logger.error(`[DockerExecutor] Execution timeout after ${timeoutMinutes} minutes`);
+    ctx.stdout.destroy();
+    ctx.stderr.destroy();
+    ctx.stream.destroy();
+    ctx.settle(ctx.reject, new Error(`SDK execution timeout (${timeoutMinutes} minutes)`));
+  }, timeoutMs);
+}
+
+/**
+ * 设置流结束处理
+ */
+function setupStreamEndHandler(ctx, stdoutChunks, stderrChunks, sessionId, dataCount) {
+  ctx.stream.on('end', () => {
+    if (ctx.timeoutHandle) clearTimeout(ctx.timeoutHandle);
+
+    // 检查会话是否被中止
+    const session = getSession(sessionId);
+    if (!session && dataCount > 0) {
+      logger.info(`[DockerExecutor] Stream ended for session ${sessionId}, session seems to have been aborted`);
+      ctx.settle(ctx.resolve, { output: stdoutChunks.join(''), sessionId, aborted: true });
+      return;
     }
 
-    // 流结束处理
-    stream.on('end', () => {
-      if (timeoutHandle) clearTimeout(timeoutHandle);
+    const stdoutOutput = stdoutChunks.join('');
+    const stderrOutput = stderrChunks.join('');
+    logger.info({ sessionId, totalChunks: dataCount, stdoutLength: stdoutOutput.length, stderrLength: stderrOutput.length }, '[DockerExecutor] Stream ended');
 
-      // 检查会话是否被中止
-      const session = getSession(sessionId);
-      if (!session && dataCount > 0) {
-        logger.info(`[DockerExecutor] Stream ended for session ${sessionId}, session seems to have been aborted`);
-        settle(resolve, { output: stdoutChunks.join(''), sessionId, aborted: true });
-        return;
-      }
+    if (hasRealError(stderrOutput)) {
+      logger.error({ sessionId, stderr: stderrOutput.substring(0, 2000) }, '[DockerExecutor] Execution failed');
+      ctx.settle(ctx.reject, new Error(`SDK execution error: ${stderrOutput}`));
+    } else {
+      logger.info({ sessionId }, '[DockerExecutor] Execution completed successfully');
+      ctx.settle(ctx.resolve, { output: stdoutOutput, sessionId });
+    }
+  });
+}
 
-      const stdoutOutput = stdoutChunks.join('');
-      const stderrOutput = stderrChunks.join('');
-      logger.info({ sessionId, totalChunks: dataCount, stdoutLength: stdoutOutput.length, stderrLength: stderrOutput.length }, '[DockerExecutor] Stream ended');
-
-      if (hasRealError(stderrOutput)) {
-        logger.error({ sessionId, stderr: stderrOutput.substring(0, 2000) }, '[DockerExecutor] Execution failed');
-        settle(reject, new Error(`SDK execution error: ${stderrOutput}`));
-      } else {
-        logger.info({ sessionId }, '[DockerExecutor] Execution completed successfully');
-        settle(resolve, { output: stdoutOutput, sessionId });
-      }
-    });
-
-    stream.on('error', (err) => {
-      if (timeoutHandle) clearTimeout(timeoutHandle);
-      logger.error({ sessionId, err }, '[DockerExecutor] Stream error');
-      settle(reject, err);
-    });
+/**
+ * 设置流错误处理
+ */
+function setupStreamErrorHandler(ctx, sessionId) {
+  ctx.stream.on('error', (err) => {
+    if (ctx.timeoutHandle) clearTimeout(ctx.timeoutHandle);
+    logger.error({ sessionId, err }, '[DockerExecutor] Stream error');
+    ctx.settle(ctx.reject, err);
   });
 }
 

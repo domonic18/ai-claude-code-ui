@@ -18,6 +18,7 @@ import { promises as fs } from 'fs';
 import { Octokit } from '@octokit/rest';
 import { createLogger } from '../../utils/logger.js';
 import { gitSpawn } from './gitSpawn.js';
+import { buildCloneAuth } from './GitAuthHelper.js';
 
 const logger = createLogger('services/scm/GitHubService');
 
@@ -153,6 +154,59 @@ export async function getCommitMessages(projectPath, limit = 5) {
 }
 
 /**
+ * 检查目标目录是否已包含正确的仓库
+ * @param {string} cloneDir - 目标目录
+ * @param {string} githubUrl - 期望的 GitHub URL
+ * @returns {Promise<string|null>} 如果目录已存在且匹配则返回路径，否则返回 null
+ * @throws {Error} 如果目录已存在但仓库不匹配
+ */
+async function checkExistingRepo(cloneDir, githubUrl) {
+    try {
+        await fs.access(cloneDir);
+    } catch {
+        return null; // 目录不存在
+    }
+
+    // 目录已存在，检查仓库 URL
+    try {
+        const existingUrl = await getGitRemoteUrl(cloneDir);
+        if (normalizeGitHubUrl(existingUrl) === normalizeGitHubUrl(githubUrl)) {
+            logger.info({ cloneDir, githubUrl }, 'Repository already exists at path with correct URL');
+            return cloneDir;
+        }
+        throw new Error(`Directory ${cloneDir} already exists with a different repository (${existingUrl}). Expected: ${githubUrl}`);
+    } catch (gitError) {
+        if (gitError.message.includes('already exists with a different repository')) {
+            throw gitError;
+        }
+        throw new Error(`Directory ${cloneDir} already exists but is not a valid git repository`);
+    }
+}
+
+/**
+ * 执行 git clone 操作（统一有 token 和无 token 两条路径）
+ * @param {string} githubUrl - GitHub 仓库 URL
+ * @param {string} cloneDir - 目标目录
+ * @param {string|null} githubToken - GitHub 令牌
+ */
+async function performClone(githubUrl, cloneDir, githubToken) {
+    const { env, cleanup } = await buildCloneAuth(githubToken);
+
+    try {
+        await gitSpawn(['clone', '--depth', '1', githubUrl, cloneDir], process.cwd(), {
+            env,
+            timeout: 60000,
+        });
+        logger.info({ cloneDir, githubUrl }, 'Repository cloned successfully');
+    } catch (error) {
+        logger.error({ error: error.message, githubUrl, cloneDir }, 'Git clone failed');
+        throw new Error(`Git clone failed: ${error.message}`);
+    } finally {
+        await cleanup();
+    }
+}
+
+/**
  * 将 GitHub 仓库克隆到指定目录
  * @param {string} githubUrl - GitHub 仓库 URL
  * @param {string|null} githubToken - GitHub 令牌（可选，用于私有仓库）
@@ -167,66 +221,59 @@ export async function cloneGitHubRepo(githubUrl, githubToken = null, projectPath
     const cloneDir = path.resolve(projectPath);
 
     // 检查目录是否已存在
-    try {
-        await fs.access(cloneDir);
-        try {
-            const existingUrl = await getGitRemoteUrl(cloneDir);
-            if (normalizeGitHubUrl(existingUrl) === normalizeGitHubUrl(githubUrl)) {
-                logger.info({ cloneDir, githubUrl }, 'Repository already exists at path with correct URL');
-                return cloneDir;
-            }
-            throw new Error(`Directory ${cloneDir} already exists with a different repository (${existingUrl}). Expected: ${githubUrl}`);
-        } catch (gitError) {
-            throw new Error(`Directory ${cloneDir} already exists but is not a valid git repository`);
-        }
-    } catch (accessError) {
-        // 目录不存在，继续克隆
-    }
+    const existing = await checkExistingRepo(cloneDir, githubUrl);
+    if (existing) return existing;
 
     await fs.mkdir(path.dirname(cloneDir), { recursive: true });
-
     logger.info({ githubUrl, cloneDir }, 'Cloning repository');
 
-    // clone 没有 cwd（目标目录是参数），所以不能直接用 gitSpawn 的 cwd 模式
-    // 但 gitSpawn 接受任意 cwd，我们传 process.cwd() 即可
-    if (githubToken) {
-        // 安全传递凭证：创建临时 askpass 脚本，通过环境变量传 token，不暴露在 ps 进程列表
-        const tmpDir = path.join(os.tmpdir(), 'claude-ui-askpass');
-        await fs.mkdir(tmpDir, { recursive: true });
-        const askpassPath = path.join(tmpDir, `askpass-${Date.now()}.sh`);
-        const askpassContent = '#!/bin/sh\nprintf \'%s\\n\' "$GIT_ASKPASS_SECRET"\n';
+    await performClone(githubUrl, cloneDir, githubToken);
+    return cloneDir;
+}
 
-        try {
-            await fs.writeFile(askpassPath, askpassContent, { mode: 0o700 });
-
-            await gitSpawn(['clone', '--depth', '1', githubUrl, cloneDir], process.cwd(), {
-                env: {
-                    GIT_ASKPASS: askpassPath,
-                    GIT_ASKPASS_SECRET: githubToken,
-                    GIT_TERMINAL_PROMPT: '0',
-                },
-                timeout: 60000,
-            });
-
-            logger.info({ cloneDir, githubUrl }, 'Repository cloned successfully');
-            return cloneDir;
-        } catch (error) {
-            logger.error({ error: error.message, githubUrl, cloneDir }, 'Git clone failed');
-            throw new Error(`Git clone failed: ${error.message}`);
-        } finally {
-            // 清理 askpass 脚本
-            await fs.unlink(askpassPath).catch(() => {});
+/**
+ * 创建并 checkout 本地分支
+ * @param {string} projectPath - 项目路径
+ * @param {string} branchName - 分支名称
+ */
+async function checkoutBranch(projectPath, branchName) {
+    try {
+        await gitSpawn(['checkout', '-b', branchName], projectPath);
+        logger.info({ branchName }, 'Created and checked out local branch');
+        return;
+    } catch (error) {
+        if (!error.stderr || !error.stderr.includes('already exists')) {
+            throw new Error(`Failed to create branch: ${error.stderr || error.message}`);
         }
-    } else {
-        try {
-            await gitSpawn(['clone', '--depth', '1', githubUrl, cloneDir], process.cwd(), {
-                timeout: 60000,
-            });
-            logger.info({ cloneDir, githubUrl }, 'Repository cloned successfully');
-            return cloneDir;
-        } catch (error) {
-            logger.error({ error: error.message, githubUrl, cloneDir }, 'Git clone failed');
-            throw new Error(`Git clone failed: ${error.message}`);
+    }
+
+    // 分支已存在，checkout 已有分支
+    logger.info({ branchName }, 'Branch already exists locally, checking out');
+    try {
+        await gitSpawn(['checkout', branchName], projectPath);
+        logger.info({ branchName }, 'Checked out existing branch');
+    } catch (error) {
+        throw new Error(`Failed to checkout existing branch: ${error.stderr || error.message}`);
+    }
+}
+
+/**
+ * 推送分支到远程（容忍已存在的情况）
+ * @param {string} projectPath - 项目路径
+ * @param {string} branchName - 分支名称
+ */
+async function pushBranchToRemote(projectPath, branchName) {
+    try {
+        await gitSpawn(['push', '-u', 'origin', branchName], projectPath);
+        logger.info({ branchName }, 'Pushed branch to remote');
+    } catch (error) {
+        const tolerable = error.stderr && (
+            error.stderr.includes('already exists') || error.stderr.includes('up-to-date')
+        );
+        if (tolerable) {
+            logger.info({ branchName }, 'Branch already exists on remote, using existing branch');
+        } else {
+            throw new Error(`Failed to push branch: ${error.stderr || error.message}`);
         }
     }
 }
@@ -238,36 +285,8 @@ export async function cloneGitHubRepo(githubUrl, githubToken = null, projectPath
  * @returns {Promise<void>}
  */
 export async function createAndPushBranch(projectPath, branchName) {
-    // 创建并 checkout 分支
-    try {
-        await gitSpawn(['checkout', '-b', branchName], projectPath);
-        logger.info({ branchName }, 'Created and checked out local branch');
-    } catch (error) {
-        if (error.stderr && error.stderr.includes('already exists')) {
-            // 分支已存在，checkout 已有分支
-            logger.info({ branchName }, 'Branch already exists locally, checking out');
-            try {
-                await gitSpawn(['checkout', branchName], projectPath);
-                logger.info({ branchName }, 'Checked out existing branch');
-            } catch {
-                throw new Error(`Failed to checkout existing branch: ${error.stderr}`);
-            }
-        } else {
-            throw new Error(`Failed to create branch: ${error.stderr || error.message}`);
-        }
-    }
-
-    // 推送到远程
-    try {
-        await gitSpawn(['push', '-u', 'origin', branchName], projectPath);
-        logger.info({ branchName }, 'Pushed branch to remote');
-    } catch (error) {
-        if (error.stderr && (error.stderr.includes('already exists') || error.stderr.includes('up-to-date'))) {
-            logger.info({ branchName }, 'Branch already exists on remote, using existing branch');
-        } else {
-            throw new Error(`Failed to push branch: ${error.stderr || error.message}`);
-        }
-    }
+    await checkoutBranch(projectPath, branchName);
+    await pushBranchToRemote(projectPath, branchName);
 }
 
 // ─── GitHub API 操作 ───────────────────────────────────
@@ -378,6 +397,20 @@ export async function executeGitHubWorkflow(params) {
 // ─── 清理 ──────────────────────────────────────────────
 
 /**
+ * 清理关联的 Claude 会话目录
+ * @param {string|null} sessionId - 会话 ID
+ */
+async function cleanupSessionDir(sessionId) {
+    if (!sessionId) return;
+    try {
+        const sessionPath = path.join(os.homedir(), '.claude', 'sessions', sessionId);
+        await fs.rm(sessionPath, { recursive: true, force: true });
+    } catch (error) {
+        logger.warn({ sessionId, error: error.message }, 'Failed to clean up session directory');
+    }
+}
+
+/**
  * 清理临时项目目录及其 Claude 会话
  * @param {string} projectPath - 项目目录路径
  * @param {string|null} sessionId - 关联的会话 ID
@@ -386,23 +419,15 @@ export async function cleanupProject(projectPath, sessionId = null) {
     const startTime = Date.now();
     logger.info({ projectPath, sessionId }, 'cleanupProject START');
 
-    try {
-        if (!projectPath.includes('.claude/external-projects')) {
-            logger.info({ projectPath }, 'cleanupProject SKIP - not in external-projects');
-            return;
-        }
+    if (!projectPath.includes('.claude/external-projects')) {
+        logger.info({ projectPath }, 'cleanupProject SKIP - not in external-projects');
+        return;
+    }
 
+    try {
         await fs.rm(projectPath, { recursive: true, force: true });
         logger.info({ projectPath, duration: Date.now() - startTime }, 'cleanupProject cleaned');
-
-        if (sessionId) {
-            try {
-                const sessionPath = path.join(os.homedir(), '.claude', 'sessions', sessionId);
-                await fs.rm(sessionPath, { recursive: true, force: true });
-            } catch (error) {
-                logger.warn({ sessionId, error: error.message }, 'Failed to clean up session directory');
-            }
-        }
+        await cleanupSessionDir(sessionId);
     } catch (error) {
         logger.error({ error: error.message, projectPath }, 'cleanupProject FAILED');
     }
