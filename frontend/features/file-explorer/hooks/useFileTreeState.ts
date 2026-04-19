@@ -8,13 +8,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api } from '@/shared/services';
 import { filterFileTree, isImageFile } from '../utils/fileTreeHelpers';
-import { logger } from '@/shared/utils/logger';
+import { useFileTreeFetch } from './useFileTreeFetch';
 import type { FileNode, FileViewMode, SelectedFile, SelectedImage } from '../types/file-explorer.types';
-
-/** Request timeout in milliseconds */
-const REQUEST_TIMEOUT_MS = 10000;
 
 interface UseFileTreeStateReturn {
   // State
@@ -76,45 +72,13 @@ export function useFileTreeState({
   const [filteredFiles, setFilteredFiles] = useState<FileNode[]>([]);
   const [showNewMenu, setShowNewMenu] = useState(false);
 
-  // Fetch files from API
-  const fetchFiles = useCallback(async () => {
-    if (!selectedProject) return;
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-      const data = await api.fileTree.listFiles(
-        selectedProject.path,
-        controller.signal
-      );
-      clearTimeout(timeoutId);
-
-      setFiles(data.files || []);
-      logger.info('FileTree: Files loaded', {
-        projectId: selectedProject.path,
-        count: data.files?.length || 0
-      });
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        logger.warn('FileTree: Request timeout', { projectId: selectedProject.path });
-      } else {
-        logger.error('FileTree: Failed to load files', {
-          projectId: selectedProject.path,
-          error
-        });
-      }
-      setFiles([]);
-    }
-  }, [selectedProject]);
-
-  // Load files when project changes
-  useEffect(() => {
-    if (selectedProject) {
-      setLoading(true);
-      fetchFiles().finally(() => setLoading(false));
-    }
-  }, [selectedProject, fetchFiles]);
+  // File fetching
+  const { fetchFiles } = useFileTreeFetch({
+    selectedProject,
+    setFiles,
+    setLoading,
+    setExpandedDirs,
+  });
 
   // Load view mode preference from localStorage
   useEffect(() => {

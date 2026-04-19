@@ -19,6 +19,63 @@ interface MemoryData {
 }
 
 /**
+ * Memory Editor Component
+ *
+ * Renders the textarea editor with save button for editing memory content.
+ */
+interface MemoryEditorProps {
+  content: string;
+  isLoading: boolean;
+  isSaving: boolean;
+  onSave: () => void;
+  onChange: (value: string) => void;
+}
+
+function MemoryEditor({ content, isLoading, isSaving, onSave, onChange }: MemoryEditorProps) {
+  const { t } = useTranslation();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <textarea
+        id="memory-editor"
+        value={content}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full h-[60vh] min-h-[400px] p-4 font-mono text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-y"
+        placeholder={t('memory.placeholder')}
+        spellCheck={false}
+      />
+      <div className="flex justify-end">
+        <Button
+          key={isSaving ? 'saving' : 'idle'}
+          onClick={onSave}
+          disabled={isSaving || isLoading}
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2" />
+              {t('memory.saving')}
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4 mr-2" />
+              {t('memory.save')}
+            </>
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
  * 记忆页面组件
  */
 export function MemoryPage() {
@@ -111,41 +168,13 @@ export function MemoryPage() {
         )}
 
         {/* Editor */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 text-primary animate-spin" />
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <textarea
-              id="memory-editor"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="w-full h-[60vh] min-h-[400px] p-4 font-mono text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-y"
-              placeholder={t('memory.placeholder')}
-              spellCheck={false}
-            />
-            <div className="flex justify-end">
-              <Button
-                key={isSaving ? 'saving' : 'idle'}
-                onClick={handleSave}
-                disabled={isSaving || isLoading}
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2" />
-                    {t('memory.saving')}
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-2" />
-                    {t('memory.save')}
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        )}
+        <MemoryEditor
+          content={content}
+          isLoading={isLoading}
+          isSaving={isSaving}
+          onSave={handleSave}
+          onChange={setContent}
+        />
       </main>
     </div>
   );

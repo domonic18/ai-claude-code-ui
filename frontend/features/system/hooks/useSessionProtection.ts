@@ -52,22 +52,12 @@ function isUpdateAdditive(
 }
 
 /**
- * Session Protection Hook
- *
- * Manages active sessions to prevent project updates during conversations.
+ * Create session state tracking callback helpers
  */
-export function useSessionProtection(
-  selectedProject: Project | null,
-  selectedSession: SidebarSession | null,
-  onRefresh?: () => Promise<void>
-): UseSessionProtectionReturn {
-  const [activeSessions, setActiveSessions] = useState<Set<string>>(new Set());
-  const [processingSessions, setProcessingSessions] = useState<Set<string>>(new Set());
-  const [externalMessageUpdate, setExternalMessageUpdate] = useState(0);
-
-  /**
-   * Mark a session as active (in conversation)
-   */
+function createSessionStateCallbacks(
+  setActiveSessions: React.Dispatch<React.SetStateAction<Set<string>>>,
+  setProcessingSessions: React.Dispatch<React.SetStateAction<Set<string>>>
+) {
   const markSessionAsActive = useCallback((sessionId: string) => {
     if (sessionId) {
       setActiveSessions(prev => new Set([...prev, sessionId]));
@@ -75,9 +65,6 @@ export function useSessionProtection(
     }
   }, []);
 
-  /**
-   * Mark a session as inactive (conversation ended)
-   */
   const markSessionAsInactive = useCallback((sessionId: string) => {
     if (sessionId) {
       setActiveSessions(prev => {
@@ -89,9 +76,6 @@ export function useSessionProtection(
     }
   }, []);
 
-  /**
-   * Mark a session as processing (executing command)
-   */
   const markSessionAsProcessing = useCallback((sessionId: string) => {
     if (sessionId) {
       setProcessingSessions(prev => new Set([...prev, sessionId]));
@@ -99,9 +83,6 @@ export function useSessionProtection(
     }
   }, []);
 
-  /**
-   * Mark a session as not processing (command completed)
-   */
   const markSessionAsNotProcessing = useCallback((sessionId: string) => {
     if (sessionId) {
       setProcessingSessions(prev => {
@@ -113,13 +94,31 @@ export function useSessionProtection(
     }
   }, []);
 
-  /**
-   * Clear all active sessions
-   */
   const clearAllActiveSessions = useCallback(() => {
     setActiveSessions(new Set());
     logger.info('[SessionProtection] All active sessions cleared');
   }, []);
+
+  return {
+    markSessionAsActive,
+    markSessionAsInactive,
+    markSessionAsProcessing,
+    markSessionAsNotProcessing,
+    clearAllActiveSessions,
+  };
+}
+
+export function useSessionProtection(
+  selectedProject: Project | null,
+  selectedSession: SidebarSession | null,
+  onRefresh?: () => Promise<void>
+): UseSessionProtectionReturn {
+  const [activeSessions, setActiveSessions] = useState<Set<string>>(new Set());
+  const [processingSessions, setProcessingSessions] = useState<Set<string>>(new Set());
+  const [externalMessageUpdate, setExternalMessageUpdate] = useState(0);
+
+  // Create session state callbacks
+  const sessionCallbacks = createSessionStateCallbacks(setActiveSessions, setProcessingSessions);
 
   /**
    * Check if there's any active session
@@ -168,7 +167,7 @@ export function useSessionProtection(
       if (selectedProject) {
         localStorage.setItem('lastProjectName', selectedProject.name);
       }
-      
+
       // Refresh sidebar to show the new session
       if (onRefresh) {
         logger.info('[SessionProtection] Refreshing sidebar to show new session');
@@ -221,12 +220,8 @@ export function useSessionProtection(
     processingSessions,
     externalMessageUpdate,
     incrementExternalMessageUpdate,
-    markSessionAsActive,
-    markSessionAsInactive,
-    markSessionAsProcessing,
-    markSessionAsNotProcessing,
+    ...sessionCallbacks,
     replaceTemporarySession,
-    clearAllActiveSessions,
     hasActiveSession,
     isSessionActive,
     isSessionProcessing,

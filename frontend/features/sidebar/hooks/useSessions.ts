@@ -96,11 +96,56 @@ export function useSessions(): UseSessionsReturn {
 
   /**
    * Initialize hasMore state from project sessionMeta
-   * This is called when projects are initially loaded
    */
   const initializeHasMore = useCallback((projectName: string, hasMoreValue: boolean) => {
     setHasMore(prev => ({ ...prev, [projectName]: hasMoreValue }));
   }, []);
+
+  // Use CRUD helpers
+  const { renameSession, deleteSession } = useSessionCRUDOperations(service, {
+    setSessions,
+    setAdditionalSessions,
+  });
+
+  /**
+   * Reset all session data (e.g., when projects list changes)
+   */
+  const reset = useCallback(() => {
+    setSessions({});
+    setAdditionalSessions({});
+    setHasMore({});
+  }, []);
+
+  return {
+    sessions,
+    loadingSessions,
+    additionalSessions,
+    hasMore,
+    loadMoreSessions,
+    initializeHasMore,
+    renameSession,
+    deleteSession,
+    reset,
+  };
+}
+
+/**
+ * useSessionCRUDOperations Hook
+ *
+ * Handles session CRUD operations with local state updates.
+ *
+ * @param service - Sidebar service
+ * @param setters - State setters
+ * @returns CRUD operation functions
+ */
+function useSessionCRUDOperations(
+  service: ReturnType<typeof getSidebarService>,
+  setters: {
+    setSessions: React.Dispatch<React.SetStateAction<Record<string, Session[]>>>;
+    setAdditionalSessions: React.Dispatch<React.SetStateAction<Record<string, Session[]>>>;
+  }
+) {
+  const { setSessions, setAdditionalSessions } = setters;
 
   /**
    * Rename a session
@@ -132,7 +177,7 @@ export function useSessions(): UseSessionsReturn {
       logger.error(`Error renaming session ${sessionId}:`, err);
       throw err;
     }
-  }, [service]);
+  }, [service, setSessions, setAdditionalSessions]);
 
   /**
    * Delete a session
@@ -162,27 +207,11 @@ export function useSessions(): UseSessionsReturn {
       logger.error(`Error deleting session ${sessionId}:`, err);
       throw err;
     }
-  }, [service]);
-
-  /**
-   * Reset all session data (e.g., when projects list changes)
-   */
-  const reset = useCallback(() => {
-    setSessions({});
-    setAdditionalSessions({});
-    setHasMore({});
-  }, []);
+  }, [service, setSessions, setAdditionalSessions]);
 
   return {
-    sessions,
-    loadingSessions,
-    additionalSessions,
-    hasMore,
-    loadMoreSessions,
-    initializeHasMore,
     renameSession,
     deleteSession,
-    reset,
   };
 }
 

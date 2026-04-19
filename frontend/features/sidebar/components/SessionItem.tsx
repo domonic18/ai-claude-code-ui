@@ -87,6 +87,67 @@ function SessionItemRenaming({
 }
 
 /**
+ * Session Item Actions Component
+ *
+ * Renders the hover action buttons for session items (edit/delete).
+ */
+interface SessionItemActionsProps {
+  isCursorProvider: boolean;
+  onEdit: (e: React.MouseEvent) => void;
+  onDelete: (e: React.MouseEvent) => void;
+}
+
+function SessionItemActions({ isCursorProvider, onEdit, onDelete }: SessionItemActionsProps) {
+  return (
+    <>
+      {/* Hover Action Buttons - Desktop only */}
+      <div className="hidden md:block absolute right-2 top-1/2 transform -translate-y-1/2">
+        <div className="flex items-center gap-1 invisible group-hover:visible transition-all duration-200">
+          {/* Edit Button */}
+          <button
+            className="w-6 h-6 bg-gray-50 hover:bg-gray-100 dark:bg-gray-900/20 dark:hover:bg-gray-900/40 rounded flex items-center justify-center"
+            onClick={onEdit}
+            title="Manually edit session name"
+          >
+            <svg className="w-3 h-3 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
+            </svg>
+          </button>
+
+          {/* Delete Button (only for non-Cursor sessions) */}
+          {!isCursorProvider && (
+            <button
+              className="w-6 h-6 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded flex items-center justify-center"
+              onClick={onDelete}
+              title="Delete this session permanently"
+            >
+              <svg className="w-3 h-3 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6" />
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Mobile Delete Button - Always visible */}
+      <div className="md:hidden absolute right-2 top-1/2 transform -translate-y-1/2">
+        {!isCursorProvider && (
+          <button
+            className="w-5 h-5 rounded-md bg-red-50 dark:bg-red-900/20 flex items-center justify-center active:scale-95 transition-transform opacity-70"
+            onClick={onDelete}
+            title="Delete this session"
+          >
+            <svg className="w-2.5 h-2.5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6" />
+            </svg>
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
+/**
  * SessionItemNormal Component
  *
  * Renders the normal session display with hover actions (edit/delete buttons).
@@ -157,58 +218,17 @@ function SessionItemNormal({
         </div>
       </div>
 
-      {/* Hover Action Buttons - Desktop only */}
-      <div className="hidden md:block absolute right-2 top-1/2 transform -translate-y-1/2">
-        <div className="flex items-center gap-1 invisible group-hover:visible transition-all duration-200">
-          {/* Edit Button */}
-          <button
-            className="w-6 h-6 bg-gray-50 hover:bg-gray-100 dark:bg-gray-900/20 dark:hover:bg-gray-900/40 rounded flex items-center justify-center"
-            onClick={(e) => {
-              e.stopPropagation();
-              onStartRename();
-            }}
-            title="Manually edit session name"
-          >
-            <svg className="w-3 h-3 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
-            </svg>
-          </button>
-
-          {/* Delete Button (only for non-Cursor sessions) */}
-          {session.__provider !== 'cursor' && (
-            <button
-              className="w-6 h-6 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded flex items-center justify-center"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-              title="Delete this session permanently"
-            >
-              <svg className="w-3 h-3 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6" />
-              </svg>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Mobile Delete Button - Always visible */}
-      <div className="md:hidden absolute right-2 top-1/2 transform -translate-y-1/2">
-        {session.__provider !== 'cursor' && (
-          <button
-            className="w-5 h-5 rounded-md bg-red-50 dark:bg-red-900/20 flex items-center justify-center active:scale-95 transition-transform opacity-70"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            title="Delete this session"
-          >
-            <svg className="w-2.5 h-2.5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6" />
-            </svg>
-          </button>
-        )}
-      </div>
+      <SessionItemActions
+        isCursorProvider={session.__provider === 'cursor'}
+        onEdit={(e) => {
+          e.stopPropagation();
+          onStartRename();
+        }}
+        onDelete={(e) => {
+          e.stopPropagation();
+          onDelete();
+        }}
+      />
     </div>
   );
 }

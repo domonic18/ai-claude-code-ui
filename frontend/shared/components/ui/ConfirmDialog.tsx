@@ -101,6 +101,90 @@ const ICON_PATHS = {
 } as const;
 
 /**
+ * DialogBody Component
+ *
+ * Renders the main content of the confirmation dialog.
+ *
+ * @param props - DialogBody props
+ */
+function DialogBody({
+  type,
+  title,
+  message,
+  confirmLabel,
+  cancelLabel,
+  loadingLabel,
+  isLoading,
+  onConfirm,
+  onCancel,
+  confirmButtonRef,
+}: Omit<ConfirmDialogProps, 'isOpen'> & { confirmButtonRef: React.RefObject<HTMLButtonElement> }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <button
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={isLoading ? undefined : onCancel}
+        aria-label="Close dialog"
+        disabled={isLoading}
+        tabIndex={-1}
+      />
+
+      {/* Dialog Content */}
+      <div
+        className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-md mx-4 p-6"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dialog-title"
+        aria-describedby="dialog-description"
+      >
+        {/* Icon and Title */}
+        <div className="flex items-start gap-4">
+          <div className={cn('flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center', ICON_STYLES[type])}>
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICON_PATHS[type]} />
+            </svg>
+          </div>
+
+          <div className="flex-1">
+            <h3 id="dialog-title" className="text-lg font-semibold text-gray-900 dark:text-white">
+              {title}
+            </h3>
+            <p id="dialog-description" className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              {message}
+            </p>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-3 mt-6 justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onCancel}
+            disabled={isLoading}
+          >
+            {cancelLabel}
+          </Button>
+          <Button
+            ref={confirmButtonRef}
+            variant={BUTTON_VARIANTS[type]}
+            size="sm"
+            onClick={onConfirm}
+            disabled={isLoading}
+          >
+            {isLoading && (
+              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            )}
+            {isLoading ? loadingLabel : confirmLabel}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * ConfirmDialog Component
  *
  * @param props - ConfirmDialog props
@@ -163,71 +247,21 @@ export function ConfirmDialog({
 
   if (!isOpen) return null;
 
-  const dialogContent = (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <button
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={isLoading ? undefined : onCancel}
-        aria-label="Close dialog"
-        disabled={isLoading}
-        tabIndex={-1}
-      />
-
-      {/* Dialog Content */}
-      <div
-        className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-md mx-4 p-6"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="dialog-title"
-        aria-describedby="dialog-description"
-      >
-        {/* Icon and Title */}
-        <div className="flex items-start gap-4">
-          <div className={cn('flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center', ICON_STYLES[type])}>
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICON_PATHS[type]} />
-            </svg>
-          </div>
-
-          <div className="flex-1">
-            <h3 id="dialog-title" className="text-lg font-semibold text-gray-900 dark:text-white">
-              {title}
-            </h3>
-            <p id="dialog-description" className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              {message}
-            </p>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-3 mt-6 justify-end">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onCancel}
-            disabled={isLoading}
-          >
-            {cancelLabel}
-          </Button>
-          <Button
-            ref={confirmButtonRef}
-            variant={BUTTON_VARIANTS[type]}
-            size="sm"
-            onClick={handleConfirm}
-            disabled={isLoading}
-          >
-            {isLoading && (
-              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            )}
-            {isLoading ? loadingLabel : confirmLabel}
-          </Button>
-        </div>
-      </div>
-    </div>
+  return createPortal(
+    <DialogBody
+      type={type}
+      title={title}
+      message={message}
+      confirmLabel={confirmLabel}
+      cancelLabel={cancelLabel}
+      loadingLabel={loadingLabel}
+      isLoading={isLoading}
+      onConfirm={handleConfirm}
+      onCancel={onCancel}
+      confirmButtonRef={confirmButtonRef}
+    />,
+    document.body
   );
-
-  return createPortal(dialogContent, document.body);
 }
 
 export default ConfirmDialog;

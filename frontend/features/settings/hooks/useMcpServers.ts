@@ -10,6 +10,45 @@ import { getSettingsService } from '../services/settingsService';
 import type { McpServer } from '../types/settings.types';
 import { logger } from '@/shared/utils/logger';
 
+/**
+ * Helper function to handle MCP server operations with error handling
+ */
+async function handleMcpOperation<T>(
+  operation: () => Promise<T>,
+  errorMessage: string,
+  setLoading: (loading: boolean) => void,
+  setError: (error: string | null) => void
+): Promise<T> {
+  try {
+    setLoading(true);
+    setError(null);
+    return await operation();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : errorMessage;
+    setError(message);
+    logger.error('[handleMcpOperation]', err);
+    throw err;
+  } finally {
+    setLoading(false);
+  }
+}
+
+/**
+ * Helper to clean up server-related data
+ */
+function cleanupServerData<T>(
+  prev: Record<string, T>,
+  serverId: string
+): Record<string, T> {
+  const updated = { ...prev };
+  Object.keys(updated).forEach(key => {
+    if (key.endsWith(`-${serverId}`)) {
+      delete updated[key];
+    }
+  });
+  return updated;
+}
+
 export interface McpServerState {
   servers: McpServer[];
   loading: boolean;
@@ -56,94 +95,57 @@ export function useMcpServers(): UseMcpServersReturn {
 
   // Fetch all servers
   const fetchServers = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await service.getMcpServers();
-      setServers(data);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch MCP servers';
-      setError(message);
-      logger.error('[useMcpServers] Error fetching servers:', err);
-    } finally {
-      setLoading(false);
-    }
+    const data = await handleMcpOperation(
+      () => service.getMcpServers(),
+      'Failed to fetch MCP servers',
+      setLoading,
+      setError
+    );
+    setServers(data);
   }, [service]);
 
   // Create server
   const createServer = useCallback(async (server: Partial<McpServer>) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await service.createMcpServer(server);
-      if (result.success) {
-        await fetchServers();
-      }
-      return result;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create MCP server';
-      setError(message);
-      return { success: false, error: message };
-    } finally {
-      setLoading(false);
+    const result = await handleMcpOperation(
+      () => service.createMcpServer(server),
+      'Failed to create MCP server',
+      setLoading,
+      setError
+    );
+    if (result.success) {
+      await fetchServers();
     }
+    return result;
   }, [service, fetchServers]);
 
   // Update server
   const updateServer = useCallback(async (id: string, server: Partial<McpServer>) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await service.updateMcpServer(id, server);
-      if (result.success) {
-        await fetchServers();
-      }
-      return result;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to update MCP server';
-      setError(message);
-      return { success: false, error: message };
-    } finally {
-      setLoading(false);
+    const result = await handleMcpOperation(
+      () => service.updateMcpServer(id, server),
+      'Failed to update MCP server',
+      setLoading,
+      setError
+    );
+    if (result.success) {
+      await fetchServers();
     }
+    return result;
   }, [service, fetchServers]);
 
   // Delete server
   const deleteServer = useCallback(async (id: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await service.deleteMcpServer(id);
-      if (result.success) {
-        await fetchServers();
-        // Clear test results and tools for deleted server
-        setTestResults(prev => {
-          const updated = { ...prev };
-          Object.keys(updated).forEach(key => {
-            if (key.endsWith(`-${id}`)) {
-              delete updated[key];
-            }
-          });
-          return updated;
-        });
-        setServerTools(prev => {
-          const updated = { ...prev };
-          Object.keys(updated).forEach(key => {
-            if (key.endsWith(`-${id}`)) {
-              delete updated[key];
-            }
-          });
-          return updated;
-        });
-      }
-      return result;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to delete MCP server';
-      setError(message);
-      return { success: false, error: message };
-    } finally {
-      setLoading(false);
+    const result = await handleMcpOperation(
+      () => service.deleteMcpServer(id),
+      'Failed to delete MCP server',
+      setLoading,
+      setError
+    );
+    if (result.success) {
+      await fetchServers();
+      setTestResults(prev => cleanupServerData(prev, id));
+      setServerTools(prev => cleanupServerData(prev, id));
     }
+    return result;
   }, [service, fetchServers]);
 
   // Test server
@@ -151,11 +153,7 @@ export function useMcpServers(): UseMcpServersReturn {
     try {
       setError(null);
       const result = await service.testMcpServer(id);
-      // Store test result by server ID
-      setTestResults(prev => ({
-        ...prev,
-        [id]: result
-      }));
+      setTestResults(prev => ({ ...prev, [id]: result }));
       return result;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to test MCP server';
@@ -170,12 +168,8 @@ export function useMcpServers(): UseMcpServersReturn {
       setError(null);
       setToolsLoading(prev => ({ ...prev, [id]: true }));
       const result = await service.discoverMcpTools(id);
-      // Store tools data by server ID
       if (result.success) {
-        setServerTools(prev => ({
-          ...prev,
-          [id]: result.data
-        }));
+        setServerTools(prev => ({ ...prev, [id]: result.data }));
       }
       return result;
     } catch (err) {

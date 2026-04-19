@@ -21,6 +21,98 @@ export interface UserMenuProps {
   onShowSettings?: () => void;
 }
 
+/**
+ * User Menu Dropdown Component
+ *
+ * Renders the dropdown menu items when the user menu is open.
+ */
+interface UserMenuDropdownProps {
+  displayName: string;
+  onShowSettings?: () => void;
+  isAdmin: boolean;
+  onClose: () => void;
+  onLogout: () => void;
+}
+
+function UserMenuDropdown({
+  displayName,
+  onShowSettings,
+  isAdmin,
+  onClose,
+  onLogout
+}: UserMenuDropdownProps) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border border-border rounded-lg shadow-lg overflow-hidden">
+      {/* 用户信息区域 */}
+      <div className="px-4 py-3 border-b border-border">
+        <p className="text-xs text-muted-foreground">{t('common.loggedInAs')}</p>
+        <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
+      </div>
+
+      {/* 菜单项 */}
+      <div className="py-1">
+        {/* 语言切换 */}
+        <div className="px-4 py-2 hover:bg-accent/50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Languages className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm text-foreground">{t('common.language')}</span>
+            </div>
+            <LanguageSwitcher variant="text" />
+          </div>
+        </div>
+
+        {/* 记忆管理 */}
+        <Link
+          to="/memory"
+          onClick={onClose}
+          className="w-full px-4 py-2 flex items-center gap-3 hover:bg-accent/50 transition-colors"
+        >
+          <Brain className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm text-foreground">{t('memory.title')}</span>
+        </Link>
+
+        {/* 设置 */}
+        {onShowSettings && (
+          <button
+            onClick={() => {
+              onShowSettings();
+              onClose();
+            }}
+            className="w-full px-4 py-2 flex items-center gap-3 hover:bg-accent/50 transition-colors"
+          >
+            <Settings className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm text-foreground">{t('common.settings')}</span>
+          </button>
+        )}
+
+        {/* 管理控制台 - 仅对管理员显示 */}
+        {isAdmin && (
+          <Link
+            to="/admin"
+            onClick={onClose}
+            className="w-full px-4 py-2 flex items-center gap-3 hover:bg-accent/50 transition-colors"
+          >
+            <Shield className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm text-foreground">{t('common.adminConsole')}</span>
+          </Link>
+        )}
+
+        {/* 退出登录 */}
+        <button
+          onClick={onLogout}
+          className="w-full px-4 py-2 flex items-center gap-3 hover:bg-accent/50 transition-colors text-red-600 dark:text-red-400"
+        >
+          <LogOut className="w-4 h-4" />
+          <span className="text-sm font-medium">{t('common.logout')}</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export const UserMenu = ({
   onShowSettings,
 }: UserMenuProps) => {
@@ -50,11 +142,6 @@ export const UserMenu = ({
 
   const handleLogout = async () => {
     await logout();
-    setIsOpen(false);
-  };
-
-  const handleSettings = () => {
-    onShowSettings?.();
     setIsOpen(false);
   };
 
@@ -91,69 +178,13 @@ export const UserMenu = ({
 
       {/* 下拉菜单 */}
       {isOpen && (
-        <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border border-border rounded-lg shadow-lg overflow-hidden">
-          {/* 用户信息区域 */}
-          <div className="px-4 py-3 border-b border-border">
-            <p className="text-xs text-muted-foreground">{t('common.loggedInAs')}</p>
-            <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
-          </div>
-
-          {/* 菜单项 */}
-          <div className="py-1">
-            {/* 语言切换 */}
-            <div className="px-4 py-2 hover:bg-accent/50">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Languages className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm text-foreground">{t('common.language')}</span>
-                </div>
-                <LanguageSwitcher variant="text" />
-              </div>
-            </div>
-
-            {/* 记忆管理 */}
-            <Link
-              to="/memory"
-              onClick={() => setIsOpen(false)}
-              className="w-full px-4 py-2 flex items-center gap-3 hover:bg-accent/50 transition-colors"
-            >
-              <Brain className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm text-foreground">{t('memory.title')}</span>
-            </Link>
-
-            {/* 设置 */}
-            {onShowSettings && (
-              <button
-                onClick={handleSettings}
-                className="w-full px-4 py-2 flex items-center gap-3 hover:bg-accent/50 transition-colors"
-              >
-                <Settings className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm text-foreground">{t('common.settings')}</span>
-              </button>
-            )}
-
-            {/* 管理控制台 - 仅对管理员显示 */}
-            {isAdmin && (
-              <Link
-                to="/admin"
-                onClick={() => setIsOpen(false)}
-                className="w-full px-4 py-2 flex items-center gap-3 hover:bg-accent/50 transition-colors"
-              >
-                <Shield className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm text-foreground">{t('common.adminConsole')}</span>
-              </Link>
-            )}
-
-            {/* 退出登录 */}
-            <button
-              onClick={handleLogout}
-              className="w-full px-4 py-2 flex items-center gap-3 hover:bg-accent/50 transition-colors text-red-600 dark:text-red-400"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="text-sm font-medium">{t('common.logout')}</span>
-            </button>
-          </div>
-        </div>
+        <UserMenuDropdown
+          displayName={displayName}
+          onShowSettings={onShowSettings}
+          isAdmin={isAdmin}
+          onClose={() => setIsOpen(false)}
+          onLogout={handleLogout}
+        />
       )}
     </div>
   );

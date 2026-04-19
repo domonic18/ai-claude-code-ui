@@ -144,29 +144,55 @@ export function FileTreeItem({
           </div>
 
           {!isRenaming && (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0 hover:bg-primary hover:text-primary-foreground"
-                onClick={onRenameStart}
-              >
-                <Edit2 className="w-3 h-3" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                onClick={onDelete}
-                disabled={isDeleting}
-              >
-                <Trash2 className="w-3 h-3" />
-              </Button>
-            </>
+            <FileTreeItemActions
+              onRenameStart={onRenameStart}
+              onDelete={onDelete}
+              isDeleting={isDeleting}
+            />
           )}
         </div>
       </Button>
     </div>
+  );
+}
+
+/**
+ * FileTreeItemActions Component
+ *
+ * Renders the action buttons for a file tree item.
+ *
+ * @param props - Component props
+ * @returns Action buttons JSX
+ */
+function FileTreeItemActions({
+  onRenameStart,
+  onDelete,
+  isDeleting,
+}: {
+  onRenameStart: (e: React.MouseEvent) => void;
+  onDelete: (e: React.MouseEvent) => void;
+  isDeleting: boolean;
+}): JSX.Element {
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-6 w-6 p-0 hover:bg-primary hover:text-primary-foreground"
+        onClick={onRenameStart}
+      >
+        <Edit2 className="w-3 h-3" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+        onClick={onDelete}
+        disabled={isDeleting}
+      >
+        <Trash2 className="w-3 h-3" />
+      </Button>
+    </>
   );
 }
 

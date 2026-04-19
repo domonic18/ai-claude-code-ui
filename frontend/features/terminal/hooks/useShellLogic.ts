@@ -7,6 +7,43 @@ import type { ShellProps } from '../types/terminal.types';
 import { useTerminalConnection } from './useTerminalConnection';
 import { useTerminalSetup } from './useTerminalSetup';
 
+/**
+ * Auto-reconnect on session change
+ */
+function useAutoReconnect(
+  selectedSession: ShellProps['selectedSession'],
+  isInitialized: boolean,
+  disconnectFromShell: () => void
+) {
+  const [lastSessionId, setLastSessionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const currentSessionId = selectedSession?.id || null;
+    if (lastSessionId !== null && lastSessionId !== currentSessionId && isInitialized) {
+      disconnectFromShell();
+    }
+    setLastSessionId(currentSessionId);
+  }, [selectedSession?.id, isInitialized, disconnectFromShell, lastSessionId]);
+}
+
+/**
+ * Auto-connect when conditions are met
+ */
+function useAutoConnect(
+  autoConnect: boolean,
+  isInitialized: boolean,
+  isConnecting: boolean,
+  isConnected: boolean,
+  userDisconnected: boolean,
+  connect: () => void
+) {
+  useEffect(() => {
+    if (userDisconnected) return;
+    if (!autoConnect || !isInitialized || isConnecting || isConnected) return;
+    connect();
+  }, [autoConnect, isInitialized, isConnecting, isConnected, connect, userDisconnected]);
+}
+
 export function useShellLogic({
   selectedProject,
   selectedSession,
@@ -26,7 +63,6 @@ export function useShellLogic({
 }) {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isRestarting, setIsRestarting] = useState(false);
-  const [lastSessionId, setLastSessionId] = useState<string | null>(null);
 
   // Refs for stable callback access
   const selectedProjectRef = useRef(selectedProject);
@@ -120,20 +156,10 @@ export function useShellLogic({
   }, [disconnect, terminal]);
 
   // Auto-reconnect on session change
-  useEffect(() => {
-    const currentSessionId = selectedSession?.id || null;
-    if (lastSessionId !== null && lastSessionId !== currentSessionId && isInitialized) {
-      disconnectFromShell();
-    }
-    setLastSessionId(currentSessionId);
-  }, [selectedSession?.id, isInitialized, disconnectFromShell, lastSessionId]);
+  useAutoReconnect(selectedSession, isInitialized, disconnectFromShell);
 
   // Auto-connect effect
-  useEffect(() => {
-    if (userDisconnected) return;
-    if (!autoConnect || !isInitialized || isConnecting || isConnected) return;
-    connect();
-  }, [autoConnect, isInitialized, isConnecting, isConnected, connect, userDisconnected]);
+  useAutoConnect(autoConnect, isInitialized, isConnecting, isConnected, userDisconnected, connect);
 
   return {
     terminalRef,

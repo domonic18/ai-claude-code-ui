@@ -6,10 +6,10 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useDropzone } from 'react-dropzone';
 import { logger } from '@/shared/utils/logger';
 import { MAX_FILE_SIZE, STORAGE_KEYS } from '../constants';
 import type { FileAttachment } from '../types';
+import { useFileUploadHandler } from './useFileUploadHandler';
 
 interface UseChatInputStateOptions {
   /** Current input value */
@@ -123,100 +123,6 @@ export function useChatInputState({
   }, [onFocusChange]);
 
   /**
-   * Handle file upload to server
-   */
-  const handleFileUpload = useCallback(async (file: File, attachment: FileAttachment) => {
-    if (!authenticatedFetch) {
-      logger.error('[handleFileUpload] authenticatedFetch not available');
-      attachment.error = 'Upload service unavailable';
-      onAddFile?.(attachment);
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('file', file);
-    if (selectedProject) {
-      formData.append('project', selectedProject.name);
-    }
-
-    try {
-      attachment.uploadProgress = 0;
-      // Only add file once on initial upload
-      onAddFile?.(attachment);
-
-      const response = await authenticatedFetch('/api/files/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        logger.error('[handleFileUpload] Upload failed:', response.status, errorText);
-        throw new Error(`Upload failed: ${response.status} ${errorText}`);
-      }
-
-      const data = await response.json();
-      attachment.path = data.data?.path;
-      attachment.uploadProgress = 100;
-      // Update the existing file instead of adding a duplicate
-      onAddFile?.(attachment);
-    } catch (error) {
-      logger.error('[handleFileUpload] File upload error:', error);
-      attachment.error = error instanceof Error ? error.message : 'Upload failed';
-      // Update the existing file with error state
-      onAddFile?.(attachment);
-    }
-  }, [authenticatedFetch, selectedProject, onAddFile]);
-
-  /**
-   * Handle file drop
-   */
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    acceptedFiles.forEach(file => {
-      if (file.size > maxFileSize) {
-        logger.error(`File ${file.name} exceeds maximum size of ${maxFileSize} bytes`);
-        return;
-      }
-
-      const attachment: FileAttachment = {
-        id: `${file.name}-${Date.now()}`, // Generate unique ID
-        name: file.name,
-        size: file.size,
-        type: file.type,
-      };
-
-      if (file.type.startsWith('image/')) {
-        // For images, store as base64 data URL
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          attachment.data = e.target?.result as string;
-          onAddFile?.(attachment);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        // For documents, upload to server and store path
-        handleFileUpload(file, attachment);
-      }
-    });
-  }, [maxFileSize, onAddFile, handleFileUpload]);
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    noClick: true,
-    noKeyboard: true,
-    accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp'],
-      'application/pdf': ['.pdf'],
-      'application/msword': ['.doc'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-      'text/markdown': ['.md'],
-      'text/plain': ['.txt'],
-      'application/json': ['.json'],
-      'text/csv': ['.csv'],
-    },
-  });
-
-  /**
    * Handle remove file
    */
   const handleRemoveFile = useCallback((fileId: string) => {
@@ -232,6 +138,14 @@ export function useChatInputState({
     onChange(e.target.value, pos);
   }, [onChange]);
 
+  // File upload handling
+  const { isDragActive, getRootProps, getInputProps } = useFileUploadHandler({
+    maxFileSize,
+    onAddFile,
+    authenticatedFetch,
+    selectedProject,
+  });
+
   const canSend = value.trim().length > 0 && !isLoading && !disabled;
 
   return {
@@ -244,7 +158,6 @@ export function useChatInputState({
     getInputProps,
     handleFocus,
     handleBlur,
-    handleFileUpload,
     handleRemoveFile,
     handleInputChange,
   };

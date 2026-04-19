@@ -1,0 +1,173 @@
+/**
+ * SidebarHeader Sub-Components
+ *
+ * Extracted components for desktop and mobile header layouts.
+ * These components are used by the main SidebarHeader component.
+ */
+
+import React, { memo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { MessageSquare, RefreshCw, Plus } from 'lucide-react';
+import { Button } from '@/shared/components/ui/Button';
+import { IS_PLATFORM, PLATFORM_DASHBOARD_URL } from '../constants/sidebar.constants';
+import { APP_NAME } from '@/shared/constants/app.constants';
+
+interface DesktopHeaderProps {
+  isRefreshing: boolean;
+  onRefresh: () => void | Promise<void>;
+  onToggleSidebar?: () => void;
+}
+
+interface MobileHeaderProps {
+  isRefreshing: boolean;
+  onRefresh: () => void | Promise<void>;
+  onNewSession?: () => void;
+  isPWA: boolean;
+  isMobile: boolean;
+}
+
+/**
+ * Desktop Header Component
+ * Displays the header for desktop view with logo, title, and action buttons.
+ */
+export const DesktopHeader = memo(function DesktopHeader({
+  isRefreshing,
+  onRefresh,
+  onToggleSidebar,
+}: DesktopHeaderProps) {
+  const { t } = useTranslation();
+
+  const handleRefresh = async () => {
+    await onRefresh();
+  };
+
+  return (
+    <div className="hidden md:flex items-center justify-between">
+      {IS_PLATFORM ? (
+        <a
+          href={PLATFORM_DASHBOARD_URL}
+          className="flex items-center gap-3 hover:opacity-80 transition-opacity group"
+          title="View Environments"
+        >
+          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
+            <MessageSquare className="w-4 h-4 text-primary-foreground" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-foreground">{APP_NAME}</h1>
+            <p className="text-sm text-muted-foreground">{t('app.tagline')}</p>
+          </div>
+        </a>
+      ) : (
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-sm">
+            <MessageSquare className="w-4 h-4 text-primary-foreground" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-foreground">{APP_NAME}</h1>
+            <p className="text-sm text-muted-foreground">{t('app.tagline')}</p>
+          </div>
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <button
+          className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:text-accent-foreground rounded-md text-xs h-8 w-8 px-0 hover:bg-accent transition-colors duration-200"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          title={t('sidebar.refreshConversations') || 'Refresh conversations'}
+        >
+          <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+        </button>
+        {onToggleSidebar && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 px-0 hover:bg-accent transition-colors duration-200"
+            onClick={onToggleSidebar}
+            title="Hide sidebar"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+});
+
+/**
+ * Mobile Header Component
+ * Displays the header for mobile view with logo, title, and action buttons.
+ */
+export const MobileHeader = memo(function MobileHeader({
+  isRefreshing,
+  onRefresh,
+  onNewSession,
+  isPWA,
+  isMobile,
+}: MobileHeaderProps) {
+  const { t } = useTranslation();
+
+  const handleRefresh = async () => {
+    await onRefresh();
+  };
+
+  return (
+    <div
+      className="md:hidden p-3 border-b border-border"
+      style={isPWA && isMobile ? { paddingTop: '16px' } : {}}
+    >
+      <div className="flex items-center justify-between">
+        {IS_PLATFORM ? (
+          <a
+            href={PLATFORM_DASHBOARD_URL}
+            className="flex items-center gap-3 active:opacity-70 transition-opacity"
+            title="View Environments"
+          >
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+              <MessageSquare className="w-4 h-4 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold text-foreground">{APP_NAME}</h1>
+              <p className="text-sm text-muted-foreground">{t('app.conversations')}</p>
+            </div>
+          </a>
+        ) : (
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+              <MessageSquare className="w-4 h-4 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold text-foreground">{APP_NAME}</h1>
+              <p className="text-sm text-muted-foreground">{t('app.conversations')}</p>
+            </div>
+          </div>
+        )}
+        <div className="flex gap-2">
+          {onNewSession && (
+            <button
+              className="w-8 h-8 rounded-md bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-all duration-150"
+              onClick={onNewSession}
+              title="New conversation"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          )}
+          <button
+            className="w-8 h-8 rounded-md bg-background border border-border flex items-center justify-center active:scale-95 transition-all duration-150"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            title="Refresh conversations"
+          >
+            <RefreshCw className={`w-4 h-4 text-foreground ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});

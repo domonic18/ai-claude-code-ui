@@ -26,6 +26,112 @@ export interface LoadingPageProps {
 }
 
 /**
+ * Loading Content Component
+ *
+ * Renders the full-size loading view with all details.
+ */
+interface LoadingContentProps {
+  message: string;
+  description?: string;
+  progress?: number;
+  showProgress?: boolean;
+  estimatedTime?: number;
+  isTakingLonger: boolean;
+  icon?: React.ReactNode;
+}
+
+function LoadingContent({
+  message,
+  description,
+  progress,
+  showProgress,
+  estimatedTime,
+  isTakingLonger,
+  icon
+}: LoadingContentProps) {
+  const formatTime = (seconds: number): string => {
+    if (seconds < 60) {
+      return `${seconds}s`;
+    }
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
+  };
+
+  return (
+    <div className="max-w-md w-full text-center">
+      {/* Loading Icon */}
+      <div className="flex justify-center mb-6">
+        {icon || (
+          <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+            <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
+          </div>
+        )}
+      </div>
+
+      {/* Message */}
+      <div className="mb-4">
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+          {message}
+        </h1>
+        {description && (
+          <p className="text-gray-600 dark:text-gray-400">
+            {description}
+          </p>
+        )}
+      </div>
+
+      {/* Progress Bar */}
+      {showProgress && progress !== undefined && (
+        <div className="mb-4">
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-2 overflow-hidden">
+            <div
+              className="bg-blue-600 dark:bg-blue-500 h-full rounded-full transition-all duration-300 ease-out"
+              style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+            />
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {progress}%
+          </p>
+        </div>
+      )}
+
+      {/* Estimated Time */}
+      {estimatedTime !== undefined && (
+        <div className="mb-4">
+          <p className="text-sm text-gray-500 dark:text-gray-500">
+            Estimated time: {formatTime(estimatedTime)}
+          </p>
+        </div>
+      )}
+
+      {/* Taking Longer Message */}
+      {isTakingLonger && (
+        <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+          <p className="text-sm text-yellow-800 dark:text-yellow-200">
+            This is taking longer than expected. Please wait...
+          </p>
+        </div>
+      )}
+
+      {/* Loading Dots Animation */}
+      <div className="mt-6 flex justify-center gap-1">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="w-2 h-2 bg-blue-600 dark:bg-blue-400 rounded-full animate-bounce"
+            style={{
+              animationDelay: `${i * 0.15}s`,
+              animationDuration: '0.6s'
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Loading Page Component
  *
  * Displays a loading page with optional progress bar and timeout handling.
@@ -63,15 +169,6 @@ const LoadingPage: React.FC<LoadingPageProps> = ({
     }
   }, [timeout]);
 
-  const formatTime = (seconds: number): string => {
-    if (seconds < 60) {
-      return `${seconds}s`;
-    }
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}m ${secs}s`;
-  };
-
   if (minimal) {
     return (
       <div className={`flex items-center justify-center p-4 ${className}`}>
@@ -87,75 +184,15 @@ const LoadingPage: React.FC<LoadingPageProps> = ({
 
   return (
     <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4 ${className}`}>
-      <div className="max-w-md w-full text-center">
-        {/* Loading Icon */}
-        <div className="flex justify-center mb-6">
-          {icon || (
-            <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-              <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
-            </div>
-          )}
-        </div>
-
-        {/* Message */}
-        <div className="mb-4">
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-            {message}
-          </h1>
-          {description && (
-            <p className="text-gray-600 dark:text-gray-400">
-              {description}
-            </p>
-          )}
-        </div>
-
-        {/* Progress Bar */}
-        {showProgress && progress !== undefined && (
-          <div className="mb-4">
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-2 overflow-hidden">
-              <div
-                className="bg-blue-600 dark:bg-blue-500 h-full rounded-full transition-all duration-300 ease-out"
-                style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
-              />
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {progress}%
-            </p>
-          </div>
-        )}
-
-        {/* Estimated Time */}
-        {estimatedTime !== undefined && (
-          <div className="mb-4">
-            <p className="text-sm text-gray-500 dark:text-gray-500">
-              Estimated time: {formatTime(estimatedTime)}
-            </p>
-          </div>
-        )}
-
-        {/* Taking Longer Message */}
-        {isTakingLonger && (
-          <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-            <p className="text-sm text-yellow-800 dark:text-yellow-200">
-              This is taking longer than expected. Please wait...
-            </p>
-          </div>
-        )}
-
-        {/* Loading Dots Animation */}
-        <div className="mt-6 flex justify-center gap-1">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="w-2 h-2 bg-blue-600 dark:bg-blue-400 rounded-full animate-bounce"
-              style={{
-                animationDelay: `${i * 0.15}s`,
-                animationDuration: '0.6s'
-              }}
-            />
-          ))}
-        </div>
-      </div>
+      <LoadingContent
+        message={message}
+        description={description}
+        progress={progress}
+        showProgress={showProgress}
+        estimatedTime={estimatedTime}
+        isTakingLonger={isTakingLonger}
+        icon={icon}
+      />
     </div>
   );
 };

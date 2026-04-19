@@ -38,7 +38,7 @@ interface UseDeleteConfirmationOptions {
   /** Callback after successful deletion */
   onSessionDelete?: (projectName: string, sessionId: string, provider?: SessionProvider) => void;
   /** Function to refresh projects after deletion */
-  onRefresh?: () => Promise<void>;
+  onRefresh?: () => void | Promise<void>;
 }
 
 /**
