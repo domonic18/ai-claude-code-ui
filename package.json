@@ -37,7 +37,9 @@
     "test:imports": "node scripts/check-imports.cjs",
     "test:ci": "npm run test:imports && npm run test:unit && npm run test:services && npm run test:frontend",
     "test:frontend": "npx vitest run",
-    "test:watch": "npx vitest"
+    "test:watch": "npx vitest",
+    "lint": "eslint backend/ frontend/ shared/",
+    "lint:fix": "eslint --fix backend/ frontend/ shared/"
   },
   "keywords": [
     "claude code",
@@ -114,6 +116,7 @@
     "ws": "^8.14.2"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^25.0.8",
@@ -124,6 +127,7 @@
     "autoprefixer": "^10.4.16",
     "complexity-report": "^2.0.0-alpha",
     "concurrently": "^8.2.2",
+    "eslint": "^9.39.4",
     "jsdom": "^27.0.1",
     "node-gyp": "^10.0.0",
     "postcss": "^8.4.32",
@@ -132,6 +136,7 @@
     "tailwindcss": "^3.4.0",
     "terser": "^5.46.1",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.58.2",
     "vite": "^7.0.4",
     "vitest": "^3.2.4"
   }
