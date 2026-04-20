@@ -5,10 +5,16 @@
  */
 
 import { logger } from '@/shared/utils/logger';
-import { filterMemoryContext } from '@/shared/utils';
-import { safeLocalStorage, generateMessageId } from './wsUtils';
+import { safeLocalStorage } from './wsUtils';
 import type { MessageHandlerCallbacks } from './types';
 import type { WebSocketMessage } from '@/shared/types';
+import {
+  isCurrentSessionMatch,
+  updateSessionState,
+  handlePendingSession,
+  clearChatMessagesCache,
+  handleSessionIdStorage
+} from './sessionStateManager';
 
 /**
  * Handle session-created message
@@ -18,20 +24,7 @@ export function handleSessionCreated(
   callbacks: MessageHandlerCallbacks,
   currentSessionId: string | null
 ): boolean {
-  const isTemporarySession = !currentSessionId || currentSessionId.startsWith('temp-');
-
-  if (message.sessionId && isTemporarySession) {
-    logger.info('[WS] Session created:', message.sessionId, '(replacing:', currentSessionId, ')');
-
-    safeLocalStorage.setItem('pendingSessionId', message.sessionId);
-    safeLocalStorage.setItem('lastSessionId', message.sessionId);
-
-    callbacks.onSetSessionId(message.sessionId);
-
-    if (callbacks.onReplaceTemporarySession) {
-      callbacks.onReplaceTemporarySession(currentSessionId || '', message.sessionId);
-    }
-  }
+  handleSessionIdStorage(message.sessionId, currentSessionId, callbacks);
   return true;
 }
 
@@ -80,66 +73,6 @@ export function handleTodoWrite(message: WebSocketMessage, callbacks: MessageHan
   } catch (e) {
     logger.warn('Error handling TodoWrite message:', e);
     return false;
-  }
-}
-
-/**
- * Check if completed session matches current session
- */
-function isCurrentSessionMatch(
-  completedSessionId: string | undefined,
-  currentSessionId: string | null,
-  pendingSessionId: string | null
-): boolean {
-  return Boolean(
-    completedSessionId === currentSessionId ||
-    !currentSessionId ||
-    (completedSessionId?.startsWith('temp-') && (pendingSessionId === currentSessionId || pendingSessionId))
-  );
-}
-
-/**
- * Update session state on completion
- */
-function updateSessionState(
-  completedSessionId: string | undefined,
-  currentSessionId: string | null,
-  callbacks: MessageHandlerCallbacks
-) {
-  if (!completedSessionId) return;
-
-  callbacks.onSessionInactive?.(completedSessionId);
-  callbacks.onSessionNotProcessing?.(completedSessionId);
-}
-
-/**
- * Handle pending session completion
- */
-function handlePendingSession(
-  pendingSessionId: string | null,
-  currentSessionId: string | null,
-  exitCode: number | undefined,
-  callbacks: MessageHandlerCallbacks
-) {
-  if (pendingSessionId && !currentSessionId && exitCode === 0) {
-    callbacks.onSetSessionId(pendingSessionId);
-    safeLocalStorage.removeItem('pendingSessionId');
-    logger.info('New session complete, ID set to:', pendingSessionId);
-  }
-}
-
-/**
- * Clear chat messages cache on successful completion
- */
-function clearChatMessagesCache(
-  exitCode: number | undefined,
-  getSelectedProjectName: () => string | undefined
-) {
-  if (exitCode === 0) {
-    const selectedProjectName = getSelectedProjectName();
-    if (selectedProjectName) {
-      safeLocalStorage.removeItem(`chat_messages_${selectedProjectName}`);
-    }
   }
 }
 
