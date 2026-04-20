@@ -7,12 +7,34 @@
  * @module projects/managers/ContainerProjectManager
  */
 
+import { PassThrough } from 'stream';
 import containerManager from '../../container/core/index.js';
 import { getSessionsInContainer } from '../../sessions/container/ContainerSessions.js';
 import { CONTAINER, FILE_TIMEOUTS } from '../../../config/config.js';
 import { loadProjectConfig } from '../config/index.js';
 import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('services/projects/managers/ContainerProjectManager');
+
+/**
+ * 从 Docker 多路复用流中收集 stdout 输出
+ * Docker exec 返回的流包含 8 字节帧头（streamType + length），
+ * 必须通过 modem.demuxStream 解码后才能得到正确的文本内容。
+ * @param {Object} stream - Docker exec 返回的原始流
+ * @returns {Promise<string>} stdout 输出内容
+ */
+function _collectStreamOutput(stream) {
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  containerManager.docker.modem.demuxStream(stream, stdout, stderr);
+
+  return new Promise((resolve) => {
+    let data = '';
+    stdout.on('data', (chunk) => { data += chunk.toString(); });
+    stderr.on('data', () => {});
+    stream.on('error', () => resolve(''));
+    stream.on('end', () => resolve(data));
+  });
+}
 
 /**
  * 创建项目条目对象
@@ -69,12 +91,7 @@ async function createDefaultWorkspace(userId, workspacePath) {
       ['sh', '-c', 'mkdir -p "$1/my-workspace" && echo "created"', 'createDefault', workspacePath]
     );
 
-    await new Promise((resolve) => {
-      let output = '';
-      createStream.on('data', (c) => output += c.toString());
-      createStream.on('end', () => resolve(output));
-      createStream.on('error', () => resolve(output));
-    });
+    await _collectStreamOutput(createStream);
 
     logger.info('[ContainerProjectManager] Default workspace created: my-workspace');
     return createProjectEntry('my-workspace', 'my-workspace');
@@ -122,12 +139,7 @@ export async function getProjectsInContainer(userId) {
       ['sh', '-c', 'ls -1 "$1" 2>/dev/null | grep -v "^\\.claude$" | grep -v "^memory$" || echo ""', 'listProjects', workspacePath]
     );
 
-    const output = await new Promise((resolve, reject) => {
-      let data = '';
-      stream.on('data', (chunk) => { data += chunk.toString(); });
-      stream.on('error', () => resolve(''));
-      stream.on('end', () => resolve(data));
-    });
+    const output = await _collectStreamOutput(stream);
 
     let projectConfig = {};
     try { projectConfig = await loadProjectConfig(); } catch { /* silent */ }

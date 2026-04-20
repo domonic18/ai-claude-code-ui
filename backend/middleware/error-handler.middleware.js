@@ -211,7 +211,7 @@ function errorHandler(err, req, res, next) {
   }
 
   // 处理未知错误
-  logger.error('Unhandled error:', err);
+  logger.error({ err }, `Unhandled error: ${err.message}`);
   res.status(500).json({
     error: process.env.NODE_ENV === 'production'
       ? 'Internal server error'
@@ -269,12 +269,13 @@ function _logError(err, req) {
   };
 
   // 根据错误级别选择日志输出
-  if (err.statusCode >= 500) {
-    logger.error('[ERROR]', JSON.stringify(logData));
-  } else if (err.statusCode >= 400) {
-    logger.warn('[WARN]', JSON.stringify(logData));
+  const statusCode = err.statusCode || 500;
+  if (statusCode >= 500) {
+    logger.error({ err, ...logData }, '[ERROR]');
+  } else if (statusCode >= 400) {
+    logger.warn({ err, ...logData }, '[WARN]');
   } else {
-    logger.info('[INFO]', JSON.stringify(logData));
+    logger.info(logData, '[INFO]');
   }
 }
 

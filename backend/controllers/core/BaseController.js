@@ -145,7 +145,7 @@ export class BaseController {
     }
 
     // 记录错误
-    logger.error(`[${this.constructor.name}] Error:`, error);
+    logger.error({ err: error }, `[${this.constructor.name}] Error: ${error.message}`);
 
     // 传递给错误处理中间件
     next(error);

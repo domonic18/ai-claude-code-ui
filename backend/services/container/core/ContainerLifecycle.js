@@ -52,8 +52,12 @@ export class ContainerLifecycleManager {
 
     // 已就绪：检查运行状态
     if (stateMachine.is(ContainerState.READY)) {
-      return this._handleReadyState(userId, stateMachine) ||
-        this._createContainerWithStateMachine(userId, userConfig, stateMachine);
+      const existing = await this._handleReadyState(userId, stateMachine);
+      if (existing) return existing;
+      // 容器信息丢失但状态为 ready，先重置状态再重建
+      stateMachine.transitionTo(ContainerState.NON_EXISTENT);
+      await containerStateStore.save(stateMachine);
+      return this._createContainerWithStateMachine(userId, userConfig, stateMachine);
     }
 
     // 创建中：等待或报错
