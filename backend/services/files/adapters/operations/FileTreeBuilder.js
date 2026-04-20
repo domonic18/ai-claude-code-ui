@@ -9,6 +9,7 @@
 
 import { PassThrough } from 'stream';
 import containerManager from '../../../container/core/index.js';
+import { parseFileTreeOutput, buildTreeStructure } from './fileTreeParsers.js';
 
 /**
  * 文件树构建器类
@@ -89,116 +90,19 @@ export class FileTreeBuilder {
    * @returns {Array} 文件树
    */
   _parseOutput(output, basePath) {
-    const tree = [];
-    const processedPaths = new Set();
-
     if (!output || output.trim() === '') {
-      return tree;
+      return [];
     }
 
-    // 解析输出：路径\0类型\0大小\0修改时间\0...
-    const parts = output.split('\0');
-    const pathTypeMap = new Map();
-    const pathSizeMap = new Map();
-    const pathMtimeMap = new Map();
-    const validPaths = [];
-
-    // 每4个元素为一组
-    for (let i = 0; i < parts.length - 3; i += 4) {
-      const fullPath = parts[i];
-      const typeFlag = parts[i + 1];
-      const sizeStr = parts[i + 2];
-      const mtimeStr = parts[i + 3];
-
-      if (!fullPath || !typeFlag) continue;
-      if (!fullPath.startsWith(basePath)) continue;
-
-      // 转换 find 的类型标识
-      let type = 'file';
-      if (typeFlag === 'd' || typeFlag === 'l') {
-        type = 'directory';
-      }
-
-      const size = parseInt(sizeStr, 10) || 0;
-      const mtime = parseFloat(mtimeStr) || 0;
-
-      pathTypeMap.set(fullPath, type);
-      pathSizeMap.set(fullPath, size);
-      pathMtimeMap.set(fullPath, mtime);
-      validPaths.push(fullPath);
-    }
-
-    // 构建文件树
-    return this._buildTree(validPaths, pathTypeMap, pathSizeMap, pathMtimeMap, basePath, processedPaths);
-  }
-
-  /**
-   * 构建树结构
-   * @private
-   */
-  _buildTree(validPaths, pathTypeMap, pathSizeMap, pathMtimeMap, basePath, processedPaths) {
-    const tree = [];
-
-    for (const fullPath of validPaths) {
-      const relativePath = fullPath.replace(basePath + '/', '').replace(basePath, '');
-
-      // 跳过隐藏文件
-      const pathParts = relativePath.split('/');
-      if (pathParts.some(part => this.adapter._isHiddenFile(part))) continue;
-      if (processedPaths.has(relativePath)) continue;
-
-      processedPaths.add(relativePath);
-
-      const parts = relativePath.split('/').filter(Boolean).map(name => this.adapter._cleanFileName(name));
-      if (parts.length === 0 || parts.some(part => part === '' || !this.adapter._isValidFileName(part))) {
-        continue;
-      }
-
-      this._addNodeToTree(tree, parts, basePath, pathTypeMap, pathSizeMap, pathMtimeMap);
-    }
-
-    return tree;
-  }
-
-  /**
-   * 添加节点到树
-   * @private
-   */
-  _addNodeToTree(tree, parts, basePath, pathTypeMap, pathSizeMap, pathMtimeMap) {
-    let currentLevel = tree;
-
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
-      const pathSoFar = `${basePath}/${parts.slice(0, i + 1).join('/')}`;
-      const type = pathTypeMap.get(pathSoFar) || 'file';
-      const size = pathSizeMap.get(pathSoFar) || 0;
-      const mtime = pathMtimeMap.get(pathSoFar) || 0;
-
-      let existing = currentLevel.find(item => item.name === part);
-
-      if (!existing) {
-        existing = {
-          name: part,
-          type: type,
-          path: pathSoFar,
-          size: type === 'file' ? size : 0,
-          modified: mtime ? new Date(mtime * 1000).toISOString() : null
-        };
-
-        if (type === 'directory') {
-          existing.children = [];
-        }
-
-        currentLevel.push(existing);
-      } else if (type === 'directory' && !existing.children) {
-        existing.type = 'directory';
-        existing.children = [];
-      }
-
-      if (type === 'directory') {
-        currentLevel = existing.children || tree;
-      }
-    }
+    const parsed = parseFileTreeOutput(output, basePath);
+    return buildTreeStructure(
+      parsed.validPaths,
+      parsed.pathTypeMap,
+      parsed.pathSizeMap,
+      parsed.pathMtimeMap,
+      basePath,
+      this.adapter
+    );
   }
 }
 

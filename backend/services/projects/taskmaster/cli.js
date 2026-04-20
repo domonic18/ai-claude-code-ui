@@ -8,52 +8,11 @@
  * @module services/projects/taskmaster/cli
  */
 
-import { spawn } from 'child_process';
 import { createLogger } from '../../../utils/logger.js';
+import { executeCommand, handleTaskMasterResult, parseJSONOutput } from './taskmasterExecutor.js';
+import { buildAddTaskArgs, buildUpdateTaskArgs, buildParsePRDArgs, buildSetStatusArgs } from './taskmasterCommands.js';
 
 const logger = createLogger('services/projects/taskmaster/cli');
-
-/**
- * 执行 CLI 命令并返回结果
- * @param {string} command - 要执行的命令
- * @param {string[]} args - 命令参数
- * @param {string} cwd - 工作目录
- * @param {Object} [options={}] - 额外选项
- * @param {string} [options.stdinInput] - 需要通过 stdin 传入的数据
- * @returns {Promise<{stdout: string, stderr: string, code: number}>} 命令执行结果
- */
-function executeCommand(command, args, cwd, options = {}) {
-    return new Promise((resolve, reject) => {
-        const child = spawn(command, args, {
-            cwd,
-            stdio: ['pipe', 'pipe', 'pipe']
-        });
-
-        let stdout = '';
-        let stderr = '';
-
-        child.stdout.on('data', (data) => {
-            stdout += data.toString();
-        });
-
-        child.stderr.on('data', (data) => {
-            stderr += data.toString();
-        });
-
-        child.on('close', (code) => {
-            resolve({ stdout, stderr, code });
-        });
-
-        child.on('error', (error) => {
-            reject(error);
-        });
-
-        if (options.stdinInput) {
-            child.stdin.write(options.stdinInput);
-        }
-        child.stdin.end();
-    });
-}
 
 /**
  * 检查 TaskMaster CLI 是否已全局安装
@@ -105,21 +64,13 @@ export async function checkTaskMasterInstallation() {
  * @returns {Promise<Object|null>} 下一个任务数据，或 null
  */
 export async function getNextTask(projectPath) {
-    const result = await executeCommand('task-master', ['next'], projectPath);
+  const result = await executeCommand('task-master', ['next'], projectPath);
 
-    if (result.code !== 0) {
-        throw new Error(`task-master next failed with code ${result.code}: ${result.stderr}`);
-    }
+  if (result.code !== 0) {
+    throw new Error(`task-master next failed with code ${result.code}: ${result.stderr}`);
+  }
 
-    if (!result.stdout.trim()) {
-        return null;
-    }
-
-    try {
-        return JSON.parse(result.stdout);
-    } catch {
-        return { message: result.stdout.trim() };
-    }
+  return parseJSONOutput(result.stdout);
 }
 
 /**
@@ -128,16 +79,11 @@ export async function getNextTask(projectPath) {
  * @returns {Promise<{output: string, success: boolean}>} 初始化结果
  */
 export async function initTaskMaster(projectPath) {
-    const result = await executeCommand('npx', ['task-master', 'init'], projectPath, {
-        stdinInput: 'yes\n'
-    });
+  const result = await executeCommand('npx', ['task-master', 'init'], projectPath, {
+    stdinInput: 'yes\n'
+  });
 
-    if (result.code !== 0) {
-        logger.error('TaskMaster init failed:', result.stderr);
-        throw new Error(result.stderr || result.stdout);
-    }
-
-    return { output: result.stdout, success: true };
+  return handleTaskMasterResult(result, 'TaskMaster init');
 }
 
 /**
@@ -152,31 +98,10 @@ export async function initTaskMaster(projectPath) {
  * @returns {Promise<{output: string, success: boolean}>} 执行结果
  */
 export async function addTask(projectPath, params) {
-    const { prompt, title, description, priority = 'medium', dependencies } = params;
+  const args = buildAddTaskArgs(params);
+  const result = await executeCommand('npx', args, projectPath);
 
-    const args = ['task-master-ai', 'add-task'];
-
-    if (prompt) {
-        args.push('--prompt', prompt, '--research');
-    } else {
-        args.push('--prompt', `Create a task titled "${title}" with description: ${description}`);
-    }
-
-    if (priority) {
-        args.push('--priority', priority);
-    }
-    if (dependencies) {
-        args.push('--dependencies', dependencies);
-    }
-
-    const result = await executeCommand('npx', args, projectPath);
-
-    if (result.code !== 0) {
-        logger.error('Add task failed:', result.stderr);
-        throw new Error(result.stderr || result.stdout);
-    }
-
-    return { output: result.stdout, success: true };
+  return handleTaskMasterResult(result, 'Add task');
 }
 
 /**
@@ -187,18 +112,10 @@ export async function addTask(projectPath, params) {
  * @returns {Promise<{output: string, success: boolean}>} 执行结果
  */
 export async function setTaskStatus(projectPath, taskId, status) {
-    const result = await executeCommand(
-        'npx',
-        ['task-master-ai', 'set-status', `--id=${taskId}`, `--status=${status}`],
-        projectPath
-    );
+  const args = buildSetStatusArgs(taskId, status);
+  const result = await executeCommand('npx', args, projectPath);
 
-    if (result.code !== 0) {
-        logger.error('Set task status failed:', result.stderr);
-        throw new Error(result.stderr || result.stdout);
-    }
-
-    return { output: result.stdout, success: true };
+  return handleTaskMasterResult(result, 'Set task status');
 }
 
 /**
@@ -213,26 +130,10 @@ export async function setTaskStatus(projectPath, taskId, status) {
  * @returns {Promise<{output: string, success: boolean}>} 执行结果
  */
 export async function updateTask(projectPath, taskId, updates) {
-    const parts = [];
-    if (updates.title) parts.push(`title: "${updates.title}"`);
-    if (updates.description) parts.push(`description: "${updates.description}"`);
-    if (updates.priority) parts.push(`priority: "${updates.priority}"`);
-    if (updates.details) parts.push(`details: "${updates.details}"`);
+  const args = buildUpdateTaskArgs(taskId, updates);
+  const result = await executeCommand('npx', args, projectPath);
 
-    const prompt = `Update task with the following changes: ${parts.join(', ')}`;
-
-    const result = await executeCommand(
-        'npx',
-        ['task-master-ai', 'update-task', `--id=${taskId}`, `--prompt=${prompt}`],
-        projectPath
-    );
-
-    if (result.code !== 0) {
-        logger.error('Update task failed:', result.stderr);
-        throw new Error(result.stderr || result.stdout);
-    }
-
-    return { output: result.stdout, success: true };
+  return handleTaskMasterResult(result, 'Update task');
 }
 
 /**
@@ -245,22 +146,8 @@ export async function updateTask(projectPath, taskId, updates) {
  * @returns {Promise<{output: string, success: boolean}>} 执行结果
  */
 export async function parsePRD(projectPath, prdPath, options = {}) {
-    const args = ['task-master-ai', 'parse-prd', prdPath];
+  const args = buildParsePRDArgs(prdPath, options);
+  const result = await executeCommand('npx', args, projectPath);
 
-    if (options.numTasks) {
-        args.push('--num-tasks', options.numTasks.toString());
-    }
-    if (options.append) {
-        args.push('--append');
-    }
-    args.push('--research');
-
-    const result = await executeCommand('npx', args, projectPath);
-
-    if (result.code !== 0) {
-        logger.error('Parse PRD failed:', result.stderr);
-        throw new Error(result.stderr || result.stdout);
-    }
-
-    return { output: result.stdout, success: true };
+  return handleTaskMasterResult(result, 'Parse PRD');
 }

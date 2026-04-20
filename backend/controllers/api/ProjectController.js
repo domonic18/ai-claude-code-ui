@@ -1,29 +1,42 @@
 /**
  * ProjectController.js
  *
- * 项目控制器 - 处理项目管理相关的 HTTP 请求
- * 业务逻辑委托至:
- * - services/workspace/WorkspaceService.js - 工作空间创建和管理
+ * Project controller - handles HTTP requests for project management
+ * Business logic delegated to:
+ * - services/workspace/WorkspaceService.js - workspace creation and management
  *
  * @module controllers/ProjectController
  */
 
 import { BaseController } from '../core/BaseController.js';
 import { ClaudeDiscovery } from '../../services/projects/discovery/index.js';
-import { NotFoundError, ValidationError } from '../../middleware/error-handler.middleware.js';
+import { NotFoundError } from '../../middleware/error-handler.middleware.js';
 import { createNewWorkspace, addExistingWorkspace, deleteWorkspace } from '../../services/workspace/WorkspaceService.js';
 import { createLogger } from '../../utils/logger.js';
 import { applyPagination } from '../utils/pagination.js';
+import {
+  validateDisplayName,
+  validateSummary,
+  validateWorkspaceParams,
+  validateProjectCreation,
+  findProjectByIdentifier
+} from './projectControllerHelpers.js';
+import {
+  getSessionMessages,
+  renameSessionSummary,
+  deleteSession,
+  getProjectSessions
+} from './projectSessionHandlers.js';
 
 const logger = createLogger('controllers/api/ProjectController');
 
 /**
- * 项目控制器
+ * Project controller
  */
 export class ProjectController extends BaseController {
   /**
-   * 构造函数
-   * @param {Object} dependencies - 依赖注入对象
+   * Constructor
+   * @param {Object} dependencies - Dependency injection object
    */
   constructor(dependencies = {}) {
     super(dependencies);
@@ -31,7 +44,7 @@ export class ProjectController extends BaseController {
   }
 
   /**
-   * 获取项目列表
+   * Gets project list
    */
   async getProjects(req, res, next) {
     try {
@@ -48,7 +61,7 @@ export class ProjectController extends BaseController {
   }
 
   /**
-   * 获取项目详情
+   * Gets project details
    */
   async getProject(req, res, next) {
     try {
@@ -56,7 +69,7 @@ export class ProjectController extends BaseController {
       const { projectId } = req.params;
 
       const projects = await this.claudeDiscovery.getProjects({ userId });
-      const project = projects.find(p => p.name === projectId || p.id === projectId);
+      const project = findProjectByIdentifier(projects, projectId);
 
       if (!project) {
         throw new NotFoundError('Project', projectId);
@@ -69,7 +82,7 @@ export class ProjectController extends BaseController {
   }
 
   /**
-   * 获取项目会话
+   * Gets project sessions
    */
   async getProjectSessions(req, res, next) {
     try {
@@ -78,18 +91,20 @@ export class ProjectController extends BaseController {
       const { limit = 50, offset = 0 } = this._getPagination(req);
 
       const projects = await this.claudeDiscovery.getProjects({ userId });
-      const project = projects.find(p => p.name === projectName || p.id === projectName);
+      const project = findProjectByIdentifier(projects, projectName);
 
       if (!project) {
         throw new NotFoundError('Project', projectName);
       }
 
       const projectIdentifier = project.fullPath || projectName;
-      const result = await this.claudeDiscovery.getProjectSessions(projectIdentifier, {
+      const result = await getProjectSessions(
+        this.claudeDiscovery,
+        projectIdentifier,
         userId,
         limit,
         offset
-      });
+      );
 
       this._successWithPagination(res, result.sessions, {
         page: Math.floor(offset / limit) + 1,
@@ -103,7 +118,7 @@ export class ProjectController extends BaseController {
   }
 
   /**
-   * 获取项目会话的消息
+   * Gets project session messages
    */
   async getSessionMessages(req, res, next) {
     try {
@@ -111,35 +126,23 @@ export class ProjectController extends BaseController {
       const { projectName, sessionId } = req.params;
       const { limit = 100, offset = 0 } = this._getPagination(req, { page: 1, limit: 100 });
 
-      const { getSessionMessagesInContainer } = await import('../../services/sessions/container/ContainerSessions.js');
-      const result = await getSessionMessagesInContainer(userId, projectName, sessionId, limit, offset);
+      const result = await getSessionMessages(userId, projectName, sessionId, limit, offset);
 
-      if (result && result.messages) {
-        this._success(res, {
-          messages: result.messages,
-          hasMore: result.hasMore,
-          total: result.total,
-          offset: result.offset
-        });
-      } else {
-        this._success(res, result.messages || []);
-      }
+      this._success(res, result);
     } catch (error) {
       this._handleError(error, req, res, next);
     }
   }
 
   /**
-   * 重命名项目
+   * Renames project
    */
   async renameProject(req, res, next) {
     try {
       const { projectName } = req.params;
       const { displayName } = req.body;
 
-      if (!displayName || typeof displayName !== 'string') {
-        throw new ValidationError('Display name is required');
-      }
+      validateDisplayName(displayName);
 
       const { renameProject } = await import('../../services/projects/project-management/index.js');
       await renameProject(projectName, displayName);
@@ -151,7 +154,7 @@ export class ProjectController extends BaseController {
   }
 
   /**
-   * 删除项目
+   * Deletes project
    */
   async deleteProject(req, res, next) {
     try {
@@ -171,7 +174,7 @@ export class ProjectController extends BaseController {
   }
 
   /**
-   * 检查项目是否为空
+   * Checks if project is empty
    */
   async checkProjectEmpty(req, res, next) {
     try {
@@ -186,23 +189,14 @@ export class ProjectController extends BaseController {
   }
 
   /**
-   * 手动创建项目（添加现有路径）
+   * Manually creates project (adds existing path)
    */
   async createProject(req, res, next) {
     try {
       const userId = this._getUserId(req);
       const { path: inputPath } = req.body;
 
-      if (!inputPath || typeof inputPath !== 'string') {
-        throw new ValidationError('Path is required');
-      }
-
-      const cleanPath = inputPath.trim();
-      const projectName = cleanPath.split('/').filter(Boolean).pop() || cleanPath.replace(/^\//, '');
-
-      if (!projectName) {
-        throw new ValidationError('Invalid project path');
-      }
+      const { cleanPath, projectName } = validateProjectCreation(inputPath);
 
       const { addProjectManually } = await import('../../services/projects/project-management/index.js');
       const project = await addProjectManually(userId, projectName, projectName);
@@ -214,16 +208,14 @@ export class ProjectController extends BaseController {
   }
 
   /**
-   * 创建工作空间（新建或添加已有）
+   * Creates workspace (new or existing)
    */
   async createWorkspace(req, res, next) {
     try {
       const userId = this._getUserId(req);
       const { workspaceType, path: workspacePath, githubUrl, githubTokenId, newGithubToken } = req.body;
 
-      if (!workspaceType || !workspacePath) {
-        throw new ValidationError('workspaceType and path are required');
-      }
+      validateWorkspaceParams(workspaceType, workspacePath);
 
       const cleanPath = workspacePath.trim();
       const cleanGithubUrl = githubUrl?.trim();
@@ -248,7 +240,7 @@ export class ProjectController extends BaseController {
   }
 
   /**
-   * 重命名会话摘要
+   * Renames session summary
    */
   async renameSession(req, res, next) {
     try {
@@ -256,24 +248,9 @@ export class ProjectController extends BaseController {
       const { projectName, sessionId } = req.params;
       const { summary } = req.body;
 
-      if (!summary || typeof summary !== 'string') {
-        throw new ValidationError('Summary is required');
-      }
+      const trimmedSummary = validateSummary(summary);
 
-      const trimmedSummary = summary.trim();
-      if (trimmedSummary.length === 0) {
-        throw new ValidationError('Summary cannot be empty');
-      }
-      if (trimmedSummary.length > 200) {
-        throw new ValidationError('Summary is too long (max 200 characters)');
-      }
-
-      const { updateSessionSummaryInContainer } = await import('../../services/sessions/container/ContainerSessions.js');
-      const success = await updateSessionSummaryInContainer(userId, projectName, sessionId, trimmedSummary);
-
-      if (!success) {
-        throw new NotFoundError('Session', sessionId);
-      }
+      await renameSessionSummary(userId, projectName, sessionId, trimmedSummary);
 
       this._success(res, { sessionId, summary: trimmedSummary }, 'Session renamed successfully');
     } catch (error) {
@@ -282,19 +259,14 @@ export class ProjectController extends BaseController {
   }
 
   /**
-   * 删除会话
+   * Deletes session
    */
   async deleteSession(req, res, next) {
     try {
       const userId = this._getUserId(req);
       const { projectName, sessionId } = req.params;
 
-      const { deleteSessionInContainer } = await import('../../services/sessions/container/ContainerSessions.js');
-      const success = await deleteSessionInContainer(userId, projectName, sessionId);
-
-      if (!success) {
-        throw new NotFoundError('Session', sessionId);
-      }
+      await deleteSession(userId, projectName, sessionId);
 
       this._success(res, { sessionId }, 'Session deleted successfully');
     } catch (error) {

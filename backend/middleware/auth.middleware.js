@@ -7,14 +7,17 @@
  * @module middleware/auth.middleware
  */
 
-import jwt from 'jsonwebtoken';
 import { repositories } from '../database/db.js';
-import { AUTH, SERVER } from '../config/config.js';
+import { SERVER } from '../config/config.js';
 import { createLogger } from '../utils/logger.js';
-import { AuthType, _tryJwtAuth, _tryInternalApiKeyAuth, _tryExternalApiKeyAuth, _checkRoles, handlePlatformAuth } from './authStrategies.js';
-const logger = createLogger('middleware/auth.middleware');
+import { AuthType, _tryJwtAuth, _tryInternalApiKeyAuth, _tryExternalApiKeyAuth, _checkRoles } from './authStrategies.js';
+import { handlePlatformAuth } from './platformAuthHandler.js';
+import { handleJwtAuth } from './jwtAuthHandler.js';
+import jwt from 'jsonwebtoken';
+import { AUTH } from '../config/config.js';
 
-const { User, ApiKey } = repositories;
+const logger = createLogger('middleware/auth.middleware');
+const { ApiKey } = repositories;
 
 /**
  * 认证选项
@@ -40,34 +43,11 @@ function authenticate(options = {}) {
   return async (req, res, next) => {
     // 平台模式：使用单个数据库用户
     if (SERVER.isPlatform) {
-      try {
-        const user = User.getFirst();
-        if (!user) {
-          if (optional) {
-            return next();
-          }
-          return res.status(500).json({
-            error: 'Platform mode: No user found in database',
-            code: 'PLATFORM_NO_USER'
-          });
-        }
-
-        req.user = {
-          ...user,
-          userId: user.id,
-          authType: AuthType.PLATFORM
-        };
-        return next();
-      } catch (error) {
-        logger.error('Platform mode error:', error);
-        if (optional) {
-          return next();
-        }
-        return res.status(500).json({
-          error: 'Platform mode: Failed to fetch user',
-          code: 'PLATFORM_ERROR'
-        });
+      const platformResult = handlePlatformAuth(req, next, optional);
+      if (platformResult) {
+        return res.status(platformResult.status).json(platformResult.json);
       }
+      return next();
     }
 
     // 尝试 JWT 认证
@@ -130,78 +110,15 @@ function authenticateJwt(options = {}) {
   return async (req, res, next) => {
     // 平台模式
     if (SERVER.isPlatform) {
-      try {
-        const user = User.getFirst();
-        if (!user) {
-          if (optional) return next();
-          return res.status(500).json({
-            error: 'Platform mode: No user found in database',
-            code: 'PLATFORM_NO_USER'
-          });
-        }
-
-        req.user = {
-          ...user,
-          userId: user.id,
-          authType: AuthType.PLATFORM
-        };
-        return _checkRoles(req, res, next, requiredRoles);
-      } catch (error) {
-        if (optional) return next();
-        return res.status(500).json({
-          error: 'Platform mode: Failed to fetch user',
-          code: 'PLATFORM_ERROR'
-        });
+      const platformResult = handlePlatformAuth(req, next, optional);
+      if (platformResult) {
+        return res.status(platformResult.status).json(platformResult.json);
       }
+      return _checkRoles(req, res, next, requiredRoles);
     }
 
     // JWT 认证
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token) {
-      if (optional) {
-        req.user = null;
-        return next();
-      }
-      return res.status(401).json({
-        error: 'Access denied. No token provided.',
-        code: 'NO_TOKEN'
-      });
-    }
-
-    try {
-      const decoded = jwt.verify(token, AUTH.jwtSecret);
-      const user = User.getById(decoded.userId);
-
-      if (!user) {
-        if (optional) {
-          req.user = null;
-          return next();
-        }
-        return res.status(401).json({
-          error: 'Invalid token. User not found.',
-          code: 'USER_NOT_FOUND'
-        });
-      }
-
-      req.user = {
-        ...user,
-        userId: user.id,
-        authType: AuthType.JWT
-      };
-
-      return _checkRoles(req, res, next, requiredRoles);
-    } catch (error) {
-      if (optional) {
-        req.user = null;
-        return next();
-      }
-      return res.status(403).json({
-        error: 'Invalid token',
-        code: 'INVALID_TOKEN'
-      });
-    }
+    return handleJwtAuth(req, res, next, optional, requiredRoles);
   };
 }
 
@@ -264,42 +181,6 @@ function authenticateExternalApiKey(options = {}) {
   };
 }
 
-/**
- * WebSocket 认证函数
- * @param {string} token - JWT 令牌
- * @returns {Object|null} 认证用户信息或 null
- */
-function authenticateWebSocket(token) {
-  // 平台模式
-  if (SERVER.isPlatform) {
-    try {
-      const user = User.getFirst();
-      if (user) {
-        return { userId: user.id, username: user.username, authType: AuthType.PLATFORM };
-      }
-      return null;
-    } catch (error) {
-      return null;
-    }
-  }
-
-  if (!token) {
-    return null;
-  }
-
-  try {
-    const decoded = jwt.verify(token, AUTH.jwtSecret);
-    const user = User.getById(decoded.userId);
-
-    if (!user) {
-      return null;
-    }
-
-    return { userId: user.id, username: user.username, authType: AuthType.JWT };
-  } catch (error) {
-    return null;
-  }
-}
 
 /**
  * 生成 JWT 令牌
@@ -321,6 +202,8 @@ export {
   authenticate,
   authenticateJwt,
   authenticateExternalApiKey,
-  authenticateWebSocket,
   generateToken
 };
+
+// Re-export authenticateWebSocket from the handler
+export { authenticateWebSocket } from './webSocketAuthHandler.js';

@@ -13,9 +13,19 @@
 
 import containerManager from './core/index.js';
 import { v4 as uuidv4 } from 'uuid';
-import path from 'path';
 import { PTY_TIMEOUTS } from '../../config/config.js';
 import { createLogger } from '../../utils/logger.js';
+import { setupStreamHandlers } from './ptyStreamHandlers.js';
+import {
+  cleanupPtySession,
+  getPtySessionInfoHelper,
+  getActivePtySessionsHelper,
+  getPtySessionsByUserIdHelper,
+  endAllPtySessionsForUserHelper,
+  getPtySessionBufferHelper,
+  cleanupIdlePtySessionsHelper
+} from './ptySessionManagement.js';
+
 const logger = createLogger('services/container/PtyContainer');
 
 // PTY 会话存储：sessionId -> sessionInfo
@@ -99,7 +109,7 @@ export async function createPtyInContainer(ws, options) {
     ptyStreams.set(sessionId, { stream, exec, ws });
 
     // 8. 设置流处理器
-    setupStreamHandlers(sessionId, stream, ws);
+    setupStreamHandlers(sessionId, stream, ws, ptySessions, (id) => cleanupPtySession(id, ptyStreams, ptySessions));
 
     // 9. 发送会话启动消息
     if (ws.readyState === 1) {
@@ -146,84 +156,6 @@ function buildShellCommand(projectPath, initialCommand) {
   command += initialCommand || 'bash';
 
   return command;
-}
-
-/**
- * 为 PTY 会话设置流处理器
- * @param {string} sessionId - 会话 ID
- * @param {object} stream - Docker exec 流
- * @param {object} ws - WebSocket 连接
- */
-function setupStreamHandlers(sessionId, stream, ws) {
-  // 处理来自容器的输出
-  stream.on('data', (data) => {
-    const output = data.toString();
-
-    // 更新会话信息
-    const session = ptySessions.get(sessionId);
-    if (session) {
-      session.lastActive = new Date();
-
-      // 添加到缓冲区
-      if (session.buffer.length >= session.bufferSize) {
-        session.buffer.shift();
-      }
-      session.buffer.push(output);
-    }
-
-    // 发送到 WebSocket
-    if (ws.readyState === 1) {
-      ws.send(JSON.stringify({
-        type: 'output',
-        sessionId,
-        data: output
-      }));
-    }
-  });
-
-  // 处理流错误
-  stream.on('error', (error) => {
-    logger.error(`PTY stream error for session ${sessionId}:`, error.message);
-
-    if (ws.readyState === 1) {
-      ws.send(JSON.stringify({
-        type: 'error',
-        sessionId,
-        error: error.message
-      }));
-    }
-
-    // 将会话标记为错误
-    const session = ptySessions.get(sessionId);
-    if (session) {
-      session.status = 'error';
-      session.error = error.message;
-    }
-  });
-
-  // 处理流结束
-  stream.on('end', () => {
-    logger.info(`PTY stream ended for session ${sessionId}`);
-
-    if (ws.readyState === 1) {
-      ws.send(JSON.stringify({
-        type: 'session_ended',
-        sessionId
-      }));
-    }
-
-    // 将会话标记为已结束
-    const session = ptySessions.get(sessionId);
-    if (session) {
-      session.status = 'ended';
-      session.endedAt = new Date();
-    }
-  });
-
-  // 处理 WebSocket 关闭
-  ws.on('close', () => {
-    cleanupPtySession(sessionId);
-  });
 }
 
 /**
@@ -289,44 +221,7 @@ export async function resizePty(sessionId, cols, rows) {
  * @returns {Promise<boolean>} 如果成功则为 true
  */
 export async function endPtySession(sessionId) {
-  return cleanupPtySession(sessionId);
-}
-
-/**
- * 清理 PTY 会话
- * @param {string} sessionId - 会话 ID
- * @returns {Promise<boolean>} 如果已清理则为 true
- */
-async function cleanupPtySession(sessionId) {
-  const sessionData = ptyStreams.get(sessionId);
-  const session = ptySessions.get(sessionId);
-
-  if (sessionData) {
-    const { stream, exec } = sessionData;
-
-    try {
-      // 关闭流
-      if (stream && !stream.destroyed) {
-        stream.destroy();
-      }
-    } catch (error) {
-      logger.error(`Error closing stream for session ${sessionId}:`, error.message);
-    }
-
-    // 从流映射中移除
-    ptyStreams.delete(sessionId);
-  }
-
-  if (session) {
-    // 将会话标记为已结束
-    session.status = 'ended';
-    session.endedAt = new Date();
-
-    // 从会话映射中移除
-    ptySessions.delete(sessionId);
-  }
-
-  return true;
+  return cleanupPtySession(sessionId, ptyStreams, ptySessions);
 }
 
 /**
@@ -335,7 +230,7 @@ async function cleanupPtySession(sessionId) {
  * @returns {object|undefined} 会话信息
  */
 export function getPtySessionInfo(sessionId) {
-  return ptySessions.get(sessionId);
+  return getPtySessionInfoHelper(sessionId, ptySessions);
 }
 
 /**
@@ -343,8 +238,7 @@ export function getPtySessionInfo(sessionId) {
  * @returns {Array} 活动会话数组
  */
 export function getActivePtySessions() {
-  return Array.from(ptySessions.values())
-    .filter(session => session.status === 'active');
+  return getActivePtySessionsHelper(ptySessions);
 }
 
 /**
@@ -353,8 +247,7 @@ export function getActivePtySessions() {
  * @returns {Array} 用户会话数组
  */
 export function getPtySessionsByUserId(userId) {
-  return Array.from(ptySessions.values())
-    .filter(session => session.userId === userId);
+  return getPtySessionsByUserIdHelper(userId, ptySessions);
 }
 
 /**
@@ -363,19 +256,7 @@ export function getPtySessionsByUserId(userId) {
  * @returns {Promise<number>} 已结束会话数
  */
 export async function endAllPtySessionsForUser(userId) {
-  const sessions = getPtySessionsByUserId(userId);
-  let count = 0;
-
-  for (const session of sessions) {
-    try {
-      await cleanupPtySession(session.sessionId);
-      count++;
-    } catch (error) {
-      logger.error(`Failed to end session ${session.sessionId}:`, error.message);
-    }
-  }
-
-  return count;
+  return endAllPtySessionsForUserHelper(userId, ptySessions, ptyStreams);
 }
 
 /**
@@ -384,13 +265,7 @@ export async function endAllPtySessionsForUser(userId) {
  * @returns {string} 缓冲区内容
  */
 export function getPtySessionBuffer(sessionId) {
-  const session = ptySessions.get(sessionId);
-
-  if (!session) {
-    return '';
-  }
-
-  return session.buffer.join('');
+  return getPtySessionBufferHelper(sessionId, ptySessions);
 }
 
 /**
@@ -399,19 +274,7 @@ export function getPtySessionBuffer(sessionId) {
  * @returns {number} 已清理会话数
  */
 export function cleanupIdlePtySessions(idleTime = PTY_TIMEOUTS.idleCleanup) {
-  const now = Date.now();
-  let cleanedCount = 0;
-
-  for (const [sessionId, session] of ptySessions.entries()) {
-    const timeSinceActive = now - session.lastActive.getTime();
-
-    if (timeSinceActive > idleTime && session.status === 'active') {
-      cleanupPtySession(sessionId);
-      cleanedCount++;
-    }
-  }
-
-  return cleanedCount;
+  return cleanupIdlePtySessionsHelper(ptySessions, ptyStreams, idleTime);
 }
 
 // 开始定期清理

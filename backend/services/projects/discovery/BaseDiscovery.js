@@ -8,6 +8,10 @@
  */
 
 import { PathUtils } from '../../core/utils/path-utils.js';
+import { validateProjectIdentifier } from './baseDiscoveryValidators.js';
+import { normalizeProject, normalizeSession } from './baseDiscoveryNormalizers.js';
+import { applyPagination } from './baseDiscoveryPagination.js';
+import { standardizeError } from './baseDiscoveryError.js';
 
 /**
  * 项目发现器基类
@@ -78,49 +82,13 @@ export class BaseDiscovery {
   }
 
   /**
-   * 验证项目标识符
-   * @protected
-   * @param {string} projectIdentifier - 项目标识符
-   * @returns {Object} 验证结果
-   */
-  _validateProjectIdentifier(projectIdentifier) {
-    if (!projectIdentifier || typeof projectIdentifier !== 'string') {
-      return {
-        valid: false,
-        error: 'Project identifier must be a non-empty string'
-      };
-    }
-
-    // 检查是否是有效的项目路径
-    const decoded = PathUtils.decodeProjectName(projectIdentifier);
-    if (!decoded) {
-      return {
-        valid: false,
-        error: 'Invalid project identifier format'
-      };
-    }
-
-    return { valid: true, decoded };
-  }
-
-  /**
    * 规范化项目对象
    * @protected
    * @param {Object} rawProject - 原始项目数据
    * @returns {Object} 规范化的项目对象
    */
   _normalizeProject(rawProject) {
-    return {
-      id: rawProject.id || rawProject.name,
-      name: rawProject.name,
-      path: rawProject.path,
-      displayName: rawProject.displayName || rawProject.name,
-      provider: this.provider,
-      sessionCount: rawProject.sessionCount || 0,
-      lastActivity: rawProject.lastActivity || null,
-      sessions: rawProject.sessions || [],
-      metadata: rawProject.metadata || {}
-    };
+    return normalizeProject(rawProject, this.provider);
   }
 
   /**
@@ -130,14 +98,7 @@ export class BaseDiscovery {
    * @returns {Object} 规范化的会话对象
    */
   _normalizeSession(rawSession) {
-    return {
-      id: rawSession.id,
-      summary: rawSession.summary || rawSession.title || 'Untitled Session',
-      messageCount: rawSession.messageCount || 0,
-      lastActivity: rawSession.lastActivity || rawSession.createdAt || new Date().toISOString(),
-      provider: this.provider,
-      metadata: rawSession.metadata || {}
-    };
+    return normalizeSession(rawSession, this.provider);
   }
 
   /**
@@ -145,56 +106,10 @@ export class BaseDiscovery {
    * @protected
    * @param {Array} items - 项目/会话列表
    * @param {Object} options - 选项
-   * @param {string} options.sort - 排序字段
-   * @param {string} options.order - 排序方向 (asc 或 desc)
-   * @param {number} options.limit - 数量限制
-   * @param {number} options.offset - 偏移量
    * @returns {Object} 分页结果
    */
   _applyPagination(items, options = {}) {
-    const {
-      sort = 'lastActivity',
-      order = 'desc',
-      limit,
-      offset = 0
-    } = options;
-
-    // 排序
-    let sorted = [...items];
-    if (sort) {
-      sorted.sort((a, b) => {
-        const aVal = a[sort];
-        const bVal = b[sort];
-
-        // 处理 null 值
-        if (aVal == null && bVal == null) return 0;
-        if (aVal == null) return 1;
-        if (bVal == null) return -1;
-
-        // 日期比较
-        if (typeof aVal === 'string' && typeof bVal === 'string') {
-          const aDate = new Date(aVal);
-          const bDate = new Date(bVal);
-          return order === 'desc' ? bDate - aDate : aDate - bDate;
-        }
-
-        // 数值比较
-        if (order === 'desc') {
-          return bVal - aVal;
-        }
-        return aVal - bVal;
-      });
-    }
-
-    // 分页
-    const total = sorted.length;
-    const paginated = limit ? sorted.slice(offset, offset + limit) : sorted.slice(offset);
-
-    return {
-      items: paginated,
-      total,
-      hasMore: limit ? offset + limit < total : false
-    };
+    return applyPagination(items, options);
   }
 
   /**
@@ -205,17 +120,17 @@ export class BaseDiscovery {
    * @returns {Error} 标准化的错误
    */
   _standardizeError(error, operation) {
-    const standardizedError = new Error(
-      error.message || `${operation} failed in ${this.name}`
-    );
+    return standardizeError(error, operation, this.name, this.provider);
+  }
 
-    standardizedError.type = 'discovery_error';
-    standardizedError.provider = this.provider;
-    standardizedError.operation = operation;
-    standardizedError.timestamp = new Date().toISOString();
-    standardizedError.originalError = error;
-
-    return standardizedError;
+  /**
+   * 验证项目标识符
+   * @protected
+   * @param {string} projectIdentifier - 项目标识符
+   * @returns {Object} 验证结果
+   */
+  _validateProjectIdentifier(projectIdentifier) {
+    return validateProjectIdentifier(projectIdentifier);
   }
 
   /**

@@ -12,6 +12,23 @@ import { CONTAINER } from '../../../config/config.js';
 import { JsonlParser } from '../../core/utils/jsonl-parser.js';
 import { PathUtils } from '../../core/utils/path-utils.js';
 import { createLogger } from '../../../utils/logger.js';
+import { validateProjectIdentifier } from './sessionAdapterValidators.js';
+import {
+  findJsonlSessionFiles,
+  parseSessionFile,
+  parseSessionFileMessages,
+  loadAllSessionFiles,
+  loadMessagesFromFiles,
+  readCommandOutput
+} from './sessionAdapterIo.js';
+import { standardizeError } from './sessionAdapterError.js';
+import {
+  sortSessionsByActivity,
+  sortMessagesByTimestamp,
+  paginate,
+  searchSessions
+} from './sessionAdapterPagination.js';
+
 const logger = createLogger('services/container/adapters/SessionAdapter');
 
 /**
@@ -39,8 +56,7 @@ export class SessionAdapter {
    */
   async getSessions(projectIdentifier, limit = 50, offset = 0) {
     try {
-      // 验证项目标识
-      const validation = this._validateProjectIdentifier(projectIdentifier);
+      const validation = validateProjectIdentifier(projectIdentifier);
       if (!validation.valid) {
         throw new Error(validation.error);
       }
@@ -48,45 +64,22 @@ export class SessionAdapter {
       const encodedProjectName = PathUtils.encodeProjectName(validation.decoded);
       const sessionsDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
 
-      // 确保容器存在
       await this.containerManager.getOrCreateContainer(this.userId);
 
-      // 查找所有 JSONL 文件
-      const { stream } = await this.containerManager.execInContainer(
-        this.userId,
-        `find "${sessionsDir}" -name "*.jsonl" -type f 2>/dev/null || true`
-      );
-
-      const output = await this._readCommandOutput(stream);
-      const jsonlFiles = output.trim().split('\n').filter(Boolean);
-
-      // 解析所有会话文件
-      const allSessions = [];
-      for (const file of jsonlFiles) {
-        try {
-          const sessions = await this._parseSessionFile(file);
-          allSessions.push(...sessions);
-        } catch (error) {
-          logger.warn(`Failed to parse session file ${file}:`, error.message);
-        }
-      }
-
-      // 应用分页和排序
-      const total = allSessions.length;
-      const sorted = allSessions.sort((a, b) =>
-        new Date(b.lastActivity) - new Date(a.lastActivity)
-      );
-      const paginated = sorted.slice(offset, offset + limit);
+      const jsonlFiles = await findJsonlSessionFiles(this.containerManager, this.userId, sessionsDir);
+      const allSessions = await loadAllSessionFiles(this.containerManager, this.userId, jsonlFiles, this.jsonlParser);
+      const sorted = sortSessionsByActivity(allSessions);
+      const paginated = paginate(sorted, offset, limit);
 
       return {
         projectId: projectIdentifier,
-        sessions: paginated,
-        total,
-        hasMore: offset + limit < total
+        sessions: paginated.items,
+        total: paginated.total,
+        hasMore: paginated.hasMore
       };
 
     } catch (error) {
-      throw this._standardizeError(error, 'getSessions');
+      throw standardizeError(error, 'getSessions', this.userId);
     }
   }
 
@@ -100,8 +93,7 @@ export class SessionAdapter {
    */
   async getSessionMessages(projectIdentifier, sessionId, limit = null, offset = 0) {
     try {
-      // 验证项目标识
-      const validation = this._validateProjectIdentifier(projectIdentifier);
+      const validation = validateProjectIdentifier(projectIdentifier);
       if (!validation.valid) {
         throw new Error(validation.error);
       }
@@ -109,55 +101,26 @@ export class SessionAdapter {
       const encodedProjectName = PathUtils.encodeProjectName(validation.decoded);
       const sessionsDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
 
-      // 确保容器存在
       await this.containerManager.getOrCreateContainer(this.userId);
 
-      // 查找所有 JSONL 文件
-      const { stream } = await this.containerManager.execInContainer(
-        this.userId,
-        `find "${sessionsDir}" -name "*.jsonl" -type f 2>/dev/null || true`
-      );
-
-      const output = await this._readCommandOutput(stream);
-      const jsonlFiles = output.trim().split('\n').filter(Boolean);
-
-      // 收集匹配会话的消息
-      const messages = [];
-      for (const file of jsonlFiles) {
-        try {
-          const fileMessages = await this._parseSessionFileMessages(file, sessionId);
-          messages.push(...fileMessages);
-        } catch (error) {
-          logger.warn(`Failed to parse messages from ${file}:`, error.message);
-        }
-      }
-
-      // 按时间戳排序
-      messages.sort((a, b) => {
-        const timeA = new Date(a.timestamp || 0).getTime();
-        const timeB = new Date(b.timestamp || 0).getTime();
-        return timeA - timeB;
-      });
-
-      // 处理分页
-      const total = messages.length;
+      const jsonlFiles = await findJsonlSessionFiles(this.containerManager, this.userId, sessionsDir);
+      const messages = await loadMessagesFromFiles(this.containerManager, this.userId, jsonlFiles, sessionId, this.jsonlParser);
+      const sorted = sortMessagesByTimestamp(messages);
 
       if (limit === null) {
-        // 返回全部消息（向后兼容）
-        return messages;
-      } else {
-        // 返回分页消息
-        const paginated = messages.slice(offset, offset + limit);
-        return {
-          sessionId,
-          messages: paginated,
-          total,
-          hasMore: offset + limit < total
-        };
+        return sorted;
       }
 
+      const paginated = paginate(sorted, offset, limit);
+      return {
+        sessionId,
+        messages: paginated.items,
+        total: paginated.total,
+        hasMore: paginated.hasMore
+      };
+
     } catch (error) {
-      throw this._standardizeError(error, 'getSessionMessages');
+      throw standardizeError(error, 'getSessionMessages', this.userId);
     }
   }
 
@@ -169,8 +132,7 @@ export class SessionAdapter {
    */
   async deleteSession(projectIdentifier, sessionId) {
     try {
-      // 验证项目标识
-      const validation = this._validateProjectIdentifier(projectIdentifier);
+      const validation = validateProjectIdentifier(projectIdentifier);
       if (!validation.valid) {
         throw new Error(validation.error);
       }
@@ -178,21 +140,13 @@ export class SessionAdapter {
       const encodedProjectName = PathUtils.encodeProjectName(validation.decoded);
       const sessionsDir = `${CONTAINER.paths.projects}/${encodedProjectName}`;
 
-      // 确保容器存在
       await this.containerManager.getOrCreateContainer(this.userId);
 
-      // 查找并删除包含该会话的文件
-      const { stream } = await this.containerManager.execInContainer(
-        this.userId,
-        `find "${sessionsDir}" -name "*.jsonl" -type f 2>/dev/null || true`
-      );
-
-      const output = await this._readCommandOutput(stream);
-      const jsonlFiles = output.trim().split('\n').filter(Boolean);
+      const jsonlFiles = await findJsonlSessionFiles(this.containerManager, this.userId, sessionsDir);
 
       for (const file of jsonlFiles) {
         try {
-          const sessions = await this._parseSessionFile(file);
+          const sessions = await parseSessionFile(this.containerManager, this.userId, file, this.jsonlParser);
           const hasSession = sessions.some(s => s.id === sessionId);
 
           if (hasSession) {
@@ -200,14 +154,14 @@ export class SessionAdapter {
             return true;
           }
         } catch (error) {
-          // 继续处理下一个文件
+          // Continue to next file
         }
       }
 
       return false;
 
     } catch (error) {
-      throw this._standardizeError(error, 'deleteSession');
+      throw standardizeError(error, 'deleteSession', this.userId);
     }
   }
 
@@ -229,7 +183,7 @@ export class SessionAdapter {
       };
 
     } catch (error) {
-      throw this._standardizeError(error, 'getSessionStats');
+      throw standardizeError(error, 'getSessionStats', this.userId);
     }
   }
 
@@ -246,30 +200,16 @@ export class SessionAdapter {
       let sessions = [];
 
       if (projectIdentifier) {
-        // 搜索特定项目的会话
         const result = await this.getSessions(projectIdentifier, 1000, 0);
         sessions = result.sessions;
       } else {
-        // 搜索所有项目的会话
         sessions = await this._getAllSessions();
       }
 
-      // 执行搜索
-      const queryLower = query.toLowerCase();
-      const results = sessions.filter(session => {
-        const summaryLower = (session.summary || '').toLowerCase();
-        const lastMessageLower = (session.lastUserMessage || '').toLowerCase();
-        return summaryLower.includes(queryLower) || lastMessageLower.includes(queryLower);
-      });
-
-      return {
-        query,
-        sessions: results.slice(0, limit),
-        total: results.length
-      };
+      return searchSessions(sessions, query, limit);
 
     } catch (error) {
-      throw this._standardizeError(error, 'searchSessions');
+      throw standardizeError(error, 'searchSessions', this.userId);
     }
   }
 
@@ -287,119 +227,14 @@ export class SessionAdapter {
         `find "${CONTAINER.paths.projects}" -name "*.jsonl" -type f 2>/dev/null || true`
       );
 
-      const output = await this._readCommandOutput(stream);
+      const output = await readCommandOutput(stream);
       const jsonlFiles = output.trim().split('\n').filter(Boolean);
 
-      const allSessions = [];
-      for (const file of jsonlFiles) {
-        try {
-          const sessions = await this._parseSessionFile(file);
-          allSessions.push(...sessions);
-        } catch (error) {
-          // 继续处理
-        }
-      }
-
-      return allSessions;
+      return await loadAllSessionFiles(this.containerManager, this.userId, jsonlFiles, this.jsonlParser);
 
     } catch (error) {
       return [];
     }
-  }
-
-  /**
-   * 解析会话文件
-   * @private
-   * @param {string} filePath - 文件路径
-   * @returns {Promise<Array>} 会话列表
-   */
-  async _parseSessionFile(filePath) {
-    const { stream } = await this.containerManager.execInContainer(this.userId, `cat "${filePath}"`);
-    const content = await this._readCommandOutput(stream);
-    return this.jsonlParser.parseSessions(content);
-  }
-
-  /**
-   * 解析会话文件消息
-   * @private
-   * @param {string} filePath - 文件路径
-   * @param {string} sessionId - 会话 ID
-   * @returns {Promise<Array>} 消息列表
-   */
-  async _parseSessionFileMessages(filePath, sessionId) {
-    const { stream } = await this.containerManager.execInContainer(this.userId, `cat "${filePath}"`);
-    const content = await this._readCommandOutput(stream);
-    return this.jsonlParser.parseMessages(content, sessionId);
-  }
-
-  /**
-   * 验证项目标识符
-   * @private
-   * @param {string} projectIdentifier - 项目标识符
-   * @returns {Object} 验证结果
-   */
-  _validateProjectIdentifier(projectIdentifier) {
-    if (!projectIdentifier || typeof projectIdentifier !== 'string') {
-      return {
-        valid: false,
-        error: 'Project identifier must be a non-empty string'
-      };
-    }
-
-    const decoded = PathUtils.decodeProjectName(projectIdentifier);
-    if (!decoded) {
-      return {
-        valid: false,
-        error: 'Invalid project identifier format'
-      };
-    }
-
-    return { valid: true, decoded };
-  }
-
-  /**
-   * 读取命令输出
-   * @private
-   * @param {Object} stream - 命令输出流
-   * @returns {Promise<string>}
-   */
-  async _readCommandOutput(stream) {
-    return new Promise((resolve, reject) => {
-      let output = '';
-
-      stream.on('data', (chunk) => {
-        output += chunk.toString();
-      });
-
-      stream.on('error', (err) => {
-        reject(err);
-      });
-
-      stream.on('end', () => {
-        resolve(output);
-      });
-    });
-  }
-
-  /**
-   * 标准化错误
-   * @private
-   * @param {Error} error - 原始错误
-   * @param {string} operation - 操作名称
-   * @returns {Error} 标准化的错误
-   */
-  _standardizeError(error, operation) {
-    const standardizedError = new Error(
-      error.message || `${operation} failed in container`
-    );
-
-    standardizedError.type = 'container_session_error';
-    standardizedError.operation = operation;
-    standardizedError.userId = this.userId;
-    standardizedError.timestamp = new Date().toISOString();
-    standardizedError.originalError = error;
-
-    return standardizedError;
   }
 }
 

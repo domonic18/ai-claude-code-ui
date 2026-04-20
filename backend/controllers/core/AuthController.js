@@ -13,8 +13,10 @@ import { repositories, db } from '../../database/db.js';
 import { generateToken } from '../../middleware/auth.middleware.js';
 import containerManager from '../../services/container/core/index.js';
 import { NotFoundError, UnauthorizedError, ValidationError } from '../../middleware/error-handler.middleware.js';
-import { SESSION_TIMEOUTS } from '../../config/config.js';
 import { createLogger } from '../../utils/logger.js';
+import { getCookieOptions, validateCredentials, validatePasswordChange, buildUserResponse } from './authHelpers.js';
+import { safeRollback, createUserContainerInBackground } from './transactionHelpers.js';
+
 const logger = createLogger('controllers/core/AuthController');
 
 const { User } = repositories;
@@ -56,7 +58,7 @@ export class AuthController extends BaseController {
       const { username, password } = req.body;
 
       // 验证输入
-      this._validateCredentials(username, password);
+      validateCredentials(username, password);
 
       // 检查用户名是否已存在（多用户支持）
       const existingUser = User.getByUsername(username);
@@ -89,30 +91,14 @@ export class AuthController extends BaseController {
       transactionActive = false;
 
       // 在后台为用户创建容器
-      containerManager.getOrCreateContainer(user.id).catch(err => {
-        logger.error(`[AuthController] Failed to create container for user ${user.id}:`, err.message);
-      });
+      createUserContainerInBackground(user.id, containerManager);
 
       // 设置 httpOnly cookie（行业最佳实践）
-      res.cookie('auth_token', token, this._getCookieOptions());
+      res.cookie('auth_token', token, getCookieOptions());
 
-      this._success(res, {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        createdAt: user.createdAt,
-        lastLoginAt: user.lastLoginAt
-      }, 'Registration successful', 201);
+      this._success(res, buildUserResponse(user), 'Registration successful', 201);
     } catch (error) {
-      // Only rollback if transaction is still active
-      if (transactionActive) {
-        try {
-          db().prepare('ROLLBACK').run();
-        } catch (rollbackError) {
-          // Ignore rollback errors (transaction may already be closed)
-          logger.error('[AuthController] Rollback error:', rollbackError.message);
-        }
-      }
+      safeRollback(transactionActive);
       this._handleError(error, req, res, next);
     }
   }
@@ -153,20 +139,12 @@ export class AuthController extends BaseController {
       User.updateLastLogin(user.id);
 
       // 为用户创建容器（如果不存在）
-      containerManager.getOrCreateContainer(user.id).catch(err => {
-        logger.error(`[AuthController] Failed to create container for user ${user.id}:`, err.message);
-      });
+      createUserContainerInBackground(user.id, containerManager);
 
       // 设置 httpOnly cookie（行业最佳实践）
-      res.cookie('auth_token', token, this._getCookieOptions());
+      res.cookie('auth_token', token, getCookieOptions());
 
-      this._success(res, {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        createdAt: user.createdAt,
-        lastLoginAt: user.lastLoginAt
-      }, 'Login successful');
+      this._success(res, buildUserResponse(user), 'Login successful');
     } catch (error) {
       this._handleError(error, req, res, next);
     }
@@ -187,13 +165,7 @@ export class AuthController extends BaseController {
         throw new NotFoundError('User', userId);
       }
 
-      this._success(res, {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        createdAt: user.createdAt,
-        lastLoginAt: user.lastLoginAt
-      });
+      this._success(res, buildUserResponse(user));
     } catch (error) {
       this._handleError(error, req, res, next);
     }
@@ -211,13 +183,7 @@ export class AuthController extends BaseController {
       const { currentPassword, newPassword } = req.body;
 
       // 验证输入
-      if (!currentPassword || !newPassword) {
-        throw new ValidationError('Current password and new password are required');
-      }
-
-      if (newPassword.length < 6) {
-        throw new ValidationError('New password must be at least 6 characters');
-      }
+      validatePasswordChange(currentPassword, newPassword);
 
       // 获取用户
       const user = User.getById(userId);
@@ -270,29 +236,6 @@ export class AuthController extends BaseController {
   }
 
   /**
-   * 获取 Cookie 配置选项
-   * 确保设置和清除 Cookie 时使用相同的配置
-   * @private
-   * @returns {Object} Cookie 配置选项
-   */
-  _getCookieOptions() {
-    const cookieOptions = {
-      httpOnly: true,
-      secure: process.env.COOKIE_SECURE === 'true',
-      sameSite: process.env.COOKIE_SAMESITE || 'lax',
-      maxAge: SESSION_TIMEOUTS.cookieMaxAge,
-      path: '/'
-    };
-
-    // 只在生产环境且配置了 domain 时才设置
-    if (process.env.NODE_ENV === 'production' && process.env.COOKIE_DOMAIN) {
-      cookieOptions.domain = process.env.COOKIE_DOMAIN;
-    }
-
-    return cookieOptions;
-  }
-
-  /**
    * 注销
    * @param {Object} req - Express 请求对象
    * @param {Object} res - Express 响应对象
@@ -302,32 +245,11 @@ export class AuthController extends BaseController {
     try {
       // 清除 httpOnly cookie（配置需与设置时完全一致）
       // clearCookie 会忽略 maxAge 等选项，只使用 path/domain/sameSite/secure 来匹配
-      res.clearCookie('auth_token', this._getCookieOptions());
+      res.clearCookie('auth_token', getCookieOptions());
 
       this._success(res, null, 'Logged out successfully');
     } catch (error) {
       this._handleError(error, req, res, next);
-    }
-  }
-
-  /**
-   * 验证用户凭据
-   * @private
-   * @param {string} username - 用户名
-   * @param {string} password - 密码
-   * @throws {ValidationError} 验证失败时抛出
-   */
-  _validateCredentials(username, password) {
-    if (!username || !password) {
-      throw new ValidationError('Username and password are required');
-    }
-
-    if (username.length < 3) {
-      throw new ValidationError('Username must be at least 3 characters');
-    }
-
-    if (password.length < 6) {
-      throw new ValidationError('Password must be at least 6 characters');
     }
   }
 }
