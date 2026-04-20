@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  detectLanguageFromFilename,
-  detectLanguageFromContent,
-  detectLanguage,
-  getLanguageExtensions,
-  getMonacoLanguage,
   getThemeBackgroundColor,
   getThemeForegroundColor,
   formatJSON,
@@ -13,10 +8,19 @@ import {
   getPositionFromOffset,
   getOffsetFromPosition,
   truncateCode,
-  getFileIconInfo,
   validateCodeSyntax,
   getWordAtPosition
 } from '../editorUtils';
+
+import {
+  detectLanguageFromFilename,
+  detectLanguageFromContent,
+  detectLanguage,
+  getLanguageExtensions,
+  getMonacoLanguage
+} from '../languageDetection';
+
+import { getFileIconInfo } from '../fileIconUtils';
 
 describe('detectLanguageFromFilename', () => {
   it('should detect TypeScript', () => {

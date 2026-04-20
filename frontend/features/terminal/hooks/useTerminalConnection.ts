@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { logger } from '@/shared/utils/logger';
+import { createWebSocket, buildInitMessage } from '../utils/webSocketFactory';
 
 /**
  * Hook return type
@@ -89,9 +90,9 @@ function createWebSocketMessageHandler(
 }
 
 /**
- * Configure WebSocket event handlers
+ * Configure WebSocket onopen handler with init message
  */
-function configureWebSocketHandlers(
+function configureWebSocketOnOpen(
   ws: WebSocket,
   params: WebSocketConnectionParams
 ) {
@@ -104,20 +105,28 @@ function configureWebSocketHandlers(
       if (params.fitAddonRef.current && params.terminalRef.current && ws) {
         params.fitAddonRef.current.fit();
 
-        ws.send(JSON.stringify({
-          type: 'init',
-          projectPath: params.selectedProjectRef.current.fullPath || params.selectedProjectRef.current.path,
-          sessionId: params.isPlainShellRef.current ? null : params.selectedSessionRef.current?.id,
-          hasSession: params.isPlainShellRef.current ? false : !!params.selectedSessionRef.current,
-          provider: params.isPlainShellRef.current ? 'plain-shell' : (params.selectedSessionRef.current?.__provider || 'claude'),
-          cols: params.terminalRef.current.cols,
-          rows: params.terminalRef.current.rows,
-          initialCommand: params.initialCommandRef.current,
-          isPlainShell: params.isPlainShellRef.current
-        }));
+        const initMessage = buildInitMessage({
+          selectedProjectRef: params.selectedProjectRef,
+          selectedSessionRef: params.selectedSessionRef,
+          initialCommandRef: params.initialCommandRef,
+          isPlainShellRef: params.isPlainShellRef,
+          terminalRef: params.terminalRef
+        });
+
+        ws.send(JSON.stringify(initMessage));
       }
     }, 100);
   };
+}
+
+/**
+ * Configure WebSocket event handlers
+ */
+function configureWebSocketHandlers(
+  ws: WebSocket,
+  params: WebSocketConnectionParams
+) {
+  configureWebSocketOnOpen(ws, params);
 
   ws.onmessage = createWebSocketMessageHandler(
     params.isPlainShellRef,
@@ -191,40 +200,6 @@ async function establishWebSocketConnection(
     isConnectingRef.current = false;
     return null;
   }
-}
-
-/**
- * Create WebSocket connection with proper URL and token
- */
-async function createWebSocket(): Promise<WebSocket | null> {
-  const isPlatform = import.meta.env.VITE_IS_PLATFORM === 'true';
-  let wsUrl: string;
-
-  if (isPlatform) {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    wsUrl = `${protocol}//${window.location.host}/shell`;
-  } else {
-    let token: string | undefined;
-    try {
-      const response = await fetch('/api/auth/ws-token', { credentials: 'include' });
-      if (response.ok) {
-        const data = await response.json();
-        token = data.data?.token;
-      }
-    } catch (error) {
-      logger.error('[Shell] Error fetching ws-token:', error);
-      return null;
-    }
-
-    if (!token) {
-      return null;
-    }
-
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    wsUrl = `${protocol}//${window.location.host}/shell?token=${encodeURIComponent(token)}`;
-  }
-
-  return new WebSocket(wsUrl);
 }
 
 /**
