@@ -62,6 +62,39 @@ export function extractDiskStats(ioRecursive) {
 }
 
 /**
+ * 从 I/O 递归数组中提取指定操作的值
+ * @param {Array} ioRecursive - I/O 服务字节数递归数组
+ * @param {string} operation - 操作类型 ('Read' 或 'Write')
+ * @returns {number} 操作对应的值，未找到返回 0
+ */
+function extractIoValue(ioRecursive, operation) {
+  const entry = ioRecursive.find(x => x.op === operation);
+  return entry?.value || 0;
+}
+
+/**
+ * 计算内存使用百分比
+ * @param {object} memoryStats - 内存统计信息
+ * @returns {number} 内存使用百分比
+ */
+function calculateMemoryPercent(memoryStats) {
+  const { usage = 0, limit = 0 } = memoryStats;
+  return limit ? (usage / limit) * 100 : 0;
+}
+
+/**
+ * 提取简化网络统计（eth0 rx/tx）
+ * @param {object} networks - 网络统计对象
+ * @returns {{networkRx: number, networkTx: number}} rx/tx 字节数
+ */
+function extractSimplifiedNetworkStats(networks) {
+  return {
+    networkRx: networks?.eth0?.rx_bytes || 0,
+    networkTx: networks?.eth0?.tx_bytes || 0
+  };
+}
+
+/**
  * 构建容器统计信息响应对象
  * @param {object} stats - 原始容器统计信息
  * @returns {object} 格式化的容器统计信息
@@ -71,21 +104,17 @@ export function buildStatsResponse(stats) {
   const blkioStats = stats.blkio_stats || {};
   const ioRecursive = blkioStats.io_service_bytes_recursive || [];
 
-  // Find read/write values from blkio stats
-  const readEntry = ioRecursive.find(x => x.op === 'Read');
-  const writeEntry = ioRecursive.find(x => x.op === 'Write');
+  // Extract all stats using helper functions
+  const networkStats = extractSimplifiedNetworkStats(stats.networks);
 
   return {
     cpuPercent: calculateCPUPercent(stats),
     memoryUsage: memoryStats.usage || 0,
     memoryLimit: memoryStats.limit || 0,
-    memoryPercent: memoryStats.limit
-      ? (memoryStats.usage / memoryStats.limit) * 100
-      : 0,
-    networkRx: stats.networks?.eth0?.rx_bytes || 0,
-    networkTx: stats.networks?.eth0?.tx_bytes || 0,
-    blockRead: readEntry?.value || 0,
-    blockWrite: writeEntry?.value || 0
+    memoryPercent: calculateMemoryPercent(memoryStats),
+    ...networkStats,
+    blockRead: extractIoValue(ioRecursive, 'Read'),
+    blockWrite: extractIoValue(ioRecursive, 'Write')
   };
 }
 

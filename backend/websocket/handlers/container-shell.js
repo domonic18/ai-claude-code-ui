@@ -7,13 +7,103 @@
  * @module websocket/handlers/container-shell
  */
 
-import { WebSocket } from 'ws';
 import { PTY_SESSION_TIMEOUT } from './shell-constants.js';
 import containerManager from '../../services/container/core/index.js';
 import { createLogger, sanitizePreview } from '../../utils/logger.js';
 import { ContainerShellSession } from './ContainerShellSession.js';
 
 const logger = createLogger('websocket/handlers/container-shell');
+
+/**
+ * 发送认证错误响应
+ * @param {WebSocket} ws - WebSocket 连接
+ */
+function _determineIsPlainShell(isPlainShell, initialCommand, hasSession, provider) {
+    if (isPlainShell) return true;
+    if (initialCommand && !hasSession) return true;
+    if (provider === 'plain-shell') return true;
+    return false;
+}
+
+/**
+ * 从 WebSocket 中提取用户 ID
+ * @param {WebSocket} ws - WebSocket 连接
+ * @returns {string|undefined} 用户 ID
+ */
+function _extractUserId(ws) {
+    return ws.user?.userId || ws.user?.id;
+}
+
+/**
+ * 记录调试信息（批量）
+ * @param {string} projectPath - 项目路径
+ * @param {string} sessionId - 会话 ID
+ * @param {string} provider - 提供商
+ * @param {string} ptySessionKey - 会话键
+ * @param {string} initialCommand - 初始命令
+ * @param {number} cols - 列数
+ * @param {number} rows - 行数
+ */
+function _logDebugInfo(projectPath, sessionId, provider, ptySessionKey, initialCommand, cols, rows) {
+    logger.debug('[Container Shell] Project:', projectPath);
+    logger.debug('[Container Shell] Session key:', ptySessionKey);
+    logger.debug('[Container Shell] Provider:', provider);
+    logger.debug({ initialCommandPreview: sanitizePreview(initialCommand) || 'none' }, '[Container Shell] Initial command');
+    logger.debug({ cols, rows }, '[Container Shell] Terminal size');
+}
+
+function _sendAuthError(ws) {
+    ws.send(JSON.stringify({
+        type: 'output',
+        data: `\r\n\x1b[31mError: User authentication required\x1b[0m\r\n`
+    }));
+    ws.close();
+}
+
+/**
+ * 发送通用错误响应
+ * @param {WebSocket} ws - WebSocket 连接
+ * @param {string} message - 错误消息
+ */
+function _sendError(ws, message) {
+    ws.send(JSON.stringify({
+        type: 'output',
+        data: `\r\n\x1b[31mError: ${message}\x1b[0m\r\n`
+    }));
+}
+
+/**
+ * 创建并配置容器 shell 会话
+ * @param {Object} attachResult - Attach 结果
+ * @param {Object} stream - 流对象
+ * @param {WebSocket} ws - WebSocket 连接
+ * @param {string} projectPath - 项目路径
+ * @param {string} sessionId - 会话 ID
+ * @param {string} userId - 用户 ID
+ * @param {string} ptySessionKey - 会话键
+ * @param {Map} ptySessionsMap - PTY 会话映射
+ * @returns {ContainerShellSession} 会话对象
+ */
+function _createAndConfigureSession(attachResult, stream, ws, projectPath, sessionId, userId, ptySessionKey, ptySessionsMap) {
+    const session = new ContainerShellSession(
+        attachResult,
+        stream,
+        ws,
+        projectPath,
+        sessionId,
+        userId
+    );
+
+    ptySessionsMap.set(ptySessionKey, session);
+    session.startStreamListeners(ptySessionKey, ptySessionsMap);
+
+    ws.on('close', () => {
+        logger.info('[Container Shell] WebSocket closed, keeping session alive');
+        session.setTimeout(ptySessionKey, ptySessionsMap, PTY_SESSION_TIMEOUT);
+    });
+
+    return session;
+}
 
 /**
  * 处理容器模式下的 shell WebSocket 连接
@@ -36,10 +126,9 @@ const logger = createLogger('websocket/handlers/container-shell');
  */
 export async function handleContainerShell(ws, data, ptySessionsMap) {
     const { projectPath, sessionId, hasSession, provider, initialCommand, cols = 80, rows = 24 } = data;
-    const isPlainShell = data.isPlainShell || (!!initialCommand && !hasSession) || provider === 'plain-shell';
+    const isPlainShell = _determineIsPlainShell(data.isPlainShell, initialCommand, hasSession, provider);
 
-    // authenticateWebSocket returns { userId, username }, not { id, username }
-    const userId = ws.user?.userId || ws.user?.id;
+    const userId = _extractUserId(ws);
 
     logger.debug('[Container Shell] Function called, userId:', userId);
     logger.debug('[Container Shell] Project path:', projectPath);
@@ -48,36 +137,22 @@ export async function handleContainerShell(ws, data, ptySessionsMap) {
 
     if (!userId) {
         logger.info('[Container Shell] No userId, closing connection');
-        ws.send(JSON.stringify({
-            type: 'output',
-            data: `\r\n\x1b[31mError: User authentication required\x1b[0m\r\n`
-        }));
-        ws.close();
+        _sendAuthError(ws);
         return null;
     }
 
-    // 会话键
     const ptySessionKey = _buildSessionKey(userId, projectPath, sessionId, isPlainShell, initialCommand);
 
-    logger.debug('[Container Shell] Project:', projectPath);
-    logger.debug('[Container Shell] Session key:', ptySessionKey);
-    logger.debug('[Container Shell] Provider:', provider);
-    logger.debug({ initialCommandPreview: sanitizePreview(initialCommand) || 'none' }, '[Container Shell] Initial command');
-    logger.debug({ cols, rows }, '[Container Shell] Terminal size');
+    _logDebugInfo(projectPath, sessionId, provider, ptySessionKey, initialCommand, cols, rows);
 
-    // 发送欢迎消息
     _sendWelcomeMessage(ws, projectPath, hasSession, provider, isPlainShell);
 
-    // 构建容器内的工作目录
     const containerWorkDir = `/workspace/${projectPath}`;
-
-    // 构建命令
     const shellCommand = _buildShellCommand(containerWorkDir, isPlainShell, provider, hasSession, sessionId, initialCommand);
 
     logger.debug({ shellCommandPreview: sanitizePreview(shellCommand) }, '[Container Shell] Executing command');
 
     try {
-        // 使用 attach 方法获取可写的 Duplex 流
         const attachResult = await containerManager.attachToContainerShell(userId, {
             workingDir: containerWorkDir,
             cols,
@@ -87,40 +162,24 @@ export async function handleContainerShell(ws, data, ptySessionsMap) {
         const stream = attachResult.stream;
         logger.debug('[Container Shell] Attached to container, stream type:', stream?.constructor?.name, 'writable:', stream?.writable);
 
-        // 发送初始命令到 shell
         await _sendInitialCommand(stream, shellCommand);
 
-        // 创建会话对象
-        const session = new ContainerShellSession(
+        _createAndConfigureSession(
             attachResult,
             stream,
             ws,
             projectPath,
             sessionId,
-            userId
+            userId,
+            ptySessionKey,
+            ptySessionsMap
         );
 
-        // 保存会话
-        ptySessionsMap.set(ptySessionKey, session);
-
-        // 启动流监听
-        session.startStreamListeners(ptySessionKey, ptySessionsMap);
-
-        // 处理 WebSocket 关闭 - 保持会话存活以支持重连
-        ws.on('close', () => {
-            logger.info('[Container Shell] WebSocket closed, keeping session alive');
-            session.setTimeout(ptySessionKey, ptySessionsMap, PTY_SESSION_TIMEOUT);
-        });
-
-        // 返回会话键，以便主处理器可以引用此会话
         return ptySessionKey;
 
     } catch (error) {
         logger.error('[Container Shell] Error:', error);
-        ws.send(JSON.stringify({
-            type: 'output',
-            data: `\r\n\x1b[31mError: ${error.message}\x1b[0m\r\n`
-        }));
+        _sendError(ws, error.message);
         return null;
     }
 }

@@ -39,21 +39,27 @@ function TourMask({ maskId, highlightRect, highlightBorderRef, svgMaskRef }: {
   highlightBorderRef: React.RefObject<HTMLDivElement | null>;
   svgMaskRef: React.RefObject<SVGRectElement | null>;
 }) {
+  const rectLeft = highlightRect?.left ?? 0;
+  const rectTop = highlightRect?.top ?? 0;
+  const rectWidth = highlightRect?.width ?? 0;
+  const rectHeight = highlightRect?.height ?? 0;
+  const borderStyle = { top: rectTop, left: rectLeft, width: rectWidth, height: rectHeight, pointerEvents: 'none' as const };
+
   return (
     <div className="fixed inset-0 z-[10000]" style={{ pointerEvents: 'auto' }} onClick={(e) => e.stopPropagation()}>
       <svg className="absolute inset-0 w-full h-full" style={{ pointerEvents: 'none' }}>
         <defs>
           <mask id={maskId}>
             <rect x="0" y="0" width="100%" height="100%" fill="white" />
-            <rect ref={svgMaskRef} x={highlightRect?.left ?? 0} y={highlightRect?.top ?? 0}
-              width={highlightRect?.width ?? 0} height={highlightRect?.height ?? 0}
+            <rect ref={svgMaskRef} x={rectLeft} y={rectTop}
+              width={rectWidth} height={rectHeight}
               rx="8" ry="8" fill="black" />
           </mask>
         </defs>
         <rect x="0" y="0" width="100%" height="100%" fill="rgba(0, 0, 0, 0.6)" mask={`url(#${maskId})`} />
       </svg>
       <div ref={highlightBorderRef} className="absolute rounded-lg ring-2 ring-blue-500 transition-all duration-300"
-        style={{ top: highlightRect?.top ?? 0, left: highlightRect?.left ?? 0, width: highlightRect?.width ?? 0, height: highlightRect?.height ?? 0, pointerEvents: 'none' }} />
+        style={borderStyle} />
     </div>
   );
 }

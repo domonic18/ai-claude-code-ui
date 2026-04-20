@@ -10,6 +10,70 @@ import { extractRelativePath } from '../utils/fileTreeHelpers';
 import { logger } from '@/shared/utils/logger';
 
 /**
+ * Validate drop operation and show appropriate error message
+ * @returns true if validation passes, false otherwise
+ */
+function validateDropOperation(
+  draggingItem: FileNode,
+  targetItem: FileNode | null,
+  canDrop: (source: FileNode, target: FileNode | null) => boolean,
+  t: (key: string, params?: Record<string, string>) => string
+): boolean {
+  if (canDrop(draggingItem, targetItem)) {
+    return true;
+  }
+
+  // Show appropriate error message
+  if (targetItem?.path === draggingItem.path) {
+    alert(t('fileExplorer.move.error.cannotMoveToSelf'));
+  } else if (targetItem && targetItem.path.startsWith(draggingItem.path + '/')) {
+    alert(t('fileExplorer.move.error.cannotMoveToChild'));
+  }
+
+  return false;
+}
+
+/**
+ * Get confirmation message for move operation
+ */
+function getMoveConfirmMessage(
+  draggingItem: FileNode,
+  targetItem: FileNode | null,
+  t: (key: string, params?: Record<string, string>) => string
+): string {
+  const sourceName = draggingItem.name || '未知文件';
+  const targetName = targetItem?.name || '根目录';
+
+  return targetItem
+    ? t('fileExplorer.move.confirm', { sourceName, targetName })
+    : t('fileExplorer.move.confirmToRoot', { sourceName });
+}
+
+/**
+ * Execute move operation via API
+ */
+async function executeMove(
+  selectedProjectName: string,
+  draggingItem: FileNode,
+  targetPath: string,
+  fetchFiles: () => Promise<void>,
+  t: (key: string, params?: Record<string, string>) => string
+): Promise<void> {
+  const sourcePath = extractRelativePath(draggingItem.path, selectedProjectName);
+  const response = await api.moveFile(selectedProjectName, sourcePath, targetPath);
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (errorData.message?.includes('already exists')) {
+      throw new Error(t('fileExplorer.move.error.targetExists'));
+    }
+    throw new Error(errorData.error || errorData.message || 'Move failed');
+  }
+
+  await fetchFiles();
+}
+
+/**
  * Execute drop operation with validation and API call
  *
  * @param options - Drop operation options
@@ -35,48 +99,27 @@ export async function executeDropOperation(options: {
     setDraggingItem,
   } = options;
 
-  if (!canDrop(draggingItem, targetItem)) {
-    if (targetItem?.path === draggingItem.path) {
-      alert(t('fileExplorer.move.error.cannotMoveToSelf'));
-    } else if (targetItem && targetItem.path.startsWith(draggingItem.path + '/')) {
-      alert(t('fileExplorer.move.error.cannotMoveToChild'));
-    }
+  // Validate drop operation
+  if (!validateDropOperation(draggingItem, targetItem, canDrop, t)) {
     setDraggingItem(null);
     return;
   }
 
-  let targetPath = '';
-  if (targetItem) {
-    targetPath = extractRelativePath(targetItem.path, selectedProjectName);
-  }
+  // Get target path
+  const targetPath = targetItem ? extractRelativePath(targetItem.path, selectedProjectName) : '';
 
-  const sourceName = draggingItem.name || '未知文件';
-  const targetName = targetItem?.name || '根目录';
-
-  const confirmMessage = targetItem
-    ? t('fileExplorer.move.confirm', { sourceName, targetName })
-    : t('fileExplorer.move.confirmToRoot', { sourceName });
-
+  // Confirm move operation
+  const confirmMessage = getMoveConfirmMessage(draggingItem, targetItem, t);
   if (!confirm(confirmMessage)) {
     setDraggingItem(null);
     return;
   }
 
+  // Execute move
   setIsMoving(true);
 
   try {
-    const sourcePath = extractRelativePath(draggingItem.path, selectedProjectName);
-    const response = await api.moveFile(selectedProjectName, sourcePath, targetPath);
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      if (errorData.message?.includes('already exists')) {
-        throw new Error(t('fileExplorer.move.error.targetExists'));
-      }
-      throw new Error(errorData.error || errorData.message || 'Move failed');
-    }
-
-    await fetchFiles();
+    await executeMove(selectedProjectName, draggingItem, targetPath, fetchFiles, t);
   } catch (error) {
     logger.error('[FileExplorer] Move error:', error);
     alert(t('fileExplorer.move.error.generic', { message: error instanceof Error ? error.message : 'Unknown error' }));

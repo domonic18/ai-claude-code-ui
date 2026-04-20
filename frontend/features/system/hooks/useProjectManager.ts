@@ -123,6 +123,59 @@ export function useProjectManager(
 }
 
 /**
+ * Find first available session from project
+ * @param project - Project object
+ * @returns First session or null
+ */
+function _findFirstSession(project: Project): Session | null {
+  return project.sessions?.[0] ||
+         (project as any).cursorSessions?.[0] ||
+         (project as any).codexSessions?.[0] ||
+         null;
+}
+
+/**
+ * Determine provider for a session
+ * @param project - Project object
+ * @param session - Session object
+ * @returns Provider name ('claude' | 'cursor' | 'codex')
+ */
+function _determineSessionProvider(project: Project, session: Session): 'claude' | 'cursor' | 'codex' {
+  if (project.sessions?.some(s => s.id === session.id)) return 'claude';
+  if ((project as any).cursorSessions?.some((s: Session) => s.id === session.id)) return 'cursor';
+  return 'codex';
+}
+
+/**
+ * Clear session storage
+ */
+function _clearSessionStorage() {
+  localStorage.removeItem('lastSessionId');
+  localStorage.removeItem('lastProjectName');
+}
+
+/**
+ * Auto-select first session if available
+ * @param project - Project object
+ * @param handleSessionSelect - Session select handler
+ * @param setSelectedSession - Set session state
+ */
+function _autoSelectFirstSession(project: Project, handleSessionSelect: (session: Session, projectName?: string) => void, setSelectedSession: (session: Session | null) => void) {
+  const firstSession = _findFirstSession(project);
+
+  if (firstSession) {
+    const provider = _determineSessionProvider(project, firstSession);
+    handleSessionSelect({
+      ...firstSession,
+      __projectName: project.name,
+      __provider: provider
+    }, project.name);
+  } else {
+    setSelectedSession(null);
+  }
+}
+
+/**
  * useProjectManagerHandlers Hook
  *
  * Extracts project and session handlers for better organization.
@@ -159,26 +212,10 @@ function useProjectManagerHandlers(options: {
     setSelectedProject(project);
 
     if (!preventAutoSession) {
-      const firstSession = project.sessions?.[0] ||
-                          (project as any).cursorSessions?.[0] ||
-                          (project as any).codexSessions?.[0];
-
-      if (firstSession) {
-        const provider = project.sessions?.some(s => s.id === firstSession.id) ? 'claude' :
-                        (project as any).cursorSessions?.some((s: any) => s.id === firstSession.id) ? 'cursor' : 'codex';
-        handleSessionSelect({
-          ...firstSession,
-          __projectName: project.name,
-          __provider: provider
-        }, project.name);
-      } else {
-        setSelectedSession(null);
-      }
+      _autoSelectFirstSession(project, handleSessionSelect, setSelectedSession);
     }
 
-    if (config.onProjectSelect) {
-      config.onProjectSelect(project);
-    }
+    config.onProjectSelect?.(project);
   }, [config, handleSessionSelect, setSelectedProject, setSelectedSession]);
 
   /**
@@ -186,16 +223,13 @@ function useProjectManagerHandlers(options: {
    */
   const handleNewSession = useCallback((projectName: string) => {
     const project = projects.find(p => p.name === projectName);
-    if (project) {
-      setSelectedProject(project);
-      setSelectedSession(null);
-      setNewSessionCounter(prev => prev + 1);
-      localStorage.removeItem('lastSessionId');
-      localStorage.removeItem('lastProjectName');
-      if (config.onProjectSelect) {
-        config.onProjectSelect(project);
-      }
-    }
+    if (!project) return;
+
+    setSelectedProject(project);
+    setSelectedSession(null);
+    setNewSessionCounter(prev => prev + 1);
+    _clearSessionStorage();
+    config.onProjectSelect?.(project);
   }, [projects, config, setSelectedProject, setSelectedSession, setNewSessionCounter]);
 
   /**
@@ -206,8 +240,7 @@ function useProjectManagerHandlers(options: {
 
     if (currentSession?.id === deletedSessionId) {
       setSelectedSession(null);
-      localStorage.removeItem('lastSessionId');
-      localStorage.removeItem('lastProjectName');
+      _clearSessionStorage();
     }
   }, [selectedSessionRef, setSelectedSession]);
 
@@ -218,8 +251,7 @@ function useProjectManagerHandlers(options: {
     if (selectedProjectRef.current?.name === projectName) {
       setSelectedProject(null);
       setSelectedSession(null);
-      localStorage.removeItem('lastSessionId');
-      localStorage.removeItem('lastProjectName');
+      _clearSessionStorage();
     }
   }, [selectedProjectRef, setSelectedProject, setSelectedSession]);
 

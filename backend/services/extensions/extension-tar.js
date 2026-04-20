@@ -26,6 +26,41 @@ const PROJECT_ROOT = path.resolve(__dirname, '../../..');
 const EXTENSIONS_DIR = path.join(PROJECT_ROOT, 'extensions', '.claude');
 
 /**
+ * Copy requested extension directories
+ * @param {Object} options - Include options
+ * @param {string} targetDir - Target directory
+ */
+async function _copyRequestedDirectories(options, targetDir) {
+  const DIR_MAPPING = {
+    includeSkills: 'skills',
+    includeAgents: 'agents',
+    includeCommands: 'commands',
+    includeHooks: 'hooks',
+    includeKnowledge: 'knowledge'
+  };
+
+  const copyPromises = Object.entries(DIR_MAPPING)
+    .filter(([optionKey]) => options[optionKey])
+    .map(([, dirName]) => copyDirectoryIfExists(dirName, targetDir));
+
+  await Promise.all(copyPromises);
+}
+
+/**
+ * Setup stream cleanup handlers
+ * @param {Readable} stream - Tar stream
+ * @param {Function} cleanup - Cleanup function
+ */
+function _setupStreamCleanup(stream, cleanup) {
+  finished(stream, () => cleanup());
+
+  const timeoutId = setTimeout(cleanup, 5 * 60 * 1000);
+  stream.on('end', () => clearTimeout(timeoutId));
+  stream.on('error', () => clearTimeout(timeoutId));
+  stream.cleanup = cleanup;
+}
+
+/**
  * Create a tar archive stream of extension files
  *
  * @param {Object} options - Options
@@ -47,73 +82,38 @@ export async function createExtensionTar(options = {}) {
     includeConfig = true
   } = options;
 
-  // Create a temporary directory for the tar content
   const tempDir = path.join(PROJECT_ROOT, 'workspace', 'temp', `extensions-${Date.now()}`);
-
-  // Cleanup function to remove temp directory
   const cleanup = () => {
     fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
   };
 
   try {
-    // Ensure temp directory exists
     await fs.promises.mkdir(tempDir, { recursive: true });
 
-    // Create .claude directory structure
     const claudeDir = path.join(tempDir, '.claude');
     await fs.promises.mkdir(claudeDir, { recursive: true });
 
-    // Copy requested directories
-    if (includeSkills) {
-      await copyDirectoryIfExists('skills', claudeDir);
-    }
-    if (includeAgents) {
-      await copyDirectoryIfExists('agents', claudeDir);
-    }
-    if (includeCommands) {
-      await copyDirectoryIfExists('commands', claudeDir);
-    }
-    if (includeHooks) {
-      await copyDirectoryIfExists('hooks', claudeDir);
-    }
-    if (includeKnowledge) {
-      await copyDirectoryIfExists('knowledge', claudeDir);
-    }
+    await _copyRequestedDirectories({
+      includeSkills,
+      includeAgents,
+      includeCommands,
+      includeHooks,
+      includeKnowledge
+    }, claudeDir);
 
-    // Copy config files
     if (includeConfig) {
       await copyConfigFiles(claudeDir);
     }
 
-    // Create tar archive path
     const tarPath = path.join(tempDir, 'extensions.tar');
     await createTarArchive(tempDir, tarPath);
 
-    // Create a readable stream from the tar file
     const stream = fs.createReadStream(tarPath);
-
-    // Use stream.finished() to ensure cleanup happens when stream is finalized
-    // This is more reliable than just 'end' and 'error' events
-    finished(stream, (err) => {
-      // Ignore errors, just cleanup
-      cleanup();
-    });
-
-    // Also set up timeout-based cleanup as a safety net
-    // If stream is not consumed within 5 minutes, cleanup anyway
-    const timeoutId = setTimeout(cleanup, 5 * 60 * 1000);
-
-    // Clear timeout when stream is consumed
-    stream.on('end', () => clearTimeout(timeoutId));
-    stream.on('error', () => clearTimeout(timeoutId));
-
-    // Expose cleanup function for manual cleanup if needed
-    stream.cleanup = cleanup;
+    _setupStreamCleanup(stream, cleanup);
 
     return stream;
 
   } catch (error) {
-    // Clean up on error
     cleanup();
     throw error;
   }

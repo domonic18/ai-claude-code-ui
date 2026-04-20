@@ -28,6 +28,46 @@ import { handleCodexResponse, handleCodexComplete } from './codexHandler';
 import type { MessageHandlerCallbacks } from './types';
 
 /**
+ * Message type → handler lookup table
+ * Maps each WebSocket message type to its corresponding handler function
+ */
+const MESSAGE_HANDLERS: Record<string, (message: WebSocketMessage, callbacks: MessageHandlerCallbacks, currentSessionId: string | null) => boolean> = {
+  'session-start': (msg) => { logger.info(`Session started:`, msg.sessionId); return true; },
+  'memory-context': (msg, cbs) => handleMemoryContext(msg, cbs),
+  'session-created': (msg, cbs, sid) => handleSessionCreated(msg, cbs, sid),
+  'token-budget': (msg, cbs) => handleTokenBudget(msg, cbs),
+  'TodoWrite': (msg, cbs) => handleTodoWrite(msg, cbs),
+  'claude-response': (msg, cbs) => handleClaudeResponse(msg, cbs),
+  'claude-output': (msg, cbs) => handleClaudeOutput(msg, cbs),
+  'claude-interactive-prompt': (msg, cbs) => handleClaudeInteractivePrompt(msg, cbs),
+  'claude-error': (msg, cbs) => handleClaudeError(msg, cbs),
+  'cursor-system': (msg, cbs, sid) => handleCursorSystem(msg, cbs, sid),
+  'cursor-user': () => false, // Don't add user messages as they're already shown from input
+  'cursor-tool-use': (msg, cbs) => handleCursorToolUse(msg, cbs),
+  'cursor-error': (msg, cbs) => handleCursorError(msg, cbs),
+  'cursor-result': (msg, cbs, sid) => handleCursorResult(msg, cbs, sid),
+  'cursor-output': (msg, cbs) => handleCursorOutput(msg, cbs),
+  'claude-complete': (msg, cbs, sid) => handleClaudeComplete(msg, cbs, sid),
+  'codex-response': (msg, cbs) => handleCodexResponse(msg, cbs),
+  'codex-complete': (msg, cbs, sid) => handleCodexComplete(msg, cbs, sid),
+  'session-aborted': (msg, cbs, sid) => handleSessionAborted(msg, cbs, sid),
+};
+
+/**
+ * Check if message should be filtered by session ID
+ * @param message - WebSocket message to check
+ * @param currentSessionId - Current active session ID
+ * @returns true if message should be filtered (skipped)
+ */
+function shouldFilterBySession(message: WebSocketMessage, currentSessionId: string | null): boolean {
+  const globalMessageTypes = ['projects_updated', 'session-created', 'claude-complete', 'codex-complete'];
+  const isGlobalMessage = globalMessageTypes.includes(message.type);
+
+  // For new sessions (currentSessionId is null), allow messages through
+  return !isGlobalMessage && message.sessionId && currentSessionId && message.sessionId !== currentSessionId;
+}
+
+/**
  * Handle WebSocket message and return whether it was processed
  *
  * @param message - WebSocket message to process
@@ -41,82 +81,16 @@ export function handleWebSocketMessage(
   const currentSessionId = callbacks.getCurrentSessionId();
 
   // Filter messages by session ID to prevent cross-session interference
-  const globalMessageTypes = [
-    'projects_updated',
-    'session-created',
-    'claude-complete',
-    'codex-complete'
-  ];
-  const isGlobalMessage = globalMessageTypes.includes(message.type);
-
-  // For new sessions (currentSessionId is null), allow messages through
-  if (!isGlobalMessage && message.sessionId && currentSessionId && message.sessionId !== currentSessionId) {
+  if (shouldFilterBySession(message, currentSessionId)) {
     logger.info(`\u23ed\ufe0f Skipping message for different session:`, message.sessionId, 'current:', currentSessionId);
     return false;
   }
 
-  switch (message.type) {
-    case 'session-start':
-      logger.info(`Session started:`, message.sessionId);
-      return true;
-
-    case 'memory-context':
-      return handleMemoryContext(message, callbacks);
-
-    case 'session-created':
-      return handleSessionCreated(message, callbacks, currentSessionId);
-
-    case 'token-budget':
-      return handleTokenBudget(message, callbacks);
-
-    case 'TodoWrite':
-      return handleTodoWrite(message, callbacks);
-
-    case 'claude-response':
-      return handleClaudeResponse(message, callbacks);
-
-    case 'claude-output':
-      return handleClaudeOutput(message, callbacks);
-
-    case 'claude-interactive-prompt':
-      return handleClaudeInteractivePrompt(message, callbacks);
-
-    case 'claude-error':
-      return handleClaudeError(message, callbacks);
-
-    case 'cursor-system':
-      return handleCursorSystem(message, callbacks, currentSessionId);
-
-    case 'cursor-user':
-      // Don't add user messages as they're already shown from input
-      return false;
-
-    case 'cursor-tool-use':
-      return handleCursorToolUse(message, callbacks);
-
-    case 'cursor-error':
-      return handleCursorError(message, callbacks);
-
-    case 'cursor-result':
-      return handleCursorResult(message, callbacks, currentSessionId);
-
-    case 'cursor-output':
-      return handleCursorOutput(message, callbacks);
-
-    case 'claude-complete':
-      return handleClaudeComplete(message, callbacks, currentSessionId);
-
-    case 'codex-response':
-      return handleCodexResponse(message, callbacks);
-
-    case 'codex-complete':
-      return handleCodexComplete(message, callbacks, currentSessionId);
-
-    case 'session-aborted':
-      return handleSessionAborted(message, callbacks, currentSessionId);
-
-    default:
-      logger.info('Unknown message type:', message.type);
-      return false;
+  const handler = MESSAGE_HANDLERS[message.type];
+  if (!handler) {
+    logger.info('Unknown message type:', message.type);
+    return false;
   }
+
+  return handler(message, callbacks, currentSessionId);
 }
