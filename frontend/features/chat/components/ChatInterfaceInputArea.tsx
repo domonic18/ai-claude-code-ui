@@ -10,6 +10,7 @@ import { ChatToolbar } from './ChatToolbar';
 
 interface ChatInterfaceInputAreaProps {
   selectedModel: any;
+  models?: Array<{ name: string; provider: string }>;
   onModelSelect: (model: any) => void;
   tokenBudget: any;
   isLoading: boolean;
@@ -25,6 +26,7 @@ interface ChatInterfaceInputAreaProps {
 
 export function ChatInterfaceInputArea({
   selectedModel,
+  models,
   onModelSelect,
   tokenBudget,
   isLoading,
@@ -42,6 +44,7 @@ export function ChatInterfaceInputArea({
       {/* Model selector toolbar - use modular component */}
       <ChatToolbar
         selectedModel={selectedModel}
+        models={models}
         onModelSelect={onModelSelect}
         tokenBudget={tokenBudget}
         isLoading={isLoading}

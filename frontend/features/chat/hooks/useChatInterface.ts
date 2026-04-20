@@ -94,6 +94,7 @@ export interface UseChatInterfaceResult {
   permissionMode: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
   setPermissionMode: (mode: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan') => void;
   selectedModel: any;
+  availableModels: Array<{ name: string; provider: string }>;
   handleModelSelect: (model: any) => void;
   messages: ChatMessage[];
   setMessages: (messages: ChatMessage[]) => void;
@@ -200,7 +201,7 @@ export function useChatInterface({
   return {
     input, setInput, attachedFiles, setAttachedFiles, isLoading, setIsLoading, currentSessionId, setCurrentSessionId,
     tasks, setTasks, tokenBudget, setTokenBudget, permissionMode, setPermissionMode,
-    selectedModel, handleModelSelect, messages, setMessages,
+    availableModels, selectedModel, handleModelSelect, messages, setMessages,
     streamingContent: stream.streamingContent, streamingThinking: stream.streamingThinking, isStreaming: stream.isStreaming, resetStream: stream.resetStream,
     modelSwitchNotification, ...menu, handleSend, handleInputChangeWithCommands: menu.handleInputChangeWithCommands,
     handleAddFile, handleRemoveFile: useCallback((id: string) => setAttachedFiles(prev => prev.filter(f => f.id !== id)), []),

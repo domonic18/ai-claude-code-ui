@@ -13,6 +13,8 @@ import TokenUsagePie from '@/shared/components/ui/TokenUsagePie';
 export interface ChatToolbarProps {
   /** Selected model */
   selectedModel: string;
+  /** Available models list */
+  models?: Array<{ name: string; provider: string }>;
   /** Handle model selection */
   onModelSelect: (modelId: string) => void;
   /** Token budget */
@@ -42,6 +44,7 @@ export interface ChatToolbarProps {
  */
 export function ChatToolbar({
   selectedModel,
+  models,
   onModelSelect,
   tokenBudget,
   isLoading,
@@ -80,6 +83,7 @@ export function ChatToolbar({
       <div className="flex items-center gap-3">
         <ModelSelector
           selectedModel={selectedModel}
+          models={models}
           onModelSelect={onModelSelect}
           tokenBudget={tokenBudget}
         />

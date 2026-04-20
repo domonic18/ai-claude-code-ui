@@ -32,11 +32,8 @@ export async function handleIntermediateState(userId, userConfig, options, state
   try {
     const { waitForReady } = await import('./ContainerReadyChecker.js');
     await waitForReady(stateMachine);
-    // Return container from registry (it should be ready now)
-    const { containerStateStore } = await import('./ContainerStateStore.js');
-    const sm = await containerStateStore.getOrCreate(userId, '');
-    // Note: Container is returned by the caller after state becomes ready
-    return null;
+    // State is now READY — recurse to get the actual container info from the READY branch
+    return getOrCreateContainer(userId, userConfig, options);
   } catch (error) {
     if (stateMachine.is(ContainerState.FAILED)) {
       stateMachine.transitionTo(ContainerState.NON_EXISTENT);
