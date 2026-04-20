@@ -36,6 +36,102 @@ const toUiScope = (scope: 'user' | 'project'): 'user' | 'local' => {
 };
 
 /**
+ * Get server configuration display
+ */
+function ServerConfigDisplay({ server }: { server: McpServer }) {
+  if (server.type === 'stdio' && server.config?.command) {
+    return <div>Command: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded text-xs">{server.config.command}</code></div>;
+  }
+
+  if ((server.type === 'sse' || server.type === 'http') && server.config?.url) {
+    return <div>URL: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded text-xs">{server.config.url}</code></div>;
+  }
+
+  if (server.config?.args && server.config.args.length > 0) {
+    return <div>Args: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded text-xs">{server.config.args.join(' ')}</code></div>;
+  }
+
+  return null;
+}
+
+/**
+ * Get test result styling
+ */
+function getTestResultClassNames(success: boolean): string {
+  const baseClasses = 'mt-2 p-2 rounded text-xs';
+  const colorClasses = success
+    ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200'
+    : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200';
+  return `${baseClasses} ${colorClasses}`;
+}
+
+/**
+ * Test result display component
+ */
+function TestResultDisplay({ testResult }: { testResult: any }) {
+  if (!testResult) return null;
+
+  return (
+    <div className={getTestResultClassNames(testResult.success)}>
+      <div className="font-medium">{testResult.message}</div>
+    </div>
+  );
+}
+
+/**
+ * Tools discovery display component
+ */
+function ToolsDisplay({ serverTools }: { serverTools: any }) {
+  if (!serverTools?.tools || serverTools.tools.length === 0) return null;
+
+  const tools = serverTools.tools;
+  const displayTools = tools.slice(0, 5);
+  const remainingCount = tools.length - 5;
+
+  return (
+    <div className="mt-2 p-2 rounded text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200">
+      <div className="font-medium">Tools ({tools.length}):</div>
+      <div className="flex flex-wrap gap-1 mt-1">
+        {displayTools.map((tool: any, i: number) => (
+          <code key={i} className="bg-blue-100 dark:bg-blue-800 px-1 rounded">{tool.name}</code>
+        ))}
+        {remainingCount > 0 && (
+          <span className="text-xs opacity-75">+{remainingCount} more</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Action buttons component
+ */
+function ServerActions({ server, onEdit, onDelete }: { server: McpServer; onEdit: (server: McpServer) => void; onDelete: (serverId: string) => void }) {
+  return (
+    <div className="flex items-center gap-2 ml-4">
+      <Button
+        onClick={() => onEdit(server)}
+        variant="ghost"
+        size="sm"
+        className="text-gray-600 hover:text-gray-700"
+        title="Edit server"
+      >
+        <Edit3 className="w-4 h-4" />
+      </Button>
+      <Button
+        onClick={() => onDelete(server.id)}
+        variant="ghost"
+        size="sm"
+        className="text-red-600 hover:text-red-700"
+        title="Delete server"
+      >
+        <Trash2 className="w-4 h-4" />
+      </Button>
+    </div>
+  );
+}
+
+/**
  * McpServerCard - Single MCP server display card
  */
 export const McpServerCard: React.FC<McpServerCardProps> = ({
@@ -54,73 +150,19 @@ export const McpServerCard: React.FC<McpServerCardProps> = ({
           <div className="flex items-center gap-2 mb-2">
             {getTransportIcon(server.type)}
             <span className="font-medium text-foreground">{server.name}</span>
-            <Badge variant="outline" className="text-xs">
-              {server.type}
-            </Badge>
-            <Badge variant="outline" className="text-xs">
-              {uiScope}
-            </Badge>
+            <Badge variant="outline" className="text-xs">{server.type}</Badge>
+            <Badge variant="outline" className="text-xs">{uiScope}</Badge>
           </div>
 
           <div className="text-sm text-muted-foreground space-y-1">
-            {server.type === 'stdio' && server.config?.command && (
-              <div>Command: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded text-xs">{server.config.command}</code></div>
-            )}
-            {(server.type === 'sse' || server.type === 'http') && server.config?.url && (
-              <div>URL: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded text-xs">{server.config.url}</code></div>
-            )}
-            {server.config?.args && server.config.args.length > 0 && (
-              <div>Args: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded text-xs">{server.config.args.join(' ')}</code></div>
-            )}
+            <ServerConfigDisplay server={server} />
           </div>
 
-          {/* Test Results */}
-          {testResult && (
-            <div className={`mt-2 p-2 rounded text-xs ${
-              testResult.success
-                ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200'
-                : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200'
-            }`}>
-              <div className="font-medium">{testResult.message}</div>
-            </div>
-          )}
-
-          {/* Tools Discovery Results */}
-          {serverTools?.tools && serverTools.tools.length > 0 && (
-            <div className="mt-2 p-2 rounded text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200">
-              <div className="font-medium">Tools ({serverTools.tools.length}):</div>
-              <div className="flex flex-wrap gap-1 mt-1">
-                {serverTools.tools.slice(0, 5).map((tool: any, i: number) => (
-                  <code key={i} className="bg-blue-100 dark:bg-blue-800 px-1 rounded">{tool.name}</code>
-                ))}
-                {serverTools.tools.length > 5 && (
-                  <span className="text-xs opacity-75">+{serverTools.tools.length - 5} more</span>
-                )}
-              </div>
-            </div>
-          )}
+          <TestResultDisplay testResult={testResult} />
+          <ToolsDisplay serverTools={serverTools} />
         </div>
 
-        <div className="flex items-center gap-2 ml-4">
-          <Button
-            onClick={() => onEdit(server)}
-            variant="ghost"
-            size="sm"
-            className="text-gray-600 hover:text-gray-700"
-            title="Edit server"
-          >
-            <Edit3 className="w-4 h-4" />
-          </Button>
-          <Button
-            onClick={() => onDelete(server.id)}
-            variant="ghost"
-            size="sm"
-            className="text-red-600 hover:text-red-700"
-            title="Delete server"
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        </div>
+        <ServerActions server={server} onEdit={onEdit} onDelete={onDelete} />
       </div>
     </div>
   );

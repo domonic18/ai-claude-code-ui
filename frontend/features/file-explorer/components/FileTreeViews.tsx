@@ -170,6 +170,65 @@ interface FileTreeItemProps {
   renderChildren: (children: FileNode[], level: number) => React.ReactNode;
 }
 
+/**
+ * Get icon for file tree item
+ */
+function getItemIcon(item: FileNode, expandedDirs: Set<string>): React.ReactNode {
+  if (item.type === 'directory') {
+    return expandedDirs.has(item.path)
+      ? <FolderOpen className="w-4 h-4 text-blue-500 flex-shrink-0" />
+      : <Folder className="w-4 h-4 text-muted-foreground flex-shrink-0" />;
+  }
+  return getFileIcon(item.name);
+}
+
+/**
+ * Get name content for file tree item
+ */
+function getNameContent(item: FileNode, renamingFile: string | null, editingName: string, onRenameChange: (value: string) => void, onRenameConfirm: () => void, onRenameCancel: () => void): React.ReactNode {
+  if (renamingFile === item.path) {
+    return <RenameInput value={editingName} onChange={onRenameChange} onConfirm={onRenameConfirm} onCancel={onRenameCancel} width="w-32" />;
+  }
+  return <span className="text-sm truncate text-foreground">{item.name}</span>;
+}
+
+/**
+ * Get action buttons for file tree item
+ */
+function getActionButtons(item: FileNode, renamingFile: string | null, deletingFile: string | null, onRenameStart: (item: FileNode, e: React.MouseEvent) => void, onDelete: (item: FileNode, e: React.MouseEvent) => void): React.ReactNode {
+  if (renamingFile === item.path) return null;
+  return <FileTreeActionButtons item={item} renamingFile={renamingFile} deletingFile={deletingFile} onRenameStart={onRenameStart} onDelete={onDelete} />;
+}
+
+/**
+ * Get children nodes for directory item
+ */
+function getItemChildren(item: FileNode, expandedDirs: Set<string>, renderChildren: (children: FileNode[], level: number) => React.ReactNode, level: number): React.ReactNode {
+  if (item.type !== 'directory' || !expandedDirs.has(item.path) || !item.children?.length) return null;
+  return renderChildren(item.children, level + 1);
+}
+
+/**
+ * Get container class name for file tree item
+ */
+function getContainerClassName(item: FileNode, dragOverItem: FileNode | null): string {
+  const baseClasses = 'select-none group/file rounded-md relative';
+  const dragOverClasses = dragOverItem?.path === item.path && item.type === 'directory' ? 'ring-2 ring-blue-400 bg-blue-50/50' : '';
+  return `${baseClasses} ${dragOverClasses}`;
+}
+
+/**
+ * Get layout component based on view mode
+ */
+function getLayoutComponent(viewMode: 'simple' | 'detailed' | 'compact', layoutProps: LayoutProps): React.ReactNode {
+  switch (viewMode) {
+    case 'simple': return <SimpleLayout {...layoutProps} />;
+    case 'detailed': return <DetailedLayout {...layoutProps} />;
+    case 'compact': return <CompactLayout {...layoutProps} />;
+    default: return null;
+  }
+}
+
 // File tree item with drag-and-drop
 function FileTreeItem({
   item, level, viewMode, expandedDirs, selectedFolder, renamingFile, editingName, deletingFile,
@@ -182,18 +241,19 @@ function FileTreeItem({
     item.type === 'directory' ? onToggleDirectory(item.path) : onSelectFile(item);
   };
 
-  const icon = item.type === 'directory' ? (expandedDirs.has(item.path) ? <FolderOpen className="w-4 h-4 text-blue-500 flex-shrink-0" /> : <Folder className="w-4 h-4 text-muted-foreground flex-shrink-0" />) : getFileIcon(item.name);
-  const nameContent = renamingFile === item.path ? <RenameInput value={editingName} onChange={onRenameChange} onConfirm={onRenameConfirm} onCancel={onRenameCancel} width="w-32" /> : <span className="text-sm truncate text-foreground">{item.name}</span>;
-  const actionButtons = renamingFile !== item.path ? <FileTreeActionButtons item={item} renamingFile={renamingFile} deletingFile={deletingFile} onRenameStart={onRenameStart} onDelete={onDelete} /> : null;
-  const children = item.type === 'directory' && expandedDirs.has(item.path) && item.children?.length ? renderChildren(item.children, level + 1) : null;
+  const icon = getItemIcon(item, expandedDirs);
+  const nameContent = getNameContent(item, renamingFile, editingName, onRenameChange, onRenameConfirm, onRenameCancel);
+  const actionButtons = getActionButtons(item, renamingFile, deletingFile, onRenameStart, onDelete);
+  const children = getItemChildren(item, expandedDirs, renderChildren, level);
+
   const layoutProps = { item, level, icon, nameContent, selectedFolder, draggingItem, units, t, actionButtons, onClick: handleClick };
+  const containerClassName = getContainerClassName(item, dragOverItem);
+  const layoutComponent = getLayoutComponent(viewMode, layoutProps);
 
   return (
-    <div key={item.path} className={`select-none group/file rounded-md relative ${dragOverItem?.path === item.path && item.type === 'directory' ? 'ring-2 ring-blue-400 bg-blue-50/50' : ''}`}
+    <div key={item.path} className={containerClassName}
       draggable={renamingFile !== item.path} onDragStart={(e) => { e.stopPropagation(); onDragStart(item, e); }} onDragOver={(e) => { e.stopPropagation(); onDragOver(item, e); }} onDrop={(e) => onDrop(item, e)}>
-      {viewMode === 'simple' && <SimpleLayout {...layoutProps} />}
-      {viewMode === 'detailed' && <DetailedLayout {...layoutProps} />}
-      {viewMode === 'compact' && <CompactLayout {...layoutProps} />}
+      {layoutComponent}
       {viewMode !== 'detailed' && actionButtons && <ActionButtonsOverlay actionButtons={actionButtons} />}
       {children}
     </div>

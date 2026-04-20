@@ -40,13 +40,82 @@ async function findSessionFile(dir, sessionId) {
 }
 
 /**
+ * 处理 token_count 事件并提取 token 使用信息
+ * @param {object} payloadInfo - payload.info 对象
+ * @returns {object|null} token 使用信息对象
+ */
+function extractTokenUsage(payloadInfo) {
+  if (!payloadInfo?.total_token_usage) return null;
+
+  return {
+    used: payloadInfo.total_token_usage.total_tokens || 0,
+    total: payloadInfo.model_context_window || 200000
+  };
+}
+
+/**
+ * 检查是否为 token_count 事件
+ * @param {object} entry - JSONL 条目
+ * @returns {boolean}
+ */
+function isTokenCountEvent(entry) {
+  return entry.type === 'event_msg' &&
+         entry.payload?.type === 'token_count' &&
+         entry.payload?.info;
+}
+
+/**
+ * 检查是否为 response_item 条目
+ * @param {object} entry - JSONL 条目
+ * @returns {boolean}
+ */
+function isResponseItem(entry) {
+  return entry.type === 'response_item' && entry.payload?.type;
+}
+
+/**
+ * 处理单行 JSONL 数据
+ * @param {string} line - JSONL 行
+ * @param {Array} messages - 消息数组（用于累积结果）
+ * @param {object} currentTokenUsage - 当前 token 使用信息
+ * @returns {boolean} 是否成功处理
+ */
+function processJsonlLine(line, messages, currentTokenUsage) {
+  if (!line.trim()) return false;
+
+  try {
+    const entry = JSON.parse(line);
+
+    // Extract token usage from token_count events (keep latest)
+    if (isTokenCountEvent(entry)) {
+      const usage = extractTokenUsage(entry.payload.info);
+      if (usage) Object.assign(currentTokenUsage, usage);
+      return true;
+    }
+
+    // Dispatch response_item entries to handlers
+    if (isResponseItem(entry)) {
+      const handler = PAYLOAD_HANDLERS.get(entry.payload.type);
+      const result = handler?.(entry);
+      if (result) messages.push(result);
+    }
+
+    return true;
+  } catch {
+    // Skip malformed lines
+    return false;
+  }
+}
+
+/**
  * 从 JSONL 文件逐行解析消息和 token 使用信息
  * @param {string} filePath - JSONL 文件路径
  * @returns {Promise<{messages: Array, tokenUsage: Object|null}>}
  */
 async function parseJsonlMessages(filePath) {
   const messages = [];
-  let tokenUsage = null;
+  const tokenUsage = {};
+
   const fileStream = fsSync.createReadStream(filePath);
   const rl = readline.createInterface({
     input: fileStream,
@@ -54,37 +123,16 @@ async function parseJsonlMessages(filePath) {
   });
 
   for await (const line of rl) {
-    if (!line.trim()) continue;
-
-    try {
-      const entry = JSON.parse(line);
-
-      // Extract token usage from token_count events (keep latest)
-      if (entry.type === 'event_msg' && entry.payload?.type === 'token_count' && entry.payload?.info) {
-        const info = entry.payload.info;
-        if (info.total_token_usage) {
-          tokenUsage = {
-            used: info.total_token_usage.total_tokens || 0,
-            total: info.model_context_window || 200000
-          };
-        }
-        continue;
-      }
-
-      // Dispatch response_item entries to handlers
-      if (entry.type === 'response_item' && entry.payload?.type) {
-        const handler = PAYLOAD_HANDLERS.get(entry.payload.type);
-        const result = handler?.(entry);
-        if (result) messages.push(result);
-      }
-    } catch {
-      // Skip malformed lines
-    }
+    processJsonlLine(line, messages, tokenUsage);
   }
 
   // Sort by timestamp
   messages.sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
-  return { messages, tokenUsage };
+
+  // Return tokenUsage only if it has values
+  const finalTokenUsage = Object.keys(tokenUsage).length > 0 ? tokenUsage : null;
+
+  return { messages, tokenUsage: finalTokenUsage };
 }
 
 /**

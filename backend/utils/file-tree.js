@@ -23,6 +23,75 @@ function permToRwx(perm) {
 }
 
 /**
+ * 跳过大型构建目录
+ * @param {string} name - 目录/文件名
+ * @returns {boolean} 是否应跳过
+ */
+function _shouldSkipEntry(name) {
+  const SKIP_DIRS = ['node_modules', 'dist', 'build'];
+  return SKIP_DIRS.includes(name);
+}
+
+/**
+ * 获取文件元数据（权限、大小、修改时间）
+ * @param {Object} item - 文件项对象
+ * @param {string} itemPath - 文件路径
+ */
+async function _getFileMetadata(item, itemPath) {
+  try {
+    const stats = await fsPromises.stat(itemPath);
+    const mode = stats.mode;
+    const ownerPerm = (mode >> 6) & 7;
+    const groupPerm = (mode >> 3) & 7;
+    const otherPerm = mode & 7;
+
+    Object.assign(item, {
+      size: stats.size,
+      modified: stats.mtime.toISOString(),
+      permissions: String(ownerPerm) + groupPerm + otherPerm,
+      permissionsRwx: permToRwx(ownerPerm) + permToRwx(groupPerm) + permToRwx(otherPerm)
+    });
+  } catch (statError) {
+    Object.assign(item, {
+      size: 0,
+      modified: null,
+      permissions: '000',
+      permissionsRwx: '---------'
+    });
+  }
+}
+
+/**
+ * 尝试递归读取子目录
+ * @param {Object} item - 目录项对象
+ * @param {number} maxDepth - 最大深度
+ * @param {number} currentDepth - 当前深度
+ * @param {boolean} showHidden - 是否显示隐藏文件
+ */
+async function _tryReadChildren(item, maxDepth, currentDepth, showHidden) {
+  try {
+    await fsPromises.access(item.path, fsPromises.constants.R_OK);
+    item.children = await getFileTree(item.path, maxDepth, currentDepth + 1, showHidden);
+  } catch (e) {
+    item.children = [];
+  }
+}
+
+/**
+ * 排序文件树项（目录优先，然后按名称）
+ * @param {Array} items - 文件项数组
+ * @returns {Array} 排序后的数组
+ */
+function _sortFileTree(items) {
+  return items.sort((a, b) => {
+    if (a.type !== b.type) {
+      return a.type === 'directory' ? -1 : 1;
+    }
+    return a.name.localeCompare(b.name);
+  });
+}
+
+/**
  * 获取目录的文件树结构
  * @param {string} dirPath - 要扫描的目录路径
  * @param {number} maxDepth - 最大遍历深度 (默认: 3)
@@ -37,10 +106,7 @@ export async function getFileTree(dirPath, maxDepth = 3, currentDepth = 0, showH
     const entries = await fsPromises.readdir(dirPath, { withFileTypes: true });
 
     for (const entry of entries) {
-      // 仅跳过大型构建目录
-      if (entry.name === 'node_modules' ||
-        entry.name === 'dist' ||
-        entry.name === 'build') continue;
+      if (_shouldSkipEntry(entry.name)) continue;
 
       const itemPath = path.join(dirPath, entry.name);
       const item = {
@@ -49,52 +115,21 @@ export async function getFileTree(dirPath, maxDepth = 3, currentDepth = 0, showH
         type: entry.isDirectory() ? 'directory' : 'file'
       };
 
-      // 获取文件统计信息以获取额外的元数据
-      try {
-        const stats = await fsPromises.stat(itemPath);
-        item.size = stats.size;
-        item.modified = stats.mtime.toISOString();
+      await _getFileMetadata(item, itemPath);
 
-        // 将权限转换为 rwx 格式
-        const mode = stats.mode;
-        const ownerPerm = (mode >> 6) & 7;
-        const groupPerm = (mode >> 3) & 7;
-        const otherPerm = mode & 7;
-        item.permissions = ((mode >> 6) & 7).toString() + ((mode >> 3) & 7).toString() + (mode & 7).toString();
-        item.permissionsRwx = permToRwx(ownerPerm) + permToRwx(groupPerm) + permToRwx(otherPerm);
-      } catch (statError) {
-        // 如果 stat 失败，提供默认值
-        item.size = 0;
-        item.modified = null;
-        item.permissions = '000';
-        item.permissionsRwx = '---------';
-      }
-
-      if (entry.isDirectory() && currentDepth < maxDepth) {
-        // 递归获取子目录但限制深度
-        try {
-          // 在尝试读取目录之前检查是否可以访问该目录
-          await fsPromises.access(item.path, fsPromises.constants.R_OK);
-          item.children = await getFileTree(item.path, maxDepth, currentDepth + 1, showHidden);
-        } catch (e) {
-          // 静默跳过无法访问的目录（权限被拒绝等）
-          item.children = [];
-        }
+      const shouldRecurse = entry.isDirectory() && currentDepth < maxDepth;
+      if (shouldRecurse) {
+        await _tryReadChildren(item, maxDepth, currentDepth, showHidden);
       }
 
       items.push(item);
     }
   } catch (error) {
-    // 仅记录非权限错误以避免垃圾信息
-    if (error.code !== 'EACCES' && error.code !== 'EPERM') {
+    const isPermissionError = error.code === 'EACCES' || error.code === 'EPERM';
+    if (!isPermissionError) {
       logger.error('读取目录错误:', error);
     }
   }
 
-  return items.sort((a, b) => {
-    if (a.type !== b.type) {
-      return a.type === 'directory' ? -1 : 1;
-    }
-    return a.name.localeCompare(b.name);
-  });
+  return _sortFileTree(items);
 }

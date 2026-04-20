@@ -84,6 +84,66 @@ export function handleTodoWrite(message: WebSocketMessage, callbacks: MessageHan
 }
 
 /**
+ * Check if completed session matches current session
+ */
+function isCurrentSessionMatch(
+  completedSessionId: string | undefined,
+  currentSessionId: string | null,
+  pendingSessionId: string | null
+): boolean {
+  return Boolean(
+    completedSessionId === currentSessionId ||
+    !currentSessionId ||
+    (completedSessionId?.startsWith('temp-') && (pendingSessionId === currentSessionId || pendingSessionId))
+  );
+}
+
+/**
+ * Update session state on completion
+ */
+function updateSessionState(
+  completedSessionId: string | undefined,
+  currentSessionId: string | null,
+  callbacks: MessageHandlerCallbacks
+) {
+  if (!completedSessionId) return;
+
+  callbacks.onSessionInactive?.(completedSessionId);
+  callbacks.onSessionNotProcessing?.(completedSessionId);
+}
+
+/**
+ * Handle pending session completion
+ */
+function handlePendingSession(
+  pendingSessionId: string | null,
+  currentSessionId: string | null,
+  exitCode: number | undefined,
+  callbacks: MessageHandlerCallbacks
+) {
+  if (pendingSessionId && !currentSessionId && exitCode === 0) {
+    callbacks.onSetSessionId(pendingSessionId);
+    safeLocalStorage.removeItem('pendingSessionId');
+    logger.info('New session complete, ID set to:', pendingSessionId);
+  }
+}
+
+/**
+ * Clear chat messages cache on successful completion
+ */
+function clearChatMessagesCache(
+  exitCode: number | undefined,
+  getSelectedProjectName: () => string | undefined
+) {
+  if (exitCode === 0) {
+    const selectedProjectName = getSelectedProjectName();
+    if (selectedProjectName) {
+      safeLocalStorage.removeItem(`chat_messages_${selectedProjectName}`);
+    }
+  }
+}
+
+/**
  * Handle claude-complete message
  */
 export function handleClaudeComplete(
@@ -94,10 +154,8 @@ export function handleClaudeComplete(
   const completedSessionId = message.sessionId || currentSessionId || safeLocalStorage.getItem('pendingSessionId');
   const pendingSessionId = safeLocalStorage.getItem('pendingSessionId');
 
-  const isCurrentSession =
-    completedSessionId === currentSessionId ||
-    !currentSessionId ||
-    (completedSessionId?.startsWith('temp-') && (pendingSessionId === currentSessionId || pendingSessionId));
+  // Check if this is the current session
+  const isCurrentSession = isCurrentSessionMatch(completedSessionId, currentSessionId, pendingSessionId);
 
   if (isCurrentSession) {
     logger.info('[WS] Completing stream for session:', completedSessionId, 'current:', currentSessionId);
@@ -105,21 +163,14 @@ export function handleClaudeComplete(
     callbacks.completeStream?.();
   }
 
-  if (completedSessionId) {
-    callbacks.onSessionInactive?.(completedSessionId);
-    callbacks.onSessionNotProcessing?.(completedSessionId);
-  }
+  // Update session state
+  updateSessionState(completedSessionId, currentSessionId, callbacks);
 
-  if (pendingSessionId && !currentSessionId && message.exitCode === 0) {
-    callbacks.onSetSessionId(pendingSessionId);
-    safeLocalStorage.removeItem('pendingSessionId');
-    logger.info('New session complete, ID set to:', pendingSessionId);
-  }
+  // Handle pending session completion
+  handlePendingSession(pendingSessionId, currentSessionId, message.exitCode, callbacks);
 
-  const selectedProjectName = callbacks.getSelectedProjectName();
-  if (selectedProjectName && message.exitCode === 0) {
-    safeLocalStorage.removeItem(`chat_messages_${selectedProjectName}`);
-  }
+  // Clear chat messages cache
+  clearChatMessagesCache(message.exitCode, callbacks.getSelectedProjectName);
 
   return true;
 }
