@@ -10,27 +10,6 @@
  */
 
 import express from 'express';
-import {
-    resolveProjectPath,
-    getStatus,
-    getFileDiff,
-    getFileWithDiff,
-    getCommits,
-    getCommitDiff,
-    getRemoteStatus,
-    getBranches,
-    createInitialCommit,
-    commitFiles,
-    checkoutBranch,
-    createBranch,
-    fetchFromRemote,
-    pullFromRemote,
-    pushToRemote,
-    publishBranch,
-    discardChanges,
-    deleteUntracked,
-    generateCommitMessage
-} from '../../services/scm/index.js';
 import { createLogger } from '../../utils/logger.js';
 import {
     classifyRemoteError,
@@ -41,6 +20,26 @@ import {
     classifyPublishError,
     classifyPublishDetails
 } from './gitErrorClassifier.js';
+import {
+    handleGetStatus,
+    handleGetDiff,
+    handleGetFileWithDiff,
+    handleGetBranches,
+    handleGetCommits,
+    handleGetCommitDiff,
+    handleGetRemoteStatus,
+    handleInitialCommit,
+    handleCommit,
+    handleGenerateCommitMessage,
+    handleCheckout,
+    handleCreateBranch,
+    handleFetch,
+    handlePull,
+    handlePush,
+    handlePublish,
+    handleDiscard,
+    handleDeleteUntracked
+} from './gitRouteHandlers.js';
 
 const logger = createLogger('routes/api/git');
 const router = express.Router();
@@ -99,188 +98,35 @@ function gitHandlerWithStatus(handler, statusErrorFormatter) {
 
 // ─── 状态查询路由 ──────────────────────────────────────
 
-router.get('/status', gitHandler(
-    async (req, res) => {
-        const { project } = req.query;
-        if (!project) return res.status(400).json({ error: 'Project name is required' });
-        const projectPath = await resolveProjectPath(project);
-        res.json(await getStatus(projectPath));
-    },
-    formatGitStatusError
-));
-
-router.get('/diff', gitHandler(
-    async (req, res) => {
-        const { project, file } = req.query;
-        if (!project || !file) return res.status(400).json({ error: 'Project name and file path are required' });
-        const projectPath = await resolveProjectPath(project);
-        res.json({ diff: await getFileDiff(projectPath, file) });
-    }
-));
-
-router.get('/file-with-diff', gitHandlerWithStatus(
-    async (req, res) => {
-        const { project, file } = req.query;
-        if (!project || !file) return res.status(400).json({ error: 'Project name and file path are required' });
-        const projectPath = await resolveProjectPath(project);
-        res.json(await getFileWithDiff(projectPath, file));
-    },
-    formatFileWithDiffError
-));
-
-router.get('/branches', gitHandler(
-    async (req, res) => {
-        const { project } = req.query;
-        if (!project) return res.status(400).json({ error: 'Project name is required' });
-        const projectPath = await resolveProjectPath(project);
-        res.json({ branches: await getBranches(projectPath) });
-    }
-));
-
-router.get('/commits', gitHandler(
-    async (req, res) => {
-        const { project, limit = 10 } = req.query;
-        if (!project) return res.status(400).json({ error: 'Project name is required' });
-        const safeLimit = Math.min(Math.max(1, Number(limit) || 10), 500);
-        const projectPath = await resolveProjectPath(project);
-        res.json({ commits: await getCommits(projectPath, safeLimit) });
-    }
-));
-
-router.get('/commit-diff', gitHandler(
-    async (req, res) => {
-        const { project, commit } = req.query;
-        if (!project || !commit) return res.status(400).json({ error: 'Project name and commit hash are required' });
-        const projectPath = await resolveProjectPath(project);
-        res.json({ diff: await getCommitDiff(projectPath, commit) });
-    }
-));
-
-router.get('/remote-status', gitHandler(
-    async (req, res) => {
-        const { project } = req.query;
-        if (!project) return res.status(400).json({ error: 'Project name is required' });
-        const projectPath = await resolveProjectPath(project);
-        res.json(await getRemoteStatus(projectPath));
-    }
-));
+router.get('/status', gitHandler(handleGetStatus, formatGitStatusError));
+router.get('/diff', gitHandler(handleGetDiff));
+router.get('/file-with-diff', gitHandlerWithStatus(handleGetFileWithDiff, formatFileWithDiffError));
+router.get('/branches', gitHandler(handleGetBranches));
+router.get('/commits', gitHandler(handleGetCommits));
+router.get('/commit-diff', gitHandler(handleGetCommitDiff));
+router.get('/remote-status', gitHandler(handleGetRemoteStatus));
 
 // ─── 提交操作路由 ──────────────────────────────────────
 
-router.post('/initial-commit', gitHandlerWithStatus(
-    async (req, res) => {
-        const { project } = req.body;
-        if (!project) return res.status(400).json({ error: 'Project name is required' });
-        const projectPath = await resolveProjectPath(project);
-        const result = await createInitialCommit(projectPath);
-        res.json({ success: true, ...result, message: 'Initial commit created successfully' });
-    },
-    formatInitialCommitError
-));
-
-router.post('/commit', gitHandler(
-    async (req, res) => {
-        const { project, message, files } = req.body;
-        if (!project || !message || !files || files.length === 0) {
-            return res.status(400).json({ error: 'Project name, commit message, and files are required' });
-        }
-        const projectPath = await resolveProjectPath(project);
-        res.json({ success: true, ...await commitFiles(projectPath, files, message) });
-    }
-));
-
-router.post('/generate-commit-message', gitHandler(
-    async (req, res) => {
-        const { project, files, provider = 'claude' } = req.body;
-        if (!project || !files || files.length === 0) return res.status(400).json({ error: 'Project name and files are required' });
-        if (!['claude', 'cursor'].includes(provider)) return res.status(400).json({ error: 'provider must be "claude" or "cursor"' });
-        const projectPath = await resolveProjectPath(project);
-        res.json({ message: await generateCommitMessage(projectPath, files, provider) });
-    }
-));
+router.post('/initial-commit', gitHandlerWithStatus(handleInitialCommit, formatInitialCommitError));
+router.post('/commit', gitHandler(handleCommit));
+router.post('/generate-commit-message', gitHandler(handleGenerateCommitMessage));
 
 // ─── 分支操作路由 ──────────────────────────────────────
 
-router.post('/checkout', gitHandler(
-    async (req, res) => {
-        const { project, branch } = req.body;
-        if (!project || !branch) return res.status(400).json({ error: 'Project name and branch are required' });
-        const projectPath = await resolveProjectPath(project);
-        res.json({ success: true, ...await checkoutBranch(projectPath, branch) });
-    }
-));
-
-router.post('/create-branch', gitHandler(
-    async (req, res) => {
-        const { project, branch } = req.body;
-        if (!project || !branch) return res.status(400).json({ error: 'Project name and branch name are required' });
-        const projectPath = await resolveProjectPath(project);
-        res.json({ success: true, ...await createBranch(projectPath, branch) });
-    }
-));
+router.post('/checkout', gitHandler(handleCheckout));
+router.post('/create-branch', gitHandler(handleCreateBranch));
 
 // ─── 远程操作路由 ──────────────────────────────────────
 
-router.post('/fetch', gitHandler(
-    async (req, res) => {
-        const { project } = req.body;
-        if (!project) return res.status(400).json({ error: 'Project name is required' });
-        const projectPath = await resolveProjectPath(project);
-        res.json({ success: true, ...await fetchFromRemote(projectPath) });
-    },
-    (error) => ({ error: 'Fetch failed', details: classifyRemoteError(error) })
-));
-
-router.post('/pull', gitHandler(
-    async (req, res) => {
-        const { project } = req.body;
-        if (!project) return res.status(400).json({ error: 'Project name is required' });
-        const projectPath = await resolveProjectPath(project);
-        res.json({ success: true, ...await pullFromRemote(projectPath) });
-    },
-    (error) => ({ error: classifyPullError(error), details: classifyPullDetails(error) })
-));
-
-router.post('/push', gitHandler(
-    async (req, res) => {
-        const { project } = req.body;
-        if (!project) return res.status(400).json({ error: 'Project name is required' });
-        const projectPath = await resolveProjectPath(project);
-        res.json({ success: true, ...await pushToRemote(projectPath) });
-    },
-    (error) => ({ error: classifyPushError(error), details: classifyPushDetails(error) })
-));
-
-router.post('/publish', gitHandler(
-    async (req, res) => {
-        const { project, branch } = req.body;
-        if (!project || !branch) return res.status(400).json({ error: 'Project name and branch are required' });
-        const projectPath = await resolveProjectPath(project);
-        res.json({ success: true, ...await publishBranch(projectPath, branch) });
-    },
-    (error) => ({ error: classifyPublishError(error), details: classifyPublishDetails(error) })
-));
+router.post('/fetch', gitHandler(handleFetch, (error) => ({ error: 'Fetch failed', details: classifyRemoteError(error) })));
+router.post('/pull', gitHandler(handlePull, (error) => ({ error: classifyPullError(error), details: classifyPullDetails(error) })));
+router.post('/push', gitHandler(handlePush, (error) => ({ error: classifyPushError(error), details: classifyPushDetails(error) })));
+router.post('/publish', gitHandler(handlePublish, (error) => ({ error: classifyPublishError(error), details: classifyPublishDetails(error) })));
 
 // ─── 文件操作路由 ──────────────────────────────────────
 
-router.post('/discard', gitHandler(
-    async (req, res) => {
-        const { project, file } = req.body;
-        if (!project || !file) return res.status(400).json({ error: 'Project name and file path are required' });
-        const projectPath = await resolveProjectPath(project);
-        await discardChanges(projectPath, file);
-        res.json({ success: true, message: `Changes discarded for ${file}` });
-    }
-));
-
-router.post('/delete-untracked', gitHandler(
-    async (req, res) => {
-        const { project, file } = req.body;
-        if (!project || !file) return res.status(400).json({ error: 'Project name and file path are required' });
-        const projectPath = await resolveProjectPath(project);
-        const isDir = await deleteUntracked(projectPath, file);
-        res.json({ success: true, message: `Untracked ${isDir ? 'directory' : 'file'} ${file} deleted successfully` });
-    }
-));
+router.post('/discard', gitHandler(handleDiscard));
+router.post('/delete-untracked', gitHandler(handleDeleteUntracked));
 
 export default router;

@@ -17,19 +17,22 @@ function countCyclomaticComplexity(code) {
   const cleaned = code
     .replace(/\/\*[\s\S]*?\*\//g, '') // Remove block comments
     .replace(/\/\/.*$/gm, '') // Remove line comments
-    .replace(/(['"`])((?:\\.|(?!\1)[^\\])*)\1/g, ''); // Remove strings
+    .replace(/(['"`])((?:\\.|(?!\1)[^\\])*)\1/g, '') // Remove strings
+    .replace(/\?\./g, '  '); // Neutralize optional chaining (not a branch)
 
-  // Count decision points
+  // Count standalone `if` (but NOT `else if`, counted separately below)
+  const allIf = (cleaned.match(/\bif\b/g) || []).length;
+  const elseIf = (cleaned.match(/\belse\s+if\b/g) || []).length;
+  complexity += elseIf; // each `else if` is one branch
+  complexity += (allIf - elseIf); // standalone `if` (not preceded by `else`)
+
   const decisions = [
-    /\bif\b/g,
-    /\belse\s+if\b/g,
     /\bswitch\b/g,
     /\bfor\b/g,
     /\bwhile\b/g,
-    /\bdo\b/g,
     /\bcatch\b/g,
     /\?\?/g, // nullish coalescing
-    /\?[^:]/g, // ternary (first part)
+    /\?[^:.]/g, // ternary (exclude `?.` and `?:` TS annotation)
     /&&/g,
     /\|\|/g,
   ];
@@ -47,11 +50,11 @@ function countCyclomaticComplexity(code) {
 }
 
 /**
- * Find maximum nesting depth more accurately
+ * Find maximum nesting depth based on brace levels only.
+ * Tracks per-function depth by resetting at top-level close-brace.
  */
 function findMaxNestingDepth(code) {
   let maxDepth = 0;
-  let currentDepth = 0;
 
   // Remove strings and comments
   const cleaned = code
@@ -59,24 +62,22 @@ function findMaxNestingDepth(code) {
     .replace(/\/\/.*$/gm, '')
     .replace(/(['"`])((?:\\.|(?!\1)[^\\])*)\1/g, '');
 
-  const lines = cleaned.split('\n');
+  // Track depth per top-level block (function/class/method)
+  let depth = 0;
+  let blockMax = 0;
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-
-    // Skip empty lines
-    if (!trimmed) continue;
-
-    // Count braces (they increase nesting)
-    const openBraces = (line.match(/\{/g) || []).length;
-    const closeBraces = (line.match(/\}/g) || []).length;
-
-    // Count control flow keywords that increase nesting
-    const keywordMatches = trimmed.match(/\b(if|else|for|while|switch|case|try|catch|finally)\b/g);
-    const keywordCount = keywordMatches ? keywordMatches.length : 0;
-
-    currentDepth += openBraces + keywordCount - closeBraces;
-    maxDepth = Math.max(maxDepth, currentDepth);
+  for (let i = 0; i < cleaned.length; i++) {
+    if (cleaned[i] === '{') {
+      depth++;
+      blockMax = Math.max(blockMax, depth);
+    } else if (cleaned[i] === '}') {
+      depth--;
+      if (depth === 0 && blockMax > 0) {
+        // End of a top-level block — record its peak
+        maxDepth = Math.max(maxDepth, blockMax);
+        blockMax = 0;
+      }
+    }
   }
 
   return maxDepth;

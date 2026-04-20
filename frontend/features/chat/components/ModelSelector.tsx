@@ -11,10 +11,10 @@
  * - Context window display
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
-import { getAllModelOptions } from '../../../../shared/modelConstants';
+import React from 'react';
 import type { TokenBudget } from './TokenDisplay';
+import { useModelSelectorState } from './modelSelectorCallbacks';
+import { getTokenBadgeColorClasses, getButtonClasses, getModelItemClasses, getModelNameClasses } from './modelSelectorStyles';
 
 /**
  * TokenBadge component for displaying token budget percentage
@@ -25,19 +25,11 @@ interface TokenBadgeProps {
 }
 
 function TokenBadge({ tokenPercentage, title }: TokenBadgeProps) {
-  const getColorClasses = () => {
-    if (tokenPercentage >= 90) {
-      return 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400';
-    }
-    if (tokenPercentage >= 70) {
-      return 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400';
-    }
-    return 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400';
-  };
+  const colorClasses = getTokenBadgeColorClasses(tokenPercentage);
 
   return (
     <div
-      className={`flex items-center justify-center w-10 h-10 rounded-full border-2 text-xs font-bold transition-colors ${getColorClasses()}`}
+      className={`flex items-center justify-center w-10 h-10 rounded-full border-2 text-xs font-bold transition-colors ${colorClasses}`}
       title={title}
     >
       {tokenPercentage}%
@@ -57,18 +49,14 @@ interface ModelSelectorButtonProps {
 }
 
 function ModelSelectorButton({ isModelsLoaded, currentModel, isOpen, disabled, onClick }: ModelSelectorButtonProps) {
+  const buttonClasses = getButtonClasses(disabled);
+
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`
-        flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors
-        ${disabled
-          ? 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-600 cursor-not-allowed'
-          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-blue-500 dark:hover:border-blue-400 cursor-pointer'
-        }
-      `}
+      className={buttonClasses}
     >
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -131,17 +119,11 @@ function ModelDropdown({
                 key={model.name}
                 type="button"
                 onClick={() => handleSelect(model.name)}
-                className={`
-                      w-full px-3 py-2 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors
-                      ${model.name === selectedModel
-                        ? 'bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-500'
-                        : 'border-l-4 border-transparent'
-                      }
-                    `}
+                className={getModelItemClasses(model.name === selectedModel)}
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium ${model.name === selectedModel ? 'text-blue-700 dark:text-blue-300' : 'text-gray-900 dark:text-white'}`}>
+                    <p className={getModelNameClasses(model.name === selectedModel)}>
                       {model.name}
                     </p>
                     {model.description && (
@@ -172,97 +154,6 @@ function ModelDropdown({
       )}
     </div>
   );
-}
-
-/**
- * Custom hook to manage ModelSelector state and logic
- */
-function useModelSelectorState(
-  selectedModel: string | undefined,
-  models: ModelOption[] | undefined,
-  onModelSelect: ((modelId: string) => void) | undefined,
-  tokenBudget: TokenBudget | null | undefined
-) {
-  const { t } = useTranslation();
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const [loadedModels, setLoadedModels] = useState<ModelOption[]>(models || []);
-
-  // Load models if not provided
-  useEffect(() => {
-    if (!models) {
-      getAllModelOptions().then(setLoadedModels).catch(error => {
-        // Error is logged by getAllModelOptions
-      });
-    }
-  }, [models]);
-
-  const currentModels = models || loadedModels;
-  const isModelsLoaded = currentModels.length > 0;
-  const currentModel = isModelsLoaded
-    ? currentModels.find(m => m.name === selectedModel) || currentModels[0]
-    : null;
-
-  // Compute token percentage
-  const tokenPercentage = React.useMemo(() => {
-    if (tokenBudget?.percentage !== undefined) {
-      return tokenBudget.percentage;
-    }
-    if (tokenBudget?.total && tokenBudget?.used !== undefined) {
-      return Math.round((tokenBudget.used / tokenBudget.total) * 100);
-    }
-    return null;
-  }, [tokenBudget]);
-
-  // Group models by provider
-  const groupedModels = React.useMemo(() => {
-    const groups: Record<string, ModelOption[]> = {};
-    currentModels.forEach(model => {
-      const provider = model.provider || 'Unknown';
-      if (!groups[provider]) {
-        groups[provider] = [];
-      }
-      if (model.name) {
-        groups[provider].push(model);
-      }
-    });
-    return groups;
-  }, [currentModels]);
-
-  // Handle model selection
-  const handleSelect = useCallback((modelName: string) => {
-    onModelSelect?.(modelName);
-    setIsOpen(false);
-  }, [onModelSelect]);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
-    }
-  }, [isOpen]);
-
-  return {
-    currentModels,
-    isModelsLoaded,
-    currentModel,
-    tokenPercentage,
-    groupedModels,
-    handleSelect,
-    isOpen,
-    setIsOpen,
-    dropdownRef,
-    t
-  };
 }
 
 export interface ModelOption {

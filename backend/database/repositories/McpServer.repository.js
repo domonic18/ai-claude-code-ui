@@ -12,9 +12,11 @@ import { getDatabase } from '../connection.js';
 import { createLogger } from '../../utils/logger.js';
 import {
   handleDbError,
-  buildUpdateFields,
-  parseJson,
-  rowToObject
+  rowToObject,
+  executeCreate,
+  executeToggleEnabled,
+  executeUpdate,
+  getLastInsertRowId
 } from './McpServer.repository.helpers.js';
 
 const logger = createLogger('database/repositories/McpServer.repository');
@@ -97,28 +99,7 @@ export class McpServer {
    */
   static async create(userId, data) {
     try {
-      const db = getDatabase();
-      const now = new Date().toISOString();
-      const stmt = db.prepare(`
-        INSERT INTO user_mcp_servers (
-          user_id, name, type, config, enabled, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-      `);
-
-      stmt.run(
-        userId,
-        data.name,
-        data.type,
-        JSON.stringify(data.config),
-        data.enabled !== undefined ? (data.enabled ? 1 : 0) : 1,
-        now,
-        now
-      );
-
-      const id = this.lastInsertRowId();
-      logger.info(`[McpServer] Created server "${data.name}" for user ${userId} with id ${id}`);
-
-      return await this.getById(id);
+      return await executeCreate(userId, data, this.getById.bind(this));
     } catch (error) {
       throw handleDbError(error, 'create MCP server', { userId, serverName: data.name });
     }
@@ -132,33 +113,7 @@ export class McpServer {
    */
   static async update(id, data) {
     try {
-      const db = getDatabase();
-      const now = new Date().toISOString();
-
-      const { updates, values } = buildUpdateFields(data);
-
-      if (updates.length === 0) {
-        return await this.getById(id);
-      }
-
-      updates.push('updated_at = ?');
-      values.push(now);
-      values.push(id);
-
-      const stmt = db.prepare(`
-        UPDATE user_mcp_servers
-        SET ${updates.join(', ')}
-        WHERE id = ?
-      `);
-
-      const result = stmt.run(...values);
-
-      if (result.changes === 0) {
-        throw new Error('MCP server not found');
-      }
-
-      logger.info(`[McpServer] Updated server ${id}`);
-      return await this.getById(id);
+      return await executeUpdate(id, data, this.getById.bind(this));
     } catch (error) {
       throw handleDbError(error, 'update MCP server', { id, serverName: data.name });
     }
@@ -239,26 +194,7 @@ export class McpServer {
    */
   static async toggleEnabled(id) {
     try {
-      const db = getDatabase();
-      const row = db.prepare(`
-        SELECT enabled FROM user_mcp_servers WHERE id = ?
-      `).get(id);
-
-      if (!row) {
-        throw new Error('MCP server not found');
-      }
-
-      const newEnabled = row.enabled === 0 ? 1 : 0;
-      const now = new Date().toISOString();
-
-      db.prepare(`
-        UPDATE user_mcp_servers
-        SET enabled = ?, updated_at = ?
-        WHERE id = ?
-      `).run(newEnabled, now, id);
-
-      logger.info(`[McpServer] Toggled server ${id} enabled to ${newEnabled}`);
-      return await this.getById(id);
+      return await executeToggleEnabled(id, this.getById.bind(this));
     } catch (error) {
       throw handleDbError(error, 'toggle MCP server', { id });
     }
@@ -270,9 +206,7 @@ export class McpServer {
    * @returns {number} 最后插入的行 ID
    */
   static lastInsertRowId() {
-    const db = getDatabase();
-    const row = db.prepare('SELECT last_insert_rowid() as id').get();
-    return row.id;
+    return getLastInsertRowId();
   }
 
 }
