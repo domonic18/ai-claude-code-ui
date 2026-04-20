@@ -1,7 +1,9 @@
 /**
  * Editor Utils
  *
- * Utility functions for editor functionality.
+ * Re-exports all utility functions for editor functionality.
  */
 
 export * from './editorUtils';
+export * from './languageDetection';
+export * from './fileIconUtils';

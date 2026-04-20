@@ -22,7 +22,17 @@ import {
   isValidFilePath,
   sanitizeFileName,
   truncateFileName
-} from '../fileUtils';
+} from '../filePathUtils';
+import {
+  getFileIconInfo,
+  filterFilesByQuery,
+  flattenFileTree,
+  findNodeByPath,
+  getAllFilePaths,
+  sortFilesByName,
+  sortFilesBySize,
+  sortFilesByTime
+} from '../fileTreeUtils';
 
 describe('formatFileSize', () => {
   it('should return "0 B" for zero bytes', () => {

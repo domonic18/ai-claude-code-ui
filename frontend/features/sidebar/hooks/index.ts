@@ -28,3 +28,6 @@ export type { UseWorkspaceReturn } from './useWorkspace';
 
 export { useProjectSessions } from './useProjectSessions';
 export type { UseProjectSessionsReturn } from './useProjectSessions';
+
+export { useProjectCreationWizard } from './useProjectCreationWizard.tsx';
+export type { UseProjectCreationWizardReturn } from './useProjectCreationWizard.tsx';

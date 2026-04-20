@@ -7,124 +7,19 @@
  */
 
 import { Router } from 'express';
-import { samlConfig, validateSamlConfig } from '../../config/saml.config.js';
-import { generateToken } from '../../middleware/auth.middleware.js';
-import containerManager from '../../services/container/core/index.js';
-import { repositories } from '../../database/db.js';
-import saml2 from 'saml2-js';
+import { samlConfig } from '../../config/saml.config.js';
 import { createLogger } from '../../utils/logger.js';
+import { createSamlInstances } from './samlInstanceFactory.js';
+import {
+  extractUserInfo,
+  findOrCreateUser,
+  setAuthCookie,
+  initiateContainerCreation,
+  redirectToFrontend,
+} from './samlUserManager.js';
+
 const logger = createLogger('routes/core/saml');
-
-const { User } = repositories;
-const { ServiceProvider: Saml, IdentityProvider: IdP } = saml2;
-
 const router = Router();
-
-// ─── 证书解析工具 ──────────────────────────────────────────
-
-/**
- * 从 PEM 格式字符串中移除 BEGIN/END 标记和空白
- * @param {string} pem - PEM 格式的证书或密钥
- * @returns {string|null} 清理后的 base64 内容
- */
-function stripPemHeaders(pem) {
-  if (!pem) return null;
-  return pem
-    .replace(/-----BEGIN [\s\S]+?-----/g, '')
-    .replace(/-----END [\s\S]+?-----/g, '')
-    .replace(/\s/g, '');
-}
-
-// ─── SAML 属性映射 ──────────────────────────────────────────
-
-/**
- * SAML 属性候选名映射表
- * 每个 UI 字段对应多个可能的 SAML 属性名，取第一个有值的
- */
-const ATTRIBUTE_MAPPINGS = {
-  email: ['email', 'mail', 'username'],
-  firstName: ['firstName', 'givenname', 'first_name'],
-  lastName: ['lastName', 'sn', 'last_name'],
-  displayName: ['displayName', 'display_name', 'name', 'username'],
-};
-
-/**
- * 从 SAML 属性中提取第一个有效值
- * @param {Object} attributes - SAML 属性（数组格式）
- * @param {string[]} candidates - 候选属性名列表
- * @param {string} fallback - 默认值
- * @returns {string} 提取的值
- */
-function extractAttribute(attributes, candidates, fallback = '') {
-  for (const name of candidates) {
-    if (attributes[name]?.[0]) return attributes[name][0];
-  }
-  return fallback;
-}
-
-/**
- * 从 SAML 响应中提取用户信息
- * @param {Object} spResponse - saml2-js 解析后的响应
- * @returns {Object} { externalId, email, firstName, lastName, displayName }
- */
-function extractUserInfo(spResponse) {
-  const samlUser = spResponse.user || {};
-  const externalId = samlUser.name_id;
-  const attributes = samlUser.attributes || {};
-
-  const email = extractAttribute(attributes, ATTRIBUTE_MAPPINGS.email, externalId);
-  const firstName = extractAttribute(attributes, ATTRIBUTE_MAPPINGS.firstName, '');
-  const lastName = extractAttribute(attributes, ATTRIBUTE_MAPPINGS.lastName, '');
-  const displayName = extractAttribute(attributes, ATTRIBUTE_MAPPINGS.displayName, '')
-    || `${firstName} ${lastName}`.trim()
-    || email;
-
-  return { externalId, email, firstName, lastName, displayName };
-}
-
-// ─── SAML 实例创建 ──────────────────────────────────────────
-
-/**
- * 创建 SAML SP/IdP 实例
- * @returns {{ sp: Object, idp: Object }|null}
- */
-function createSamlInstances() {
-  if (!samlConfig.enabled) return null;
-
-  const validation = validateSamlConfig();
-  if (!validation.valid) {
-    throw new Error(`SAML configuration invalid: ${validation.errors.join('; ')}`);
-  }
-
-  try {
-    const idpCert = stripPemHeaders(samlConfig.certificate);
-    const spPrivateKey = stripPemHeaders(samlConfig.spPrivateKey);
-    const spCert = stripPemHeaders(samlConfig.spCertificate);
-
-    const idp = new IdP({
-      sso_login_url: samlConfig.sso_url,
-      sso_logout_url: samlConfig.slo_url,
-      certificates: [idpCert],
-      entity_id: samlConfig.entity_id,
-    });
-
-    const spConfig = {
-      entity_id: samlConfig.issuer,
-      assert_endpoint: samlConfig.callbackUrl,
-      allow_unencrypted_assertion: true,
-    };
-
-    if (spPrivateKey && spCert) {
-      spConfig.private_key = spPrivateKey;
-      spConfig.certificate = spCert;
-    }
-
-    return { sp: new Saml(spConfig), idp };
-  } catch (error) {
-    logger.error('[SAML] Failed to create SAML instances:', error);
-    return null;
-  }
-}
 
 // ─── SAML 禁用检查 ──────────────────────────────────────────
 
@@ -202,15 +97,24 @@ router.post('/callback', async (req, res) => {
 
     // 查找或创建用户
     const user = await findOrCreateUser(externalId, { email, firstName, lastName, displayName });
-    if (!user) return; // findOrCreateUser 已发送错误响应
 
     // 设置认证 cookie 并重定向
     setAuthCookie(res, user);
     initiateContainerCreation(user);
-    redirectToFrontend(res);
+    return redirectToFrontend(res);
 
   } catch (error) {
     logger.error('[SAML] Error during callback processing:', error);
+
+    // Handle custom errors with status codes
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        error: error.message,
+        code: error.code,
+        details: error.details,
+      });
+    }
+
     return res.status(500).json({
       error: 'SAML callback processing failed',
       message: error.message,
@@ -279,91 +183,5 @@ router.get('/test', async (_req, res) => {
     return res.status(500).json({ error: 'SAML configuration test failed', message: error.message });
   }
 });
-
-// ─── Callback 辅助函数 ──────────────────────────────────────
-
-/**
- * 查找或创建 SAML 用户
- * @param {string} externalId - SAML NameID
- * @param {Object} profile - 用户属性
- * @returns {Promise<Object|null>} 用户对象，失败时返回 null（并已发送响应）
- */
-async function findOrCreateUser(externalId, profile) {
-  let user = User.getByExternalId(externalId);
-
-  if (user) {
-    if (user.identity_provider && user.identity_provider !== 'saml') {
-      // 这里无法直接返回 res 响应，调用方需要处理
-      throw Object.assign(new Error('User already exists with a different authentication method'), {
-        statusCode: 400,
-        code: 'IDENTITY_PROVIDER_CONFLICT',
-        details: { existing_provider: user.identity_provider, requested_provider: 'saml' },
-      });
-    }
-    User.updateLastLogin(user.id);
-    return user;
-  }
-
-  try {
-    return User.createWithSSO({
-      username: profile.email,
-      email: profile.email,
-      identity_provider: 'saml',
-      external_id: externalId,
-      first_name: profile.firstName,
-      last_name: profile.lastName,
-      display_name: profile.displayName,
-    });
-  } catch (dbError) {
-    logger.error('[SAML] Failed to create user:', dbError);
-    throw Object.assign(new Error('Failed to create user'), {
-      statusCode: 500,
-      code: 'USER_CREATION_FAILED',
-    });
-  }
-}
-
-/**
- * 设置认证 Cookie
- * @param {Object} res - Express 响应对象
- * @param {Object} user - 用户对象
- */
-function setAuthCookie(res, user) {
-  const token = generateToken({ id: user.id, username: user.username });
-  const cookieOptions = {
-    httpOnly: true,
-    secure: process.env.COOKIE_SECURE === 'true',
-    sameSite: 'lax',
-    maxAge: 365 * 24 * 60 * 60 * 1000,
-    path: '/',
-  };
-
-  if (process.env.NODE_ENV === 'production' && process.env.COOKIE_DOMAIN) {
-    cookieOptions.domain = process.env.COOKIE_DOMAIN;
-  }
-
-  res.cookie('auth_token', token, cookieOptions);
-}
-
-/**
- * 异步创建用户容器（不阻塞登录流程）
- * @param {Object} user - 用户对象
- */
-function initiateContainerCreation(user) {
-  containerManager.getOrCreateContainer(user.id)
-    .then(() => logger.info(`[SAML] Container ready for user ${user.id}`))
-    .catch(err => logger.error(`[SAML] Failed to create container for user ${user.id}:`, err.message));
-}
-
-/**
- * 重定向到前端
- * @param {Object} res - Express 响应对象
- */
-function redirectToFrontend(res) {
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173/chat';
-  const redirectUrl = new URL(frontendUrl);
-  redirectUrl.searchParams.set('saml', 'success');
-  return res.redirect(redirectUrl.toString());
-}
 
 export default router;

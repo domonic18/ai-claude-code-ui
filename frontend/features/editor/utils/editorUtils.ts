@@ -1,216 +1,58 @@
 /**
- * Editor Utils
+ * Editor Core Utils
  *
- * Utility functions for code and PRD editor functionality.
+ * Core utility functions for code and PRD editor functionality:
+ * - Theme utilities
+ * - JSON formatting
+ * - Binary file detection
+ * - Position/offset calculation
+ * - Code truncation
+ * - Syntax validation
+ * - Word extraction
  */
 
 import type { EditorLanguage, EditorTheme } from '../types';
 
-/**
- * Language detection utilities
- */
-export const LANGUAGE_EXTENSIONS: Record<string, EditorLanguage> = {
-  'js': 'javascript',
-  'jsx': 'javascript',
-  'ts': 'typescript',
-  'tsx': 'typescript',
-  'py': 'python',
-  'java': 'java',
-  'cpp': 'cpp',
-  'c': 'cpp',
-  'h': 'cpp',
-  'hpp': 'cpp',
-  'cs': 'csharp',
-  'go': 'go',
-  'rs': 'rust',
-  'php': 'php',
-  'rb': 'ruby',
-  'sql': 'sql',
-  'yaml': 'yaml',
-  'yml': 'yaml',
-  'json': 'json',
-  'md': 'markdown',
-  'html': 'html',
-  'htm': 'html',
-  'css': 'css',
-  'scss': 'scss',
-  'sass': 'scss',
-  'xml': 'xml',
-  'sh': 'bash',
-  'bash': 'bash',
-  'dockerfile': 'dockerfile',
-  'ps1': 'powershell',
-  'psm1': 'powershell',
-  'txt': 'text',
+// ─── Theme utilities ────────────────────────────────────
+
+const THEME_BG_COLORS: Record<EditorTheme, string> = {
+  light: '#ffffff',
+  dark: '#1e1e1e',
+  monokai: '#272822',
+  solarized: '#fdf6e3',
+  dracula: '#282a36',
+  nord: '#2e3440',
+  github: '#ffffff',
+};
+
+const THEME_FG_COLORS: Record<EditorTheme, string> = {
+  light: '#000000',
+  dark: '#d4d4d4',
+  monokai: '#f8f8f2',
+  solarized: '#657b83',
+  dracula: '#f8f8f2',
+  nord: '#d8dee9',
+  github: '#24292e',
 };
 
 /**
- * Detect programming language from filename
- */
-export function detectLanguageFromFilename(filename: string): EditorLanguage {
-  const ext = filename.split('.').pop()?.toLowerCase();
-  if (!ext) {
-    return 'text';
-  }
-
-  if (ext in LANGUAGE_EXTENSIONS) {
-    return LANGUAGE_EXTENSIONS[ext];
-  }
-
-  // Check for Dockerfile
-  if (filename.toLowerCase() === 'dockerfile') {
-    return 'dockerfile';
-  }
-
-  return 'text';
-}
-
-/**
- * Detect language from file content (shebang detection)
- */
-export function detectLanguageFromContent(content: string): EditorLanguage | null {
-  const firstLine = content.split('\n')[0].trim();
-
-  if (!firstLine.startsWith('#!')) {
-    return null;
-  }
-
-  const shebang = firstLine.slice(2).toLowerCase();
-
-  if (shebang.includes('python')) {
-    return 'python';
-  }
-  if (shebang.includes('bash') || shebang.includes('sh')) {
-    return 'bash';
-  }
-  if (shebang.includes('node')) {
-    return 'javascript';
-  }
-  if (shebang.includes('ruby')) {
-    return 'ruby';
-  }
-  if (shebang.includes('perl')) {
-    return 'perl';
-  }
-
-  return null;
-}
-
-/**
- * Detect language from filename and optional content
- */
-export function detectLanguage(filename: string, content?: string): EditorLanguage {
-  // First try content detection (shebang)
-  if (content) {
-    const contentLanguage = detectLanguageFromContent(content);
-    if (contentLanguage) {
-      return contentLanguage;
-    }
-  }
-
-  // Fall back to filename detection
-  return detectLanguageFromFilename(filename);
-}
-
-/**
- * Get file extensions for a language
- */
-export function getLanguageExtensions(language: EditorLanguage): string[] {
-  const extensions: Record<EditorLanguage, string[]> = {
-    javascript: ['.js', '.jsx', '.mjs', '.cjs'],
-    typescript: ['.ts', '.tsx', '.mts', '.cts'],
-    python: ['.py', '.pyw', '.pyi'],
-    java: ['.java'],
-    cpp: ['.cpp', '.cc', '.cxx', '.h', '.hpp', '.hxx'],
-    csharp: ['.cs'],
-    go: ['.go'],
-    rust: ['.rs'],
-    php: ['.php'],
-    ruby: ['.rb'],
-    perl: ['.pl', '.pm'],
-    sql: ['.sql'],
-    yaml: ['.yaml', '.yml'],
-    json: ['.json'],
-    markdown: ['.md', '.markdown'],
-    html: ['.html', '.htm'],
-    css: ['.css'],
-    scss: ['.scss', '.sass'],
-    xml: ['.xml'],
-    bash: ['.sh', '.bash'],
-    powershell: ['.ps1', '.psm1'],
-    dockerfile: ['Dockerfile', '.dockerignore'],
-    text: ['.txt'],
-  };
-
-  return extensions[language] || [];
-}
-
-/**
- * Get Monaco editor language identifier
- */
-export function getMonacoLanguage(language: EditorLanguage): string {
-  const monacoLanguages: Record<EditorLanguage, string> = {
-    javascript: 'javascript',
-    typescript: 'typescript',
-    python: 'python',
-    java: 'java',
-    cpp: 'cpp',
-    csharp: 'csharp',
-    go: 'go',
-    rust: 'rust',
-    php: 'php',
-    ruby: 'ruby',
-    perl: 'perl',
-    sql: 'sql',
-    yaml: 'yaml',
-    json: 'json',
-    markdown: 'markdown',
-    html: 'html',
-    css: 'css',
-    scss: 'scss',
-    xml: 'xml',
-    bash: 'shell',
-    powershell: 'powershell',
-    dockerfile: 'dockerfile',
-    text: 'plaintext',
-  };
-
-  return monacoLanguages[language] || 'plaintext';
-}
-
-/**
- * Theme utilities
+ * Get theme background color
  */
 export function getThemeBackgroundColor(theme: EditorTheme): string {
-  const bgColors: Record<EditorTheme, string> = {
-    light: '#ffffff',
-    dark: '#1e1e1e',
-    monokai: '#272822',
-    solarized: '#fdf6e3',
-    dracula: '#282a36',
-    nord: '#2e3440',
-    github: '#ffffff',
-  };
-
-  return bgColors[theme] || '#1e1e1e';
-}
-
-export function getThemeForegroundColor(theme: EditorTheme): string {
-  const fgColors: Record<EditorTheme, string> = {
-    light: '#000000',
-    dark: '#d4d4d4',
-    monokai: '#f8f8f2',
-    solarized: '#657b83',
-    dracula: '#f8f8f2',
-    nord: '#d8dee9',
-    github: '#24292e',
-  };
-
-  return fgColors[theme] || '#d4d4d4';
+  return THEME_BG_COLORS[theme] || '#1e1e1e';
 }
 
 /**
- * Code formatting utilities
+ * Get theme foreground color
+ */
+export function getThemeForegroundColor(theme: EditorTheme): string {
+  return THEME_FG_COLORS[theme] || '#d4d4d4';
+}
+
+// ─── JSON utilities ─────────────────────────────────────
+
+/**
+ * Format JSON string with pretty printing
  */
 export function formatJSON(json: string): string {
   try {
@@ -221,6 +63,9 @@ export function formatJSON(json: string): string {
   }
 }
 
+/**
+ * Minify JSON string
+ */
 export function minifyJSON(json: string): string {
   try {
     const parsed = JSON.parse(json);
@@ -230,41 +75,39 @@ export function minifyJSON(json: string): string {
   }
 }
 
+// ─── Binary detection ───────────────────────────────────
+
+const BINARY_EXTENSIONS = new Set([
+  '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.webp',
+  '.pdf', '.zip', '.tar', '.gz', '.rar', '.7z',
+  '.exe', '.dll', '.so', '.dylib',
+  '.mp3', '.mp4', '.wav', '.ogg', '.flac',
+  '.ttf', '.otf', '.woff', '.woff2',
+  '.class', '.jar',
+]);
+
 /**
  * Check if a file is binary
  */
 export function isBinaryFile(content: string, filename: string): boolean {
-  // Check common binary extensions
-  const binaryExtensions = [
-    '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.webp',
-    '.pdf', '.zip', '.tar', '.gz', '.rar', '.7z',
-    '.exe', '.dll', '.so', '.dylib',
-    '.mp3', '.mp4', '.wav', '.ogg', '.flac',
-    '.ttf', '.otf', '.woff', '.woff2',
-    '.class', '.jar',
-  ];
-
   const ext = filename.split('.').pop()?.toLowerCase();
-  if (ext && binaryExtensions.includes(`.${ext}`)) {
+  if (ext && BINARY_EXTENSIONS.has(`.${ext}`)) {
     return true;
   }
 
-  // Check for null bytes (indicates binary)
   if (content.includes('\0')) {
     return true;
   }
 
   // Heuristic: if more than 5% of characters are non-printable, likely binary
   const nonPrintable = (content.match(/[\x00-\x08\x0E-\x1F]/g) || []).length;
-  if (content.length > 0 && nonPrintable / content.length > 0.05) {
-    return true;
-  }
-
-  return false;
+  return content.length > 0 && nonPrintable / content.length > 0.05;
 }
 
+// ─── Position/offset utilities ──────────────────────────
+
 /**
- * Calculate line and column from position
+ * Calculate line and column from offset
  */
 export function getPositionFromOffset(content: string, offset: number): { line: number; column: number } {
   const lines = content.substring(0, offset).split('\n');
@@ -288,6 +131,8 @@ export function getOffsetFromPosition(content: string, line: number, column: num
   return offset + column - 1;
 }
 
+// ─── Code utilities ─────────────────────────────────────
+
 /**
  * Truncate code for preview
  */
@@ -301,182 +146,10 @@ export function truncateCode(code: string, maxLines: number = 10): string {
 }
 
 /**
- * File icon lookup constants
+ * Check unbalanced brackets in code
  */
-const FILE_ICONS: Record<string, string> = {
-  js: 'javascript',
-  jsx: 'react',
-  ts: 'typescript',
-  tsx: 'react',
-  py: 'python',
-  java: 'java',
-  cpp: 'code',
-  c: 'code',
-  h: 'code',
-  cs: 'code',
-  go: 'go',
-  rs: 'rust',
-  php: 'php',
-  rb: 'ruby',
-  sql: 'database',
-  yaml: 'settings',
-  yml: 'settings',
-  json: 'code',
-  md: 'markdown',
-  html: 'code',
-  htm: 'code',
-  css: 'code',
-  scss: 'code',
-  sass: 'code',
-  xml: 'code',
-  sh: 'terminal',
-  bash: 'terminal',
-  dockerfile: 'docker',
-  ps1: 'powershell',
-  psm1: 'powershell',
-  txt: 'file',
-  png: 'image',
-  jpg: 'image',
-  jpeg: 'image',
-  gif: 'image',
-  svg: 'image',
-  pdf: 'file',
-  zip: 'zip',
-};
-
-/**
- * File color lookup constants
- */
-const FILE_COLORS: Record<string, string> = {
-  javascript: '#f7df1e',
-  typescript: '#3178c6',
-  react: '#61dafb',
-  python: '#3776ab',
-  java: '#b07219',
-  go: '#00add8',
-  rust: '#dea584',
-  php: '#777bb4',
-  ruby: '#cc342d',
-  html: '#e34c26',
-  css: '#563d7c',
-  json: '#f7df1e',
-  markdown: '#083fa1',
-  docker: '#2496ed',
-  default: '#6e7681',
-};
-
-/**
- * File category lookup constants
- */
-const FILE_CATEGORIES: Record<string, string> = {
-  javascript: 'frontend',
-  typescript: 'frontend',
-  react: 'frontend',
-  python: 'backend',
-  java: 'backend',
-  go: 'backend',
-  rust: 'backend',
-  php: 'backend',
-  ruby: 'backend',
-  html: 'frontend',
-  css: 'frontend',
-  sql: 'database',
-  docker: 'devops',
-  default: 'file',
-};
-
-/**
- * Get file icon info
- *
- * @param filename - The filename to get icon info for
- * @returns Object containing icon, color, and category
- */
-export function getFileIconInfo(filename: string): {
-  icon: string;
-  color: string;
-  category: string;
-} {
-  const ext = filename.split('.').pop()?.toLowerCase();
-  const name = filename.toLowerCase();
-
-  // Default values
-  let icon = FILE_ICONS[ext || ''] || 'file';
-  let color = FILE_COLORS[ext || ''] || FILE_COLORS.default;
-  let category = FILE_CATEGORIES[ext || ''] || FILE_CATEGORIES.default;
-
-  // Apply special cases
-  const specialCase = applySpecialFileCases(name, ext);
-  if (specialCase) {
-    icon = specialCase.icon || icon;
-    color = specialCase.color || color;
-    category = specialCase.category || category;
-  }
-
-  return { icon, color, category };
-}
-
-/**
- * Apply special file name cases
- *
- * @param name - Lowercase filename
- * @param ext - File extension
- * @returns Special case overrides or null
- */
-function applySpecialFileCases(
-  name: string,
-  ext: string | undefined
-): { icon?: string; color?: string; category?: string } | null {
-  if (name === 'dockerfile') {
-    return {
-      icon: 'docker',
-      color: FILE_COLORS.docker,
-      category: 'devops',
-    };
-  }
-
-  if (name === 'package.json') {
-    return {
-      icon: 'npm',
-      color: '#cb3837',
-    };
-  }
-
-  if (name === 'tsconfig.json') {
-    return {
-      icon: 'typescript',
-      color: FILE_COLORS.typescript,
-    };
-  }
-
-  if (name === 'readme.md') {
-    return {
-      icon: 'markdown',
-      category: 'docs',
-    };
-  }
-
-  return null;
-}
-
-/**
- * Validate code syntax (basic validation)
- */
-export function validateCodeSyntax(code: string, language: EditorLanguage): {
-  valid: boolean;
-  errors: string[];
-} {
+function checkBrackets(code: string): string[] {
   const errors: string[] = [];
-
-  // Check for basic syntax issues
-  if (language === 'json') {
-    try {
-      JSON.parse(code);
-    } catch (e) {
-      errors.push(e instanceof Error ? e.message : 'Invalid JSON');
-    }
-  }
-
-  // Check for unbalanced brackets
   const brackets: Record<string, string> = { '(': ')', '[': ']', '{': '}' };
   const stack: string[] = [];
   const openBrackets = Object.keys(brackets);
@@ -496,6 +169,30 @@ export function validateCodeSyntax(code: string, language: EditorLanguage): {
   if (stack.length > 0) {
     errors.push(`Unclosed bracket: ${stack[stack.length - 1]}`);
   }
+
+  return errors;
+}
+
+/**
+ * Validate code syntax (basic validation)
+ */
+export function validateCodeSyntax(code: string, language: EditorLanguage): {
+  valid: boolean;
+  errors: string[];
+} {
+  const errors: string[] = [];
+
+  // JSON-specific validation
+  if (language === 'json') {
+    try {
+      JSON.parse(code);
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : 'Invalid JSON');
+    }
+  }
+
+  // Bracket balance check for all languages
+  errors.push(...checkBrackets(code));
 
   return {
     valid: errors.length === 0,

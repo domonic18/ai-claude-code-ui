@@ -57,6 +57,27 @@ function parseJsonlLines(content) {
 }
 
 /**
+ * 分页辅助函数
+ * @param {Array} items - 要分页的数组
+ * @param {number} limit - 每页数量
+ * @param {number} offset - 偏移量
+ * @returns {Object} 包含分页数据和元数据的对象
+ */
+function _paginate(items, limit, offset) {
+  const total = items.length;
+  const paginatedItems = items.slice(offset, offset + limit);
+  const hasMore = offset + limit < total;
+
+  return {
+    items: paginatedItems,
+    total,
+    hasMore,
+    offset,
+    limit
+  };
+}
+
+/**
  * 遍历项目的所有会话文件，对每个文件执行 handler。
  * handler 返回 true 时提前终止遍历（用于 "找到就停" 的场景）。
  * @param {number} userId - 用户 ID
@@ -199,6 +220,34 @@ function mergeGroupedAndStandalone(sessionGroups, allSessions) {
 // ─── 会话查询 ────────────────────────────────────────────
 
 /**
+ * 收集所有会话和条目数据
+ * @param {number} userId - 用户 ID
+ * @param {string} projectDir - 项目目录
+ * @param {string[]} sessionFiles - 会话文件列表
+ * @returns {Promise<{allSessions: Map, allEntries: Array}>}
+ */
+async function _collectAllSessionData(userId, projectDir, sessionFiles) {
+  const allSessions = new Map();
+  const allEntries = [];
+
+  await forEachSessionFile(userId, projectDir, sessionFiles, ({ entries }) => {
+    const result = parseJsonlContent(
+      entries.map(e => e._raw || JSON.stringify(e)).filter(l => l.trim()).join('\n')
+    );
+
+    result.sessions.forEach(session => {
+      if (!allSessions.has(session.id)) {
+        allSessions.set(session.id, session);
+      }
+    });
+
+    allEntries.push(...result.entries);
+  });
+
+  return { allSessions, allEntries };
+}
+
+/**
  * 获取项目的会话列表（容器模式）
  * @param {number} userId - 用户 ID
  * @param {string} projectName - 项目名称
@@ -214,37 +263,20 @@ async function getSessionsInContainer(userId, projectName, limit = 5, offset = 0
       return { sessions: [], hasMore: false, total: 0 };
     }
 
-    const allSessions = new Map();
-    const allEntries = [];
     const projectDir = getProjectDir(projectName);
-
-    await forEachSessionFile(userId, projectDir, sessionFiles, ({ entries }) => {
-      const result = parseJsonlContent(
-        entries.map(e => e._raw || JSON.stringify(e)).filter(l => l.trim()).join('\n')
-      );
-
-      result.sessions.forEach(session => {
-        if (!allSessions.has(session.id)) {
-          allSessions.set(session.id, session);
-        }
-      });
-
-      allEntries.push(...result.entries);
-    });
+    const { allSessions, allEntries } = await _collectAllSessionData(userId, projectDir, sessionFiles);
 
     const sessionGroups = buildSessionGroups(allEntries, allSessions);
     const visibleSessions = mergeGroupedAndStandalone(sessionGroups, allSessions);
 
-    const total = visibleSessions.length;
-    const paginatedSessions = visibleSessions.slice(offset, offset + limit);
-    const hasMore = offset + limit < total;
+    const pagination = _paginate(visibleSessions, limit, offset);
 
     return {
-      sessions: paginatedSessions,
-      hasMore,
-      total,
-      offset,
-      limit
+      sessions: pagination.items,
+      hasMore: pagination.hasMore,
+      total: pagination.total,
+      offset: pagination.offset,
+      limit: pagination.limit
     };
 
   } catch (error) {
@@ -277,6 +309,45 @@ async function getSessionFilesInfo(userId, projectName) {
 }
 
 /**
+ * 收集指定会话的所有消息
+ * @param {number} userId - 用户 ID
+ * @param {string} projectDir - 项目目录
+ * @param {string[]} sessionFiles - 会话文件列表
+ * @param {string} sessionId - 会话 ID
+ * @returns {Promise<Array>} 消息数组
+ */
+async function _collectMessagesForSession(userId, projectDir, sessionFiles, sessionId) {
+  const messages = [];
+
+  await forEachSessionFile(userId, projectDir, sessionFiles, ({ entries }) => {
+    for (const entry of entries) {
+      if (entry.sessionId === sessionId && !entry._raw) {
+        messages.push(entry);
+      }
+    }
+  });
+
+  return messages;
+}
+
+/**
+ * 排序和过滤消息
+ * @param {Array} messages - 原始消息数组
+ * @returns {Array} 排序并过滤后的消息数组
+ */
+function _sortAndFilterMessages(messages) {
+  // 按时间戳排序
+  messages.sort((a, b) => {
+    const timeA = new Date(a.timestamp || 0).getTime();
+    const timeB = new Date(b.timestamp || 0).getTime();
+    return timeA - timeB;
+  });
+
+  // 过滤所有用户消息中的记忆上下文
+  return messages.map(filterMemoryContextFromEntry);
+}
+
+/**
  * 从容器内获取特定会话的消息（支持分页）
  * @param {number} userId - 用户 ID
  * @param {string} projectName - 项目名称
@@ -294,42 +365,22 @@ async function getSessionMessagesInContainer(userId, projectName, sessionId, lim
       return { messages: [], total: 0, hasMore: false };
     }
 
-    const messages = [];
-
-    await forEachSessionFile(userId, projectDir, sessionFiles, ({ entries }) => {
-      for (const entry of entries) {
-        if (entry.sessionId === sessionId && !entry._raw) {
-          messages.push(entry);
-        }
-      }
-    });
-
-    // 按时间戳排序
-    messages.sort((a, b) => {
-      const timeA = new Date(a.timestamp || 0).getTime();
-      const timeB = new Date(b.timestamp || 0).getTime();
-      return timeA - timeB;
-    });
-
-    // 过滤所有用户消息中的记忆上下文
-    const filteredMessages = messages.map(filterMemoryContextFromEntry);
+    const messages = await _collectMessagesForSession(userId, projectDir, sessionFiles, sessionId);
+    const filteredMessages = _sortAndFilterMessages(messages);
 
     // 处理分页
-    const total = filteredMessages.length;
-    const hasMore = limit !== null && offset + limit < total;
-
     if (limit === null) {
       // 返回全部消息（向后兼容）
       return filteredMessages;
     } else {
       // 返回分页消息
-      const paginatedMessages = filteredMessages.slice(offset, offset + limit);
+      const pagination = _paginate(filteredMessages, limit, offset);
       return {
-        messages: paginatedMessages,
-        total,
-        hasMore,
-        offset,
-        limit
+        messages: pagination.items,
+        total: pagination.total,
+        hasMore: pagination.hasMore,
+        offset: pagination.offset,
+        limit: pagination.limit
       };
     }
   } catch (error) {
@@ -341,6 +392,37 @@ async function getSessionMessagesInContainer(userId, projectName, sessionId, lim
 // ─── 会话写操作 ──────────────────────────────────────────
 
 /**
+ * 查找并修改会话条目的通用模式
+ * @param {number} userId - 用户 ID
+ * @param {string} projectName - 项目名称
+ * @param {string} sessionId - 会话 ID
+ * @param {function(entries: Array): {modified: boolean, entries: Array}} modifierFn - 修改函数
+ * @returns {Promise<boolean>} 是否找到并修改了会话
+ */
+async function _findAndModifySession(userId, projectName, sessionId, modifierFn) {
+  const projectDir = getProjectDir(projectName);
+  const sessionFiles = await listSessionFiles(userId, projectName);
+
+  if (sessionFiles.length === 0) {
+    return false;
+  }
+
+  let found = false;
+
+  await forEachSessionFile(userId, projectDir, sessionFiles, async ({ filePath, entries }) => {
+    const result = modifierFn(entries);
+
+    if (result.modified) {
+      await writeJsonlContentToContainer(userId, filePath, result.entries);
+      found = true;
+      return true; // 提前终止遍历
+    }
+  });
+
+  return found;
+}
+
+/**
  * 更新会话摘要（容器模式）
  * @param {number} userId - 用户 ID
  * @param {string} projectName - 项目名称
@@ -350,17 +432,7 @@ async function getSessionMessagesInContainer(userId, projectName, sessionId, lim
  */
 async function updateSessionSummaryInContainer(userId, projectName, sessionId, newSummary) {
   try {
-    const projectDir = getProjectDir(projectName);
-    const sessionFiles = await listSessionFiles(userId, projectName);
-
-    if (sessionFiles.length === 0) {
-      return false;
-    }
-
-    // 在所有会话文件中查找该会话
-    let found = false;
-
-    await forEachSessionFile(userId, projectDir, sessionFiles, async ({ filePath, entries }) => {
+    const found = await _findAndModifySession(userId, projectName, sessionId, (entries) => {
       let sessionFound = false;
       let summaryEntryIndex = -1;
 
@@ -390,13 +462,10 @@ async function updateSessionSummaryInContainer(userId, projectName, sessionId, n
             timestamp: new Date().toISOString()
           });
         }
-
-        // Write back to file
-        await writeJsonlContentToContainer(userId, filePath, entries);
-
-        found = true;
-        return true; // 提前终止遍历
+        return { modified: true, entries };
       }
+
+      return { modified: false, entries };
     });
 
     if (!found) {
@@ -418,20 +487,10 @@ async function updateSessionSummaryInContainer(userId, projectName, sessionId, n
  */
 async function deleteSessionInContainer(userId, projectName, sessionId) {
   try {
-    const projectDir = getProjectDir(projectName);
-    const sessionFiles = await listSessionFiles(userId, projectName);
-
-    if (sessionFiles.length === 0) {
-      return false;
-    }
-
-    // 在所有会话文件中查找并删除该会话的条目
-    let found = false;
-
-    await forEachSessionFile(userId, projectDir, sessionFiles, async ({ filePath, entries }) => {
+    const found = await _findAndModifySession(userId, projectName, sessionId, (entries) => {
       let sessionFound = false;
 
-      // 过滤掉属于该会话的条目
+      // 过滤掉属于该会话的条目（从后向前遍历以安全删除）
       for (let i = entries.length - 1; i >= 0; i--) {
         const entry = entries[i];
         if (!entry._raw && entry.sessionId === sessionId) {
@@ -440,13 +499,7 @@ async function deleteSessionInContainer(userId, projectName, sessionId) {
         }
       }
 
-      if (sessionFound) {
-        // Write back to file
-        await writeJsonlContentToContainer(userId, filePath, entries);
-
-        found = true;
-        return true; // 提前终止遍历
-      }
+      return { modified: sessionFound, entries };
     });
 
     if (!found) {

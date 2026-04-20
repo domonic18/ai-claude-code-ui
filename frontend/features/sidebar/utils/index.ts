@@ -28,3 +28,12 @@ export {
   sortProjects,
   getSortOrderLabel,
 } from './projectSorters';
+
+export {
+  checkNameAvailability,
+  generateAvailableName,
+  debounce,
+} from './projectNameUtils';
+
+export type { NameAvailabilityStatus } from './projectNameUtils';
+export { CHECK_DEBOUNCE_MS } from './projectNameUtils';
