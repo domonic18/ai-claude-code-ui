@@ -7,6 +7,11 @@
  */
 
 import { MESSAGE_CONSTANTS } from '../../types/message-types.js';
+import {
+  getRelativeTimeString,
+  formatTimestamp,
+  truncateText
+} from './messageFormattingUtils.js';
 
 /**
  * 消息过滤器类
@@ -163,8 +168,7 @@ export class MessageFilter {
    * @returns {string} 截断后的文本
    */
   static truncateText(text, maxLength, suffix = '...') {
-    if (!text || text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + suffix;
+    return truncateText(text, maxLength, suffix);
   }
 
   /**
@@ -175,18 +179,7 @@ export class MessageFilter {
    * @returns {string} 格式化后的时间
    */
   static formatTimestamp(timestamp, format = 'iso') {
-    const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
-
-    switch (format) {
-      case 'iso':
-        return date.toISOString();
-      case 'locale':
-        return date.toLocaleString();
-      case 'relative':
-        return this.getRelativeTimeString(date);
-      default:
-        return date.toISOString();
-    }
+    return formatTimestamp(timestamp, format);
   }
 
   /**
@@ -196,18 +189,6 @@ export class MessageFilter {
    * @returns {string} 相对时间字符串
    */
   static getRelativeTimeString(date) {
-    const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
-
-    const THRESHOLDS = [
-      [60, () => `${diffSec}s ago`],
-      [3600, () => `${Math.floor(diffSec / 60)}m ago`],
-      [86400, () => `${Math.floor(diffSec / 3600)}h ago`],
-      [604800, () => `${Math.floor(diffSec / 86400)}d ago`],
-    ];
-
-    for (const [limit, formatter] of THRESHOLDS) {
-      if (diffSec < limit) return formatter();
-    }
-    return date.toLocaleDateString();
+    return getRelativeTimeString(date);
   }
 }

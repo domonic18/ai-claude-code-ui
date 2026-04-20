@@ -13,20 +13,9 @@
  */
 
 import { createLogger } from './utils/logger.js';
-import { showStatus, showHelp, showVersion } from './cli/display.js';
-import { checkForUpdates, updatePackage } from './cli/updates.js';
+import { executeCommand } from './cli/cliCommands.js';
 
 const logger = createLogger('cli');
-
-// 启动服务器
-async function startServer() {
-    // 启动时静默检查更新
-    checkForUpdates(true);
-
-    // 导入并运行服务器
-    await import('./index.js');
-}
-
 const OPTION_DEFINITIONS = [
     { flags: ['--port', '-p'], key: 'port', hasValue: true },
     { flags: ['--database-path'], key: 'databasePath', hasValue: true },
@@ -87,32 +76,7 @@ async function main() {
         process.env.DATABASE_PATH = options.databasePath;
     }
 
-    switch (command) {
-        case 'start':
-            await startServer();
-            break;
-        case 'status':
-        case 'info':
-            showStatus();
-            break;
-        case 'help':
-        case '-h':
-        case '--help':
-            showHelp();
-            break;
-        case 'version':
-        case '-v':
-        case '--version':
-            showVersion();
-            break;
-        case 'update':
-            await updatePackage();
-            break;
-        default:
-            logger.error(`\n❌ Unknown command: ${command}`);
-            logger.info('   Run "cloudcli help" for usage information.\n');
-            process.exit(1);
-    }
+    await executeCommand(command, options);
 }
 
 // 运行 CLI
