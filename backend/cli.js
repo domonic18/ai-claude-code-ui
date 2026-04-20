@@ -16,7 +16,6 @@ import { createLogger } from './utils/logger.js';
 import { executeCommand } from './cli/cliCommands.js';
 
 const logger = createLogger('cli');
-
 const OPTION_DEFINITIONS = [
     { flags: ['--port', '-p'], key: 'port', hasValue: true },
     { flags: ['--database-path'], key: 'databasePath', hasValue: true },
