@@ -13,7 +13,7 @@ import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('container/core/ContainerStateHandler');
 
 const STALE_STATE_THRESHOLD_MS = 30000;
-const INTERMEDIATE_STATES = [ContainerState.CREATING, ContainerState.STARTING, ContainerState.HEALTH_CHECKING];
+export const INTERMEDIATE_STATES = [ContainerState.CREATING, ContainerState.STARTING, ContainerState.HEALTH_CHECKING];
 
 /**
  * Handle intermediate state (creating, starting, health_checking)

@@ -14,6 +14,13 @@ import path from 'path';
 import os from 'os';
 import { CURSOR_MODELS } from '../../../../shared/modelConstants.js';
 import { createLogger } from '../../../utils/logger.js';
+import {
+    mcpConfigToUIFormat,
+    readMcpConfig,
+    addMcpServer,
+    addMcpServerJson,
+    removeMcpServer,
+} from './cursorMcpConfig.js';
 
 const logger = createLogger('services/execution/cursor/CursorConfigService');
 
@@ -31,14 +38,6 @@ function getCursorDir() {
  */
 function getConfigPath() {
     return path.join(getCursorDir(), 'cli-config.json');
-}
-
-/**
- * 获取 MCP 配置文件路径
- * @returns {string} mcp.json 路径
- */
-function getMcpConfigPath() {
-    return path.join(getCursorDir(), 'mcp.json');
 }
 
 /**
@@ -148,181 +147,7 @@ export async function writeConfig(updates) {
     return { config };
 }
 
-// ─── MCP 配置管理 ──────────────────────────────────────
+// ─── MCP 配置管理（从 cursorMcpConfig.js 重新导出） ─────────────
 
-/**
- * 将 MCP 服务器配置转换为 UI 友好格式
- * @param {Object} mcpConfig - 原始 MCP 配置对象
- * @returns {Array<Object>} UI 格式的服务器列表
- */
-export function mcpConfigToUIFormat(mcpConfig) {
-    const servers = [];
-    if (!mcpConfig.mcpServers || typeof mcpConfig.mcpServers !== 'object') {
-        return servers;
-    }
-
-    for (const [name, config] of Object.entries(mcpConfig.mcpServers)) {
-        const server = {
-            id: name,
-            name,
-            type: 'stdio',
-            scope: 'cursor',
-            config: {},
-            raw: config
-        };
-
-        if (config.command) {
-            server.type = 'stdio';
-            server.config.command = config.command;
-            server.config.args = config.args || [];
-            server.config.env = config.env || {};
-        } else if (config.url) {
-            server.type = config.transport || 'http';
-            server.config.url = config.url;
-            server.config.headers = config.headers || {};
-        }
-
-        servers.push(server);
-    }
-
-    return servers;
-}
-
-/**
- * 根据传输类型构建服务器配置
- * @param {string} type - 传输类型：stdio | http | sse
- * @param {Object} params - 配置参数
- * @returns {Object} 服务器配置
- */
-function buildServerConfig(type, params) {
-    if (type === 'stdio') {
-        return {
-            command: params.command,
-            args: params.args || [],
-            env: params.env || {}
-        };
-    }
-    // http or sse
-    return {
-        url: params.url,
-        transport: type,
-        headers: params.headers || {}
-    };
-}
-
-/**
- * 读取 MCP 配置
- * @returns {Promise<{servers: Array, isDefault: boolean, path: string}>}
- */
-export async function readMcpConfig() {
-    const mcpPath = getMcpConfigPath();
-
-    try {
-        const content = await fs.readFile(mcpPath, 'utf8');
-        const mcpConfig = JSON.parse(content);
-        return {
-            servers: mcpConfigToUIFormat(mcpConfig),
-            isDefault: false,
-            path: mcpPath
-        };
-    } catch {
-        logger.info('Cursor MCP config not found');
-        return {
-            servers: [],
-            isDefault: true,
-            path: mcpPath
-        };
-    }
-}
-
-/**
- * 读取原始 MCP 配置对象
- * @returns {Promise<Object>} 原始配置 {mcpServers: {...}}
- */
-async function readRawMcpConfig() {
-    const mcpPath = getMcpConfigPath();
-    try {
-        const content = await fs.readFile(mcpPath, 'utf8');
-        const config = JSON.parse(content);
-        if (!config.mcpServers) {
-            config.mcpServers = {};
-        }
-        return config;
-    } catch {
-        return { mcpServers: {} };
-    }
-}
-
-/**
- * 添加 MCP 服务器（stdio/http/sse）
- * @param {string} name - 服务器名称
- * @param {string} type - 传输类型
- * @param {Object} params - 配置参数
- * @returns {Promise<{config: Object}>} 更新后的完整配置
- */
-export async function addMcpServer(name, type, params) {
-    logger.info(`Adding MCP server to Cursor config: ${name}`);
-
-    const mcpConfig = await readRawMcpConfig();
-    mcpConfig.mcpServers[name] = buildServerConfig(type, params);
-
-    const mcpPath = getMcpConfigPath();
-    await ensureDir(mcpPath);
-    await fs.writeFile(mcpPath, JSON.stringify(mcpConfig, null, 2));
-
-    return { config: mcpConfig };
-}
-
-/**
- * 使用原始 JSON 添加 MCP 服务器
- * @param {string} name - 服务器名称
- * @param {Object|string} jsonConfig - JSON 配置
- * @returns {Promise<{config: Object}>} 更新后的完整配置
- * @throws {Error} JSON 解析失败时抛出错误
- */
-export async function addMcpServerJson(name, jsonConfig) {
-    logger.info(`Adding MCP server to Cursor config via JSON: ${name}`);
-
-    const parsedConfig = typeof jsonConfig === 'string'
-        ? JSON.parse(jsonConfig)
-        : jsonConfig;
-
-    const mcpConfig = await readRawMcpConfig();
-    mcpConfig.mcpServers[name] = parsedConfig;
-
-    const mcpPath = getMcpConfigPath();
-    await ensureDir(mcpPath);
-    await fs.writeFile(mcpPath, JSON.stringify(mcpConfig, null, 2));
-
-    return { config: mcpConfig };
-}
-
-/**
- * 删除 MCP 服务器
- * @param {string} name - 服务器名称
- * @returns {Promise<{config: Object}>} 更新后的完整配置
- * @throws {Error} 配置文件不存在或服务器不存在时抛出错误
- */
-export async function removeMcpServer(name) {
-    logger.info(`Removing MCP server from Cursor config: ${name}`);
-
-    const mcpPath = getMcpConfigPath();
-    const mcpConfig = await readRawMcpConfig();
-
-    // readRawMcpConfig 在文件不存在时返回默认 {mcpServers: {}}
-    // 需要区分"文件不存在"和"服务器不存在"
-    try {
-        await fs.access(mcpPath);
-    } catch {
-        throw new Error('Cursor MCP configuration not found');
-    }
-
-    if (!mcpConfig.mcpServers[name]) {
-        throw new Error(`MCP server "${name}" not found in Cursor configuration`);
-    }
-
-    delete mcpConfig.mcpServers[name];
-    await fs.writeFile(mcpPath, JSON.stringify(mcpConfig, null, 2));
-
-    return { config: mcpConfig };
-}
+// Re-export MCP functions for backward compatibility
+export { mcpConfigToUIFormat, readMcpConfig, addMcpServer, addMcpServerJson, removeMcpServer };

@@ -5,7 +5,7 @@
  * This component now delegates to specialized sub-components for better maintainability.
  */
 
-import React, { useState, useEffect, useRef, memo } from 'react';
+import React, { useRef, memo } from 'react';
 // Import modular components
 import { UserMessage } from './UserMessage';
 import { MessageHeader } from './MessageHeader';
@@ -16,6 +16,7 @@ import { SimplifiedToolIndicator } from './SimplifiedToolIndicator';
 // Import utilities
 import { MINIMIZED_TOOLS } from '../constants';
 import type { ChatMessageProps } from '../types';
+import { useToolAutoExpand } from './useToolAutoExpand';
 
 /**
  * Get provider from localStorage
@@ -23,46 +24,6 @@ import type { ChatMessageProps } from '../types';
 function getProvider(): string {
   if (typeof window === 'undefined') return 'claude';
   return localStorage.getItem('selected-provider') || 'claude';
-}
-
-/**
- * Custom hook for auto-expanding tools on scroll into view
- */
-function useToolAutoExpand(
-  messageRef: React.RefObject<HTMLDivElement>,
-  isToolUse: boolean,
-  autoExpandTools: boolean
-) {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  useEffect(() => {
-    if (!autoExpandTools || !messageRef.current || !isToolUse) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && !isExpanded) {
-            setIsExpanded(true);
-            const details = messageRef.current?.querySelectorAll('details');
-            details?.forEach(detail => {
-              detail.open = true;
-            });
-          }
-        });
-      },
-      { threshold: 0.1 }
-    );
-
-    observer.observe(messageRef.current);
-
-    return () => {
-      if (messageRef.current) {
-        observer.unobserve(messageRef.current);
-      }
-    };
-  }, [autoExpandTools, isExpanded, isToolUse, messageRef]);
-
-  return isExpanded;
 }
 
 /**

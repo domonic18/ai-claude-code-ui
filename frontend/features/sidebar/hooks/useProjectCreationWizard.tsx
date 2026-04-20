@@ -6,19 +6,16 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Check, AlertCircle, Loader2 } from 'lucide-react';
-import { api } from '@/shared/services';
 import { logger } from '@/shared/utils/logger';
 import {
-  checkNameAvailability,
-  generateAvailableName,
-  debounce,
-  CHECK_DEBOUNCE_MS,
-  type NameAvailabilityStatus,
-} from '../utils/projectNameUtils';
-
-/**
- * Return type for useProjectCreationWizard hook
- */
+  useProjectNameInitialization,
+  useProjectNameAvailabilityCheck,
+  createDebouncedChecker,
+  sanitizeProjectName,
+  validateProjectName,
+  createProjectApi,
+} from './projectNameValidation';
+import type { NameAvailabilityStatus } from '../utils/projectNameUtils';
 export interface UseProjectCreationWizardReturn {
   /** Current project name */
   projectName: string;
@@ -40,51 +37,6 @@ export interface UseProjectCreationWizardReturn {
   setError: (error: string | null) => void;
   /** Set creating state (for advanced use cases) */
   setIsCreating: (creating: boolean) => void;
-}
-
-/**
- * Custom hook to initialize project name on mount
- *
- * @param {string} baseProjectName - Base project name from translation
- * @param {Function} setProjectName - State setter for project name
- * @param {React.MutableRefObject<boolean>} isInitialLoad - Ref to track initial load
- */
-export function useProjectNameInitialization(
-  baseProjectName: string,
-  setProjectName: (name: string) => void,
-  isInitialLoad: React.MutableRefObject<boolean>
-): void {
-  useEffect(() => {
-    const initializeName = async () => {
-      const availableName = await generateAvailableName(baseProjectName);
-      setProjectName(availableName);
-      // Mark initial load as complete after setting the name
-      isInitialLoad.current = false;
-    };
-
-    initializeName();
-  }, [baseProjectName, setProjectName, isInitialLoad]);
-}
-
-/**
- * Custom hook to check project name availability
- *
- * @param {string} projectName - Current project name
- * @param {React.MutableRefObject<boolean>} isInitialLoad - Ref to track initial load
- * @param {Function} checkAvailability - Debounced availability check function
- */
-export function useProjectNameAvailabilityCheck(
-  projectName: string,
-  isInitialLoad: React.MutableRefObject<boolean>,
-  checkAvailability: (name: string) => void
-): void {
-  useEffect(() => {
-    if (isInitialLoad.current) {
-      // Skip check during initial load
-      return;
-    }
-    checkAvailability(projectName);
-  }, [projectName, checkAvailability, isInitialLoad]);
 }
 
 /**
@@ -112,16 +64,7 @@ export function useProjectCreationWizard(
   const isInitialLoad = useRef(true);
 
   const checkAvailability = useCallback(
-    debounce(async (name: string) => {
-      if (!name || name.trim().length === 0) {
-        setAvailabilityStatus('idle');
-        return;
-      }
-
-      setAvailabilityStatus('checking');
-      const status = await checkNameAvailability(name);
-      setAvailabilityStatus(status);
-    }, CHECK_DEBOUNCE_MS),
+    createDebouncedChecker(setAvailabilityStatus),
     []
   );
 
@@ -135,8 +78,7 @@ export function useProjectCreationWizard(
    * @param {string} value - New input value
    */
   const handleProjectNameChange = (value: string): void => {
-    // Allow alphanumeric, hyphens, underscores, and Chinese characters
-    const sanitizedName = value.replace(/[^\u4e00-\u9fa5a-zA-Z0-9-_]/g, '');
+    const sanitizedName = sanitizeProjectName(value);
     setProjectName(sanitizedName);
     setError(null);
   };
@@ -145,13 +87,9 @@ export function useProjectCreationWizard(
    * Handle create project action
    */
   const handleCreateProject = async (): Promise<void> => {
-    if (!projectName || projectName.trim().length === 0) {
-      setError('Project name cannot be empty');
-      return;
-    }
-
-    if (availabilityStatus === 'unavailable') {
-      setError('A project with this name already exists');
+    const validation = validateProjectName(projectName, availabilityStatus);
+    if (!validation.valid) {
+      setError(validation.error!);
       return;
     }
 
@@ -159,30 +97,11 @@ export function useProjectCreationWizard(
     setError(null);
 
     try {
-      // Default workspace path for user projects
-      const workspacePath = `/workspace/${projectName}`;
-
-      logger.info('[ProjectCreationWizard] Creating project:', workspacePath);
-
-      const response = await api.createProject(workspacePath);
-
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        logger.error('[ProjectCreationWizard] Non-JSON response:', text);
-        throw new Error('Server returned an unexpected response');
-      }
-
-      const data = await response.json();
-      logger.info('[ProjectCreationWizard] Response:', data);
-
-      if (!response.ok) {
-        throw new Error(data.error || data.message || 'Failed to create project');
-      }
+      const project = await createProjectApi(projectName);
 
       // Success! Notify parent
-      if (onProjectCreated && data.project) {
-        onProjectCreated(data.project);
+      if (onProjectCreated && project) {
+        onProjectCreated(project);
       }
 
       if (onClose) {

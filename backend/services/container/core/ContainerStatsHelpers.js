@@ -7,59 +7,10 @@
  * @module container/core/ContainerStatsHelpers
  */
 
-/**
- * 从网络数据中提取网络统计信息
- * @param {object} networks - 网络数据对象
- * @returns {object} 格式化的网络统计信息
- */
-export function extractNetworkStats(networks) {
-  const result = {};
-
-  for (const [name, data] of Object.entries(networks)) {
-    result[name] = {
-      rxBytes: data.rx_bytes || 0,
-      txBytes: data.tx_bytes || 0,
-      rxDropped: data.rx_dropped || 0,
-      txDropped: data.tx_dropped || 0,
-      rxErrors: data.rx_errors || 0,
-      txErrors: data.tx_errors || 0
-    };
-  }
-
-  return result;
-}
-
-/**
- * 从磁盘 I/O 数据中提取磁盘统计信息
- * @param {Array} ioRecursive - I/O 服务字节数递归数组
- * @returns {object} 格式化的磁盘 I/O 统计信息
- */
-export function extractDiskStats(ioRecursive) {
-  const result = {
-    readBytes: 0,
-    writeBytes: 0,
-    readCount: 0,
-    writeCount: 0
-  };
-
-  for (const entry of ioRecursive) {
-    switch (entry.op) {
-      case 'Read':
-        result.readBytes = entry.value || 0;
-        break;
-      case 'Write':
-        result.writeBytes = entry.value || 0;
-        break;
-      case 'Sync':
-        // Sync operations are handled separately
-        break;
-      default:
-        break;
-    }
-  }
-
-  return result;
-}
+export {
+  extractNetworkStats,
+  extractDiskStats
+} from './containerStatsExtractors.js';
 
 /**
  * 从 I/O 递归数组中提取指定操作的值

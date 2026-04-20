@@ -7,6 +7,8 @@
  * @module services/execution/AgentWriter
  */
 
+import { getAssistantMessages, getTotalTokens } from './agentTokenUtils.js';
+
 /**
  * SSE 流写入器 - 将 SDK/CLI 输出适配到 Server-Sent Events
  */
@@ -90,20 +92,7 @@ export class ResponseCollector {
      * @returns {Array<Object>}
      */
     getAssistantMessages() {
-        const result = [];
-        for (const msg of this.messages) {
-            if (msg && msg.type === 'status') continue;
-
-            if (typeof msg === 'string') {
-                try {
-                    const parsed = JSON.parse(msg);
-                    if (parsed.type === 'claude-response' && parsed.data && parsed.data.type === 'assistant') {
-                        result.push(parsed.data);
-                    }
-                } catch { /* skip */ }
-            }
-        }
-        return result;
+        return getAssistantMessages(this.messages);
     }
 
     /**
@@ -111,34 +100,6 @@ export class ResponseCollector {
      * @returns {{inputTokens: number, outputTokens: number, cacheReadTokens: number, cacheCreationTokens: number, totalTokens: number}}
      */
     getTotalTokens() {
-        let inputTokens = 0;
-        let outputTokens = 0;
-        let cacheReadTokens = 0;
-        let cacheCreationTokens = 0;
-
-        for (const msg of this.messages) {
-            let data = msg;
-            if (typeof msg === 'string') {
-                try { data = JSON.parse(msg); } catch { continue; }
-            }
-
-            if (data && data.type === 'claude-response' && data.data) {
-                const usage = data.data.message?.usage;
-                if (usage) {
-                    inputTokens += usage.input_tokens || 0;
-                    outputTokens += usage.output_tokens || 0;
-                    cacheReadTokens += usage.cache_read_input_tokens || 0;
-                    cacheCreationTokens += usage.cache_creation_input_tokens || 0;
-                }
-            }
-        }
-
-        return {
-            inputTokens,
-            outputTokens,
-            cacheReadTokens,
-            cacheCreationTokens,
-            totalTokens: inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens
-        };
+        return getTotalTokens(this.messages);
     }
 }

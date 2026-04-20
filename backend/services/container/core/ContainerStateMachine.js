@@ -47,94 +47,19 @@
 
 import { EventEmitter } from 'events';
 import { createLogger } from '../../../utils/logger.js';
+import {
+  ContainerState,
+  canTransitionTo,
+  isTerminalState as isTerminalStateUtil,
+  isStableState as isStableStateUtil,
+  getIntermediateStates,
+} from './containerStateTransitions.js';
+
 const logger = createLogger('services/container/core/ContainerStateMachine');
 
-/**
- * 容器状态枚举
- */
-export const ContainerState = {
-  /** 容器不存在 */
-  NON_EXISTENT: 'non_existent',
-  /** 正在创建容器 */
-  CREATING: 'creating',
-  /** 容器已创建，正在启动 */
-  STARTING: 'starting',
-  /** 容器启动中，正在进行健康检查 */
-  HEALTH_CHECKING: 'health_checking',
-  /** 容器就绪，可以使用 */
-  READY: 'ready',
-  /** 正在停止容器 */
-  STOPPING: 'stopping',
-  /** 正在删除容器 */
-  REMOVING: 'removing',
-  /** 创建或运行失败 */
-  FAILED: 'failed',
-  /** 容器已停止且不会重启 */
-  DEAD: 'dead'
-};
+// Re-export for backward compatibility
+export { ContainerState };
 
-/**
- * 有效的状态转换
- * source -> [target states]
- */
-const VALID_TRANSITIONS = {
-  [ContainerState.NON_EXISTENT]: [
-    ContainerState.CREATING
-  ],
-  [ContainerState.CREATING]: [
-    ContainerState.STARTING,
-    ContainerState.FAILED
-  ],
-  [ContainerState.STARTING]: [
-    ContainerState.HEALTH_CHECKING,
-    ContainerState.FAILED
-  ],
-  [ContainerState.HEALTH_CHECKING]: [
-    ContainerState.READY,
-    ContainerState.FAILED
-  ],
-  [ContainerState.READY]: [
-    ContainerState.STOPPING,
-    ContainerState.REMOVING,
-    ContainerState.FAILED,
-    ContainerState.NON_EXISTENT
-  ],
-  [ContainerState.STOPPING]: [
-    ContainerState.DEAD,
-    ContainerState.FAILED
-  ],
-  [ContainerState.REMOVING]: [
-    ContainerState.NON_EXISTENT,
-    ContainerState.FAILED
-  ],
-  [ContainerState.FAILED]: [
-    ContainerState.REMOVING,
-    ContainerState.NON_EXISTENT
-  ],
-  [ContainerState.DEAD]: [
-    ContainerState.REMOVING,
-    ContainerState.NON_EXISTENT
-  ]
-};
-
-/**
- * 状态是否为终止状态（无法再转换）
- */
-const TERMINAL_STATES = new Set([
-  ContainerState.NON_EXISTENT,
-  ContainerState.DEAD,
-  ContainerState.FAILED
-]);
-
-/**
- * 状态是否为稳定状态（可以长期停留）
- */
-const STABLE_STATES = new Set([
-  ContainerState.NON_EXISTENT,
-  ContainerState.READY,
-  ContainerState.DEAD,
-  ContainerState.FAILED
-]);
 
 /**
  * 容器状态机类
@@ -189,7 +114,7 @@ export class ContainerStateMachine extends EventEmitter {
    * @returns {boolean}
    */
   isStable() {
-    return STABLE_STATES.has(this.currentState);
+    return isStableStateUtil(this.currentState);
   }
 
   /**
@@ -197,7 +122,7 @@ export class ContainerStateMachine extends EventEmitter {
    * @returns {boolean}
    */
   isTerminal() {
-    return TERMINAL_STATES.has(this.currentState);
+    return isTerminalStateUtil(this.currentState);
   }
 
   /**
@@ -211,10 +136,9 @@ export class ContainerStateMachine extends EventEmitter {
     const previousState = this.currentState;
 
     // 验证状态转换
-    if (!this._canTransitionTo(newState)) {
+    if (!canTransitionTo(this.currentState, newState)) {
       throw new Error(
-        `Invalid state transition from ${previousState} to ${newState}. ` +
-        `Valid transitions from ${previousState}: ${VALID_TRANSITIONS[previousState]?.join(', ') || 'none'}`
+        `Invalid state transition from ${previousState} to ${newState}`
       );
     }
 
@@ -375,22 +299,13 @@ export class ContainerStateMachine extends EventEmitter {
    * @returns {Promise<string>} 最终到达的稳定状态
    */
   async waitForStable(options = {}) {
-    return this.waitForState(Array.from(STABLE_STATES), options);
-  }
-
-  /**
-   * 检查是否可以转换到目标状态
-   * @private
-   * @param {string} targetState - 目标状态
-   * @returns {boolean}
-   */
-  _canTransitionTo(targetState) {
-    if (this.currentState === targetState) {
-      return true; // 允许自转换
-    }
-
-    const validTargets = VALID_TRANSITIONS[this.currentState];
-    return validTargets?.includes(targetState) || false;
+    const stableStates = [
+      ContainerState.NON_EXISTENT,
+      ContainerState.READY,
+      ContainerState.DEAD,
+      ContainerState.FAILED
+    ];
+    return this.waitForState(stableStates, options);
   }
 
   /**
@@ -500,11 +415,7 @@ export class ContainerStateMachine extends EventEmitter {
    */
   static fromJSON(data) {
     // 如果状态是中间状态，服务器重启后这些状态肯定无效，重置为 NON_EXISTENT
-    const intermediateStates = [
-      ContainerState.CREATING,
-      ContainerState.STARTING,
-      ContainerState.HEALTH_CHECKING
-    ];
+    const intermediateStates = getIntermediateStates();
     const initialState = intermediateStates.includes(data.currentState)
       ? ContainerState.NON_EXISTENT
       : data.currentState;
