@@ -7,10 +7,12 @@
  * @module features/system/hooks/useProjectActions
  */
 
+import { api } from '@/shared/services';
 import { requestDeduplicator } from '@/shared/utils';
+import { logger } from '@/shared/utils/logger';
 import type { Project } from '@/features/sidebar/types/sidebar.types';
 import type { Session } from '../types/projectManagement.types';
-import { hasProjectsChanged } from './useProjectUtils';
+import { hasProjectsChanged, parseProjectsResponse } from './useProjectUtils';
 import { performInitialSessionSelection, syncSessionAfterRefresh } from './useProjectSync';
 import { fetchProjectsWithRetry } from './projectFetchHelpers';
 import { updateSessionInProjects, findUpdatedProject, updateProjectIfNeeded } from './projectSessionHelpers';

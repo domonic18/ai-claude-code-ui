@@ -4,7 +4,7 @@
  * Extracted session processing logic from JsonlParser class.
  */
 
-import { createSession } from './jsonlHelpers.js';
+import { createSession, processUserEntry, processAssistantEntry } from './jsonlHelpers.js';
 
 /**
  * Process a session entry and update session map
@@ -48,7 +48,6 @@ function resolveSessionSummary(session, entry, pendingSummaries) {
  * @param {boolean} includeApiErrors - Whether to include API errors
  */
 function processEntryByRole(session, entry, includeApiErrors) {
-  const { processUserEntry, processAssistantEntry } = require('./jsonlHelpers.js');
   const role = entry.role || entry.message?.role;
   if (!entry.message) return;
 

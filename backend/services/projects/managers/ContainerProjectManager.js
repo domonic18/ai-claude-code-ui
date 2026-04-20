@@ -129,7 +129,8 @@ export async function getProjectsInContainer(userId) {
     let container;
     try {
       container = await containerManager.getOrCreateContainer(userId, {}, { wait: true, timeout: FILE_TIMEOUTS.quickRequest });
-    } catch {
+    } catch (err) {
+      logger.error(`[ContainerProjectManager] Failed to get/create container for user ${userId}: ${err.message}`);
       return [];
     }
 

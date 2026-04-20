@@ -64,6 +64,7 @@ export function ChatInterfaceRenderer({
       {/* Input area */}
       <ChatInterfaceInputArea
         selectedModel={hook.selectedModel}
+        models={hook.availableModels}
         onModelSelect={hook.handleModelSelect}
         tokenBudget={hook.tokenBudget}
         isLoading={hook.isLoading}
