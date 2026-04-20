@@ -11,9 +11,17 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
 import { BaseDiscovery } from './BaseDiscovery.js';
-import { createLogger } from '../../../utils/logger.js';
-import { parseCodexSessionFile } from './codexSessionParser.js';
-const logger = createLogger('services/projects/discovery/CodexDiscovery');
+import {
+  findJsonlFiles,
+  parseAllCodexSessions,
+  filterSessionsByProject
+} from './codexFileFinder.js';
+import {
+  buildProjectMap,
+  sortProjectsByActivity,
+  sortSessionsByActivity,
+  normalizeSessionWithMetadata
+} from './codexProjectHelpers.js';
 
 /**
  * Codex 项目发现器
@@ -34,42 +42,6 @@ export class CodexDiscovery extends BaseDiscovery {
   }
 
   /**
-   * 将会话数据添加到项目 Map 中
-   * @param {Map} projectMap - 项目映射
-   * @param {Object} sessionData - 会话数据
-   * @private
-   */
-  _addSessionToProject(projectMap, sessionData) {
-    const projectPath = sessionData.cwd;
-
-    if (!projectMap.has(projectPath)) {
-      projectMap.set(projectPath, {
-        id: projectPath,
-        name: path.basename(projectPath),
-        path: projectPath,
-        displayName: path.basename(projectPath),
-        sessionCount: 0,
-        lastActivity: null,
-        sessions: []
-      });
-    }
-
-    const project = projectMap.get(projectPath);
-    project.sessionCount++;
-    project.sessions.push(this._normalizeSession({
-      id: sessionData.id,
-      summary: sessionData.summary,
-      messageCount: sessionData.messageCount,
-      lastActivity: sessionData.timestamp
-    }));
-
-    const sessionTime = new Date(sessionData.timestamp).getTime();
-    if (!project.lastActivity || sessionTime > new Date(project.lastActivity).getTime()) {
-      project.lastActivity = sessionData.timestamp;
-    }
-  }
-
-  /**
    * 获取项目列表
    * @param {Object} options - 选项
    * @returns {Promise<Array>} 项目列表
@@ -77,39 +49,24 @@ export class CodexDiscovery extends BaseDiscovery {
   async getProjects(options = {}) {
     try {
       const codexSessionsDir = this._getProjectsRoot('native');
-      const projectMap = new Map();
 
-      // 确保目录存在
+      // Ensure directory exists
       try {
         await fs.access(codexSessionsDir);
       } catch (error) {
         return [];
       }
 
-      // 递归查找所有 JSONL 文件
-      const jsonlFiles = await this._findJsonlFiles(codexSessionsDir);
+      // Parse all Codex session files
+      const sessionsWithPaths = await parseAllCodexSessions(codexSessionsDir);
+      const sessionDataList = sessionsWithPaths.map(s => s.sessionData);
 
-      // 解析每个文件以提取项目信息
-      for (const filePath of jsonlFiles) {
-        try {
-          const sessionData = await parseCodexSessionFile(filePath);
-          if (sessionData && sessionData.cwd) {
-            this._addSessionToProject(projectMap, sessionData);
-          }
-        } catch (error) {
-          logger.warn(`Could not parse Codex session file ${filePath}:`, error.message);
-        }
-      }
+      // Build project map
+      const projectMap = buildProjectMap(sessionDataList, this._normalizeSession.bind(this));
 
-      // 转换为数组并排序
+      // Convert to array and sort
       const projects = Array.from(projectMap.values());
-      projects.sort((a, b) => {
-        const timeA = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
-        const timeB = b.lastActivity ? new Date(b.lastActivity).getTime() : 0;
-        return timeB - timeA;
-      });
-
-      return projects;
+      return sortProjectsByActivity(projects);
 
     } catch (error) {
       throw this._standardizeError(error, 'getProjects');
@@ -130,7 +87,7 @@ export class CodexDiscovery extends BaseDiscovery {
     try {
       const codexSessionsDir = this._getProjectsRoot('native');
 
-      // 确保目录存在
+      // Ensure directory exists
       try {
         await fs.access(codexSessionsDir);
       } catch (error) {
@@ -142,38 +99,21 @@ export class CodexDiscovery extends BaseDiscovery {
         };
       }
 
-      // 递归查找所有 JSONL 文件
-      const jsonlFiles = await this._findJsonlFiles(codexSessionsDir);
-      const sessions = [];
+      // Parse all Codex session files
+      const sessionsWithPaths = await parseAllCodexSessions(codexSessionsDir);
 
-      // 解析每个文件以查找匹配项目的会话
-      for (const filePath of jsonlFiles) {
-        try {
-          const sessionData = await parseCodexSessionFile(filePath);
+      // Filter sessions by project
+      const filteredSessions = filterSessionsByProject(sessionsWithPaths, projectIdentifier);
 
-          if (sessionData && this._isSessionInProject(sessionData, projectIdentifier)) {
-            sessions.push(this._normalizeSession({
-              id: sessionData.id,
-              summary: sessionData.summary,
-              messageCount: sessionData.messageCount,
-              lastActivity: sessionData.timestamp,
-              metadata: {
-                cwd: sessionData.cwd,
-                // 兼容 Codex 旧格式：使用 model_provider，否则使用 model
-                model: sessionData.model_provider || sessionData.model,
-                filePath: filePath
-              }
-            }));
-          }
-        } catch (error) {
-          logger.warn(`Could not parse Codex session file ${filePath}:`, error.message);
-        }
-      }
+      // Normalize sessions with metadata
+      const sessions = filteredSessions.map(({ sessionData, filePath }) =>
+        normalizeSessionWithMetadata(sessionData, filePath, this._normalizeSession.bind(this))
+      );
 
-      // 按最后活动时间排序（最新优先）
-      sessions.sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
+      // Sort by activity time
+      sortSessionsByActivity(sessions);
 
-      // 应用分页
+      // Apply pagination
       const total = sessions.length;
       const paginated = sessions.slice(offset, offset + limit);
 
@@ -215,53 +155,6 @@ export class CodexDiscovery extends BaseDiscovery {
    */
   _getProjectsRoot(mode) {
     return path.join(os.homedir(), '.codex', 'sessions');
-  }
-
-  /**
-   * 递归查找所有 JSONL 文件
-   * @private
-   * @param {string} dir - 目录路径
-   * @returns {Promise<Array>} JSONL 文件路径数组
-   */
-  async _findJsonlFiles(dir) {
-    const files = [];
-    try {
-      const entries = await fs.readdir(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-          files.push(...await this._findJsonlFiles(fullPath));
-        } else if (entry.name.endsWith('.jsonl')) {
-          files.push(fullPath);
-        }
-      }
-    } catch (error) {
-      // 跳过无法读取的目录
-    }
-    return files;
-  }
-
-  /**
-   * 检查会话是否属于指定项目
-   * @private
-   * @param {Object} sessionData - 会话数据
-   * @param {string} projectPath - 项目路径
-   * @returns {boolean}
-   */
-  _isSessionInProject(sessionData, projectPath) {
-    const sessionCwd = sessionData?.cwd || '';
-
-    // 处理 Windows 长路径前缀
-    const cleanSessionCwd = sessionCwd.startsWith('\\\\?\\')
-      ? sessionCwd.slice(4)
-      : sessionCwd;
-    const cleanProjectPath = projectPath.startsWith('\\\\?\\')
-      ? projectPath.slice(4)
-      : projectPath;
-
-    return sessionData.cwd === projectPath ||
-      cleanSessionCwd === cleanProjectPath ||
-      path.relative(cleanSessionCwd, cleanProjectPath) === '';
   }
 }
 

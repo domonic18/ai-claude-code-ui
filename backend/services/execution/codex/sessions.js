@@ -5,41 +5,10 @@ import path from 'path';
 import os from 'os';
 import { createLogger } from '../../../utils/logger.js';
 import { findJsonlFiles, isSessionInProject } from './sessionFileUtils.js';
+import { processEntry, buildSummary } from './codexSessionParsers.js';
+import { formatSession } from './codexSessionFormatters.js';
+
 const logger = createLogger('services/execution/codex/sessions');
-
-function processEntry(entry, state) {
-  if (entry.timestamp) state.lastTimestamp = entry.timestamp;
-
-  if (entry.type === 'session_meta' && entry.payload) {
-    state.sessionMeta = {
-      id: entry.payload.id,
-      cwd: entry.payload.cwd,
-      model: entry.payload.model || entry.payload.model_provider,
-      timestamp: entry.timestamp,
-      git: entry.payload.git,
-    };
-  }
-
-  if (entry.type === 'event_msg' && entry.payload?.type === 'user_message') {
-    state.messageCount++;
-    if (entry.payload.message) state.lastUserMessage = entry.payload.message;
-  }
-
-  if (entry.type === 'response_item' && entry.payload?.type === 'message' && entry.payload.role === 'assistant') {
-    state.messageCount++;
-  }
-}
-
-function buildSummary(sessionMeta, lastTimestamp, lastUserMessage, messageCount) {
-  return {
-    ...sessionMeta,
-    timestamp: lastTimestamp || sessionMeta.timestamp,
-    summary: lastUserMessage
-      ? (lastUserMessage.length > 50 ? lastUserMessage.substring(0, 50) + '...' : lastUserMessage)
-      : 'Codex Session',
-    messageCount,
-  };
-}
 
 async function parseCodexSessionFile(filePath) {
   try {
@@ -76,16 +45,7 @@ async function getCodexSessions(projectPath) {
       try {
         const sessionData = await parseCodexSessionFile(filePath);
         if (sessionData && isSessionInProject(sessionData, projectPath)) {
-          sessions.push({
-            id: sessionData.id,
-            summary: sessionData.summary || 'Codex Session',
-            messageCount: sessionData.messageCount || 0,
-            lastActivity: sessionData.timestamp ? new Date(sessionData.timestamp) : new Date(),
-            cwd: sessionData.cwd,
-            model: sessionData.model,
-            filePath,
-            provider: 'codex',
-          });
+          sessions.push(formatSession(sessionData, filePath));
         }
       } catch (error) {
         logger.warn(`Could not parse Codex session file ${filePath}:`, error.message);

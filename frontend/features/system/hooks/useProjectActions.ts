@@ -7,129 +7,13 @@
  * @module features/system/hooks/useProjectActions
  */
 
-import { api, authenticatedFetch } from '@/shared/services';
 import { requestDeduplicator } from '@/shared/utils';
 import type { Project } from '@/features/sidebar/types/sidebar.types';
 import type { Session } from '../types/projectManagement.types';
-import { hasProjectsChanged, parseProjectsResponse } from './useProjectUtils';
+import { hasProjectsChanged } from './useProjectUtils';
 import { performInitialSessionSelection, syncSessionAfterRefresh } from './useProjectSync';
-import { logger } from '@/shared/utils/logger';
-
-/**
- * Fetch projects with retry logic
- *
- * @param {Object} user - Current user
- * @param {number} retryCount - Current retry count
- * @param {Function} fetchProjects - Fetch function to call for retry
- * @returns {Promise<Project[] | undefined>} Projects array or undefined
- */
-export async function fetchProjectsWithRetry(
-  user: { id: string } | null,
-  retryCount: number,
-  fetchProjects: (isRetry: boolean, retryCount: number) => Promise<Project[] | undefined>
-): Promise<Project[] | undefined> {
-  let shouldKeepLoading = false;
-
-  try {
-    const response = await api.projects.list();
-
-    if (!response.ok) {
-      logger.error('Failed to fetch projects:', response.status, response.statusText);
-      if (retryCount < 10) {
-        shouldKeepLoading = true;
-        setTimeout(() => {
-          logger.info(`[useProjects] Retry ${retryCount + 1}/10 due to network error...`);
-          fetchProjects(true, retryCount + 1);
-        }, 2000);
-      }
-      return;
-    }
-
-    const responseData = await response.json();
-    const data = parseProjectsResponse(responseData);
-
-    // If no projects found and user is logged in, keep retrying
-    if (data.length === 0 && user) {
-      if (retryCount < 6) {
-        shouldKeepLoading = true;
-        logger.info(`[useProjects] No projects found (retry ${retryCount + 1}/6), container may be initializing...`);
-        setTimeout(() => {
-          logger.info('[useProjects] Retrying project fetch...');
-          fetchProjects(true, retryCount + 1);
-        }, 2000);
-        return data;
-      } else {
-        logger.info('[useProjects] Max retries reached, giving up');
-        return data;
-      }
-    }
-
-    // Fetch Cursor sessions for each project
-    await Promise.all(data.map(async (project) => {
-      try {
-        const url = `/api/cursor/sessions?projectPath=${encodeURIComponent(project.fullPath || (project as any).path || '')}`;
-        const cursorResponse = await authenticatedFetch(url);
-        if (cursorResponse.ok) {
-          const cursorData = await cursorResponse.json();
-          if (cursorData.success && cursorData.sessions) {
-            (project as any).cursorSessions = cursorData.sessions;
-          }
-        }
-      } catch (error) {
-        logger.error(`Error fetching Cursor sessions for project ${project.name}:`, error);
-      }
-    }));
-
-    return data;
-  } catch (error) {
-    logger.error('Error fetching projects:', error);
-    throw error;
-  } finally {
-    if (!shouldKeepLoading) {
-      // Signal caller to stop loading
-    }
-  }
-}
-
-/**
- * Update session in projects after WebSocket update
- *
- * @param {Session | null} currentSession - Current session
- * @param {Project} updatedSelectedProject - Updated project
- * @param {Function} setSelectedSession - Session setter
- */
-export function updateSessionInProjects(
-  currentSession: Session | null,
-  updatedSelectedProject: Project,
-  setSelectedSession: (session: Session | null) => void
-): void {
-  if (!currentSession) {
-    return;
-  }
-
-  const allSessions = [
-    ...(updatedSelectedProject.sessions || []),
-    ...(updatedSelectedProject.codexSessions || []),
-    ...(updatedSelectedProject.cursorSessions || [])
-  ];
-  const freshSession = allSessions.find(s => s.id === currentSession.id);
-
-  if (freshSession) {
-    const hasSessionChanges =
-      (freshSession as any).summary !== (currentSession as any).summary ||
-      (freshSession as any).title !== (currentSession as any).title;
-
-    if (hasSessionChanges) {
-      setSelectedSession({
-        ...freshSession,
-        __projectName: updatedSelectedProject.name,
-        __provider: currentSession.__provider
-      } as Session);
-    }
-  } else {
-    setSelectedSession(null);
-  }
-}
+import { fetchProjectsWithRetry } from './projectFetchHelpers';
+import { updateSessionInProjects, findUpdatedProject, updateProjectIfNeeded } from './projectSessionHelpers';
 
 /**
  * Execute fetch projects with retry and initial session selection
@@ -265,12 +149,9 @@ export function executeWebSocketUpdate(
   const currentSession = deps.selectedSessionRef.current;
 
   if (currentProject) {
-    const updatedSelectedProject = updatedProjects.find(p => p.name === currentProject.name);
+    const updatedSelectedProject = findUpdatedProject(updatedProjects, currentProject);
     if (updatedSelectedProject) {
-      if (JSON.stringify(updatedSelectedProject) !== JSON.stringify(currentProject)) {
-        deps.setSelectedProject(updatedSelectedProject);
-      }
-
+      updateProjectIfNeeded(currentProject, updatedSelectedProject, deps.setSelectedProject);
       updateSessionInProjects(currentSession, updatedSelectedProject, deps.setSelectedSession);
     }
   }

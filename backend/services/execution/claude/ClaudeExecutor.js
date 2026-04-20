@@ -12,6 +12,20 @@ import { mapCliOptionsToSDK } from './OptionsMapper.js';
 import { handleImages, cleanupTempFiles } from './ImageHandler.js';
 import { loadMcpConfig } from './McpConfigLoader.js';
 import { createLogger } from '../../../utils/logger.js';
+import {
+  addSession,
+  removeSession,
+  getSession,
+  isSessionActive,
+  getActiveSessions
+} from './claudeExecutorSession.js';
+import {
+  processStreamMessages,
+  handleNewSession,
+  sendCompleteEvent,
+  handleExecutionError
+} from './claudeExecutorStream.js';
+
 const logger = createLogger('services/execution/claude/ClaudeExecutor');
 
 /**
@@ -43,39 +57,48 @@ export class ClaudeExecutor {
     let tempDir = null;
 
     try {
-      // 准备执行环境
       const sdkOptions = await this._prepareSdkOptions(options, command);
       tempImagePaths = sdkOptions.tempImagePaths;
       tempDir = sdkOptions.tempDir;
       const finalCommand = sdkOptions.finalCommand;
 
-      // 创建 SDK 查询实例
       queryInstance = query({
         prompt: finalCommand,
         options: sdkOptions
       });
 
-      // 跟踪查询实例以支持中止功能
       if (capturedSessionId) {
-        this._addSession(capturedSessionId, queryInstance, tempImagePaths, tempDir);
+        addSession(this.activeSessions, capturedSessionId, queryInstance, tempImagePaths, tempDir);
       }
 
-      // 处理流式消息
-      await this._processStreamMessages(queryInstance, capturedSessionId, sessionId, writer);
+      capturedSessionId = await processStreamMessages(
+        queryInstance,
+        capturedSessionId,
+        sessionId,
+        writer,
+        (sid, inst, paths, dir) => addSession(this.activeSessions, sid, inst, paths, dir),
+        handleNewSession
+      );
 
-      // 完成时清理会话和临时文件
       if (capturedSessionId) {
-        this._removeSession(capturedSessionId);
+        removeSession(this.activeSessions, capturedSessionId);
       }
       await cleanupTempFiles(tempImagePaths, tempDir);
 
-      // 发送完成事件
-      this._sendCompleteEvent(writer, capturedSessionId, sessionId, command);
+      sendCompleteEvent(writer, capturedSessionId, sessionId, command);
 
       return { sessionId: capturedSessionId };
 
     } catch (error) {
-      await this._handleExecutionError(error, capturedSessionId, tempImagePaths, tempDir, writer);
+      await handleExecutionError(
+        error,
+        capturedSessionId,
+        tempImagePaths,
+        tempDir,
+        (sid) => removeSession(this.activeSessions, sid),
+        cleanupTempFiles,
+        writer
+      );
       throw error;
     }
   }
@@ -103,102 +126,12 @@ export class ClaudeExecutor {
   }
 
   /**
-   * 处理流式消息
-   * @private
-   */
-  async _processStreamMessages(queryInstance, capturedSessionId, originalSessionId, writer) {
-    logger.info({ sessionId: capturedSessionId || 'NEW' }, '[ClaudeExecutor] Starting async generator loop');
-
-    for await (const message of queryInstance) {
-      // 从第一条消息捕获会话 ID
-      if (message.session_id && !capturedSessionId) {
-        capturedSessionId = message.session_id;
-        this._addSession(capturedSessionId, queryInstance, [], null);
-        await this._handleNewSession(capturedSessionId, originalSessionId, writer);
-      }
-
-      // 转换并发送消息到 WebSocket
-      writer.send({
-        type: 'claude-response',
-        data: message
-      });
-
-      // 从结果消息中提取并发送 token 预算更新
-      if (message.type === 'result') {
-        const tokenBudget = this._extractTokenBudget(message);
-        if (tokenBudget) {
-          logger.info({ sessionId: capturedSessionId, tokenBudget }, '[ClaudeExecutor] Token budget from modelUsage');
-          writer.send({
-            type: 'token-budget',
-            data: tokenBudget
-          });
-        }
-      }
-    }
-  }
-
-  /**
-   * 处理新会话创建
-   * @private
-   */
-  async _handleNewSession(capturedSessionId, originalSessionId, writer) {
-    // 在 writer 上设置会话 ID
-    if (writer?.setSessionId && typeof writer.setSessionId === 'function') {
-      writer.setSessionId(capturedSessionId);
-    }
-
-    // 仅为新会话发送一次 session-created 事件
-    if (!originalSessionId) {
-      writer.send({
-        type: 'session-created',
-        sessionId: capturedSessionId
-      });
-    }
-  }
-
-  /**
-   * 发送完成事件
-   * @private
-   */
-  _sendCompleteEvent(writer, capturedSessionId, originalSessionId, command) {
-    logger.info({ sessionId: capturedSessionId }, '[ClaudeExecutor] Streaming complete');
-    writer.send({
-      type: 'claude-complete',
-      sessionId: capturedSessionId,
-      exitCode: 0,
-      isNewSession: !originalSessionId && !!command
-    });
-  }
-
-  /**
-   * 处理执行错误
-   * @private
-   */
-  async _handleExecutionError(error, capturedSessionId, tempImagePaths, tempDir, writer) {
-    logger.error({ sessionId: capturedSessionId, err: error }, '[ClaudeExecutor] Execution error');
-
-    // 错误时清理会话
-    if (capturedSessionId) {
-      this._removeSession(capturedSessionId);
-    }
-
-    // 错误时清理临时图像文件
-    await cleanupTempFiles(tempImagePaths, tempDir);
-
-    // 发送错误到 WebSocket
-    writer.send({
-      type: 'claude-error',
-      error: error.message
-    });
-  }
-
-  /**
    * 中止活动的会话
    * @param {string} sessionId - 会话 ID
    * @returns {Promise<boolean>}
    */
   async abort(sessionId) {
-    const session = this._getSession(sessionId);
+    const session = getSession(this.activeSessions, sessionId);
 
     if (!session) {
       logger.info({ sessionId }, '[ClaudeExecutor] Session not found');
@@ -208,17 +141,13 @@ export class ClaudeExecutor {
     try {
       logger.info({ sessionId }, '[ClaudeExecutor] Aborting session');
 
-      // 在查询实例上调用 interrupt()
       await session.instance.interrupt();
 
-      // 更新会话状态
       session.status = 'aborted';
 
-      // 清理临时图像文件
       await cleanupTempFiles(session.tempImagePaths, session.tempDir);
 
-      // 清理会话
-      this._removeSession(sessionId);
+      removeSession(this.activeSessions, sessionId);
 
       return true;
     } catch (error) {
@@ -233,8 +162,7 @@ export class ClaudeExecutor {
    * @returns {boolean}
    */
   isSessionActive(sessionId) {
-    const session = this._getSession(sessionId);
-    return session && session.status === 'active';
+    return isSessionActive(this.activeSessions, sessionId);
   }
 
   /**
@@ -242,78 +170,7 @@ export class ClaudeExecutor {
    * @returns {Array<string>}
    */
   getActiveSessions() {
-    return Array.from(this.activeSessions.keys());
-  }
-
-  /**
-   * 添加会话到活动会话映射
-   * @private
-   * @param {string} sessionId - 会话 ID
-   * @param {Object} queryInstance - SDK 查询实例
-   * @param {Array<string>} tempImagePaths - 临时图像路径
-   * @param {string} tempDir - 临时目录
-   */
-  _addSession(sessionId, queryInstance, tempImagePaths = [], tempDir = null) {
-    this.activeSessions.set(sessionId, {
-      instance: queryInstance,
-      startTime: Date.now(),
-      status: 'active',
-      tempImagePaths,
-      tempDir
-    });
-  }
-
-  /**
-   * 从活动会话映射中移除会话
-   * @private
-   * @param {string} sessionId - 会话 ID
-   */
-  _removeSession(sessionId) {
-    this.activeSessions.delete(sessionId);
-  }
-
-  /**
-   * 获取会话
-   * @private
-   * @param {string} sessionId - 会话 ID
-   * @returns {Object|undefined}
-   */
-  _getSession(sessionId) {
-    return this.activeSessions.get(sessionId);
-  }
-
-  /**
-   * 提取 Token 使用情况
-   * @private
-   * @param {Object} resultMessage - SDK 结果消息
-   * @returns {Object|null}
-   */
-  _extractTokenBudget(resultMessage) {
-    if (resultMessage.type !== 'result' || !resultMessage.modelUsage) {
-      return null;
-    }
-
-    const modelKey = Object.keys(resultMessage.modelUsage)[0];
-    const modelData = resultMessage.modelUsage[modelKey];
-
-    if (!modelData) {
-      return null;
-    }
-
-    const inputTokens = modelData.cumulativeInputTokens || modelData.inputTokens || 0;
-    const outputTokens = modelData.cumulativeOutputTokens || modelData.outputTokens || 0;
-    const cacheReadTokens = modelData.cumulativeCacheReadInputTokens || modelData.cacheReadInputTokens || 0;
-    const cacheCreationTokens = modelData.cumulativeCacheCreationInputTokens || modelData.cacheCreationInputTokens || 0;
-
-    const totalUsed = inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens;
-    const contextWindow = parseInt(process.env.CONTEXT_WINDOW) || 200000;
-
-    logger.debug({ inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, totalUsed, contextWindow }, '[ClaudeExecutor] Token calculation');
-
-    return {
-      used: totalUsed,
-      total: contextWindow
-    };
+    return getActiveSessions(this.activeSessions);
   }
 }
 

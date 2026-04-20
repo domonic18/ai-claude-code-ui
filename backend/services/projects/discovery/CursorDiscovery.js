@@ -12,34 +12,11 @@ import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
 import { BaseDiscovery } from './BaseDiscovery.js';
-import { open } from 'sqlite';
-import sqlite3 from 'sqlite3';
 import { createLogger } from '../../../utils/logger.js';
-const logger = createLogger('services/projects/discovery/CursorDiscovery');
+import { loadSessionFromDatabase } from './cursorSessionLoaders.js';
+import { loadProjectFromHash, loadSessionsFromDirectory } from './cursorProjectLoaders.js';
 
-/**
- * 解析 Cursor SQLite meta 表的行数据为元数据对象
- * @param {Array<{key: string, value: string}>} metaRows - meta 表原始行
- * @returns {Object} 解析后的元数据
- */
-function decodeMetaRows(metaRows) {
-  const metadata = {};
-  for (const row of metaRows) {
-    if (!row.value) continue;
-    try {
-      const strValue = row.value.toString();
-      if (/^[0-9a-fA-F]+$/.test(strValue)) {
-        const jsonStr = Buffer.from(row.value, 'hex').toString('utf8');
-        metadata[row.key] = JSON.parse(jsonStr);
-      } else {
-        metadata[row.key] = strValue;
-      }
-    } catch (_e) {
-      metadata[row.key] = row.value.toString();
-    }
-  }
-  return metadata;
-}
+const logger = createLogger('services/projects/discovery/CursorDiscovery');
 
 /**
  * Cursor 项目发现器
@@ -81,7 +58,11 @@ export class CursorDiscovery extends BaseDiscovery {
 
       for (const entry of entries) {
         if (entry.isDirectory()) {
-          const project = await this._loadProjectFromHash(entry.name, options);
+          const project = await loadProjectFromHash(
+            entry.name,
+            cursorChatsRoot,
+            (data) => this._normalizeProject(data)
+          );
           if (project) {
             projects.push(project);
           }
@@ -131,15 +112,7 @@ export class CursorDiscovery extends BaseDiscovery {
       }
 
       // 读取会话目录
-      const sessionDirs = await fs.readdir(cursorChatsPath);
-      const sessions = [];
-
-      for (const sessionId of sessionDirs) {
-        const session = await this._loadSession(cursorChatsPath, sessionId);
-        if (session) {
-          sessions.push(session);
-        }
-      }
+      const sessions = await loadSessionsFromDirectory(cursorChatsPath);
 
       // 按创建时间排序（最新优先）
       sessions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -196,124 +169,6 @@ export class CursorDiscovery extends BaseDiscovery {
    */
   _calculateProjectHash(projectPath) {
     return crypto.createHash('md5').update(projectPath).digest('hex');
-  }
-
-  /**
-   * 从哈希目录加载项目
-   * @private
-   * @param {string} hashDir - 哈希目录名
-   * @param {Object} options - 选项
-   * @returns {Promise<Object|null>} 项目对象
-   */
-  async _loadProjectFromHash(hashDir, options) {
-    try {
-      const cursorChatsPath = path.join(this._getProjectsRoot('native'), hashDir);
-
-      // 读取会话目录
-      const sessionDirs = await fs.readdir(cursorChatsPath);
-      const sessions = [];
-
-      let projectPath = null;
-      let latestActivity = null;
-
-      for (const sessionId of sessionDirs) {
-        const session = await this._loadSession(cursorChatsPath, sessionId);
-        if (session) {
-          sessions.push(session);
-          if (session.projectPath) {
-            projectPath = session.projectPath;
-          }
-          if (!latestActivity || new Date(session.createdAt) > new Date(latestActivity)) {
-            latestActivity = session.createdAt;
-          }
-        }
-      }
-
-      if (!projectPath || sessions.length === 0) {
-        return null;
-      }
-
-      return this._normalizeProject({
-        id: hashDir,
-        name: hashDir,
-        path: projectPath,
-        displayName: path.basename(projectPath),
-        sessionCount: sessions.length,
-        lastActivity: latestActivity,
-        sessions: sessions.slice(0, 5)
-      });
-
-    } catch (error) {
-      logger.warn(`Failed to load Cursor project from hash ${hashDir}:`, error.message);
-      return null;
-    }
-  }
-
-  /**
-   * 加载会话
-   * @private
-   * @param {string} cursorChatsPath - Cursor chats 路径
-   * @param {string} sessionId - 会话 ID
-   * @returns {Promise<Object|null>} 会话对象
-   */
-  async _loadSession(cursorChatsPath, sessionId) {
-    const sessionPath = path.join(cursorChatsPath, sessionId);
-    const storeDbPath = path.join(sessionPath, 'store.db');
-
-    try {
-      await fs.access(storeDbPath);
-
-      // 获取数据库文件修改时间作为回退时间戳
-      let dbStatMtimeMs = null;
-      try {
-        const stat = await fs.stat(storeDbPath);
-        dbStatMtimeMs = stat.mtimeMs;
-      } catch (_) {}
-
-      // 打开 SQLite 数据库
-      const db = await open({
-        filename: storeDbPath,
-        driver: sqlite3.Database,
-        mode: sqlite3.OPEN_READONLY
-      });
-
-      // 读取并解析元数据
-      const metaRows = await db.all('SELECT key, value FROM meta');
-      const metadata = decodeMetaRows(metaRows);
-
-      // 获取消息数量
-      const messageCountResult = await db.get('SELECT COUNT(*) as count FROM blobs');
-
-      await db.close();
-
-      // 提取会话信息
-      const sessionName = metadata.title || metadata.sessionTitle || 'Untitled Session';
-
-      let createdAt = null;
-      if (metadata.createdAt) {
-        createdAt = new Date(metadata.createdAt).toISOString();
-      } else if (dbStatMtimeMs) {
-        createdAt = new Date(dbStatMtimeMs).toISOString();
-      } else {
-        createdAt = new Date().toISOString();
-      }
-
-      return {
-        id: sessionId,
-        summary: sessionName,
-        messageCount: messageCountResult.count || 0,
-        lastActivity: createdAt,
-        createdAt: createdAt,
-        projectPath: metadata.cwd || null,
-        metadata: {
-          cwd: metadata.cwd
-        }
-      };
-
-    } catch (error) {
-      logger.warn(`Could not read Cursor session ${sessionId}:`, error.message);
-      return null;
-    }
   }
 }
 
