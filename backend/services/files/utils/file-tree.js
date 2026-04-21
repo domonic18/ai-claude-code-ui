@@ -43,6 +43,65 @@ function cleanFileName(name) {
   return cleaned;
 }
 
+/** 应跳过的目录名集合 */
+const SKIP_DIRS = new Set(['node_modules', 'dist', 'build']);
+
+/**
+ * 解析单行文件树输出为文件项对象
+ * @param {string} line - 原始行（name|type|size|mtime 格式）
+ * @param {string} containerPath - 容器路径
+ * @returns {Object|null} 文件项，或 null 表示跳过
+ */
+function parseTreeLine(line, containerPath) {
+  const parts = line.split('|');
+  if (parts.length < 4) {
+    logger.warn('[FileTree] Skipping malformed line:', JSON.stringify(line));
+    return null;
+  }
+
+  const [rawName, type, size, mtime] = parts;
+  const name = cleanFileName(rawName);
+
+  if (!name || name === '.' || SKIP_DIRS.has(name)) {
+    return null;
+  }
+
+  const parsedSize = parseInt(size, 10);
+  const parsedMtime = parseFloat(mtime);
+
+  if (isNaN(parsedSize) || isNaN(parsedMtime)) {
+    logger.warn('[FileTree] Skipping line with invalid values:', JSON.stringify(line));
+    return null;
+  }
+
+  const dateObj = new Date(parsedMtime * 1000);
+  if (isNaN(dateObj.getTime())) {
+    logger.warn('[FileTree] Skipping line with invalid date:', JSON.stringify(line));
+    return null;
+  }
+
+  return {
+    name,
+    path: `${containerPath}/${name}`,
+    type: type === 'd' ? 'directory' : 'file',
+    size: parsedSize,
+    modified: dateObj.toISOString()
+  };
+}
+
+/**
+ * 文件项排序：目录优先，然后按字母顺序
+ * @param {Object} a - 文件项 A
+ * @param {Object} b - 文件项 B
+ * @returns {number} 排序比较值
+ */
+function compareTreeItems(a, b) {
+  if (a.type !== b.type) {
+    return a.type === 'directory' ? -1 : 1;
+  }
+  return a.name.localeCompare(b.name);
+}
+
 /**
  * 解析文件树输出
  * @param {string} output - 原始输出
@@ -50,68 +109,13 @@ function cleanFileName(name) {
  * @returns {Array} 解析后的文件项数组
  */
 function parseFileTreeOutput(output, containerPath) {
-  const items = [];
-  const lines = output.trim().split('\n');
+  const items = output
+    .trim()
+    .split('\n')
+    .map(line => line ? parseTreeLine(line, containerPath) : null)
+    .filter(Boolean);
 
-  for (const line of lines) {
-    if (!line) continue;
-
-    const parts = line.split('|');
-    if (parts.length < 4) {
-      logger.warn('[FileTree] Skipping malformed line:', JSON.stringify(line));
-      continue;
-    }
-
-    const [rawName, type, size, mtime] = parts;
-
-    // 清理文件名
-    const name = cleanFileName(rawName);
-
-    // 跳过空文件名
-    if (!name || name === '' || name === '.') {
-      logger.warn('[FileTree] Skipping empty or invalid filename:', JSON.stringify(rawName));
-      continue;
-    }
-
-    // 跳过繁重的构建目录
-    if (name === 'node_modules' || name === 'dist' || name === 'build') {
-      continue;
-    }
-
-    // 解析和验证值
-    const parsedSize = parseInt(size, 10);
-    const parsedMtime = parseFloat(mtime);
-
-    if (isNaN(parsedSize) || isNaN(parsedMtime)) {
-      logger.warn('[FileTree] Skipping line with invalid values:', JSON.stringify(line));
-      continue;
-    }
-
-    const dateObj = new Date(parsedMtime * 1000);
-    if (isNaN(dateObj.getTime())) {
-      logger.warn('[FileTree] Skipping line with invalid date:', JSON.stringify(line));
-      continue;
-    }
-
-    const item = {
-      name,
-      path: `${containerPath}/${name}`,
-      type: type === 'd' ? 'directory' : 'file',
-      size: parsedSize,
-      modified: dateObj.toISOString()
-    };
-
-    items.push(item);
-  }
-
-  // 排序：目录优先，然后按字母顺序
-  items.sort((a, b) => {
-    if (a.type !== b.type) {
-      return a.type === 'directory' ? -1 : 1;
-    }
-    return a.name.localeCompare(b.name);
-  });
-
+  items.sort(compareTreeItems);
   return items;
 }
 
