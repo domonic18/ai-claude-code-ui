@@ -14,10 +14,10 @@ export { default as LoadingPage } from './LoadingPage';
 export type { LoadingPageProps } from './LoadingPage';
 
 // New pages
-export { Homepage } from './Homepage';
-export { ChatPage } from './Chat';
-export { SettingsPage } from './Settings';
-export { AdminPage } from './Admin';
+export { Homepage } from './homepage';
+export { ChatPage } from './chat';
+export { SettingsPage } from './settings';
+export { AdminPage } from './admin';
 
 // Feature pages
 export { MemoryPage } from '../features/memory';

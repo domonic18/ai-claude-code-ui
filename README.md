@@ -6,13 +6,9 @@
 
 # ✨ 项目特色
 
-1. **多用户架构** - 基于 SQLite 的用户认证和会话管理，支持多用户独立使用
-2. **容器隔离** - 每个用户拥有独立的 Docker 容器环境，确保安全和隔离
-3. **响应式设计** - 完美支持桌面端和移动端，随时随地访问
-4. **多 AI 支持** - 集成 Claude Code、Cursor CLI 和 OpenAI Codex
-5. **实时通信** - 基于 WebSocket 的流式响应，实时获取 AI 回复
-6. **文件管理** - 内置文件浏览器，支持在线查看和编辑代码
-7. **会话管理** - 自动保存对话历史，支持恢复和继续之前的对话
+多用户 Web 界面，为 Claude Code、Cursor CLI 和 OpenAI Codex 提供容器隔离的 AI 编码体验。
+
+> 完整功能介绍见 [用户手册](docs/user_operate/用户手册.md)，架构设计见 [架构概述](docs/arch/architecture-overview.md)。
 
 # 📸 项目截图
 
@@ -127,63 +123,16 @@ docker-compose -f docker-compose.deploy.yml logs -f
 docker-compose -f docker-compose.deploy.yml down
 ```
 
-## CLI 命令
-
-| 命令 | 说明 |
-|------|------|
-| `cloudcli` | 启动服务 |
-| `cloudcli status` | 显示配置状态 |
-| `cloudcli update` | 更新到最新版本 |
-| `cloudcli --port 8080` | 指定端口启动 |
-
-# 📚 主要功能
-
-## 用户管理
-- 多用户注册和登录
-- JWT Token 认证
-- 用户会话隔离
-
-## 项目管理
-- 自动发现 Claude Code 项目
-- 项目操作：重命名、删除、组织
-- 会话历史管理
-
-## 聊天界面
-- 实时流式响应
-- 会话恢复和继续
-- 多格式支持（文本、代码块、文件引用）
-- 图片上传支持
-
-## 文件浏览器
-- 交互式文件树
-- 在线查看和编辑代码
-- 语法高亮支持
-- 文件操作：创建、重命名、删除
-
-## 容器管理
-- 每用户独立容器
-- 自动容器创建和销毁
-- 资源使用监控
-- 空闲容器自动清理
-
 # 🛠️ 技术栈
 
-## 后端
-- **Node.js** + **Express** - RESTful API 服务器
-- **WebSocket** - 实时通信
-- **SQLite** - 用户数据存储
-- **Docker** - 容器隔离
+| 层级 | 技术 |
+|------|------|
+| 前端 | React 18 + Vite + Tailwind CSS + CodeMirror |
+| 后端 | Node.js + Express + WebSocket + SQLite |
+| AI | Claude Code SDK / Cursor CLI / OpenAI Codex |
+| 隔离 | Docker 容器 (每用户独立环境) |
 
-## 前端
-- **React 18** - 现代组件架构
-- **Vite** - 快速构建工具
-- **Tailwind CSS** - 样式框架
-- **CodeMirror** - 代码编辑器
-
-## AI 集成
-- **@anthropic-ai/claude-agent-sdk** - Claude Code SDK
-- **Cursor CLI** - Cursor 集成
-- **OpenAI Codex** - Codex 集成
+> 详细技术栈版本及项目结构见 [项目结构文档](docs/ai-context/project-structure.md)，API 参考见 [API 文档](docs/api/README.md)。
 
 # 📄 版权声明
 
