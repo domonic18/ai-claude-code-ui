@@ -77,7 +77,14 @@ const CODEX_ITEM_HANDLERS: Record<string, (data: any, callbacks: MessageHandlerC
 };
 
 /**
- * Handle codex-response message
+ * 处理 Codex SDK 的响应消息
+ *
+ * 从消息 data 中提取 itemType，在 CODEX_ITEM_HANDLERS 查找表中匹配
+ * 对应的处理器（agent_message / reasoning / command_execution / file_change）。
+ *
+ * @param message - WebSocket 消息，data.type 应为 'item'
+ * @param callbacks - UI 状态更新回调集合
+ * @returns 是否成功匹配并处理了该消息
  */
 export function handleCodexResponse(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
   const codexData = message.data;
@@ -88,7 +95,15 @@ export function handleCodexResponse(message: WebSocketMessage, callbacks: Messag
 }
 
 /**
- * Handle codex-complete message
+ * 处理 Codex SDK 会话完成消息
+ *
+ * 如果完成的会话是当前活跃会话，则停止加载状态并完成流式渲染；
+ * 同时将对应会话标记为非活跃、非处理中状态。
+ *
+ * @param message - WebSocket 消息，可能携带 sessionId
+ * @param callbacks - UI 状态更新回调集合
+ * @param currentSessionId - 当前活跃的会话 ID
+ * @returns 始终返回 true
  */
 export function handleCodexComplete(
   message: WebSocketMessage,
