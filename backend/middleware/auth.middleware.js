@@ -159,7 +159,12 @@ function authenticateExternalApiKey(options = {}) {
       }
 
       // 更新最后使用时间
-      ApiKey.updateLastUsed(keyRecord.id);
+      try {
+        ApiKey.updateLastUsed(keyRecord.id);
+      } catch (updateError) {
+        // 更新 lastUsed 失败不应阻塞认证流程
+        logger.warn('[AUTH] Failed to update API key lastUsed:', updateError.message);
+      }
 
       req.apiKey = {
         id: keyRecord.id,
@@ -169,6 +174,8 @@ function authenticateExternalApiKey(options = {}) {
 
       next();
     } catch (error) {
+      // 区分"数据库不可用"和"key不存在"（后者已在上方处理）
+      logger.error('[AUTH] External API key verification error:', error.message);
       if (optional) {
         req.apiKey = null;
         return next();
