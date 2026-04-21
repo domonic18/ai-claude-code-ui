@@ -12,6 +12,8 @@ import { McpServer } from '../../database/repositories/McpServer.repository.js';
 import { createLogger } from '../../utils/logger.js';
 import { validateMcpConfig } from './validators/McpValidator.js';
 import { requireOwnership } from './helpers/ownershipHelper.js';
+import { assertNameUnique, assertNameUniqueForUpdate } from './helpers/nameUniquenessHelper.js';
+import { buildSdkConfig } from './helpers/sdkConfigBuilder.js';
 
 const logger = createLogger('services/mcp/McpService');
 
@@ -69,14 +71,8 @@ export class McpService {
    */
   static async createServer(userId, data) {
     try {
-      // 验证配置
       validateMcpConfig(data);
-
-      // 检查名称是否已存在
-      const existing = await McpServer.getByName(userId, data.name);
-      if (existing) {
-        throw new Error(`MCP server with name "${data.name}" already exists`);
-      }
+      await assertNameUnique(userId, data.name);
 
       const server = await McpServer.create(userId, data);
       logger.info(`[McpService] Created MCP server "${data.name}" for user ${userId}`);
@@ -96,18 +92,12 @@ export class McpService {
    */
   static async updateServer(id, userId, data) {
     try {
-      // 验证所有权
       const server = await requireOwnership(id, userId);
 
-      // 如果更改名称，检查新名称是否已存在
       if (data.name && data.name !== server.name) {
-        const existing = await McpServer.getByName(userId, data.name);
-        if (existing && existing.id !== id) {
-          throw new Error(`MCP server with name "${data.name}" already exists`);
-        }
+        await assertNameUniqueForUpdate(userId, data.name, id);
       }
 
-      // 验证配置
       validateMcpConfig({ ...server, ...data });
 
       const updated = await McpServer.update(id, data);
@@ -127,7 +117,6 @@ export class McpService {
    */
   static async deleteServer(id, userId) {
     try {
-      // 验证所有权
       await requireOwnership(id, userId);
 
       const success = await McpServer.delete(id);
@@ -150,25 +139,17 @@ export class McpService {
   static async testServer(id, userId) {
     try {
       const server = await this.getServer(id, userId);
-
       logger.info(`[McpService] Testing MCP server "${server.name}" (${server.type})`);
 
-      // 动态导入McpClient
       const { McpClient } = await import('./McpClient.js');
       const client = new McpClient(server);
-
       const result = await client.test();
 
       logger.info(`[McpService] Test result for "${server.name}":`, result);
-
       return result;
     } catch (error) {
       logger.error(`[McpService] Error testing server ${id}:`, error);
-      return {
-        success: false,
-        status: 'failed',
-        message: error.message
-      };
+      return { success: false, status: 'failed', message: error.message };
     }
   }
 
@@ -181,25 +162,17 @@ export class McpService {
   static async discoverTools(id, userId) {
     try {
       const server = await this.getServer(id, userId);
-
       logger.info(`[McpService] Discovering tools for MCP server "${server.name}" (${server.type})`);
 
-      // 动态导入McpClient
       const { McpClient } = await import('./McpClient.js');
       const client = new McpClient(server);
-
       const result = await client.discoverTools();
 
       logger.info(`[McpService] Discovery result for "${server.name}":`, result);
-
       return result;
     } catch (error) {
       logger.error(`[McpService] Error discovering tools for server ${id}:`, error);
-      return {
-        success: false,
-        error: error.message,
-        tools: []
-      };
+      return { success: false, error: error.message, tools: [] };
     }
   }
 
@@ -228,23 +201,7 @@ export class McpService {
    */
   static async getSdkConfig(userId) {
     const servers = await this.getEnabledServers(userId);
-    const config = {};
-
-    for (const server of servers) {
-      config[server.name] = {
-        type: server.type,
-        ...(server.type === 'stdio' ? {
-          command: server.config.command,
-          args: server.config.args || [],
-          env: server.config.env || {}
-        } : {
-          url: server.config.url
-        })
-      };
-    }
-
-    logger.info(`[McpService] Generated SDK config for user ${userId} with ${Object.keys(config).length} servers`);
-    return config;
+    return buildSdkConfig(servers, userId);
   }
 }
 

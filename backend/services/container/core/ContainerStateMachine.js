@@ -54,6 +54,7 @@ import {
   isStableState as isStableStateUtil,
   getIntermediateStates,
 } from './containerStateTransitions.js';
+import { addWaiter, removeWaiter, notifyAndWaiters } from './stateWaiterManager.js';
 
 const logger = createLogger('services/container/core/ContainerStateMachine');
 
@@ -172,7 +173,7 @@ export class ContainerStateMachine extends EventEmitter {
     });
 
     // 通知等待者
-    this._notifyStateWaiters(newState);
+    notifyAndWaiters(this._stateWaiters, newState);
 
     return true;
   }
@@ -188,13 +189,9 @@ export class ContainerStateMachine extends EventEmitter {
 
   /**
    * 强制重置状态到 NON_EXISTENT
-   * 用于处理卡住的状态（如服务器重启后遗留的 creating 状态）
-   * 此方法绕过正常的转换规则
-   * 如果正在创建中，则跳过重置以避免干扰活跃的创建过程
    * @returns {boolean} 是否执行了重置
    */
   forceReset() {
-    // 如果正在创建中，不允许强制重置
     if (this.isCreating()) {
       logger.info(`[StateMachine] Skipping force reset for user ${this.userId}: container creation is in progress`);
       return false;
@@ -209,170 +206,52 @@ export class ContainerStateMachine extends EventEmitter {
 
     logger.info(`[StateMachine] Force reset state from ${previousState} to NON_EXISTENT for user ${this.userId}`);
 
-    // 触发状态变化事件
     this.emit('stateChanged', {
-      from: previousState,
-      to: ContainerState.NON_EXISTENT,
-      userId: this.userId,
-      containerName: this.containerName,
-      timestamp: this.lastTransitionTime,
-      metadata: { forced: true }
+      from: previousState, to: ContainerState.NON_EXISTENT,
+      userId: this.userId, containerName: this.containerName,
+      timestamp: this.lastTransitionTime, metadata: { forced: true }
     });
 
-    // 通知等待者
-    this._notifyStateWaiters(ContainerState.NON_EXISTENT);
-
+    notifyAndWaiters(this._stateWaiters, ContainerState.NON_EXISTENT);
     return true;
   }
 
-  /**
-   * 开始创建操作，设置保护标志
-   * 防止创建过程被 forceReset 中断
-   */
-  beginCreation() {
-    this._isCreating = true;
-  }
-
-  /**
-   * 结束创建操作，清除保护标志
-   */
-  endCreation() {
-    this._isCreating = false;
-  }
-
-  /**
-   * 检查是否正在创建中
-   * @returns {boolean}
-   */
-  isCreating() {
-    return this._isCreating;
-  }
-
-  /**
-   * 获取错误信息
-   * @returns {Error|null}
-   */
-  getError() {
-    return this.error;
-  }
+  beginCreation() { this._isCreating = true; }
+  endCreation() { this._isCreating = false; }
+  isCreating() { return this._isCreating; }
+  getError() { return this.error; }
 
   /**
    * 等待状态变为指定状态或稳定状态
-   * @param {string|string[]} targetStates - 目标状态或状态数组
-   * @param {Object} options - 选项
-   * @param {number} options.timeout - 超时时间（毫秒）
-   * @returns {Promise<string>} 最终到达的状态
+   * @param {string|string[]} targetStates
+   * @param {Object} options
+   * @returns {Promise<string>}
    */
   async waitForState(targetStates, options = {}) {
     const { timeout = 30000 } = options;
     const targets = Array.isArray(targetStates) ? targetStates : [targetStates];
 
-    // 如果已经在目标状态，立即返回
-    if (targets.includes(this.currentState)) {
-      return this.currentState;
-    }
+    if (targets.includes(this.currentState)) return this.currentState;
+    if (this.isTerminal()) return this.currentState;
 
-    // 如果当前状态是终止状态，无法转换
-    if (this.isTerminal()) {
-      return this.currentState;
-    }
-
-    // 创建等待 Promise
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
-        this._removeStateWaiter(this.currentState, resolve);
+        removeWaiter(this._stateWaiters, this.currentState, resolve);
         reject(new Error(`Timeout waiting for state ${targets.join(' or ')}, current: ${this.currentState}`));
       }, timeout);
 
-      // 添加到等待者列表
-      this._addStateWaiter(this.currentState, (newState) => {
+      addWaiter(this._stateWaiters, this.currentState, (newState) => {
         clearTimeout(timer);
         resolve(newState);
       }, targets);
     });
   }
 
-  /**
-   * 等待到达稳定状态
-   * @param {Object} options - 选项
-   * @param {number} options.timeout - 超时时间（毫秒）
-   * @returns {Promise<string>} 最终到达的稳定状态
-   */
   async waitForStable(options = {}) {
-    const stableStates = [
-      ContainerState.NON_EXISTENT,
-      ContainerState.READY,
-      ContainerState.DEAD,
-      ContainerState.FAILED
-    ];
-    return this.waitForState(stableStates, options);
-  }
-
-  /**
-   * 添加状态等待者
-   * @private
-   * @param {string} state - 要等待的状态
-   * @param {Function} callback - 状态变化回调
-   * @param {string[]} targetStates - 目标状态列表
-   */
-  _addStateWaiter(state, callback, targetStates) {
-    if (!this._stateWaiters.has(state)) {
-      this._stateWaiters.set(state, []);
-    }
-    this._stateWaiters.get(state).push({ callback, targetStates });
-  }
-
-  /**
-   * 移除状态等待者
-   * @private
-   * @param {string} state - 状态
-   * @param {Function} callback - 回调函数
-   */
-  _removeStateWaiter(state, callback) {
-    const waiters = this._stateWaiters.get(state);
-    if (waiters) {
-      const index = waiters.findIndex(w => w.callback === callback);
-      if (index !== -1) {
-        waiters.splice(index, 1);
-      }
-    }
-  }
-
-  /**
-   * 通知状态等待者
-   * @private
-   * @param {string} newState - 新状态
-   */
-  _notifyStateWaiters(newState) {
-    // 通知所有状态的等待者，而不仅仅是前一个状态
-    // 这样可以处理多步状态转换的情况
-    for (const [state, waiters] of this._stateWaiters.entries()) {
-      if (!waiters || waiters.length === 0) continue;
-
-      // 过滤出等待当前新状态的等待者
-      const matchingWaiters = waiters.filter(w => w.targetStates.includes(newState));
-
-      if (matchingWaiters.length > 0) {
-        logger.info(`[StateMachine] Notifying ${matchingWaiters.length} waiters from state ${state} for new state ${newState}`);
-
-        // 通知匹配的等待者
-        matchingWaiters.forEach(waiter => {
-          try {
-            waiter.callback(newState);
-          } catch (error) {
-            logger.error('[StateMachine] Error in state waiter callback:', error);
-          }
-        });
-      }
-
-      // 清理已通知的等待者（只移除已匹配的）
-      const remainingWaiters = waiters.filter(w => !w.targetStates.includes(newState));
-      if (remainingWaiters.length > 0) {
-        this._stateWaiters.set(state, remainingWaiters);
-      } else {
-        this._stateWaiters.delete(state);
-      }
-    }
+    return this.waitForState([
+      ContainerState.NON_EXISTENT, ContainerState.READY,
+      ContainerState.DEAD, ContainerState.FAILED
+    ], options);
   }
 
   /**
