@@ -151,6 +151,14 @@ function validateUserId(req, res, next) {
     return next();
   }
 
+  // 先检查是否为纯整数字符串，防止 '3.14' 被 parseInt 截断为 3
+  if (!/^\d+$/.test(String(userId))) {
+    throw new ValidationError('Invalid user ID', {
+      field: 'userId',
+      expectedFormat: 'positive integer'
+    });
+  }
+
   const userIdNum = parseInt(userId, 10);
 
   if (isNaN(userIdNum) || userIdNum <= 0) {
