@@ -1,10 +1,32 @@
+/**
+ * TaskMaster 文件夹检测器
+ *
+ * 检测并分析给定项目路径中的 TaskMaster 项目文件夹（`.taskmaster/`）。
+ * 验证文件夹结构，检查关键文件（`tasks/tasks.json`、`config.json`），
+ * 并计算聚合的任务统计信息（完成百分比、状态分布、子任务数）。
+ *
+ * ## 检测流程
+ * 1. 检查项目根目录下是否存在 `.taskmaster/` 目录
+ * 2. 验证关键文件是否存在（tasks/tasks.json 为必需）
+ * 3. 解析 tasks.json 并计算聚合统计
+ *
+ * @module services/projects/taskmaster/detector
+ */
+
 import { promises as fs } from 'fs';
 import path from 'path';
 import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('services/projects/taskmaster/detector');
 
+/** TaskMaster 有效安装所需的文件列表 */
 const KEY_FILES = ['tasks/tasks.json', 'config.json'];
 
+/**
+ * 检查目录是否存在且确实为目录
+ *
+ * @param {string} dirPath - 要检查的绝对路径
+ * @returns {Promise<{exists: boolean, reason?: string}>} 存在性结果，附失败原因
+ */
 async function checkDirectoryExists(dirPath) {
   try {
     const stats = await fs.stat(dirPath);
@@ -16,6 +38,15 @@ async function checkDirectoryExists(dirPath) {
   }
 }
 
+/**
+ * 验证 TaskMaster 所需的关键文件是否存在
+ *
+ * 仅 `tasks/tasks.json` 被视为必需文件 —— 缺失时 `hasEssentialFiles` 为 false。
+ * 其他文件仅做检查但不阻塞。
+ *
+ * @param {string} taskMasterPath - `.taskmaster` 目录的绝对路径
+ * @returns {Promise<{fileStatus: Object<string, boolean>, hasEssentialFiles: boolean}>}
+ */
 async function checkKeyFiles(taskMasterPath) {
   const fileStatus = {};
   let hasEssentialFiles = true;
@@ -26,14 +57,26 @@ async function checkKeyFiles(taskMasterPath) {
       fileStatus[file] = true;
     } catch {
       fileStatus[file] = false;
+      // tasks.json 是 TaskMaster 正常运行的唯一必需文件
       if (file === 'tasks/tasks.json') hasEssentialFiles = false;
     }
   }
   return { fileStatus, hasEssentialFiles };
 }
 
+/**
+ * 从 tasks.json 数据中提取扁平化的任务数组
+ *
+ * 支持两种数据格式：
+ * - `{ tasks: [...] }` — 扁平结构（默认）
+ * - `{ <标签>: { tasks: [...] } }` — 按标签分组结构，每个键持有独立的任务列表
+ *
+ * @param {Object} tasksData - 解析后的 tasks.json 内容
+ * @returns {Array} 所有任务对象的扁平数组
+ */
 function extractAllTasks(tasksData) {
   if (tasksData.tasks) return tasksData.tasks;
+  // 按标签分组格式：将所有标签下的任务合并到一个数组
   const tasks = [];
   Object.values(tasksData).forEach(tagData => {
     if (tagData.tasks) tasks.push(...tagData.tasks);
@@ -41,10 +84,21 @@ function extractAllTasks(tasksData) {
   return tasks;
 }
 
+/**
+ * 从扁平任务数组计算聚合统计信息
+ *
+ * 按状态（pending、in-progress、done、review 等）统计任务数量，
+ * 计算总体完成百分比，同时统计子任务数量。
+ *
+ * @param {Array<Object>} tasks - 任务对象数组，每个任务包含 `status` 字段
+ * @param {Array} [tasks[].subtasks] - 可选的嵌套子任务数组
+ * @returns {{taskCount: number, subtaskCount: number, completed: number, pending: number, inProgress: number, review: number, completionPercentage: number}}
+ */
 function calculateTaskStats(tasks) {
   const stats = tasks.reduce((acc, task) => {
     acc.total++;
     acc[task.status] = (acc[task.status] || 0) + 1;
+    // 递归统计子任务，并单独追踪其状态分布
     if (task.subtasks) {
       task.subtasks.forEach(sub => {
         acc.subtotalTasks++;
@@ -66,12 +120,19 @@ function calculateTaskStats(tasks) {
   };
 }
 
+/**
+ * 读取并解析 tasks.json，返回聚合的任务统计信息
+ *
+ * @param {string} taskMasterPath - `.taskmaster` 目录的绝对路径
+ * @returns {Promise<Object>} 任务统计信息，解析失败时返回 `{ error: string }`
+ */
 async function parseTaskMetadata(taskMasterPath) {
   const tasksPath = path.join(taskMasterPath, 'tasks/tasks.json');
   try {
     const tasksData = JSON.parse(await fs.readFile(tasksPath, 'utf8'));
     const tasks = extractAllTasks(tasksData);
     const stats = calculateTaskStats(tasks);
+    // 从文件 mtime 附加最后修改时间戳
     stats.lastModified = (await fs.stat(tasksPath)).mtime.toISOString();
     return stats;
   } catch (parseError) {
@@ -80,6 +141,15 @@ async function parseTaskMetadata(taskMasterPath) {
   }
 }
 
+/**
+ * 检测指定项目目录中的 TaskMaster 安装
+ *
+ * 执行完整的检测周期：目录检查 → 文件验证 → 元数据解析。
+ * 返回结构化结果，供前端展示 TaskMaster 状态使用。
+ *
+ * @param {string} projectPath - 项目根目录的绝对路径
+ * @returns {Promise<{hasTaskmaster: boolean, reason?: string, hasEssentialFiles?: boolean, files?: Object, metadata?: Object, path?: string}>}
+ */
 async function detectTaskMasterFolder(projectPath) {
   try {
     const taskMasterPath = path.join(projectPath, '.taskmaster');
@@ -89,6 +159,7 @@ async function detectTaskMasterFolder(projectPath) {
 
     const { fileStatus, hasEssentialFiles } = await checkKeyFiles(taskMasterPath);
 
+    // 仅在关键任务文件存在时才解析元数据
     let metadata = null;
     if (fileStatus['tasks/tasks.json']) {
       metadata = await parseTaskMetadata(taskMasterPath);

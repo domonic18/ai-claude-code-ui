@@ -44,6 +44,16 @@ import {
 const logger = createLogger('routes/api/git');
 const router = express.Router();
 
+/**
+ * 通用 Git 路由错误处理包装器
+ *
+ * 捕获路由处理器中的异常，使用可选的 errorFormatter 格式化错误响应。
+ * 无格式化器时返回 `{ error: error.message }`。
+ *
+ * @param {Function} handler - 异步路由处理函数 (req, res) => Promise<void>
+ * @param {Function} [errorFormatter] - 可选的错误格式化函数 (error) => object
+ * @returns {Function} Express 中间件函数
+ */
 function gitHandler(handler, errorFormatter) {
     return async (req, res) => {
         try {
@@ -58,6 +68,13 @@ function gitHandler(handler, errorFormatter) {
     };
 }
 
+/**
+ * 格式化 git status 错误响应
+ * 区分 "不是 git 仓库" 和其他通用错误
+ *
+ * @param {Error} error - 捕获的错误
+ * @returns {{error: string, details: string}}
+ */
 function formatGitStatusError(error) {
     const isGitRepoError = error.message.includes('not a git repository')
         || error.message.includes('Project directory is not a git repository');
@@ -67,6 +84,13 @@ function formatGitStatusError(error) {
     };
 }
 
+/**
+ * 格式化 initial commit 错误响应
+ * 返回含 HTTP 状态码的结构化错误
+ *
+ * @param {Error} error
+ * @returns {{status: number, error: string, details?: string}}
+ */
 function formatInitialCommitError(error) {
     if (error.message.includes('already has commits')) {
         return { status: 400, error: error.message };
@@ -77,6 +101,13 @@ function formatInitialCommitError(error) {
     return { status: 500, error: error.message };
 }
 
+/**
+ * 格式化 file-with-diff 错误响应
+ * 目录类型差异查询返回 400，其他返回 500
+ *
+ * @param {Error} error
+ * @returns {{status: number, error: string}}
+ */
 function formatFileWithDiffError(error) {
     if (error.message.includes('Cannot show diff for directories')) {
         return { status: 400, error: error.message };
@@ -84,6 +115,16 @@ function formatFileWithDiffError(error) {
     return { status: 500, error: error.message };
 }
 
+/**
+ * 带 HTTP 状态码的 Git 路由错误处理包装器
+ *
+ * 与 gitHandler 类似，但错误格式化器需返回含 `status` 字段的对象，
+ * 用于设置响应的 HTTP 状态码。
+ *
+ * @param {Function} handler - 异步路由处理函数
+ * @param {Function} statusErrorFormatter - 错误格式化函数，返回 {status: number, error: string, ...}
+ * @returns {Function} Express 中间件函数
+ */
 function gitHandlerWithStatus(handler, statusErrorFormatter) {
     return async (req, res) => {
         try {

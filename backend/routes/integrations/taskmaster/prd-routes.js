@@ -71,6 +71,7 @@ router.post('/prd/:projectName', async (req, res) => {
             return res.status(400).json({ error: 'Missing required fields', message: 'fileName and content are required' });
         }
 
+        // 限制 PRD 文件大小不超过 10 MB，防止写入过大文件
         if (typeof content !== 'string' || content.length > 10_000_000) {
             return res.status(413).json({ error: 'Content too large', message: 'PRD content must not exceed 10 MB' });
         }
