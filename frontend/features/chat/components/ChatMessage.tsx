@@ -18,14 +18,14 @@ const GROUPABLE_TYPES = new Set(['assistant', 'user', 'tool', 'error']);
 /**
  * 判断当前消息是否应与前一条消息分组显示
  */
-function checkIsGrouped(messageType: string, prevMessage?: any): boolean {
+function isMessageGrouped(messageType: string, prevMessage?: any): boolean {
   return Boolean(prevMessage && prevMessage.type === messageType && GROUPABLE_TYPES.has(messageType));
 }
 
 /**
  * 将消息类型映射为头部显示类型
  */
-function getHeaderType(messageType: string): string {
+function getDisplayHeaderType(messageType: string): string {
   if (messageType === 'tool') return 'tool';
   if (messageType === 'error') return 'error';
   return 'assistant';
@@ -72,7 +72,7 @@ function renderNonUserMessage(
       <div className="w-full">
         {!isGrouped && (
           <MessageHeader
-            type={getHeaderType(message.type)}
+            type={getDisplayHeaderType(message.type)}
             displayName={displayName}
             provider={provider}
             isGrouped={isGrouped}
@@ -100,7 +100,7 @@ export const ChatMessage = memo(function ChatMessage({
   showThinking = true,
 }: ChatMessageProps) {
   const messageRef = useRef<HTMLDivElement>(null);
-  const isGrouped = checkIsGrouped(message.type, prevMessage);
+  const isGrouped = isMessageGrouped(message.type, prevMessage);
 
   useToolAutoExpand(messageRef, message.isToolUse || false, autoExpandTools);
 

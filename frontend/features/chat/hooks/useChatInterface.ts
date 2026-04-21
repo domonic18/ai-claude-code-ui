@@ -206,8 +206,8 @@ export function useChatInterface({
   // 返回 true 表示已作为回答处理，调用方不应再发送 claude-command
   const consumePendingQuestion = useCallback((answer: string): boolean => {
     const pending = pendingQuestionRef.current;
-    if (pending) {
-      sendUserAnswer(pending.toolUseID, pending.sessionId, answer);
+    if (pending && answer.trim()) {
+      sendUserAnswer(pending.toolUseID, pending.sessionId, answer.trim());
       pendingQuestionRef.current = null;
       return true;
     }

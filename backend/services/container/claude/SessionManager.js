@@ -35,13 +35,24 @@ export function setSessionStdin(sessionId, stdinWriter) {
 }
 
 /**
- * 获取会话的 stdin 写入函数
+ * 获取会话的 stdin 写入函数（带会话所有权校验）
+ *
+ * 仅当请求者的 userId 与会话创建者一致时才返回 stdinWriter，
+ * 防止跨会话数据注入。
+ *
  * @param {string} sessionId - 会话 ID
- * @returns {Function|null} stdin 写入函数，或 null
+ * @param {number} userId - 请求者的用户 ID
+ * @returns {Function|null} stdin 写入函数，或 null（会话不存在或不属于该用户）
  */
-export function getSessionStdin(sessionId) {
+export function getSessionStdin(sessionId, userId) {
   const session = containerSessions.get(sessionId);
-  return session?.stdinWriter || null;
+  if (!session) return null;
+  // 校验会话所有权：确保只有创建该会话的用户可以写入 stdin
+  if (userId !== undefined && session.userId !== undefined && session.userId !== userId) {
+    logger.warn({ sessionId, requestedBy: userId, ownerBy: session.userId }, '[SessionManager] Session ownership mismatch');
+    return null;
+  }
+  return session.stdinWriter || null;
 }
 
 /**
