@@ -62,6 +62,56 @@ export function parseStatOutput(output, filePath) {
 }
 
 /**
+ * Check if a relative path should be skipped (hidden or invalid)
+ * @param {string} relativePath - Relative path to check
+ * @returns {string[]|null} Cleaned path parts, or null to skip
+ */
+function validateRelativePath(relativePath) {
+  const pathParts = relativePath.split('/');
+  if (pathParts.some(part => isHiddenFile(part))) return null;
+
+  const parts = relativePath.split('/').map(cleanFileName);
+  if (parts.some(part => part === '' || !isValidFileName(part))) {
+    logger.info('[fileAdapterHelpers] Skipping invalid path:', relativePath, '->', parts);
+    return null;
+  }
+  return parts;
+}
+
+/**
+ * Insert a single path's parts into the tree structure
+ * @param {Array} tree - Root tree array
+ * @param {string[]} parts - Cleaned path parts
+ * @param {string} basePath - Base path prefix
+ * @param {Set<string>} paths - All paths set for directory detection
+ */
+function insertPathIntoTree(tree, parts, basePath, paths) {
+  let currentLevel = tree;
+  let currentPath = '';
+
+  for (const part of parts) {
+    currentPath = currentPath ? `${currentPath}/${part}` : part;
+    const fullPathForCheck = `${basePath}/${currentPath}`;
+    const isDir = isDirectory(fullPathForCheck, paths);
+
+    let node = currentLevel.find(n => n.name === part);
+    if (!node) {
+      node = {
+        name: part,
+        path: fullPathForCheck,
+        type: isDir ? 'directory' : 'file',
+        children: isDir ? [] : undefined
+      };
+      currentLevel.push(node);
+    }
+
+    if (node.children) {
+      currentLevel = node.children;
+    }
+  }
+}
+
+/**
  * Builds file tree structure from list of paths
  * @param {Array<string>} paths - Array of file paths
  * @param {string} basePath - Base path for the tree
@@ -71,53 +121,16 @@ export function buildFileTree(paths, basePath) {
   const tree = [];
 
   for (const fullPath of paths) {
-    if (!fullPath || fullPath.trim() === '') {
-      continue;
-    }
+    if (!fullPath || fullPath.trim() === '') continue;
 
     const relativePath = fullPath.startsWith(basePath)
       ? fullPath.substring(basePath.length).replace(/^\//, '') || '.'
       : fullPath;
 
-    const pathParts = relativePath.split('/');
+    const parts = validateRelativePath(relativePath);
+    if (!parts) continue;
 
-    if (pathParts.some(part => isHiddenFile(part))) {
-      continue;
-    }
-
-    const parts = relativePath.split('/').map(cleanFileName);
-
-    if (parts.some(part => part === '' || !isValidFileName(part))) {
-      logger.info('[fileAdapterHelpers] Skipping invalid path:', relativePath, '->', parts);
-      continue;
-    }
-
-    let currentLevel = tree;
-    let currentPath = '';
-
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
-      currentPath = currentPath ? `${currentPath}/${part}` : part;
-
-      const fullPathForCheck = `${basePath}/${currentPath}`;
-      const isDir = isDirectory(fullPathForCheck, new Set(paths));
-
-      let existingNode = currentLevel.find(node => node.name === part);
-
-      if (!existingNode) {
-        existingNode = {
-          name: part,
-          path: fullPathForCheck,
-          type: isDir ? 'directory' : 'file',
-          children: isDir ? [] : undefined
-        };
-        currentLevel.push(existingNode);
-      }
-
-      if (existingNode.children) {
-        currentLevel = existingNode.children;
-      }
-    }
+    insertPathIntoTree(tree, parts, basePath, new Set(paths));
   }
 
   return tree;
