@@ -16,14 +16,9 @@ import {
   FileMover,
   DirectoryCreator
 } from './operations/index.js';
+import { handleDeleteStream, handleExistsStream } from './operations/containerStreamUtils.js';
 import containerManager from '../../container/core/index.js';
 import { PassThrough } from 'stream';
-
-/** Operation timeout in milliseconds */
-const OPERATION_TIMEOUT_MS = 5000;
-
-/** Check file exists timeout in milliseconds */
-const CHECK_EXISTS_TIMEOUT_MS = 2000;
 
 /**
  * 文件操作适配器
@@ -42,7 +37,6 @@ export class FileAdapter extends BaseFileAdapter {
     });
     this.adapterType = 'container';
 
-    // 初始化操作类
     this.reader = new FileReader(this);
     this.writer = new FileWriter(this);
     this.treeBuilder = new FileTreeBuilder(this);
@@ -112,7 +106,7 @@ export class FileAdapter extends BaseFileAdapter {
         ['stat', '-c', '%F|%s|%Y|%A', containerPath]
       );
 
-      return this._parseFileStats(stream, containerPath);
+      return this._parseFileStats(stream);
     } catch (error) {
       throw this._standardizeError(error, 'getFileStats');
     }
@@ -122,10 +116,9 @@ export class FileAdapter extends BaseFileAdapter {
    * 解析文件统计信息
    * @private
    * @param {Object} stream - 命令输出流
-   * @param {string} containerPath - 容器路径
-   * @returns {Promise<{type: string, size: number, modified: string, mode: string}>} 文件统计信息
+   * @returns {Promise<{type: string, size: number, modified: string, mode: string}>}
    */
-  _parseFileStats(stream, containerPath) {
+  _parseFileStats(stream) {
     const stdout = new PassThrough();
     const stderr = new PassThrough();
     containerManager.docker.modem.demuxStream(stream, stdout, stderr);
@@ -133,13 +126,8 @@ export class FileAdapter extends BaseFileAdapter {
     return new Promise((resolve, reject) => {
       let output = '';
 
-      stdout.on('data', (chunk) => {
-        output += chunk.toString();
-      });
-
-      stream.on('error', (err) => {
-        reject(new Error(`Failed to get file stats: ${err.message}`));
-      });
+      stdout.on('data', (chunk) => { output += chunk.toString(); });
+      stream.on('error', (err) => reject(new Error(`Failed to get file stats: ${err.message}`)));
 
       stream.on('end', () => {
         try {
@@ -175,77 +163,11 @@ export class FileAdapter extends BaseFileAdapter {
       await containerManager.getOrCreateContainer(userId);
       const containerPath = validation.safePath;
 
-      const { stream } = await containerManager.execInContainer(
-        userId,
-        ['rm', '-rf', containerPath]
-      );
-
-      return this._handleDeleteResponse(stream, containerPath, userId);
+      const { stream } = await containerManager.execInContainer(userId, ['rm', '-rf', containerPath]);
+      return await handleDeleteStream(stream, containerPath, userId);
     } catch (error) {
       throw this._standardizeError(error, 'deleteFile');
     }
-  }
-
-  /**
-   * 处理删除响应
-   * @private
-   * @param {Object} stream - 命令输出流
-   * @param {string} containerPath - 容器路径
-   * @param {string} userId - 用户 ID
-   * @returns {Promise<{success: boolean}>} 删除结果
-   */
-  async _handleDeleteResponse(stream, containerPath, userId) {
-    return new Promise((resolve, reject) => {
-      let resolved = false;
-      let timeoutId = null;
-
-      const doResolve = (result) => {
-        if (!resolved) {
-          resolved = true;
-          if (timeoutId) clearTimeout(timeoutId);
-          resolve(result);
-        }
-      };
-
-      const doReject = (err) => {
-        if (!resolved) {
-          resolved = true;
-          if (timeoutId) clearTimeout(timeoutId);
-          reject(err);
-        }
-      };
-
-      stream.on('data', () => {});
-      stream.on('error', (err) => {
-        doReject(new Error(`Failed to delete file: ${err.message}`));
-      });
-
-      stream.on('end', async () => {
-        try {
-          const checkCommand = `test -e "${containerPath}" && echo "EXISTS" || echo "NOT_EXISTS"`;
-          const { stream: checkStream } = await containerManager.execInContainer(userId, checkCommand);
-
-          let checkOutput = '';
-          checkStream.on('data', (chunk) => {
-            checkOutput += chunk.toString();
-          });
-
-          checkStream.on('end', () => {
-            if (checkOutput.trim() === 'EXISTS') {
-              doReject(new Error(`File still exists after deletion`));
-            } else {
-              doResolve({ success: true });
-            }
-          });
-        } catch {
-          doResolve({ success: true });
-        }
-      });
-
-      timeoutId = setTimeout(() => {
-        doResolve({ success: true });
-      }, OPERATION_TIMEOUT_MS);
-    });
   }
 
   /**
@@ -271,36 +193,8 @@ export class FileAdapter extends BaseFileAdapter {
         ['sh', '-c', 'test -e "$1" && echo "EXISTS" || echo "NOT_EXISTS"', 'testExists', containerPath]
       );
 
-      return new Promise((resolve) => {
-        let output = '';
-        let resolved = false;
-
-        stream.on('data', (chunk) => {
-          output += chunk.toString();
-        });
-
-        stream.on('error', () => {
-          if (!resolved) {
-            resolved = true;
-            resolve(false);
-          }
-        });
-
-        stream.on('end', () => {
-          if (!resolved) {
-            resolved = true;
-            resolve(output.trim() === 'EXISTS');
-          }
-        });
-
-        setTimeout(() => {
-          if (!resolved) {
-            resolved = true;
-            resolve(false);
-          }
-        }, CHECK_EXISTS_TIMEOUT_MS);
-      });
-    } catch (error) {
+      return handleExistsStream(stream);
+    } catch {
       return false;
     }
   }

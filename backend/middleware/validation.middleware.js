@@ -9,6 +9,7 @@
 
 import { ValidationError } from './error-handler.middleware.js';
 import { _validateField } from './fieldValidators.js';
+import { createUuidValidator, createPositiveIntValidator } from './idValidators.js';
 
 /**
  * 验证规则配置
@@ -34,6 +35,19 @@ import { _validateField } from './fieldValidators.js';
  */
 
 /**
+ * 验证请求中的某个数据源
+ * @param {Object} data - 请求数据源 (body/query/params)
+ * @param {Object} rules - 验证规则
+ * @param {string} location - 数据位置标识
+ * @param {Array} errors - 累积的错误列表
+ */
+function _validateSource(data, rules, location, errors) {
+  if (!rules) return;
+  const sourceErrors = _validateObject(data, rules, location);
+  errors.push(...sourceErrors);
+}
+
+/**
  * 请求验证中间件
  * 根据验证规则验证请求数据
  * @param {ValidationSchema} schema - 验证规则
@@ -43,23 +57,9 @@ function validate(schema) {
   return (req, res, next) => {
     const errors = [];
 
-    // 验证请求体
-    if (schema.body) {
-      const bodyErrors = _validateObject(req.body, schema.body, 'body');
-      errors.push(...bodyErrors);
-    }
-
-    // 验证查询参数
-    if (schema.query) {
-      const queryErrors = _validateObject(req.query, schema.query, 'query');
-      errors.push(...queryErrors);
-    }
-
-    // 验证路径参数
-    if (schema.params) {
-      const paramErrors = _validateObject(req.params, schema.params, 'params');
-      errors.push(...paramErrors);
-    }
+    _validateSource(req.body, schema.body, 'body', errors);
+    _validateSource(req.query, schema.query, 'query', errors);
+    _validateSource(req.params, schema.params, 'params', errors);
 
     if (errors.length > 0) {
       throw new ValidationError('Validation failed', { errors });
@@ -90,87 +90,28 @@ function _validateObject(obj, rules, location) {
 }
 
 /**
- * 项目 ID 验证中间件
- * 验证项目 ID 是否为有效的 UUID
+ * 项目 ID 验证中间件（UUID v4）
  * @returns {Function} Express 中间件
  */
-function validateProjectId(req, res, next) {
-  const projectId = req.params.projectId || req.params.id || req.body.projectId;
-
-  if (!projectId) {
-    return next();
-  }
-
-  // UUID v4 格式验证
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-  if (!uuidRegex.test(projectId)) {
-    throw new ValidationError('Invalid project ID format', {
-      field: 'projectId',
-      expectedFormat: 'UUID v4'
-    });
-  }
-
-  next();
-}
+const validateProjectId = createUuidValidator('projectId', [
+  'params.projectId', 'params.id', 'body.projectId'
+]);
 
 /**
- * 会话 ID 验证中间件
- * 验证会话 ID 是否为有效的 UUID
+ * 会话 ID 验证中间件（UUID v4）
  * @returns {Function} Express 中间件
  */
-function validateSessionId(req, res, next) {
-  const sessionId = req.params.sessionId || req.params.id || req.body.sessionId;
-
-  if (!sessionId) {
-    return next();
-  }
-
-  // UUID v4 格式验证
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-  if (!uuidRegex.test(sessionId)) {
-    throw new ValidationError('Invalid session ID format', {
-      field: 'sessionId',
-      expectedFormat: 'UUID v4'
-    });
-  }
-
-  next();
-}
+const validateSessionId = createUuidValidator('sessionId', [
+  'params.sessionId', 'params.id', 'body.sessionId'
+]);
 
 /**
- * 用户 ID 验证中间件
- * 验证用户 ID 是否为有效的数字
+ * 用户 ID 验证中间件（正整数）
  * @returns {Function} Express 中间件
  */
-function validateUserId(req, res, next) {
-  const userId = req.params.userId || req.params.id || req.body.userId;
-
-  if (!userId) {
-    return next();
-  }
-
-  // 先检查是否为纯整数字符串，防止 '3.14' 被 parseInt 截断为 3
-  if (!/^\d+$/.test(String(userId))) {
-    throw new ValidationError('Invalid user ID', {
-      field: 'userId',
-      expectedFormat: 'positive integer'
-    });
-  }
-
-  const userIdNum = parseInt(userId, 10);
-
-  if (isNaN(userIdNum) || userIdNum <= 0) {
-    throw new ValidationError('Invalid user ID', {
-      field: 'userId',
-      expectedFormat: 'positive integer'
-    });
-  }
-
-  req.userId = userIdNum;
-  next();
-}
+const validateUserId = createPositiveIntValidator('userId', [
+  'params.userId', 'params.id', 'body.userId'
+]);
 
 /**
  * 内容类型验证中间件
@@ -183,6 +124,7 @@ function validateContentType(expectedTypes) {
 
   return (req, res, next) => {
     const contentType = req.headers['content-type'];
+    const baseContentType = contentType ? contentType.split(';')[0].trim() : '';
 
     if (!contentType && !types.includes('')) {
       throw new ValidationError(
@@ -190,8 +132,6 @@ function validateContentType(expectedTypes) {
         { expectedTypes: types }
       );
     }
-
-    const baseContentType = contentType ? contentType.split(';')[0].trim() : '';
 
     if (!types.includes(baseContentType)) {
       throw new ValidationError(

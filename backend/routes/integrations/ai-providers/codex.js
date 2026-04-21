@@ -1,9 +1,6 @@
 /**
  * Codex 集成路由
  *
- * 提供 Codex CLI 配置读取、会话管理和 MCP 服务器管理的 REST API。
- * MCP CLI 操作委托给 CodexCli 模块统一执行。
- *
  * @module routes/integrations/ai-providers/codex
  */
 
@@ -14,16 +11,15 @@ import os from 'os';
 import TOML from '@iarna/toml';
 import { getCodexSessions, getCodexSessionMessages, deleteCodexSession } from '../../../services/execution/codex/index.js';
 import { runCodexCliCommand, parseCodexListOutput, parseCodexGetOutput } from '../../../services/execution/codex/CodexCli.js';
+import { extractMcpServers } from './codexMcpConfig.js';
 import { createLogger } from '../../../utils/logger.js';
 
 const logger = createLogger('routes/integrations/ai-providers/codex');
 const router = express.Router();
 
-// ─── 配置 ─────────────────────────────────────────────────
-
 const CODEX_CONFIG_PATH = path.join(os.homedir(), '.codex', 'config.toml');
 
-/** @returns {Promise<Object|null>} 解析后的配置，文件不存在返回 null */
+/** @returns {Promise<Object|null>} */
 async function readCodexConfigFile() {
   try {
     const content = await fs.readFile(CODEX_CONFIG_PATH, 'utf8');
@@ -37,12 +33,12 @@ function buildDefaultConfig() {
   return { model: null, mcpServers: {}, approvalMode: 'suggest' };
 }
 
+// ─── 配置 ─────────────────────────────────────────────────
+
 router.get('/config', async (_req, res) => {
   try {
     const configData = await readCodexConfigFile();
-    if (!configData) {
-      return res.json({ success: true, config: buildDefaultConfig() });
-    }
+    if (!configData) return res.json({ success: true, config: buildDefaultConfig() });
     res.json({
       success: true,
       config: {
@@ -62,11 +58,8 @@ router.get('/config', async (_req, res) => {
 router.get('/sessions', async (req, res) => {
   try {
     const { projectPath } = req.query;
-    if (!projectPath) {
-      return res.status(400).json({ success: false, error: 'projectPath query parameter required' });
-    }
-    const sessions = await getCodexSessions(projectPath);
-    res.json({ success: true, sessions });
+    if (!projectPath) return res.status(400).json({ success: false, error: 'projectPath query parameter required' });
+    res.json({ success: true, sessions: await getCodexSessions(projectPath) });
   } catch (error) {
     logger.error('Error fetching Codex sessions:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -109,18 +102,14 @@ router.get('/mcp/cli/list', async (_req, res) => {
 
 router.post('/mcp/cli/add', async (req, res) => {
   const { name, command, args = [], env = {} } = req.body;
-  if (!name || !command) {
-    return res.status(400).json({ error: 'name and command are required' });
-  }
+  if (!name || !command) return res.status(400).json({ error: 'name and command are required' });
 
   const cliArgs = ['mcp', 'add', name];
   Object.entries(env).forEach(([key, value]) => cliArgs.push('-e', `${key}=${value}`));
   cliArgs.push('--', command);
   if (args.length > 0) cliArgs.push(...args);
 
-  const result = await runCodexCliCommand(cliArgs, {
-    successMessage: `MCP server "${name}" added successfully`,
-  });
+  const result = await runCodexCliCommand(cliArgs, { successMessage: `MCP server "${name}" added successfully` });
   res.status(result.status).json(result.body);
 });
 
@@ -144,22 +133,7 @@ router.get('/mcp/cli/get/:name', async (req, res) => {
 router.get('/mcp/config/read', async (_req, res) => {
   try {
     const configData = await readCodexConfigFile();
-    if (!configData) {
-      return res.json({ success: false, message: 'No Codex configuration file found', servers: [] });
-    }
-
-    const servers = [];
-    if (configData.mcp_servers && typeof configData.mcp_servers === 'object') {
-      for (const [name, config] of Object.entries(configData.mcp_servers)) {
-        servers.push({
-          id: name, name, type: 'stdio', scope: 'user',
-          config: { command: config.command || '', args: config.args || [], env: config.env || {} },
-          raw: config,
-        });
-      }
-    }
-
-    res.json({ success: true, configPath: CODEX_CONFIG_PATH, servers });
+    res.json(extractMcpServers(configData, CODEX_CONFIG_PATH));
   } catch (error) {
     res.status(500).json({ error: 'Failed to read Codex configuration', details: error.message });
   }

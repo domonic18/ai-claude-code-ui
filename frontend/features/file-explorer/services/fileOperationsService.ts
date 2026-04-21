@@ -7,12 +7,20 @@
 
 import { api } from '@/shared/services';
 import type { FileNode } from '../types/file-explorer.types';
-import { findFileByPath, extractRelativePath } from '../utils/fileTreeHelpers';
 import { handleApiResponse, extractErrorMessage } from '../utils/fileApiHelpers';
 import { logger } from '@/shared/utils/logger';
-
-/** Request timeout in milliseconds */
-const REQUEST_TIMEOUT_MS = 10000;
+import {
+  validateRenamePreconditions,
+  confirmRename,
+  createTimeoutPromise,
+  resetRenameState,
+} from '../utils/fileRenameHelpers';
+import {
+  validateCreatePreconditions,
+  buildNewItemPath,
+  ensureParentExpanded,
+  resetCreateState,
+} from '../utils/fileCreateHelpers';
 
 /**
  * Fetches files from the API for the selected project
@@ -69,8 +77,8 @@ export async function deleteFile(
     await handleApiResponse(response, 'Deletion failed');
     await fetchFiles();
   } catch (error) {
-    const message = extractErrorMessage(error, 'Unknown error');
-    alert(t('fileExplorer.delete.error', { message }));
+    const msg = extractErrorMessage(error, 'Unknown error');
+    alert(t('fileExplorer.delete.error', { message: msg }));
   } finally {
     setDeletingFile(null);
   }
@@ -101,51 +109,31 @@ export async function completeRename(
   setEditingName: (value: string) => void,
   setIsRenaming: (value: boolean) => void
 ): Promise<void> {
-  if (!renamingFile || isRenaming) return;
-
   const trimmedName = editingName.trim();
-  if (!trimmedName) {
-    alert(t('fileExplorer.rename.nameCannotBeEmpty'));
-    return;
-  }
+  const item = validateRenamePreconditions(
+    renamingFile, isRenaming, editingName, files, t,
+    () => resetRenameState(setRenamingFile, setEditingName)
+  );
+  if (!item) return;
 
-  const item = findFileByPath(files, renamingFile);
-  if (!item) {
-    setRenamingFile(null);
-    setEditingName('');
-    return;
-  }
-
-  const isDirectory = item.type === 'directory';
-  const message = isDirectory
-    ? t('fileExplorer.rename.confirmDirectory', { oldName: item.name, newName: trimmedName })
-    : t('fileExplorer.rename.confirmFile', { oldName: item.name, newName: trimmedName });
-
-  if (!confirm(message)) return;
+  if (!confirmRename(item, trimmedName, t)) return;
 
   setIsRenaming(true);
-
-  const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('Request timeout after 10 seconds')), REQUEST_TIMEOUT_MS);
-  });
 
   try {
     const response = await Promise.race([
       api.renameFile(selectedProjectName, item.path, trimmedName),
-      timeoutPromise
+      createTimeoutPromise()
     ]) as Response;
 
     await handleApiResponse(response, 'Rename failed');
-
-    setRenamingFile(null);
-    setEditingName('');
+    resetRenameState(setRenamingFile, setEditingName);
     await fetchFiles();
   } catch (error) {
     logger.error('[FileExplorer] Rename error:', error);
-    const message = extractErrorMessage(error, 'Unknown error');
-    alert(t('fileExplorer.rename.error', { message }));
-    setRenamingFile(null);
-    setEditingName('');
+    const msg = extractErrorMessage(error, 'Unknown error');
+    alert(t('fileExplorer.rename.error', { message: msg }));
+    resetRenameState(setRenamingFile, setEditingName);
   } finally {
     setIsRenaming(false);
   }
@@ -182,20 +170,12 @@ export async function completeNewItem(
   setSelectedFolder: (value: FileNode | null) => void,
   setIsCreating: (value: boolean) => void
 ): Promise<void> {
-  if (isCreating) return;
-
-  const trimmedName = newItemName.trim();
-  if (!trimmedName) {
-    alert(t('fileExplorer.new.nameRequired'));
-    return;
-  }
+  const trimmedName = validateCreatePreconditions(isCreating, newItemName, t);
+  if (!trimmedName) return;
 
   setIsCreating(true);
 
-  const basePath = selectedFolder
-    ? extractRelativePath(selectedFolder.path, selectedProjectName)
-    : '.';
-  const fullPath = basePath === '.' ? trimmedName : `${basePath}/${trimmedName}`;
+  const fullPath = buildNewItemPath(selectedFolder, selectedProjectName, trimmedName);
   const parentDirPath = selectedFolder?.path || null;
 
   try {
@@ -207,18 +187,13 @@ export async function completeNewItem(
       await handleApiResponse(response, 'Failed to create file');
     }
 
-    if (parentDirPath && !expandedDirs.has(parentDirPath)) {
-      setExpandedDirs(prev => new Set(prev.add(parentDirPath)));
-    }
-
-    setNewItemType(null);
-    setNewItemName('');
-    setSelectedFolder(null);
+    ensureParentExpanded(parentDirPath, expandedDirs, setExpandedDirs);
+    resetCreateState(setNewItemType, setNewItemName, setSelectedFolder);
     await fetchFiles();
   } catch (error) {
     logger.error('[FileExplorer] New item error:', error);
-    const message = extractErrorMessage(error, 'Unknown error');
-    alert(t('fileExplorer.new.error', { message }));
+    const msg = extractErrorMessage(error, 'Unknown error');
+    alert(t('fileExplorer.new.error', { message: msg }));
   } finally {
     setIsCreating(false);
   }

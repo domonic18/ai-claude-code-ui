@@ -6,9 +6,16 @@
  * @module services/mcp/McpClient
  */
 
-import { spawn } from 'child_process';
 import { EventEmitter } from 'events';
 import { createLogger } from '../../utils/logger.js';
+import { spawnStdioProcess, setupStdioProcessListeners } from './helpers/stdioProcessManager.js';
+import {
+  buildJsonRpcRequest,
+  sendStdioRequest,
+  buildInitializeParams,
+  buildTestResult,
+} from './helpers/mcpRequestHandler.js';
+
 const logger = createLogger('services/mcp/McpClient');
 
 /**
@@ -36,16 +43,19 @@ export class McpClient extends EventEmitter {
    * @returns {Promise<boolean>} 连接是否成功
    */
   async connect() {
+    const connectMethods = {
+      stdio: () => this._connectStdio(),
+      http: () => this._connectHttp(),
+      sse: () => this._connectSse(),
+    };
+
+    const method = connectMethods[this.server.type];
+    if (!method) {
+      throw new Error(`Unsupported MCP server type: ${this.server.type}`);
+    }
+
     try {
-      if (this.server.type === 'stdio') {
-        return await this._connectStdio();
-      } else if (this.server.type === 'http') {
-        return await this._connectHttp();
-      } else if (this.server.type === 'sse') {
-        return await this._connectSse();
-      } else {
-        throw new Error(`Unsupported MCP server type: ${this.server.type}`);
-      }
+      return await method();
     } catch (error) {
       logger.error(`[McpClient] Failed to connect to ${this.server.name}:`, error);
       return false;
@@ -57,71 +67,11 @@ export class McpClient extends EventEmitter {
    * @private
    * @returns {Promise<boolean>} 连接是否成功
    */
-  async _connectStdio() {
+  _connectStdio() {
     return new Promise((resolve, reject) => {
       try {
-        const { command, args = [], env = {} } = this.server.config;
-
-        if (!command) {
-          reject(new Error('Stdio server requires command'));
-          return;
-        }
-
-        logger.info(`[McpClient] Starting stdio server: ${command} ${args.join(' ')}`);
-
-        // 准备环境变量
-        const envOptions = {
-          ...process.env,
-          ...env
-        };
-
-        // 启动进程
-        this.process = spawn(command, args, {
-          env: envOptions,
-          stdio: ['pipe', 'pipe', 'pipe']
-        });
-
-        let stdout = '';
-        let stderr = '';
-
-        // 监听stdout
-        this.process.stdout.on('data', (data) => {
-          stdout += data.toString();
-          this._handleMessage(data.toString());
-        });
-
-        // 监听stderr
-        this.process.stderr.on('data', (data) => {
-          stderr += data.toString();
-          logger.error(`[McpClient] stderr: ${data}`);
-        });
-
-        // 监听进程退出
-        this.process.on('close', (code) => {
-          logger.info(`[McpClient] Process exited with code ${code}`);
-          this.connected = false;
-          this.emit('disconnected');
-        });
-
-        // 监听错误
-        this.process.on('error', (error) => {
-          logger.error(`[McpClient] Process error:`, error);
-          this.connected = false;
-          reject(error);
-        });
-
-        // 等待一小段时间确认进程启动成功
-        setTimeout(() => {
-          if (this.process && !this.process.killed) {
-            this.connected = true;
-            logger.info(`[McpClient] Connected to ${this.server.name}`);
-            this.emit('connected');
-            resolve(true);
-          } else {
-            reject(new Error('Process failed to start'));
-          }
-        }, 500);
-
+        this.process = spawnStdioProcess(this.server.config);
+        setupStdioProcessListeners(this.process, this, resolve, reject);
       } catch (error) {
         reject(error);
       }
@@ -134,8 +84,6 @@ export class McpClient extends EventEmitter {
    * @returns {Promise<boolean>} 连接是否成功
    */
   async _connectHttp() {
-    // HTTP连接需要实现HTTP客户端
-    // 这里先返回基础实现
     logger.info(`[McpClient] HTTP connection not fully implemented for ${this.server.name}`);
     this.connected = true;
     this.emit('connected');
@@ -148,8 +96,6 @@ export class McpClient extends EventEmitter {
    * @returns {Promise<boolean>} 连接是否成功
    */
   async _connectSse() {
-    // SSE连接需要实现SSE客户端
-    // 这里先返回基础实现
     logger.info(`[McpClient] SSE connection not fully implemented for ${this.server.name}`);
     this.connected = true;
     this.emit('connected');
@@ -163,15 +109,13 @@ export class McpClient extends EventEmitter {
    */
   _handleMessage(data) {
     try {
-      // 尝试解析JSON-RPC消息
       const messages = data.toString().split('\n').filter(line => line.trim());
 
       for (const message of messages) {
         try {
           const msg = JSON.parse(message);
           this.emit('message', msg);
-        } catch (e) {
-          // 不是JSON消息，忽略
+        } catch {
           console.debug(`[McpClient] Non-JSON message:`, message);
         }
       }
@@ -191,44 +135,13 @@ export class McpClient extends EventEmitter {
       throw new Error('Not connected to MCP server');
     }
 
-    const request = {
-      jsonrpc: '2.0',
-      id: ++this.requestId,
-      method,
-      params
-    };
-
+    const request = buildJsonRpcRequest(method, params, ++this.requestId);
     logger.info(`[McpClient] Sending request:`, method);
 
-    // 对于stdio，写入stdin
     if (this.server.type === 'stdio' && this.process) {
-      return new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('Request timeout'));
-        }, 10000);
-
-        // 监听响应
-        const messageHandler = (msg) => {
-          if (msg.id === request.id) {
-            clearTimeout(timeout);
-            this.removeListener('message', messageHandler);
-
-            if (msg.error) {
-              reject(new Error(msg.error.message));
-            } else {
-              resolve(msg.result);
-            }
-          }
-        };
-
-        this.on('message', messageHandler);
-
-        // 发送请求
-        this.process.stdin.write(JSON.stringify(request) + '\n');
-      });
+      return sendStdioRequest(this.process, this, request);
     }
 
-    // HTTP和SSE需要单独实现
     throw new Error('Request not implemented for this transport type');
   }
 
@@ -241,48 +154,17 @@ export class McpClient extends EventEmitter {
       const connected = await this.connect();
 
       if (!connected) {
-        return {
-          success: false,
-          status: 'failed',
-          message: `Failed to connect to ${this.server.name}`
-        };
+        return buildTestResult(false, 'failed', `Failed to connect to ${this.server.name}`, this.server);
       }
 
-      // 尝试发送initialize请求
       try {
-        const result = await this.sendRequest('initialize', {
-          protocolVersion: '2024-11-05',
-          capabilities: {},
-          clientInfo: {
-            name: 'claude-code-ui',
-            version: '1.0.0'
-          }
-        });
-
-        return {
-          success: true,
-          status: 'connected',
-          message: `${this.server.name} is responding`,
-          serverName: this.server.name,
-          serverType: this.server.type,
-          serverInfo: result
-        };
+        const result = await this.sendRequest('initialize', buildInitializeParams());
+        return buildTestResult(true, 'connected', `${this.server.name} is responding`, this.server, { serverInfo: result });
       } catch (error) {
-        return {
-          success: true,
-          status: 'connected',
-          message: `${this.server.name} is connected but initialize failed: ${error.message}`,
-          serverName: this.server.name,
-          serverType: this.server.type
-        };
+        return buildTestResult(true, 'connected', `${this.server.name} is connected but initialize failed: ${error.message}`, this.server);
       }
-
     } catch (error) {
-      return {
-        success: false,
-        status: 'failed',
-        message: error.message
-      };
+      return { success: false, status: 'failed', message: error.message };
     } finally {
       this.disconnect();
     }
@@ -297,26 +179,11 @@ export class McpClient extends EventEmitter {
       const connected = await this.connect();
 
       if (!connected) {
-        return {
-          success: false,
-          error: 'Failed to connect'
-        };
+        return { success: false, error: 'Failed to connect' };
       }
 
-      // 发送initialize请求
-      await this.sendRequest('initialize', {
-        protocolVersion: '2024-11-05',
-        capabilities: {},
-        clientInfo: {
-          name: 'claude-code-ui',
-          version: '1.0.0'
-        }
-      });
-
-      // 发送initialized通知
+      await this.sendRequest('initialize', buildInitializeParams());
       await this.sendRequest('notifications/initialized');
-
-      // 请求工具列表
       const result = await this.sendRequest('tools/list');
 
       return {
@@ -327,13 +194,8 @@ export class McpClient extends EventEmitter {
         resources: [],
         prompts: []
       };
-
     } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-        tools: []
-      };
+      return { success: false, error: error.message, tools: [] };
     } finally {
       this.disconnect();
     }
