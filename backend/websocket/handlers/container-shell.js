@@ -217,28 +217,33 @@ function _sendWelcomeMessage(ws, projectPath, hasSession, provider, isPlainShell
 }
 
 /**
+ * Shell 命令构建策略表
+ * 按提供商标签映射到对应的命令构建函数，消除 if/else 链
+ * @private
+ */
+const SHELL_COMMAND_BUILDERS = {
+    plain: (workDir, _provider, _hasSession, _sessionId, initialCommand) =>
+        `cd "${workDir}" && ${initialCommand}`,
+
+    cursor: (workDir, _provider, hasSession, sessionId) =>
+        hasSession && sessionId
+            ? `cd "${workDir}" && cursor-agent --resume="${sessionId}"`
+            : `cd "${workDir}" && cursor-agent`,
+
+    claude: (workDir, _provider, hasSession, sessionId) =>
+        hasSession && sessionId
+            ? `cd "${workDir}" && claude --resume ${sessionId} || claude`
+            : `cd "${workDir}" && claude`,
+};
+
+/**
  * 构建 shell 命令
  * @private
  */
 function _buildShellCommand(containerWorkDir, isPlainShell, provider, hasSession, sessionId, initialCommand) {
-    if (isPlainShell) {
-        // 普通 shell 模式：直接运行命令
-        return `cd "${containerWorkDir}" && ${initialCommand}`;
-    } else if (provider === 'cursor') {
-        // Cursor 模式
-        if (hasSession && sessionId) {
-            return `cd "${containerWorkDir}" && cursor-agent --resume="${sessionId}"`;
-        } else {
-            return `cd "${containerWorkDir}" && cursor-agent`;
-        }
-    } else {
-        // Claude 模式（默认）
-        if (hasSession && sessionId) {
-            return `cd "${containerWorkDir}" && claude --resume ${sessionId} || claude`;
-        } else {
-            return `cd "${containerWorkDir}" && claude`;
-        }
-    }
+    const builderKey = isPlainShell ? 'plain' : (provider === 'cursor' ? 'cursor' : 'claude');
+    const builder = SHELL_COMMAND_BUILDERS[builderKey];
+    return builder(containerWorkDir, provider, hasSession, sessionId, initialCommand);
 }
 
 /**

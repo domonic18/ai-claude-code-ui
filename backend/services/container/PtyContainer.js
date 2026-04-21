@@ -35,6 +35,64 @@ const ptySessions = new Map();
 const ptyStreams = new Map();
 
 /**
+ * 构建 PTY exec 配置
+ * @param {string} shellCommand - Shell 命令
+ * @param {number} cols - 终端列数
+ * @param {number} rows - 终端行数
+ * @returns {Object} Docker exec 配置
+ */
+function buildPtyExecConfig(shellCommand, cols, rows) {
+  return {
+    Cmd: ['/bin/bash', '-c', shellCommand],
+    AttachStdin: true,
+    AttachStdout: true,
+    AttachStderr: true,
+    Tty: true,
+    WorkingDir: '/workspace',
+    Env: [
+      'TERM=xterm-256color',
+      'COLORTERM=truecolor',
+      `COLUMNS=${cols}`,
+      `LINES=${rows}`,
+      'FORCE_COLOR=3'
+    ]
+  };
+}
+
+/**
+ * 创建 PTY 会话信息对象
+ * @param {Object} params - 会话参数
+ * @returns {Object} 会话信息
+ */
+function createPtySessionInfo({ sessionId, userId, containerId, execId, cols, rows, projectPath }) {
+  return {
+    sessionId,
+    userId,
+    containerId,
+    execId,
+    status: 'active',
+    cols,
+    rows,
+    projectPath,
+    buffer: [],
+    bufferSize: 5000,
+    createdAt: new Date(),
+    lastActive: new Date()
+  };
+}
+
+/**
+ * 通过 WebSocket 发送 JSON 消息（仅当连接就绪时）
+ * @param {object} ws - WebSocket 连接
+ * @param {Object} message - 要发送的消息对象
+ */
+function sendWsMessage(ws, message) {
+  if (ws.readyState === 1) {
+    ws.send(JSON.stringify(message));
+  }
+}
+
+/**
  * 在用户容器内创建 PTY 会话
  * @param {object} ws - WebSocket 连接
  * @param {object} options - PTY 选项
@@ -53,86 +111,41 @@ export async function createPtyInContainer(ws, options) {
 
   try {
     // 1. 获取或创建用户容器
-    const container = await containerManager.getOrCreateContainer(userId, {
-      tier: userTier
-    });
+    const container = await containerManager.getOrCreateContainer(userId, { tier: userTier });
 
     // 2. 检查会话是否已存在
-    if (ptySessions.has(sessionId)) {
-      const existingSession = ptySessions.get(sessionId);
-      if (existingSession.status === 'active') {
-        return existingSession;
-      }
+    const existingSession = ptySessions.get(sessionId);
+    if (existingSession?.status === 'active') {
+      return existingSession;
     }
 
-    // 3. 构建外壳命令
+    // 3. 创建并启动 exec
     const shellCommand = buildShellCommand(projectPath, initialCommand);
-
-    // 4. 使用 TTY 创建 exec
-    const exec = await containerManager.docker.getContainer(container.id).exec({
-      Cmd: ['/bin/bash', '-c', shellCommand],
-      AttachStdin: true,
-      AttachStdout: true,
-      AttachStderr: true,
-      Tty: true,
-      WorkingDir: '/workspace',
-      Env: [
-        'TERM=xterm-256color',
-        'COLORTERM=truecolor',
-        `COLUMNS=${cols}`,
-        `LINES=${rows}`,
-        'FORCE_COLOR=3'
-      ]
-    });
-
-    // 5. 启动 exec 流
+    const exec = await containerManager.docker.getContainer(container.id).exec(buildPtyExecConfig(shellCommand, cols, rows));
     const stream = await exec.start({ Detach: false, Tty: true });
 
-    // 6. 创建会话信息
-    const sessionInfo = {
-      sessionId,
-      userId,
-      containerId: container.id,
-      execId: exec.id,
-      status: 'active',
-      cols,
-      rows,
-      projectPath,
-      buffer: [],
-      bufferSize: 5000,
-      createdAt: new Date(),
-      lastActive: new Date()
-    };
-
-    // 7. 存储会话和流
+    // 4. 创建并存储会话
+    const sessionInfo = createPtySessionInfo({
+      sessionId, userId, containerId: container.id, execId: exec.id, cols, rows, projectPath
+    });
     ptySessions.set(sessionId, sessionInfo);
     ptyStreams.set(sessionId, { stream, exec, ws });
 
-    // 8. 设置流处理器
+    // 5. 设置流处理器
     setupStreamHandlers(sessionId, stream, ws, ptySessions, (id) => cleanupPtySession(id, ptyStreams, ptySessions));
 
-    // 9. 发送会话启动消息
-    if (ws.readyState === 1) {
-      ws.send(JSON.stringify({
-        type: 'session_started',
-        sessionId,
-        containerId: container.id,
-        message: 'PTY session started in container'
-      }));
-    }
+    // 6. 发送会话启动消息
+    sendWsMessage(ws, {
+      type: 'session_started',
+      sessionId,
+      containerId: container.id,
+      message: 'PTY session started in container'
+    });
 
     return sessionInfo;
 
   } catch (error) {
-    // 向客户端发送错误
-    if (ws.readyState === 1) {
-      ws.send(JSON.stringify({
-        type: 'error',
-        sessionId,
-        error: `Failed to create PTY: ${error.message}`
-      }));
-    }
-
+    sendWsMessage(ws, { type: 'error', sessionId, error: `Failed to create PTY: ${error.message}` });
     throw error;
   }
 }
