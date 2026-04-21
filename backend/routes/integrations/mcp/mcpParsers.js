@@ -11,32 +11,76 @@ import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('mcp/parsers');
 
 /**
+ * Extract server name from a list line
+ * @param {string} line - A line containing server name and details
+ * @returns {{ name: string, rest: string }|null} Parsed name and remainder, or null
+ */
+function splitNameAndRest(line) {
+  if (!line.includes(':')) return null;
+  const colonIndex = line.indexOf(':');
+  const name = line.substring(0, colonIndex).trim();
+  if (!name) return null;
+  return { name, rest: line.substring(colonIndex + 1).trim() };
+}
+
+/**
+ * Check if text contains status indicators (✓ or ✗)
+ * @param {string} text - Text to check
+ * @returns {boolean} True if status indicators found
+ */
+function hasStatusIndicator(text) {
+  return text.includes('\u2713') || text.includes('\u2717');
+}
+
+/**
+ * Parse status string from match result
+ * @param {string} statusText - Matched status text
+ * @returns {'connected'|'failed'} Status value
+ */
+function resolveStatus(statusText) {
+  return statusText.includes('\u2713') ? 'connected' : 'failed';
+}
+
+/**
+ * Parse status match into description and status
+ * @param {string} rest - The part after the colon
+ * @returns {{ description: string, status: string }} Extracted fields
+ */
+function extractDescriptionAndStatus(rest) {
+  if (!hasStatusIndicator(rest)) return { description: rest, status: 'unknown' };
+
+  const statusMatch = rest.match(/(.*?)\s*-\s*([\u2713\u2717].*)$/);
+  if (!statusMatch) return { description: rest, status: 'unknown' };
+
+  return { description: statusMatch[1].trim(), status: resolveStatus(statusMatch[2]) };
+}
+
+/**
+ * Determine server type from its description URL
+ * @param {string} description - Server description string
+ * @returns {'http'|'stdio'} Server type
+ */
+function inferServerType(description) {
+  if (description.startsWith('http://') || description.startsWith('https://')) return 'http';
+  return 'stdio';
+}
+
+/**
  * Parse a single server line from `claude mcp list` output
  * @param {string} line - A line containing server name and details
  * @returns {Object|null} Parsed server info, or null to skip
  */
 function parseListLine(line) {
-  if (!line.includes(':')) return null;
+  const split = splitNameAndRest(line);
+  if (!split) return null;
 
-  const colonIndex = line.indexOf(':');
-  const name = line.substring(0, colonIndex).trim();
-  if (!name) return null;
-
-  const rest = line.substring(colonIndex + 1).trim();
-  let description = rest;
-  let status = 'unknown';
-
-  if (rest.includes('\u2713') || rest.includes('\u2717')) {
-    const statusMatch = rest.match(/(.*?)\s*-\s*([\u2713\u2717].*)$/);
-    if (statusMatch) {
-      description = statusMatch[1].trim();
-      status = statusMatch[2].includes('\u2713') ? 'connected' : 'failed';
-    }
-  }
-
-  const type = (description.startsWith('http://') || description.startsWith('https://')) ? 'http' : 'stdio';
-
-  return { name, type, status: status || 'active', description };
+  const { description, status } = extractDescriptionAndStatus(split.rest);
+  return {
+    name: split.name,
+    type: inferServerType(description),
+    status: status || 'active',
+    description
+  };
 }
 
 /**
@@ -57,6 +101,63 @@ export function parseClaudeListOutput(output) {
   return servers;
 }
 
+/** Mapping of field prefixes to server object keys */
+const GET_FIELD_MAP = {
+  'Name:': 'name',
+  'Type:': 'type',
+  'Command:': 'command',
+  'URL:': 'url'
+};
+
+/**
+ * Try to extract JSON from output
+ * @param {string} output - Raw CLI output
+ * @returns {Object|null} Parsed JSON object, or null if not found
+ */
+function tryParseJson(output) {
+  const jsonMatch = output.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return null;
+  return JSON.parse(jsonMatch[0]);
+}
+
+/**
+ * Extract trimmed value from a colon-separated line
+ * @param {string} line - Line to split
+ * @returns {string} Trimmed value after first colon
+ */
+function extractColonValue(line) {
+  const parts = line.split(':');
+  return parts.length > 1 ? parts[1].trim() : '';
+}
+
+/**
+ * Extract a field value from a line if it matches a known prefix
+ * @param {string} line - Line to check
+ * @returns {{ key: string, value: string }|null} Matched key-value or null
+ */
+function matchFieldLine(line) {
+  for (const [prefix, key] of Object.entries(GET_FIELD_MAP)) {
+    if (line.includes(prefix)) {
+      return { key, value: extractColonValue(line) };
+    }
+  }
+  return null;
+}
+
+/**
+ * Parse text-form server fields from get output
+ * @param {string} output - Raw CLI output
+ * @returns {Object} Server info with raw_output
+ */
+function parseTextFields(output) {
+  const server = { raw_output: output };
+  for (const line of output.split('\n')) {
+    const match = matchFieldLine(line);
+    if (match) server[match.key] = match.value;
+  }
+  return server;
+}
+
 /**
  * Parse output from `claude mcp get <name>` command
  * Attempts JSON extraction first, falls back to text parsing
@@ -66,27 +167,7 @@ export function parseClaudeListOutput(output) {
  */
 export function parseClaudeGetOutput(output) {
   try {
-    const jsonMatch = output.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
-    }
-
-    const server = { raw_output: output };
-    const lines = output.split('\n');
-
-    for (const line of lines) {
-      if (line.includes('Name:')) {
-        server.name = line.split(':')[1]?.trim();
-      } else if (line.includes('Type:')) {
-        server.type = line.split(':')[1]?.trim();
-      } else if (line.includes('Command:')) {
-        server.command = line.split(':')[1]?.trim();
-      } else if (line.includes('URL:')) {
-        server.url = line.split(':')[1]?.trim();
-      }
-    }
-
-    return server;
+    return tryParseJson(output) || parseTextFields(output);
   } catch (error) {
     return { raw_output: output, parse_error: error.message };
   }
