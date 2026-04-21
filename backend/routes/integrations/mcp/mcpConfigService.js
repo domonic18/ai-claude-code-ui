@@ -49,6 +49,23 @@ function extractServerInfo(name, config, scope, projectPath) {
 }
 
 /**
+ * Collect servers from a config section (user-scoped or project-scoped)
+ * @param {Object} mcpServers - MCP servers object from config
+ * @param {string} scope - Scope ('user' or 'local')
+ * @param {string} [projectPath] - Project path for local scope
+ * @returns {Array} Server info objects
+ */
+function collectServers(mcpServers, scope, projectPath) {
+  if (!mcpServers || typeof mcpServers !== 'object' || Object.keys(mcpServers).length === 0) {
+    return [];
+  }
+  logger.info(`Found ${scope}-scoped MCP servers:`, Object.keys(mcpServers));
+  return Object.entries(mcpServers).map(([name, config]) =>
+    extractServerInfo(name, config, scope, projectPath)
+  );
+}
+
+/**
  * Read MCP server configurations from Claude config files
  * Checks both ~/.claude.json and ~/.claude/settings.json
  *
@@ -83,23 +100,13 @@ export async function readMcpConfig() {
   const servers = [];
 
   // User-scoped MCP servers (root level)
-  if (configData.mcpServers && typeof configData.mcpServers === 'object' && Object.keys(configData.mcpServers).length > 0) {
-    logger.info('Found user-scoped MCP servers:', Object.keys(configData.mcpServers));
-    for (const [name, config] of Object.entries(configData.mcpServers)) {
-      servers.push(extractServerInfo(name, config, 'user'));
-    }
-  }
+  servers.push(...collectServers(configData.mcpServers, 'user'));
 
   // Local-scoped MCP servers (project-specific)
   const currentProjectPath = process.cwd();
-  if (configData.projects && configData.projects[currentProjectPath]) {
-    const projectConfig = configData.projects[currentProjectPath];
-    if (projectConfig.mcpServers && typeof projectConfig.mcpServers === 'object' && Object.keys(projectConfig.mcpServers).length > 0) {
-      logger.info(`Found local-scoped MCP servers for ${currentProjectPath}:`, Object.keys(projectConfig.mcpServers));
-      for (const [name, config] of Object.entries(projectConfig.mcpServers)) {
-        servers.push(extractServerInfo(name, config, 'local', currentProjectPath));
-      }
-    }
+  const projectConfig = configData.projects?.[currentProjectPath];
+  if (projectConfig) {
+    servers.push(...collectServers(projectConfig.mcpServers, 'local', currentProjectPath));
   }
 
   logger.info(`Found ${servers.length} MCP servers in config`);
