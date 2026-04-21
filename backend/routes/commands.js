@@ -1,11 +1,16 @@
 /**
- * Commands Router
+ * 斜杠命令路由
  *
- * API routes for slash command management.
- * Business logic is delegated to:
- * - commands/commandScanner.js  - Directory scanning
- * - commands/builtInCommands.js - Built-in command definitions and handlers
- * - commands/commandService.js - File loading and parameter substitution
+ * 提供斜杠命令的管理 API，包括命令列表扫描、命令文件加载和命令执行。
+ * 业务逻辑委托给：
+ * - commands/commandScanner.js  — 目录扫描，发现自定义命令
+ * - commands/builtInCommands.js — 内置命令定义和处理器
+ * - commands/commandService.js — 文件加载和参数替换
+ *
+ * ## 端点列表
+ * - POST /list   — 列出所有可用命令（内置 + 自定义）
+ * - POST /load   — 加载指定命令文件的内容
+ * - POST /execute — 执行命令（内置命令直接处理，自定义命令做参数替换）
  *
  * @module routes/commands
  */
@@ -22,8 +27,14 @@ const logger = createLogger('routes/commands');
 const router = express.Router();
 
 /**
- * POST /api/commands/list
- * List all available commands from project and user directories
+ * POST /list
+ *
+ * 列出所有可用命令，包括内置命令和从文件系统扫描到的自定义命令。
+ * 扫描项目级（`.claude/commands/`）和用户级（`~/.claude/commands/`）两个目录。
+ *
+ * @route POST /list
+ * @body {string} [projectPath] - 项目路径（用于扫描项目级命令）
+ * @returns {{builtIn: Array, custom: Array, count: number}}
  */
 router.post('/list', async (req, res) => {
   try {
@@ -69,8 +80,14 @@ router.post('/list', async (req, res) => {
 });
 
 /**
- * POST /api/commands/load
- * Load a specific command file and return its content and metadata
+ * POST /load
+ *
+ * 加载指定命令文件的内容和元数据。
+ * 包含路径安全检查，仅允许访问 `.claude/commands/` 目录下的文件。
+ *
+ * @route POST /load
+ * @body {string} commandPath - 命令文件的绝对路径
+ * @returns {{metadata: Object, content: string}} 命令文件内容和元数据
  */
 router.post('/load', async (req, res) => {
   try {
@@ -109,8 +126,17 @@ router.post('/load', async (req, res) => {
 });
 
 /**
- * POST /api/commands/execute
- * Execute a command with parameter substitution
+ * POST /execute
+ *
+ * 执行指定命令。优先匹配内置命令处理器，未匹配则加载自定义命令文件
+ * 并执行参数替换（$ARGUMENTS、$1、$2 等）。
+ *
+ * @route POST /execute
+ * @body {string} commandName - 命令名称（如 /help）
+ * @body {string} [commandPath] - 自定义命令文件路径
+ * @body {Array<string>} [args] - 命令参数
+ * @body {Object} [context] - 执行上下文（含 projectPath、model 等）
+ * @returns {{type: string, command: string, content?: string, ...}}
  */
 router.post('/execute', async (req, res) => {
   try {

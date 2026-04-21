@@ -1,7 +1,18 @@
 /**
- * Built-in Commands
+ * 内置斜杠命令
  *
- * Definitions and handlers for built-in slash commands.
+ * 定义并处理所有内置斜杠命令（如 /help、/model、/clear 等）。
+ * 这些命令无需外部文件即可使用，始终对用户可用。
+ *
+ * ## 命令列表
+ * - /help    — 显示帮助文档
+ * - /clear   — 清空对话历史
+ * - /model   — 切换或查看当前 AI 模型
+ * - /cost    — 显示 token 用量和费用信息
+ * - /memory  — 打开 CLAUDE.md 记忆文件
+ * - /config  — 打开设置面板
+ * - /status  — 显示系统状态和版本信息
+ * - /rewind  — 回退对话到之前的状态
  *
  * @module routes/commands/builtInCommands
  */
@@ -14,7 +25,10 @@ import { createLogger } from '../../utils/logger.js';
 const logger = createLogger('commands/builtIn');
 
 /**
- * Always-available built-in command definitions
+ * 始终可用的内置命令定义列表
+ *
+ * 每个命令包含名称、描述、命名空间和元数据。
+ *
  * @type {Array<{name: string, description: string, namespace: string, metadata: object}>}
  */
 export const builtInCommands = [
@@ -69,11 +83,18 @@ export const builtInCommands = [
 ];
 
 /**
- * Built-in command handlers
- * Each handler returns { type: 'builtin', action: string, data: any }
+ * 内置命令处理器映射
+ *
+ * 每个处理器接收命令参数和上下文，返回统一的响应格式：
+ * `{ type: 'builtin', action: string, data: any }`
+ *
  * @type {Record<string, (args: string[], context: object) => Promise<object>>}
  */
 export const builtInHandlers = {
+  /**
+   * /help — 生成包含所有可用命令的帮助文档
+   * 包含内置命令列表、自定义命令创建说明和语法参考
+   */
   '/help': async (args, context) => {
     const helpText = `# Claude Code Commands
 
@@ -112,6 +133,7 @@ Custom commands can be created in:
     };
   },
 
+  /** /clear — 返回清空对话历史的指令 */
   '/clear': async (args, context) => {
     return {
       type: 'builtin',
@@ -122,7 +144,12 @@ Custom commands can be created in:
     };
   },
 
+  /**
+   * /model — 查看当前模型或切换模型
+   * 列出所有提供商（claude、cursor、codex）的可用模型
+   */
   '/model': async (args, context) => {
+    // 汇总各提供商的可用模型列表
     const availableModels = {
       claude: CLAUDE_MODELS.OPTIONS.map(o => o.value),
       cursor: CURSOR_MODELS.OPTIONS.map(o => o.value),
@@ -148,7 +175,12 @@ Custom commands can be created in:
     };
   },
 
+  /**
+   * /status — 显示系统状态信息
+   * 包括版本号、运行时间、当前模型、Node 版本、操作系统平台
+   */
   '/status': async (args, context) => {
+    // 从 package.json 读取版本信息
     const packageJsonPath = path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1')), '..', '..', 'package.json');
     let version = 'unknown';
     let packageName = 'claude-code-ui';
@@ -161,6 +193,7 @@ Custom commands can be created in:
       logger.error('Error reading package.json:', err);
     }
 
+    // 格式化运行时间
     const uptime = process.uptime();
     const uptimeMinutes = Math.floor(uptime / 60);
     const uptimeHours = Math.floor(uptimeMinutes / 60);
@@ -184,6 +217,10 @@ Custom commands can be created in:
     };
   },
 
+  /**
+   * /memory — 定位或提示创建项目的 CLAUDE.md 文件
+   * 需要已选中项目才能使用
+   */
   '/memory': async (args, context) => {
     const projectPath = context?.projectPath;
 
@@ -205,7 +242,7 @@ Custom commands can be created in:
       await fs.access(claudeMdPath);
       exists = true;
     } catch (err) {
-      // File does not exist
+      // 文件不存在，将提示用户创建
     }
 
     return {
@@ -221,6 +258,7 @@ Custom commands can be created in:
     };
   },
 
+  /** /config — 触发打开设置面板 */
   '/config': async (args, context) => {
     return {
       type: 'builtin',
@@ -231,6 +269,10 @@ Custom commands can be created in:
     };
   },
 
+  /**
+   * /rewind — 回退对话 N 步
+   * @param args[0] - 回退步数（默认 1）
+   */
   '/rewind': async (args, context) => {
     const steps = args[0] ? parseInt(args[0]) : 1;
 

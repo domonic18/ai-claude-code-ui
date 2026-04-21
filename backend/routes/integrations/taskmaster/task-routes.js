@@ -38,6 +38,7 @@ const router = express.Router();
  */
 router.get('/installation-status', async (req, res) => {
     try {
+        // 并行检查 TaskMaster CLI 安装状态和 MCP 服务器配置
         const [installationStatus, mcpStatus] = await Promise.all([
             checkTaskMasterInstallation(),
             detectTaskMasterMCPServer()
@@ -106,6 +107,7 @@ router.get('/detect-all', async (req, res) => {
         const { detectTaskMasterFolder } = await import('../../../services/projects/taskmaster/index.js');
         const projects = await getProjectsInContainer(userId);
 
+        // 并行检测所有项目的 TaskMaster 配置
         const results = await Promise.all(projects.map(async (project) => {
             try {
                 const projectPath = `${CONTAINER.paths.workspace}/${project.name}`;
@@ -169,7 +171,7 @@ router.get('/next/:projectName', async (req, res) => {
         } catch (cliError) {
             logger.warn('Failed to execute task-master CLI:', cliError.message);
 
-            // 回退：从本地文件查找下一个待处理任务
+            // CLI 不可用时回退：从本地 tasks.json 文件查找下一个待处理任务
             const nextTask = await findNextPendingTask(projectPath);
             res.json({
                 projectName,

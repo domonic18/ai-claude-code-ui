@@ -306,6 +306,7 @@ export function applyCustomizations(content, customizations) {
     let result = content;
     for (const [key, value] of Object.entries(customizations)) {
         const placeholder = `[${key}]`;
+        // 转义正则特殊字符，避免 key 中含有 [] 等字符导致正则错误
         const escaped = placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         result = result.replace(new RegExp(escaped, 'g'), value);
     }

@@ -1,7 +1,15 @@
 /**
- * CLI Authentication Helper Functions
+ * CLI 认证辅助函数
  *
- * Extracted credential checking logic for Claude, Cursor, and Codex CLIs.
+ * 提供 Claude、Cursor、Codex 三个 CLI 工具的凭证检查逻辑。
+ * 通过读取本地文件系统中的凭证文件来验证认证状态。
+ *
+ * ## 凭证存储位置
+ * - Claude: `~/.claude/.credentials.json`（OAuth token）
+ * - Codex:  `~/.codex/auth.json`（JWT token 或 API Key）
+ * - Cursor: 委托给 `cursorAuthHelper.js`（执行 CLI 命令检查）
+ *
+ * @module routes/cliAuthHelpers
  */
 
 import fs from 'fs/promises';
@@ -13,7 +21,10 @@ export {
 } from './cursorAuthHelper.js';
 
 /**
- * Check Claude CLI authentication status
+ * 检查 Claude CLI 的认证状态
+ *
+ * 读取 `~/.claude/.credentials.json`，验证 OAuth token 是否存在且未过期。
+ *
  * @returns {Promise<{authenticated: boolean, email: string|null}>}
  */
 async function checkClaudeCredentials() {
@@ -46,9 +57,13 @@ async function checkClaudeCredentials() {
 }
 
 /**
- * Extract email from id_token JWT
- * @param {string} idToken - JWT token
- * @returns {string} Extracted email or 'Authenticated'
+ * 从 id_token JWT 中提取邮箱地址
+ *
+ * 解码 JWT 的 payload 部分（base64url 编码），提取 email 或 user 字段。
+ * 解码失败时回退返回 'Authenticated'。
+ *
+ * @param {string} idToken - JWT 格式的 id_token
+ * @returns {string} 提取的邮箱地址，或 'Authenticated'
  */
 function extractEmailFromToken(idToken) {
   if (!idToken) return 'Authenticated';
@@ -65,8 +80,13 @@ function extractEmailFromToken(idToken) {
 }
 
 /**
- * Check Codex CLI authentication status
- * @returns {Promise<Object>} Authentication status
+ * 检查 Codex CLI 的认证状态
+ *
+ * 读取 `~/.codex/auth.json`，按优先级检查：
+ * 1. JWT id_token / access_token（通过 extractEmailFromToken 提取邮箱）
+ * 2. OPENAI_API_KEY（直接使用 API Key 认证）
+ *
+ * @returns {Promise<{authenticated: boolean, email?: string, error?: string}>}
  */
 async function checkCodexCredentials() {
   try {

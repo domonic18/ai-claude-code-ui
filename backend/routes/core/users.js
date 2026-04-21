@@ -1,3 +1,18 @@
+/**
+ * 用户设置路由
+ *
+ * 提供用户级别的设置管理端点，包括 Git 配置的读写和引导流程状态管理。
+ * 所有端点需要 JWT 认证。
+ *
+ * ## 端点列表
+ * - GET  /git-config           — 获取用户的 Git 配置（自动从系统 git 配置填充）
+ * - POST /git-config           — 更新用户的 Git 配置并应用到系统全局
+ * - POST /complete-onboarding  — 标记用户引导流程完成
+ * - GET  /onboarding-status    — 查询用户引导流程状态
+ *
+ * @module routes/core/users
+ */
+
 import express from 'express';
 import { repositories } from '../../database/db.js';
 import { authenticateToken } from '../../middleware/auth.js';
@@ -12,6 +27,16 @@ const { User } = repositories;
 const execAsync = promisify(exec);
 const router = express.Router();
 
+/**
+ * GET /git-config
+ *
+ * 获取用户的 Git 配置。若数据库中无记录，则尝试从系统 git 全局配置读取
+ * 并自动保存到数据库中。
+ *
+ * @route GET /git-config
+ * @auth 需要JWT认证
+ * @returns {{success: boolean, data: {gitName: string|null, gitEmail: string|null}}}
+ */
 router.get('/git-config', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -29,7 +54,6 @@ router.get('/git-config', authenticateToken, async (req, res) => {
       }
     }
 
-    // 标准响应格式：{success: true, data: {...}}
     res.json({
       success: true,
       data: {
@@ -43,7 +67,18 @@ router.get('/git-config', authenticateToken, async (req, res) => {
   }
 });
 
-// 通过 git config --global 全局应用 git 配置
+/**
+ * POST /git-config
+ *
+ * 更新用户的 Git 配置。同时保存到数据库并通过 `git config --global`
+ * 写入系统全局配置，确保所有 CLI 工具使用一致的提交者信息。
+ *
+ * @route POST /git-config
+ * @auth 需要JWT认证
+ * @body {string} gitName - Git 用户名
+ * @body {string} gitEmail - Git 邮箱地址
+ * @returns {{success: boolean, data: {gitName: string, gitEmail: string}}}
+ */
 router.post('/git-config', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -59,8 +94,10 @@ router.post('/git-config', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Invalid email format' });
     }
 
+    // 保存到数据库
     User.updateGitConfig(userId, gitName, gitEmail);
 
+    // 同步到系统全局 git 配置（即使失败也不阻塞响应）
     try {
       await execAsync(`git config --global user.name "${gitName.replace(/"/g, '\\"')}"`);
       await execAsync(`git config --global user.email "${gitEmail.replace(/"/g, '\\"')}"`);
@@ -69,7 +106,6 @@ router.post('/git-config', authenticateToken, async (req, res) => {
       logger.error('Error applying git config:', gitError);
     }
 
-    // 标准响应格式：{success: true, data: {...}}
     res.json({
       success: true,
       data: {
@@ -83,12 +119,20 @@ router.post('/git-config', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * POST /complete-onboarding
+ *
+ * 标记用户已完成引导流程。前端调用后不再显示引导界面。
+ *
+ * @route POST /complete-onboarding
+ * @auth 需要JWT认证
+ * @returns {{success: boolean, data: {message: string}}}
+ */
 router.post('/complete-onboarding', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     User.completeOnboarding(userId);
 
-    // 标准响应格式：{success: true, data: {...}}
     res.json({
       success: true,
       data: {
@@ -101,12 +145,20 @@ router.post('/complete-onboarding', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * GET /onboarding-status
+ *
+ * 查询用户是否已完成引导流程。
+ *
+ * @route GET /onboarding-status
+ * @auth 需要JWT认证
+ * @returns {{success: boolean, data: {hasCompletedOnboarding: boolean}}}
+ */
 router.get('/onboarding-status', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const hasCompleted = User.hasCompletedOnboarding(userId);
 
-    // 标准响应格式：{success: true, data: {...}}
     res.json({
       success: true,
       data: {
