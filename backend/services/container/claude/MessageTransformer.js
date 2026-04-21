@@ -44,6 +44,23 @@ export function processOutputLine(line, writer, sessionId, state) {
   if (jsonData.type === 'error') {
     logger.error({ sessionId, error: jsonData.error }, '[MessageTransformer] Sending claude-error');
     writer.send({ type: 'claude-error', error: jsonData.error });
+    return;
+  }
+
+  // 处理 Agent 交互提问：SDK canUseTool 回调输出的问题消息
+  if (jsonData.type === 'agent-question') {
+    // 优先使用 SDK 返回的真实 session ID（前端已经替换了临时 ID）
+    const effectiveSessionId = state.realSessionId || sessionId;
+    logger.info({ sessionId: effectiveSessionId, toolUseID: jsonData.toolUseID }, '[MessageTransformer] Sending agent-question');
+    writer.send({
+      type: 'agent-question',
+      sessionId: effectiveSessionId,
+      data: {
+        toolUseID: jsonData.toolUseID,
+        questions: jsonData.questions || [],
+        prompt: jsonData.prompt || ''
+      }
+    });
   }
 }
 

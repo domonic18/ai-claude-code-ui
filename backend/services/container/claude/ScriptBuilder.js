@@ -20,7 +20,8 @@ const DEFAULT_ALLOWED_TOOLS = [
   'Bash(git log:*)', 'Bash(git diff:*)', 'Bash(git status:*)',
   'Bash(pdftotext:*)', 'Bash(pandoc:*)', 'Bash(file:*)',
   'Write', 'Read', 'Edit', 'Glob', 'Grep', 'MultiEdit',
-  'Task', 'TodoWrite', 'TodoRead', 'WebFetch', 'WebSearch', 'Skill'
+  'Task', 'TodoWrite', 'TodoRead', 'WebFetch', 'WebSearch', 'Skill',
+  'AskUserQuestion'
 ];
 
 /**

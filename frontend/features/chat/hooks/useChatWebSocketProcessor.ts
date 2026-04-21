@@ -55,6 +55,8 @@ interface UseChatWebSocketProcessorOptions {
   updateStreamContent: (content: string) => void;
   /** Update stream thinking callback */
   updateStreamThinking: (thinking: string) => void;
+  /** Set pending question from Agent */
+  setPendingQuestion?: (toolUseID: string, sessionId: string) => void;
 }
 
 /**
@@ -107,6 +109,7 @@ export function useChatWebSocketProcessor(options: UseChatWebSocketProcessorOpti
         },
         getCurrentSessionId: () => options.currentSessionId,
         getSelectedProjectName: () => options.selectedProjectName,
+        setPendingQuestion: options.setPendingQuestion,
       });
     }
 

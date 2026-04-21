@@ -9,10 +9,12 @@ import { createLogger } from '../../../../utils/logger.js';
 
 const logger = createLogger('container/claude/permissionModeHelper');
 
-/** 系统级禁用的交互式规划工具（前端暂不支持） */
+/**
+ * 系统级禁用的交互式规划工具
+ * 注意：AskUserQuestion 已启用，支持 Agent 向用户提问并等待回答
+ */
 const INTERACTIVE_PLANNING_TOOLS = [
   'EnterPlanMode',   // 进入规划模式
-  'AskUserQuestion', // 向用户提问
   'ExitPlanMode'     // 退出规划模式
 ];
 

@@ -45,4 +45,8 @@ export interface MessageHandlerCallbacks {
   // Current state
   getCurrentSessionId: () => string | null;
   getSelectedProjectName: () => string | undefined;
+
+  // Agent interaction
+  onSendUserAnswer?: (sessionId: string, toolUseID: string, answer: string) => void;
+  setPendingQuestion?: (toolUseID: string, sessionId: string) => void;
 }

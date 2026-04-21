@@ -5,6 +5,8 @@
  * @module container/claude/templates/sdkScriptTemplate
  */
 
+import { generateCanUseToolCallback } from './canUseToolTemplate.js';
+
 /**
  * Generate image handling code section
  * @param {Array} imagePaths - Array of image paths
@@ -111,7 +113,12 @@ ${generateImageHandling(imagePaths)}
 
 ${generateDirectorySetup()}
 
+${generateCanUseToolCallback()}
+
     // Claude SDK 接受一个对象参数：{ prompt, options }
+    // 注入 canUseTool 回调以拦截 AskUserQuestion
+    options.canUseTool = canUseTool;
+
     const result = query({
       prompt: command,
       options: options

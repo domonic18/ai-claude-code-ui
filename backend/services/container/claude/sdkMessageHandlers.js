@@ -8,6 +8,7 @@
 
 import { createLogger } from '../../../utils/logger.js';
 import { extractTokenBudget, extractMessagePreview, isResultError } from './messageParsingHelpers.js';
+import { aliasSessionId } from './SessionManager.js';
 
 const logger = createLogger('services/container/claude/sdkMessageHandlers');
 
@@ -26,7 +27,11 @@ export function sendSessionCreated(sdkMessage, writer, sessionId, state) {
   }
 
   state.sessionCreatedSent = true;
+  state.realSessionId = sdkMessage.session_id;
   logger.info({ sessionId, newSessionId: sdkMessage.session_id }, '[MessageTransformer] Sending session-created');
+
+  // 为真实 session ID 创建别名，使前端用真实 ID 查找 stdin writer 时能找到
+  aliasSessionId(sdkMessage.session_id, sessionId);
 
   writer.send({ type: 'session-created', sessionId: sdkMessage.session_id });
 

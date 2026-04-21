@@ -53,6 +53,25 @@ export interface ChatMessage {
   isStreaming?: boolean;
   /** Whether this is an interactive prompt */
   isInteractivePrompt?: boolean;
+  /** Agent interactive question data (from AskUserQuestion tool) */
+  interactiveQuestion?: {
+    /** Unique ID for this question (matches SDK toolUseID) */
+    toolUseID: string;
+    /** Question list with options */
+    questions: Array<{
+      /** Question text */
+      question: string;
+      /** Available options for selection */
+      options?: Array<{
+        label: string;
+        description?: string;
+      }>;
+    }>;
+    /** Optional prompt text */
+    prompt?: string;
+  };
+  /** Whether user has answered this interactive question */
+  isAnswered?: boolean;
   /** Raw parameters for display */
   rawParameters?: any;
   /** Tool call ID for matching results */
