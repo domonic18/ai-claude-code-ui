@@ -81,6 +81,17 @@ export function handleAgentQuestion(message: WebSocketMessage, callbacks: Messag
 
   callbacks.onSetLoading(false);
 
+  // Validate required fields — without toolUseID or sessionId the user cannot answer
+  if (!toolUseID || !sessionId) {
+    callbacks.onAddMessage({
+      id: generateMessageId('error'),
+      type: 'error',
+      content: buildQuestionText(prompt, questions) + '\n\n⚠ Unable to accept answer: missing toolUseID or sessionId.',
+      timestamp: Date.now(),
+    });
+    return true;
+  }
+
   callbacks.onAddMessage({
     id: generateMessageId('assistant'),
     type: 'assistant',
@@ -88,9 +99,7 @@ export function handleAgentQuestion(message: WebSocketMessage, callbacks: Messag
     timestamp: Date.now(),
   });
 
-  if (callbacks.setPendingQuestion && toolUseID && sessionId) {
-    callbacks.setPendingQuestion(toolUseID, sessionId);
-  }
+  callbacks.setPendingQuestion?.(toolUseID, sessionId);
   return true;
 }
 

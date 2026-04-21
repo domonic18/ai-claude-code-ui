@@ -159,13 +159,14 @@ const COMMAND_HANDLERS = {
    * 处理前端用户对 Agent 提问的回答
    * 将用户回答通过 stdin 写入容器，让 SDK 的 canUseTool 回调继续执行
    */
-  'user-answer': async (data) => {
+  'user-answer': async (data, ws, writer) => {
     const { sessionId, toolUseID, answer } = data;
     logger.info({ sessionId, toolUseID }, '[WebSocket] Received user-answer');
 
-    const stdinWriter = getSessionStdin(sessionId);
+    const stdinWriter = getSessionStdin(sessionId, ws.user?.userId);
     if (!stdinWriter) {
       logger.warn({ sessionId }, '[WebSocket] No stdin writer found for session');
+      writer.send({ type: 'error', error: 'Session not found or access denied', sessionId });
       return;
     }
 

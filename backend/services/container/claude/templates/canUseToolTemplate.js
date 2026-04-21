@@ -26,10 +26,14 @@ export function generateCanUseToolCallback() {
 
     // 从 stdin 读取主容器转发过来的用户回答
     const readline = await import('readline');
+    // 非 TTY 模式下 stdin 默认处于暂停状态，必须显式 resume 才能 read line
+    process.stdin.resume();
     const rl = readline.createInterface({ input: process.stdin });
     rl.on('line', (line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return; // skip empty lines
       try {
-        const msg = JSON.parse(line);
+        const msg = JSON.parse(trimmed);
         if (msg.type === 'user-answer' && msg.toolUseID) {
           const resolve = pendingAnswers.get(msg.toolUseID);
           if (resolve) {
@@ -39,7 +43,8 @@ export function generateCanUseToolCallback() {
           }
         }
       } catch (e) {
-        console.error("[SDK] Failed to parse stdin line:", e.message);
+        // 非 JSON 行可能是其他 stdout 输出干扰，仅 debug 级别记录
+        console.error("[SDK] Skipping non-JSON stdin line:", trimmed.substring(0, 80));
       }
     });
 
