@@ -6,7 +6,7 @@
 
 import containerManager from '../core/index.js';
 import { buildSDKScript } from './ScriptBuilder.js';
-import { setSessionStream } from './SessionManager.js';
+import { setSessionStream, setSessionStdin } from './SessionManager.js';
 import { writeFileViaPutArchive } from '../utils/containerFileWriter.js';
 import { createLogger, sanitizePreview } from '../../../utils/logger.js';
 import { copyImagesToContainer } from './dockerImageHandler.js';
@@ -71,13 +71,14 @@ export async function executeInContainer(userId, command, options, writer, sessi
     // 步骤 1：准备容器和脚本
     const { docker, sdkScriptInfo, authToken } = await prepareContainerAndScript(userId, command, options);
 
-    // 步骤 2：在容器中执行脚本
+    // 步骤 2：在容器中执行脚本（启用 stdin 以支持 Agent 交互提问）
     const { stream } = await containerManager.execInContainer(
       userId,
       ['node', sdkScriptInfo.tmpScriptFile],
       {
         cwd: '/app',
         tty: false,
+        stdin: true,
         env: {
           NODE_PATH: '/app/node_modules',
           HOME: '/workspace',
@@ -94,6 +95,18 @@ export async function executeInContainer(userId, command, options, writer, sessi
     const stdout = new PassThrough();
     const stderr = new PassThrough();
     docker.modem.demuxStream(stream, stdout, stderr);
+
+    // 保存 stdin 写入函数（用于向前端用户的回答写入容器 stdin）
+    // Docker exec stream 在非 TTY 模式下需要使用多路复用协议写入 stdin
+    // header: [streamType(1byte), padding(3bytes), size(4bytes)] + payload
+    const stdinWriter = (data) => {
+      const header = Buffer.alloc(8);
+      header[0] = 0; // stdin stream type = 0
+      const payload = Buffer.from(data);
+      header.writeUInt32BE(payload.length, 4);
+      stream.write(Buffer.concat([header, payload]));
+    };
+    setSessionStdin(sessionId, stdinWriter);
 
     // 步骤 4：处理流输出并等待结果
     return await handleStreamProcessing(stream, stdout, stderr, writer, sessionId);

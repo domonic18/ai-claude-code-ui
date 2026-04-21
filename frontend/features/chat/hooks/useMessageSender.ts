@@ -48,6 +48,8 @@ export interface UseMessageSenderOptions {
   onSessionProcessing?: (sessionId: string) => void;
   /** Permission mode */
   permissionMode: PermissionMode;
+  /** Check and consume pending agent question; returns true if message was handled as answer */
+  consumePendingQuestion?: (answer: string) => boolean;
 }
 
 export interface UseMessageSenderResult {
@@ -195,6 +197,7 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
     onSessionActive,
     onSessionProcessing,
     permissionMode,
+    consumePendingQuestion,
   } = options;
 
   const handleSend = useCallback(async () => {
@@ -206,12 +209,17 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
     // Clear input state
     clearInputState(input, selectedProject, onSetInput, onSetAttachedFiles);
 
-    // Prepare message sending
-    prepareMessageSending(currentSessionId, onSessionActive, onSetLoading, onStartStream);
-
     // Build and add user message
     const userMessage = buildUserMessage(content, files);
     onAddMessage(userMessage);
+
+    // 如果有 Agent 待回答的提问，将用户消息作为回答发送而非新命令
+    if (consumePendingQuestion?.(content)) {
+      return; // 已作为 user-answer 发送，不需要发送 claude-command
+    }
+
+    // Prepare message sending
+    prepareMessageSending(currentSessionId, onSessionActive, onSetLoading, onStartStream);
 
     // Send via WebSocket
     if (sendMessage && ws) {
@@ -243,6 +251,7 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
     onSessionActive,
     onSessionProcessing,
     permissionMode,
+    consumePendingQuestion,
   ]);
 
   return { handleSend };

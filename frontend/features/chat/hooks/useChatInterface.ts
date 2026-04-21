@@ -135,6 +135,8 @@ export interface UseChatInterfaceResult {
   handleInputFocusChange: (isFocused: boolean) => void;
   createDiff: (oldStr: string, newStr: string) => any;
   authenticatedFetch: (url: string, options?: RequestInit) => Promise<Response>;
+  consumePendingQuestion: (answer: string) => boolean;
+  setPendingQuestion: (toolUseID: string, sessionId: string) => void;
 }
 
 /**
@@ -170,6 +172,9 @@ export function useChatInterface({
   const [tasks, setTasks] = useState<any[]>([]);
   const [tokenBudget, setTokenBudget] = useState<any>(null);
   const [permissionMode, setPermissionMode] = useState<'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'>('default');
+  // Agent 交互提问状态：当 Agent 调用 AskUserQuestion 时记录 toolUseID，
+  // 下一条用户消息将作为回答发送（user-answer）而非新命令
+  const pendingQuestionRef = useRef<{ toolUseID: string; sessionId: string } | null>(null);
   const { availableModels } = useModelsLoader();
   const modelSwitchNotification = useModelSwitchNotification();
   const { selectedModel, handleModelSelect } = useModelSelection({ availableModels, hasImageAttachment: attachedFiles.some(f => f.type?.startsWith('image/')) });
@@ -183,21 +188,56 @@ export function useChatInterface({
   }, []);
   const menu = useChatMenuSystem({ selectedProject, authenticatedFetch, onShowSettings, onShowAllTasks, onSetMessages: setMessages, setInput });
   useChatSessionManagement({ selectedProject, selectedSession, newSessionCounter, currentSessionId, authenticatedFetch, setCurrentSessionId, setMessages, setInput });
+
+  // --- Agent 交互提问状态管理（必须在 useChatWebSocketProcessor / useMessageSender 之前定义） ---
+  // 处理用户回答 Agent 交互提问：发送 user-answer 消息
+  const sendUserAnswer = useCallback((toolUseID: string, sessionId: string, answer: string) => {
+    if (sendMessage) {
+      sendMessage({
+        type: 'user-answer',
+        sessionId,
+        toolUseID,
+        answer,
+      });
+    }
+  }, [sendMessage]);
+
+  // 检查并消费 pendingQuestion：如果有等待中的提问，将用户消息作为回答发送
+  // 返回 true 表示已作为回答处理，调用方不应再发送 claude-command
+  const consumePendingQuestion = useCallback((answer: string): boolean => {
+    const pending = pendingQuestionRef.current;
+    if (pending) {
+      sendUserAnswer(pending.toolUseID, pending.sessionId, answer);
+      pendingQuestionRef.current = null;
+      return true;
+    }
+    return false;
+  }, [sendUserAnswer]);
+
+  // 记录 Agent 的交互提问
+  const setPendingQuestion = useCallback((toolUseID: string, sessionId: string) => {
+    pendingQuestionRef.current = { toolUseID, sessionId };
+  }, []);
+
   useChatWebSocketProcessor({
     wsMessages, currentSessionId, selectedProjectName: selectedProject?.name,
     addMessage, updateMessage, setMessages, setIsLoading, setCurrentSessionId,
     onReplaceTemporarySession, onSessionActive, onSessionInactive, onSessionProcessing, onSessionNotProcessing,
     onSetTokenBudget: (b) => { setTokenBudget(b); onSetTokenBudget?.(b); }, setTasks,
+    setPendingQuestion,
     ...stream,
   });
+
   const { handleSend } = useMessageSender({
     input, isLoading, currentSessionId, attachedFiles, selectedModel, selectedProject, ws, sendMessage,
     onAddMessage: addMessage, onStartStream: stream.startStream, onSetLoading: setIsLoading,
     onSetInput: setInput, onSetAttachedFiles: setAttachedFiles, onSessionActive, onSessionProcessing, permissionMode,
+    consumePendingQuestion,
   });
   const handleAddFile = useCallback((file: FileAttachment) => {
     setAttachedFiles(prev => { const i = prev.findIndex(f => f.id === file.id); if (i >= 0) { const u = [...prev]; u[i] = file; return u; } return [...prev, file]; });
   }, []);
+
   return {
     input, setInput, attachedFiles, setAttachedFiles, isLoading, setIsLoading, currentSessionId, setCurrentSessionId,
     tasks, setTasks, tokenBudget, setTokenBudget, permissionMode, setPermissionMode,
@@ -207,5 +247,7 @@ export function useChatInterface({
     handleAddFile, handleRemoveFile: useCallback((id: string) => setAttachedFiles(prev => prev.filter(f => f.id !== id)), []),
     handleInputFocusChange: useCallback((f: boolean) => onInputFocusChange?.(f), [onInputFocusChange]),
     createDiff: useCallback((o: string, n: string) => calculateDiff(o, n), []), authenticatedFetch,
+    consumePendingQuestion,
+    setPendingQuestion,
   };
 }

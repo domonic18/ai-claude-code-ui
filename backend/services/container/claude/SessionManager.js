@@ -23,6 +23,45 @@ export function setSessionStream(sessionId, stream) {
 }
 
 /**
+ * 设置会话的 stdin 写入函数
+ * @param {string} sessionId - 会话 ID
+ * @param {Function} stdinWriter - 写入容器 stdin 的函数，接受 string 参数
+ */
+export function setSessionStdin(sessionId, stdinWriter) {
+  const session = containerSessions.get(sessionId);
+  if (session) {
+    session.stdinWriter = stdinWriter;
+  }
+}
+
+/**
+ * 获取会话的 stdin 写入函数
+ * @param {string} sessionId - 会话 ID
+ * @returns {Function|null} stdin 写入函数，或 null
+ */
+export function getSessionStdin(sessionId) {
+  const session = containerSessions.get(sessionId);
+  return session?.stdinWriter || null;
+}
+
+/**
+ * 为已有会话注册别名 session ID
+ * 用于 session-created 场景：SDK 返回真实 session ID 后，
+ * 以真实 ID 为 key 创建指向同一会话对象的引用，
+ * 使前端用真实 ID 查找 stdin writer 时能找到。
+ *
+ * @param {string} aliasId - 别名 session ID（如 SDK 返回的真实 ID）
+ * @param {string} originalId - 原始 session ID（如 temp-xxx）
+ */
+export function aliasSessionId(aliasId, originalId) {
+  const session = containerSessions.get(originalId);
+  if (session && aliasId !== originalId) {
+    containerSessions.set(aliasId, session);
+    logger.info({ aliasId, originalId }, '[SessionManager] Created session alias');
+  }
+}
+
+/**
  * 创建新会话
  * @param {string} sessionId - 会话 ID
  * @param {object} sessionInfo - 会话信息

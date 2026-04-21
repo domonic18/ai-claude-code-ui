@@ -6,17 +6,41 @@
  */
 
 import React, { useRef, memo } from 'react';
-// Import modular components
 import { UserMessage } from './UserMessage';
 import { MessageHeader } from './MessageHeader';
-import { AssistantMessage } from './AssistantMessage';
-import { FullToolMessage } from './FullToolMessage';
-import { MinimizedToolMessage } from './MinimizedToolMessage';
-import { SimplifiedToolIndicator } from './SimplifiedToolIndicator';
-// Import utilities
-import { MINIMIZED_TOOLS } from '../constants';
+import { renderToolContent } from './ToolContentRenderer';
 import type { ChatMessageProps } from '../types';
 import { useToolAutoExpand } from './useToolAutoExpand';
+
+/** 可分组显示的消息类型集合 */
+const GROUPABLE_TYPES = new Set(['assistant', 'user', 'tool', 'error']);
+
+/**
+ * 判断当前消息是否应与前一条消息分组显示
+ */
+function checkIsGrouped(messageType: string, prevMessage?: any): boolean {
+  return Boolean(prevMessage && prevMessage.type === messageType && GROUPABLE_TYPES.has(messageType));
+}
+
+/**
+ * 将消息类型映射为头部显示类型
+ */
+function getHeaderType(messageType: string): string {
+  if (messageType === 'tool') return 'tool';
+  if (messageType === 'error') return 'error';
+  return 'assistant';
+}
+
+/**
+ * Get display name for message based on type and provider
+ */
+function getMessageDisplayName(type: string, provider: string): string {
+  if (type === 'error') return 'Error';
+  if (type === 'tool') return 'Tool';
+  if (provider === 'cursor') return 'Cursor';
+  if (provider === 'codex') return 'Codex';
+  return 'Claude';
+}
 
 /**
  * Get provider from localStorage
@@ -24,6 +48,42 @@ import { useToolAutoExpand } from './useToolAutoExpand';
 function getProvider(): string {
   if (typeof window === 'undefined') return 'claude';
   return localStorage.getItem('selected-provider') || 'claude';
+}
+
+/**
+ * 渲染非 user 类型消息的完整布局（头部 + 内容）
+ */
+function renderNonUserMessage(
+  message: any,
+  isGrouped: boolean,
+  onFileOpen?: (path: string) => void,
+  onShowSettings?: () => void,
+  showThinking = true,
+  messageRef?: React.RefObject<HTMLDivElement>,
+): JSX.Element {
+  const provider = getProvider();
+  const displayName = getMessageDisplayName(message.type, provider);
+
+  return (
+    <div
+      ref={messageRef}
+      className={`chat-message ${message.type} ${isGrouped ? 'grouped' : ''} px-3 sm:px-0`}
+    >
+      <div className="w-full">
+        {!isGrouped && (
+          <MessageHeader
+            type={getHeaderType(message.type)}
+            displayName={displayName}
+            provider={provider}
+            isGrouped={isGrouped}
+          />
+        )}
+        <div className="w-full">
+          {renderToolContent(message, onFileOpen, onShowSettings, showThinking)}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -40,110 +100,19 @@ export const ChatMessage = memo(function ChatMessage({
   showThinking = true,
 }: ChatMessageProps) {
   const messageRef = useRef<HTMLDivElement>(null);
-
-  const isGrouped = prevMessage && prevMessage.type === message.type &&
-    ((prevMessage.type === 'assistant') ||
-      (prevMessage.type === 'user') ||
-      (prevMessage.type === 'tool') ||
-      (prevMessage.type === 'error'));
+  const isGrouped = checkIsGrouped(message.type, prevMessage);
 
   useToolAutoExpand(messageRef, message.isToolUse || false, autoExpandTools);
 
   if (message.type === 'user') {
     return (
       <div ref={messageRef}>
-        <UserMessage
-          message={message}
-          isGrouped={isGrouped}
-        />
+        <UserMessage message={message} isGrouped={isGrouped} />
       </div>
     );
   }
 
-  const provider = getProvider();
-  const displayName = getMessageDisplayName(message.type, provider);
-
-  return (
-    <div
-      ref={messageRef}
-      className={`chat-message ${message.type} ${isGrouped ? 'grouped' : ''} px-3 sm:px-0`}
-    >
-      <div className="w-full">
-        {!isGrouped && (
-          <MessageHeader
-            type={message.type === 'tool' ? 'tool' : message.type === 'error' ? 'error' : 'assistant'}
-            displayName={displayName}
-            provider={provider}
-            isGrouped={isGrouped}
-          />
-        )}
-
-        <div className="w-full">
-          {renderToolContent(message, onFileOpen, onShowSettings, showThinking)}
-        </div>
-      </div>
-    </div>
-  );
+  return renderNonUserMessage(message, isGrouped, onFileOpen, onShowSettings, showThinking, messageRef);
 });
-
-/**
- * Get display name for message based on type and provider
- *
- * @param type - Message type
- * @param provider - AI provider
- * @returns Display name
- */
-function getMessageDisplayName(type: string, provider: string): string {
-  if (type === 'error') return 'Error';
-  if (type === 'tool') return 'Tool';
-  if (provider === 'cursor') return 'Cursor';
-  if (provider === 'codex') return 'Codex';
-  return 'Claude';
-}
-
-/**
- * Render tool message content
- *
- * @param message - Message object
- * @param onFileOpen - File open callback
- * @param onShowSettings - Settings callback
- * @param showThinking - Whether to show thinking
- * @returns Rendered tool content
- */
-function renderToolContent(
-  message: any,
-  onFileOpen?: (path: string) => void,
-  onShowSettings?: () => void,
-  showThinking = true
-): JSX.Element {
-  if (message.isToolUse && message.toolName) {
-    // Handle minimized tools (Grep, Glob)
-    if (MINIMIZED_TOOLS.includes(message.toolName as any)) {
-      return <MinimizedToolMessage message={message} />;
-    }
-
-    // Handle simplified indicators (Read, TodoWrite)
-    if (message.toolName === 'Read' || message.toolName === 'TodoWrite') {
-      return (
-        <SimplifiedToolIndicator
-          toolName={message.toolName}
-          toolInput={message.toolInput}
-          onFileOpen={onFileOpen}
-        />
-      );
-    }
-
-    // Handle full tool messages
-    return <FullToolMessage message={message} onFileOpen={onFileOpen} onShowSettings={onShowSettings} />;
-  }
-
-  return (
-    <AssistantMessage
-      content={message.content}
-      showThinking={showThinking}
-      thinking={message.thinking}
-    />
-  );
-}
 
 export default ChatMessage;

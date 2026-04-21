@@ -17,7 +17,7 @@
  * @module websocket/handlers/chat
  */
 
-import { queryClaudeSDKInContainer, abortClaudeSDKSessionInContainer, isClaudeSDKSessionActiveInContainer } from '../../services/container/claude/index.js';
+import { queryClaudeSDKInContainer, abortClaudeSDKSessionInContainer, isClaudeSDKSessionActiveInContainer, getSessionStdin } from '../../services/container/claude/index.js';
 import { spawnCursor, abortCursorSession, isCursorSessionActive, getActiveCursorSessions } from '../../services/execution/cursor/index.js';
 import { queryCodex, abortCodexSession, isCodexSessionActive, getActiveCodexSessions } from '../../services/execution/codex/index.js';
 import { WebSocketWriter } from '../writer.js';
@@ -154,6 +154,30 @@ const COMMAND_HANDLERS = {
   },
   'get-active-sessions': async (data, ws, writer) => {
     writer.send({ type: 'active-sessions', sessions: { cursor: getActiveCursorSessions(), codex: getActiveCodexSessions() } });
+  },
+  /**
+   * 处理前端用户对 Agent 提问的回答
+   * 将用户回答通过 stdin 写入容器，让 SDK 的 canUseTool 回调继续执行
+   */
+  'user-answer': async (data) => {
+    const { sessionId, toolUseID, answer } = data;
+    logger.info({ sessionId, toolUseID }, '[WebSocket] Received user-answer');
+
+    const stdinWriter = getSessionStdin(sessionId);
+    if (!stdinWriter) {
+      logger.warn({ sessionId }, '[WebSocket] No stdin writer found for session');
+      return;
+    }
+
+    // 写入 JSON 行协议到容器 stdin
+    const answerMessage = JSON.stringify({
+      type: 'user-answer',
+      toolUseID,
+      answer: answer || ''
+    }) + '\n';
+
+    logger.debug({ sessionId, toolUseID }, '[WebSocket] Writing answer to container stdin');
+    stdinWriter(answerMessage);
   },
 };
 

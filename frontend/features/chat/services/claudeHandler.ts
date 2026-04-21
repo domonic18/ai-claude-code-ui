@@ -8,58 +8,22 @@
  */
 
 import { generateMessageId } from './wsUtils';
-import {
-  handleStreamingDelta,
-  processTextBlocks,
-  processToolUseBlocks,
-  handleThinkingMessage,
-  handleResultMessage,
-  handleUserMessage,
-} from './claudeMessageHandlers';
+import { dispatchClaudeResponse } from './claudeMessageHandlers';
+import { buildQuestionText } from './questionTextBuilder';
 import type { MessageHandlerCallbacks } from './types';
 import type { WebSocketMessage } from '@/shared/types';
 
 /**
- * 处理 assistant 类型消息中的 content blocks（文本和工具调用）
- *
- * 识别消息是否为 assistant 角色输出，若是则分别处理其中的文本块和工具使用块。
- *
- * @param messageData - WebSocket 消息中的 data 字段（消息体对象）
- * @param callbacks - UI 状态更新回调集合
- * @returns 是否成功匹配并处理了 assistant 内容
- */
-function handleAssistantContent(messageData: any, callbacks: MessageHandlerCallbacks): boolean {
-  const isAssistant = messageData.type === 'assistant' ||
-    (messageData.type === 'message' && messageData.role === 'assistant');
-  if (!isAssistant || !Array.isArray(messageData.content)) return false;
-
-  const hasText = processTextBlocks(messageData.content, callbacks);
-  const hasTools = processToolUseBlocks(messageData.content, callbacks);
-  return hasText || hasTools;
-}
-
-/**
  * Claude SDK 响应消息的总分发入口
  *
- * 按优先级依次尝试将消息分派给：流式增量、assistant 内容、
- * thinking 消息、result 消息、user 消息等处理器。
- * 首个匹配成功的处理器将消费该消息。
+ * 委托给 claudeMessageHandlers 中的 dispatchClaudeResponse 处理。
  *
  * @param message - 原始 WebSocket 消息
  * @param callbacks - UI 状态更新回调集合
  * @returns 是否成功匹配并处理了该消息
  */
 export function handleClaudeResponse(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
-  const messageData = message.data?.message || message.data;
-  if (!messageData || typeof messageData !== 'object') return false;
-
-  if (handleStreamingDelta(messageData, callbacks)) return true;
-  if (handleAssistantContent(messageData, callbacks)) return true;
-  if (handleThinkingMessage(messageData, callbacks)) return true;
-  if (handleResultMessage(messageData, callbacks)) return true;
-  if (handleUserMessage(message.data?.type, messageData?.role, messageData, message.timestamp, callbacks)) return true;
-
-  return false;
+  return dispatchClaudeResponse(message, callbacks);
 }
 
 /**
@@ -97,6 +61,36 @@ export function handleClaudeInteractivePrompt(message: WebSocketMessage, callbac
     id: generateMessageId('assistant'), type: 'assistant', content: message.data,
     timestamp: Date.now(), isInteractivePrompt: true,
   });
+  return true;
+}
+
+/**
+ * 处理 Agent 交互提问消息 (AskUserQuestion)
+ *
+ * 当 Agent 调用 AskUserQuestion 工具时触发。
+ * 将提问内容作为普通 assistant 文本消息渲染，
+ * 并设置 pendingQuestion 状态，使用户下一条输入作为回答发送。
+ *
+ * @param message - 包含提问数据的 WebSocket 消息
+ * @param callbacks - UI 状态更新回调集合
+ * @returns 始终返回 true
+ */
+export function handleAgentQuestion(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
+  const { toolUseID, questions, prompt } = message.data || {};
+  const sessionId = message.sessionId;
+
+  callbacks.onSetLoading(false);
+
+  callbacks.onAddMessage({
+    id: generateMessageId('assistant'),
+    type: 'assistant',
+    content: buildQuestionText(prompt, questions),
+    timestamp: Date.now(),
+  });
+
+  if (callbacks.setPendingQuestion && toolUseID && sessionId) {
+    callbacks.setPendingQuestion(toolUseID, sessionId);
+  }
   return true;
 }
 

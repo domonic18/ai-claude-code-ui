@@ -13,7 +13,10 @@ export {
   isSessionActive as isClaudeSDKSessionActiveInContainer,
   getActiveSessions as getActiveClaudeSDKSessionsInContainer,
   getSession as getContainerSessionInfo,
-  setSessionStream
+  setSessionStream,
+  setSessionStdin,
+  getSessionStdin,
+  aliasSessionId
 } from './SessionManager.js';
 
 
