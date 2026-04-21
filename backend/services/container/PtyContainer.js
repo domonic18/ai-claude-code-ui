@@ -93,57 +93,88 @@ function sendWsMessage(ws, message) {
 }
 
 /**
+ * 获取已有的活动会话（如果存在）
+ * @param {string} sessionId - 会话 ID
+ * @returns {Object|null} 已存在的会话信息，或 null
+ */
+function getExistingActiveSession(sessionId) {
+  const existing = ptySessions.get(sessionId);
+  if (existing && existing.status === 'active') return existing;
+  return null;
+}
+
+/**
+ * 在容器中创建并启动 exec 流
+ * @param {Object} container - Docker 容器实例
+ * @param {string} shellCommand - Shell 命令
+ * @param {number} cols - 列数
+ * @param {number} rows - 行数
+ * @returns {Promise<{ exec: Object, stream: Object }>} exec 和 stream
+ */
+async function startContainerExec(container, shellCommand, cols, rows) {
+  const exec = await containerManager.docker.getContainer(container.id).exec(buildPtyExecConfig(shellCommand, cols, rows));
+  const stream = await exec.start({ Detach: false, Tty: true });
+  return { exec, stream };
+}
+
+/**
+ * 注册并初始化新的 PTY 会话
+ * @param {Object} params - 会话参数
+ * @returns {Object} 会话信息
+ */
+function registerNewSession({ sessionId, userId, container, exec, stream, ws, cols, rows, projectPath }) {
+  const sessionInfo = createPtySessionInfo({
+    sessionId, userId, containerId: container.id, execId: exec.id, cols, rows, projectPath
+  });
+  ptySessions.set(sessionId, sessionInfo);
+  ptyStreams.set(sessionId, { stream, exec, ws });
+  setupStreamHandlers(sessionId, stream, ws, ptySessions, (id) => cleanupPtySession(id, ptyStreams, ptySessions));
+  sendWsMessage(ws, {
+    type: 'session_started', sessionId,
+    containerId: container.id, message: 'PTY session started in container'
+  });
+  return sessionInfo;
+}
+
+/** PTY 会话默认配置 */
+const PTY_DEFAULTS = {
+  projectPath: '',
+  sessionId: null,
+  initialCommand: 'bash',
+  cols: 80,
+  rows: 24,
+  userTier: 'free'
+};
+
+/**
+ * 解析 PTY 选项并设置默认值
+ * @param {object} options - 原始选项
+ * @returns {Object} 完整选项
+ */
+function resolvePtyOptions(options) {
+  const merged = { ...PTY_DEFAULTS, ...options };
+  merged.sessionId = merged.sessionId || uuidv4();
+  return merged;
+}
+
+/**
  * 在用户容器内创建 PTY 会话
  * @param {object} ws - WebSocket 连接
  * @param {object} options - PTY 选项
  * @returns {Promise<object>} 会话信息
  */
 export async function createPtyInContainer(ws, options) {
-  const {
-    userId,
-    projectPath = '',
-    sessionId = uuidv4(),
-    initialCommand = 'bash',
-    cols = 80,
-    rows = 24,
-    userTier = 'free'
-  } = options;
+  const { userId, projectPath, sessionId, initialCommand, cols, rows, userTier } = resolvePtyOptions(options);
 
   try {
-    // 1. 获取或创建用户容器
+    const existing = getExistingActiveSession(sessionId);
+    if (existing) return existing;
+
     const container = await containerManager.getOrCreateContainer(userId, { tier: userTier });
-
-    // 2. 检查会话是否已存在
-    const existingSession = ptySessions.get(sessionId);
-    if (existingSession?.status === 'active') {
-      return existingSession;
-    }
-
-    // 3. 创建并启动 exec
     const shellCommand = buildShellCommand(projectPath, initialCommand);
-    const exec = await containerManager.docker.getContainer(container.id).exec(buildPtyExecConfig(shellCommand, cols, rows));
-    const stream = await exec.start({ Detach: false, Tty: true });
+    const { exec, stream } = await startContainerExec(container, shellCommand, cols, rows);
 
-    // 4. 创建并存储会话
-    const sessionInfo = createPtySessionInfo({
-      sessionId, userId, containerId: container.id, execId: exec.id, cols, rows, projectPath
-    });
-    ptySessions.set(sessionId, sessionInfo);
-    ptyStreams.set(sessionId, { stream, exec, ws });
-
-    // 5. 设置流处理器
-    setupStreamHandlers(sessionId, stream, ws, ptySessions, (id) => cleanupPtySession(id, ptyStreams, ptySessions));
-
-    // 6. 发送会话启动消息
-    sendWsMessage(ws, {
-      type: 'session_started',
-      sessionId,
-      containerId: container.id,
-      message: 'PTY session started in container'
-    });
-
-    return sessionInfo;
-
+    return registerNewSession({ sessionId, userId, container, exec, stream, ws, cols, rows, projectPath });
   } catch (error) {
     sendWsMessage(ws, { type: 'error', sessionId, error: `Failed to create PTY: ${error.message}` });
     throw error;
@@ -195,6 +226,20 @@ export async function sendInputToPty(sessionId, input) {
 }
 
 /**
+ * 验证并获取 PTY 会话数据
+ * @param {string} sessionId - 会话 ID
+ * @returns {{ session: Object, sessionData: Object }} 会话和流数据
+ * @throws {Error} 如果会话不存在
+ */
+function requirePtySession(sessionId) {
+  const session = ptySessions.get(sessionId);
+  if (!session) throw new Error(`No PTY session found: ${sessionId}`);
+  const sessionData = ptyStreams.get(sessionId);
+  if (!sessionData) throw new Error(`No active stream for session: ${sessionId}`);
+  return { session, sessionData };
+}
+
+/**
  * 调整 PTY 会话大小
  * @param {string} sessionId - 会话 ID
  * @param {number} cols - 新列数
@@ -202,30 +247,10 @@ export async function sendInputToPty(sessionId, input) {
  * @returns {Promise<boolean>} 如果成功则为 true
  */
 export async function resizePty(sessionId, cols, rows) {
-  const session = ptySessions.get(sessionId);
-
-  if (!session) {
-    throw new Error(`No PTY session found: ${sessionId}`);
-  }
-
-  const sessionData = ptyStreams.get(sessionId);
-  if (!sessionData) {
-    throw new Error(`No active stream for session: ${sessionId}`);
-  }
-
-  try {
-    // 更新会话信息
-    session.cols = cols;
-    session.rows = rows;
-
-    // 注意：Dockerode 不支持在创建后调整 exec 大小
-    // 这需要使用新方法实现
-    // 目前，我们只是更新存储的维度
-
-    return true;
-  } catch (error) {
-    throw new Error(`Failed to resize PTY: ${error.message}`);
-  }
+  const { session } = requirePtySession(sessionId);
+  session.cols = cols;
+  session.rows = rows;
+  return true;
 }
 
 /**
