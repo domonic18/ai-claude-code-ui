@@ -91,6 +91,10 @@ const STANDALONE_SHELL_DEFAULTS = {
   showHeader: true, compact: false, minimal: false
 };
 
+/**
+ * 独立 Shell 包装器：支持 Tab/Modal/嵌入式等多种使用场景，
+ * 聚合项目/会话/命令参数后委托给 Shell 组件
+ */
 function StandaloneShell(rawProps: StandaloneShellProps) {
   const props = { ...STANDALONE_SHELL_DEFAULTS, ...rawProps };
   const {

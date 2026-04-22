@@ -1,5 +1,5 @@
 /**
- * Custom hook to manage shell state and effects
+ * Shell 逻辑聚合 Hook：管理终端初始化、连接生命周期、自动重连、会话切换等状态
  */
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';

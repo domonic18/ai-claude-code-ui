@@ -118,6 +118,9 @@ const ConnectPrompt: React.FC<ConnectPromptProps> = ({
   </div>
 );
 
+/**
+ * 终端 Shell 主组件：管理 xterm 实例、WebSocket 连接、工具栏和状态覆层
+ */
 function Shell({
   selectedProject,
   selectedSession,
