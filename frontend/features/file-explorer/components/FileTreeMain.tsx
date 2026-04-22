@@ -12,6 +12,7 @@ import { FileTreeHeader } from './FileTreeHeader';
 import { FileTreeNewItem } from './FileTreeNewItem';
 import { FileTreeDetailedHeader } from './FileTreeDetailedHeader';
 import { FileTreeContent } from './FileTreeContent';
+import type { FileTreeContentProps } from './FileTreeContent';
 import { FileTreeModals } from './FileTreeModals';
 import type { FileViewMode } from '../types/file-explorer.types';
 
@@ -41,7 +42,7 @@ interface FileTreeMainProps {
     onConfirm: () => Promise<void>;
     onCancel: () => void;
   };
-  contentProps: Record<string, any>;
+  contentProps: Partial<FileTreeContentProps>;
   modalsProps: {
     selectedFile: any;
     selectedImage: any;
@@ -67,7 +68,7 @@ export function FileTreeMain({
       <FileTreeHeader {...headerProps} />
       <FileTreeNewItem {...newItemProps} />
       {viewMode === 'detailed' && filteredFiles.length > 0 && <FileTreeDetailedHeader />}
-      <FileTreeContent {...contentProps} />
+      <FileTreeContent {...(contentProps as FileTreeContentProps)} />
       <FileTreeModals {...modalsProps} />
     </div>
   );

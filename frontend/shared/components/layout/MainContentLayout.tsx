@@ -36,11 +36,11 @@ interface MainContentLayoutProps {
   selectedProject?: Project | null;
   onMenuClick: () => void;
   setActiveTab: (tab: string) => void;
-  newSessionCounter: number;
+  newSessionCounter?: number;
   ws?: any;
   sendMessage: (message: any) => void;
   messages: any[];
-  onFileOpen: (filePath: string, diffInfo: any) => void;
+  onFileOpen?: (filePath: string, diffInfo: any) => void;
   onInputFocusChange?: (focused: boolean) => void;
   onSessionActive?: (sessionId: string) => void;
   onSessionInactive?: (sessionId: string) => void;
@@ -49,20 +49,25 @@ interface MainContentLayoutProps {
   processingSessions?: Set<string>;
   onReplaceTemporarySession?: (tempId: string, realId: string) => void;
   onShowSettings?: () => void;
-  autoExpandTools: boolean;
-  showRawParameters: boolean;
-  showThinking: boolean;
-  autoScrollToBottom: boolean;
-  sendByCtrlEnter: boolean;
+  autoExpandTools?: boolean;
+  showRawParameters?: boolean;
+  showThinking?: boolean;
+  autoScrollToBottom?: boolean;
+  sendByCtrlEnter?: boolean;
   externalMessageUpdate?: number;
   authenticatedFetch?: (url: string, options?: RequestInit) => Promise<Response>;
   editingFile?: File | null;
-  editorExpanded: boolean;
-  editorWidth: number;
-  isResizing: boolean;
-  onMouseDown: (e: React.MouseEvent) => void;
-  onClose: () => void;
-  onToggleExpand: () => void;
+  editorExpanded?: boolean;
+  editorWidth?: number;
+  isResizing?: boolean;
+  onMouseDown?: (e: React.MouseEvent) => void;
+  onClose?: () => void;
+  onToggleExpand?: () => void;
+  /** Aliases from useMainContentState (handleFileOpen, handleCloseEditor, etc.) */
+  handleFileOpen?: (filePath: string, diffInfo?: any, projectName?: string) => void;
+  handleCloseEditor?: () => void;
+  handleToggleEditorExpand?: () => void;
+  handleMouseDown?: (e: React.MouseEvent) => void;
 }
 
 /**
@@ -72,13 +77,13 @@ function getSidebarProps(p: MainContentLayoutProps) {
   return {
     editingFile: p.editingFile,
     isMobile: p.isMobile,
-    editorWidth: p.editorWidth,
-    editorExpanded: p.editorExpanded,
+    editorWidth: p.editorWidth ?? 600,
+    editorExpanded: p.editorExpanded ?? false,
     projectPath: p.selectedProject?.fullPath,
-    isResizing: p.isResizing,
-    onMouseDown: p.onMouseDown,
-    onClose: p.onClose,
-    onToggleExpand: p.onToggleExpand,
+    isResizing: p.isResizing ?? false,
+    onMouseDown: p.onMouseDown ?? p.handleMouseDown ?? (() => {}),
+    onClose: p.onClose ?? p.handleCloseEditor ?? (() => {}),
+    onToggleExpand: p.onToggleExpand ?? p.handleToggleEditorExpand ?? (() => {}),
   };
 }
 
@@ -87,13 +92,17 @@ export function MainContentLayout(props: MainContentLayoutProps) {
     isMobile, activeTab, selectedSession, selectedProject,
     onMenuClick, setActiveTab, /* header */
     editingFile, editorExpanded, /* shared */
-    newSessionCounter, ws, sendMessage, messages, onFileOpen,
+    newSessionCounter, ws, sendMessage, messages,
+    onFileOpen: onFileOpenProp,
+    handleFileOpen: handleFileOpenProp,
     onInputFocusChange, onSessionActive, onSessionInactive,
     onSessionProcessing, onSessionNotProcessing, processingSessions,
     onReplaceTemporarySession, onShowSettings, autoExpandTools,
     showRawParameters, showThinking, autoScrollToBottom,
     sendByCtrlEnter, externalMessageUpdate, authenticatedFetch,
   } = props;
+
+  const onFileOpen = onFileOpenProp ?? handleFileOpenProp ?? (() => {});
 
   return (
     <div className="h-full flex flex-col">

@@ -8,6 +8,7 @@ import { FileAttachmentsPreview } from './FileAttachmentsPreview';
 import { ChatInputContainer } from './ChatInputContainer';
 import { ChatInputHint } from './ChatInputHint';
 import { ChatInputMenus } from './ChatInputMenus';
+import type { ChatInputMenusProps } from './ChatInputMenus';
 import type { FileAttachment } from '../types';
 
 interface ChatInputWrapperProps {
@@ -58,7 +59,7 @@ interface ChatInputWrapperProps {
   /** Has selected project */
   hasProject: boolean;
   /** Menu props */
-  menuProps: Record<string, unknown>;
+  menuProps: Partial<ChatInputMenusProps>;
 }
 
 export function ChatInputWrapper({
@@ -127,7 +128,7 @@ export function ChatInputWrapper({
       />
 
       {/* Menus */}
-      <ChatInputMenus {...menuProps} />
+      <ChatInputMenus {...(menuProps as ChatInputMenusProps)} />
     </div>
   );
 }

@@ -13,7 +13,7 @@ import { FileTreeViews } from './FileTreeViews';
 import { FileTreeEmptyStates } from './FileTreeEmptyStates';
 import type { FileNode } from '../types/file-explorer.types';
 
-interface FileTreeContentProps {
+export interface FileTreeContentProps {
   files: FileNode[];
   filteredFiles: FileNode[];
   searchQuery: string;

@@ -26,7 +26,7 @@ import SettingToggle from './SettingToggle';
  * @param {boolean} props.sendByCtrlEnter - Send by Ctrl+Enter setting
  * @param {Function} props.onSendByCtrlEnterChange - Send by Ctrl+Enter change handler
  */
-interface SettingsContentProps {
+export interface SettingsContentProps {
   autoExpandTools: boolean;
   onAutoExpandChange: (checked: boolean) => void;
   showRawParameters: boolean;

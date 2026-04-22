@@ -11,7 +11,7 @@ import { handleCommandSelect, handleFileSelect } from './chatInputUtils';
 import type { SlashCommand } from '../hooks/useSlashCommands';
 import type { FileReference } from '../hooks/useFileReferences';
 
-interface ChatInputMenusProps {
+export interface ChatInputMenusProps {
   /** Current input value */
   value: string;
   /** On change callback */
