@@ -63,15 +63,16 @@ export interface UseTerminalReturn {
 }
 
 export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn {
+  // 解构并设置默认值
   const {
-    shell = '/bin/bash',
-    args: rawArgs,
-    cwd,
-    env,
-    autoConnect = false,
-    onOutput,
-    onProcessComplete,
-    onError,
+    shell = '/bin/bash',  // 默认使用 bash shell
+    args: rawArgs,         // 原始命令参数
+    cwd,                   // 当前工作目录
+    env,                   // 环境变量
+    autoConnect = false,   // 是否自动连接
+    onOutput,              // 输出回调函数
+    onProcessComplete,     // 进程完成回调函数
+    onError,               // 错误回调函数
   } = options;
 
   // 使用稳定的引用来避免不必要的回调重新创建
@@ -79,18 +80,27 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
   const args = useMemo(() => rawArgs ?? EMPTY_ARGS, [rawArgs]);
 
   // 状态管理：跟踪终端的各种状态
+  // process: 当前运行的进程对象
   const [process, setProcess] = useState<TerminalProcess | null>(null);
+  // outputs: 终端输出记录数组
   const [outputs, setOutputs] = useState<TerminalOutput[]>([]);
+  // isConnected: WebSocket 连接状态
   const [isConnected, setIsConnected] = useState<boolean>(false);
+  // isLoading: 命令执行中的加载状态
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  // isConnecting: WebSocket 连接中的状态
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
+  // error: 错误对象
   const [error, setError] = useState<Error | null>(null);
 
   // Refs：存储可变值，避免闭包陷阱
+  // wsRef: WebSocket 实例引用
   const wsRef = useRef<WebSocket | null>(null);
+  // isMountedRef: 组件挂载状态引用，用于避免内存泄漏
   const isMountedRef = useRef(true);
 
   // 创建终端操作函数集合
+  // 封装了所有与 WebSocket 通信的操作
   const operations = createTerminalOperations(
     wsRef,
     isConnected,
@@ -108,9 +118,11 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
   );
 
   // 创建连接管理回调
+  // 提供 disconnect 和 reconnect 方法
   const connection = createConnectionCallbacks(wsRef, setIsConnected, setIsConnecting);
 
   // 清空输出的简单操作
+  // 重置输出数组为空
   const clearOutput = useCallback(() => {
     setOutputs([]);
   }, []);
@@ -155,11 +167,13 @@ const DEFAULT_TERMINAL_OPTIONS: TerminalOptions = {
 export function useTerminalOptions(
   initialOptions?: Partial<TerminalOptions>
 ): UseTerminalOptionsReturn {
+  // 初始化终端选项，合并默认值和用户提供的选项
   const [options, setOptions] = useState<TerminalOptions>({
     ...DEFAULT_TERMINAL_OPTIONS,
     ...initialOptions,
   });
 
+  // 从选项中提取主题类型
   const theme = options.theme as TerminalTheme;
 
   /**
@@ -168,6 +182,7 @@ export function useTerminalOptions(
    */
   const updateOptions = useCallback((updates: Partial<TerminalOptions>) => {
     setOptions(prev => {
+      // 合并更新到现有选项
       const newOptions = { ...prev, ...updates };
       // 持久化到 localStorage
       try {
@@ -223,7 +238,9 @@ export interface UseTerminalScrollReturn {
 }
 
 export function useTerminalScroll(): UseTerminalScrollReturn {
+  // 终端滚动容器的 DOM 引用
   const scrollRef = useRef<HTMLDivElement>(null);
+  // 自动滚动开关状态
   const [shouldAutoScroll, setShouldAutoScroll] = useState<boolean>(true);
 
   /**
@@ -231,7 +248,9 @@ export function useTerminalScroll(): UseTerminalScrollReturn {
    * 滚动到终端底部
    */
   const scrollToBottom = useCallback(() => {
+    // 检查 ref 是否存在，避免空引用错误
     if (scrollRef.current) {
+      // 设置 scrollTop 为 scrollHeight，滚动到最底部
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, []);
@@ -241,8 +260,10 @@ export function useTerminalScroll(): UseTerminalScrollReturn {
    * 切换自动滚动模式并持久化到 localStorage
    */
   const toggleAutoScroll = useCallback(() => {
+    // 切换自动滚动状态
     setShouldAutoScroll(prev => !prev);
     try {
+      // 持久化新的自动滚动状态到 localStorage
       localStorage.setItem('terminal-auto-scroll', String(!shouldAutoScroll));
     } catch {
       // 忽略 localStorage 错误

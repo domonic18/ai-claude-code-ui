@@ -9,14 +9,22 @@
  * - Code editor theme and settings
  */
 
+// 导入 React 核心库和 Hooks
 import React, { useState } from 'react';
+// 导入国际化 Hook
 import { useTranslation } from 'react-i18next';
+// 导入图标组件
 import { RotateCcw } from 'lucide-react';
+// 导入主题上下文
 import { useTheme } from '@/shared/contexts/ThemeContext';
+// 导入产品导览上下文
 import { useTourContext } from '@/shared/contexts/TourContext';
+// 导入代码编辑器设置 Hook
 import { useCodeEditorSettings } from '../hooks';
+// 导入 UI 组件
 import { ToggleSwitch, SettingRow } from '@/shared/components/ui/ToggleSwitch';
 
+// 字体大小选项列表
 const FONT_SIZE_OPTIONS = [
   { value: '10', label: '10px' },
   { value: '11', label: '11px' },
@@ -29,25 +37,27 @@ const FONT_SIZE_OPTIONS = [
   { value: '20', label: '20px' },
 ];
 
+// 代码编辑器设置组件属性接口
 interface CodeEditorSettingsProps {
   settings: {
-    theme: string;
-    wordWrap: boolean;
-    showMinimap: boolean;
-    lineNumbers: boolean;
-    fontSize: string;
+    theme: string;              // 编辑器主题
+    wordWrap: boolean;          // 自动换行
+    showMinimap: boolean;       // 显示缩略图
+    lineNumbers: boolean;       // 显示行号
+    fontSize: string;           // 字体大小
   };
-  setCodeEditorTheme: (theme: string) => void;
-  setCodeEditorWordWrap: (wrap: boolean) => void;
-  setCodeEditorShowMinimap: (show: boolean) => void;
-  setCodeEditorLineNumbers: (show: boolean) => void;
-  setCodeEditorFontSize: (size: string) => void;
-  t: (key: string) => string;
+  setCodeEditorTheme: (theme: string) => void;         // 设置主题
+  setCodeEditorWordWrap: (wrap: boolean) => void;      // 设置自动换行
+  setCodeEditorShowMinimap: (show: boolean) => void;   // 设置缩略图显示
+  setCodeEditorLineNumbers: (show: boolean) => void;   // 设置行号显示
+  setCodeEditorFontSize: (size: string) => void;       // 设置字体大小
+  t: (key: string) => string;                          // 翻译函数
 }
 
 /**
  * Code Editor Settings sub-component
  */
+// 代码编辑器设置子组件
 function CodeEditorSettings({
   settings,
   setCodeEditorTheme,
@@ -59,8 +69,10 @@ function CodeEditorSettings({
 }: CodeEditorSettingsProps) {
   return (
     <div className="space-y-4">
+      {/* 区域标题 */}
       <h3 className="text-lg font-semibold text-foreground">{t('settings.appearance.codeEditor')}</h3>
 
+      {/* 编辑器主题设置 */}
       <SettingRow label={t('settings.appearance.editorTheme')} description={t('settings.appearance.editorThemeDescription')}>
         <ToggleSwitch
           checked={settings.theme === 'dark'}
@@ -70,6 +82,7 @@ function CodeEditorSettings({
         />
       </SettingRow>
 
+      {/* 自动换行设置 */}
       <SettingRow label={t('settings.appearance.wordWrap')} description={t('settings.appearance.wordWrapDescription')}>
         <ToggleSwitch
           checked={settings.wordWrap}

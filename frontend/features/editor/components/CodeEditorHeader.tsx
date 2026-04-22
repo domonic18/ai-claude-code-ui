@@ -3,6 +3,8 @@ import React from 'react';
 import { X, Save, Download, Maximize2, Minimize2, Eye, Edit } from 'lucide-react';
 import type { CodeEditorFile } from '../types/editor.types';
 
+// 布局常量：工具栏按钮间距、图标尺寸等
+
 // 编辑器头部栏主组件：包含文件信息和工具栏
 /**
  * 编辑器头部栏属性接口
@@ -38,6 +40,11 @@ interface MarkdownPreviewToggleProps {
  * 仅在 Markdown 文件时显示，提供三种视图切换
  */
 function MarkdownPreviewToggle({ previewMode, onSetPreviewMode }: MarkdownPreviewToggleProps) {
+    // 当前激活的按钮样式条件：白色背景、深色文字、阴影
+    const activeButtonClass = "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm";
+    // 非激活按钮样式条件：灰色文本、悬停效果
+    const inactiveButtonClass = "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300";
+
     return (
         // 按钮组容器：隐藏在移动端，显示在中等及以上屏幕
         <div className="hidden md:flex items-center bg-gray-100 dark:bg-gray-800 rounded-md p-1">
@@ -101,19 +108,21 @@ interface SaveButtonProps {
  * 根据保存状态显示不同颜色和图标
  */
 function SaveButton({ saving, saveSuccess, onSave }: SaveButtonProps) {
+    // 按钮样式：根据保存状态动态调整背景色
+    const buttonColorClass = saveSuccess
+        ? 'bg-green-600 hover:bg-green-700'  // 成功状态：绿色
+        : 'bg-blue-600 hover:bg-blue-700';   // 默认/保存中：蓝色
+
     return (
         <button
             onClick={onSave}
-            disabled={saving}  // 保存中禁用按钮
-            className={`px-3 py-2 text-white rounded-md disabled:opacity-50 flex items-center gap-2 transition-colors min-h-[44px] md:min-h-0 ${
-                saveSuccess
-                    ? 'bg-green-600 hover:bg-green-700'  // 成功状态：绿色
-                    : 'bg-blue-600 hover:bg-blue-700'     // 默认/保存中：蓝色
-            }`}
+            disabled={saving}  // 保存中禁用按钮，防止重复提交
+            className={`px-3 py-2 text-white rounded-md disabled:opacity-50 flex items-center gap-2 transition-colors min-h-[44px] md:min-h-0 ${buttonColorClass}`}
         >
             {saveSuccess ? (
                 // 保存成功状态：显示对勾和 "Saved!" 文本
                 // 绿色背景，对勾图标 + "Saved!" 文本
+                // 2秒后自动恢复默认状态
                 <>
                     <svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -123,6 +132,7 @@ function SaveButton({ saving, saveSuccess, onSave }: SaveButtonProps) {
             ) : (
                 // 默认/保存中状态：显示软盘图标和状态文本
                 // 蓝色背景，软盘图标 + "Save"/"Saving..." 文本
+                // 保存中时按钮禁用，防止重复点击
                 <>
                     <Save className="w-5 h-5 md:w-4 md:h-4" />
                     <span className="hidden sm:inline">{saving ? 'Saving...' : 'Save'}</span>

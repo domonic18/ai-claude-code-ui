@@ -140,9 +140,16 @@ export interface UseChatInterfaceResult {
 }
 
 // 由组件调用，自定义 Hook：useChatInterface
+// 由组件调用，自定义 Hook：useChatInterface
 /**
  * Main hook for ChatInterface component
  * Extracts all complex logic and state management
+ *
+ * 这是 ChatInterface 组件的核心 Hook，负责：
+ * 1. 集中管理所有状态（输入、附件、加载状态、会话、任务、权限模式等）
+ * 2. 集成所有子 Hooks（消息管理、流式渲染、模型选择、消息发送等）
+ * 3. 处理 WebSocket 消息分发和状态更新
+ * 4. 提供 Handler 回调函数给组件使用
  */
 export function useChatInterface({
   selectedProject,
@@ -181,9 +188,12 @@ export function useChatInterface({
   const [tokenBudget, setTokenBudget] = useState<any>(null);
   // 权限模式：控制工具执行的权限策略（默认/接受编辑/绕过权限/计划模式）
   const [permissionMode, setPermissionMode] = useState<'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'>('default');
+
   // Agent 交互提问状态：当 Agent 调用 AskUserQuestion 时记录 toolUseID，
   // 下一条用户消息将作为回答发送（user-answer）而非新命令
   const pendingQuestionRef = useRef<{ toolUseID: string; sessionId: string } | null>(null);
+
+  // ========== Hook 集成 ==========
   // 加载可用的 AI 模型列表（Claude、OpenAI、Cursor 等）
   const { availableModels } = useModelsLoader();
   // 模型切换通知：当用户切换到不兼容的模型时显示警告
@@ -198,17 +208,24 @@ export function useChatInterface({
   const chatService = useRef(getChatService({ projectName: selectedProject?.name }));
   // 当项目名称变化时，更新聊天服务的配置
   useEffect(() => { if (selectedProject?.name) chatService.current.setConfig({ projectName: selectedProject.name }); }, [selectedProject?.name]);
+
+  // ========== 工具函数 ==========
   // 认证请求封装：为每个请求自动添加 JWT Token 到 Authorization 头
   const authenticatedFetch = useCallback(async (url: string, options?: RequestInit) => {
     const token = localStorage.getItem('auth_token');
     return fetch(url, { ...options, headers: { ...options?.headers, Authorization: token ? `Bearer ${token}` : '' } });
   }, []);
+
+  // ========== 菜单系统集成 ==========
   // 菜单系统：处理斜杠命令菜单和文件引用菜单的显示/隐藏逻辑
   const menu = useChatMenuSystem({ selectedProject, authenticatedFetch, onShowSettings, onShowAllTasks, onSetMessages: setMessages, setInput });
+
+  // ========== 会话管理 ==========
   // 会话管理：加载历史会话、创建新会话、切换会话时的状态重置
   useChatSessionManagement({ selectedProject, selectedSession, newSessionCounter, currentSessionId, authenticatedFetch, setCurrentSessionId, setMessages, setInput });
 
-  // --- Agent 交互提问状态管理（必须在 useChatWebSocketProcessor / useMessageSender 之前定义） ---
+  // ========== Agent 交互提问状态管理 ==========
+  // 注意：此部分必须在 useChatWebSocketProcessor / useMessageSender 之前定义
   // 处理用户回答 Agent 交互提问：发送 user-answer 消息
   const sendUserAnswer = useCallback((toolUseID: string, sessionId: string, answer: string) => {
     if (sendMessage) {
@@ -247,16 +264,20 @@ export function useChatInterface({
     ...stream,
   });
 
+  // ========== 消息发送处理 ==========
   const { handleSend } = useMessageSender({
     input, isLoading, currentSessionId, attachedFiles, selectedModel, selectedProject, ws, sendMessage,
     onAddMessage: addMessage, onStartStream: stream.startStream, onSetLoading: setIsLoading,
     onSetInput: setInput, onSetAttachedFiles: setAttachedFiles, onSessionActive, onSessionProcessing, permissionMode,
     consumePendingQuestion,
   });
+
+  // 附件处理：添加或更新附件（如果已存在则更新，否则添加）
   const handleAddFile = useCallback((file: FileAttachment) => {
     setAttachedFiles(prev => { const i = prev.findIndex(f => f.id === file.id); if (i >= 0) { const u = [...prev]; u[i] = file; return u; } return [...prev, file]; });
   }, []);
 
+  // ========== 返回状态和处理函数 ==========
   return {
     input, setInput, attachedFiles, setAttachedFiles, isLoading, setIsLoading, currentSessionId, setCurrentSessionId,
     tasks, setTasks, tokenBudget, setTokenBudget, permissionMode, setPermissionMode,

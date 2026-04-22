@@ -3,6 +3,18 @@
  *
  * Handles user input with modular hooks and components.
  * This component now uses specialized hooks for keyboard handling and menu positioning.
+ *
+ * 组件职责：
+ * 1. 管理用户输入状态（文本、焦点、拖拽等）
+ * 2. 处理键盘事件（Enter 发送、Ctrl+Enter 发送、菜单导航）
+ * 3. 集成斜杠命令和文件引用自动完成功能
+ * 4. 支持文件附件上传和预览
+ * 5. 自动调整输入框高度（多行文本）
+ *
+ * 架构设计：
+ * - useChatInputState: 管理输入框状态（焦点、光标位置、拖拽状态）
+ * - useChatInputSetup: 配置键盘处理和菜单定位
+ * - ChatInputWrapper: 渲染输入框 UI（文本框、附件预览、菜单等）
  */
 
 import { useTranslation } from 'react-i18next';
@@ -88,10 +100,15 @@ const DEFAULT_INPUT_PROPS = {
  *
  * A multi-line text input with file attachment support and slash commands.
  * Refactored to use modular hooks for keyboard handling and menu positioning.
+ *
+ * @param props - 组件属性（输入值、回调函数、菜单状态等）
+ * @returns JSX 元素
  */
 export function ChatInput(props: ChatInputComponentProps) {
+  // 国际化翻译 Hook
   const { t } = useTranslation();
 
+  // ========== 属性解构与默认值合并 ==========
   // Merge props with defaults
   const {
     value, onChange, onSend, files, onAddFile, onRemoveFile,
@@ -106,7 +123,9 @@ export function ChatInput(props: ChatInputComponentProps) {
     authenticatedFetch, selectedProject,
   } = { ...DEFAULT_INPUT_PROPS, ...props };
 
+  // ========== 使用 Hooks ==========
   // Use custom hook for state management
+  // useChatInputState 管理输入框的内部状态（焦点、光标位置、文件上传等）
   const state = useChatInputState({
     value, onChange, onSend, disabled, isLoading, sendByCtrlEnter,
     onFocusChange, maxFileSize, minRows, maxRows, projectName,
@@ -114,6 +133,7 @@ export function ChatInput(props: ChatInputComponentProps) {
   });
 
   // Setup keyboard and menu configuration
+  // useChatInputSetup 配置键盘事件处理和菜单位置计算
   const { handleKeyDown, menuProps } = useChatInputSetup({
     textareaRef: state.textareaRef,
     sendByCtrlEnter, onSend, value, onChange,
@@ -125,6 +145,8 @@ export function ChatInput(props: ChatInputComponentProps) {
     authenticatedFetch, selectedProject, frequentCommands,
   });
 
+  // ========== 构建 ChatInputWrapper 属性 ==========
+  // 将所有状态和处理函数打包传递给 ChatInputWrapper 组件
   const wrapperProps = {
     files,
     handleRemoveFile: state.handleRemoveFile,
@@ -152,6 +174,7 @@ export function ChatInput(props: ChatInputComponentProps) {
     menuProps,
   };
 
+  // ========== 渲染 UI ==========
   return <ChatInputWrapper {...wrapperProps} />;
 }
 

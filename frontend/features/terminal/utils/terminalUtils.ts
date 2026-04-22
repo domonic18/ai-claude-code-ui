@@ -6,6 +6,8 @@
  * - ansiProcessor.ts - ANSI color code parsing and stripping
  * - terminalThemes.ts - Theme color definitions
  * - processUtils.ts  - Process status, duration, and size helpers
+ *
+ * 终端工具函数模块，重新导出各个子模块的功能以保持向后兼容
  */
 
 // Command utilities
@@ -45,6 +47,7 @@ export function getStatusIconInfo(status: ProcessStatus): {
   color: string;
   label: string;
 } {
+  // 状态到 UI 元素的映射表
   const statusMap = {
     idle: { icon: 'Circle', color: 'text-gray-500', label: 'Idle' },
     running: { icon: 'Loader2', color: 'text-blue-500', label: 'Running' },
@@ -54,6 +57,7 @@ export function getStatusIconInfo(status: ProcessStatus): {
     terminated: { icon: 'XCircle', color: 'text-gray-500', label: 'Terminated' },
   };
 
+  // 返回对应状态的信息，如果状态不存在则返回 idle 状态
   return statusMap[status] || statusMap.idle;
 }
 
@@ -62,8 +66,11 @@ export function getStatusIconInfo(status: ProcessStatus): {
  * 格式化退出码为可读字符串
  */
 export function formatExitCode(exitCode: number | null): string {
+  // 退出码为 null 时返回 N/A
   if (exitCode === null) return 'N/A';
+  // 退出码为 0 表示成功
   if (exitCode === 0) return 'Success (0)';
+  // 其他退出码表示错误
   return `Error (${exitCode})`;
 }
 
@@ -72,10 +79,12 @@ export function formatExitCode(exitCode: number | null): string {
  * 将毫秒时长格式化为人类可读字符串
  */
 export function formatDuration(ms: number): string {
+  // 计算小时、分钟、秒
   const seconds = Math.floor(ms / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
 
+  // 根据时长选择合适的格式
   if (hours > 0) {
     return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
   }
@@ -90,9 +99,11 @@ export function formatDuration(ms: number): string {
  * 解析终端尺寸字符串为数字对象
  */
 export function parseTerminalSize(size: string): { cols: number; rows: number } | null {
+  // 使用正则表达式匹配 "列数x行数" 格式
   const match = size.match(/^(\d+)x(\d+)$/);
   if (!match) return null;
 
+  // 返回包含列数和行数的对象
   return {
     cols: parseInt(match[1], 10),
     rows: parseInt(match[2], 10),
@@ -112,6 +123,7 @@ export function formatTerminalSize(cols: number, rows: number): string {
  * 检查进程是否处于活动状态
  */
 export function isProcessActive(status: ProcessStatus): boolean {
+  // 进程活动状态包括 running 和 idle
   return status === 'running' || status === 'idle';
 }
 
@@ -120,5 +132,6 @@ export function isProcessActive(status: ProcessStatus): boolean {
  * 检查进程是否已完成
  */
 export function isProcessFinished(status: ProcessStatus): boolean {
+  // 进程完成状态包括 completed、failed 和 terminated
   return status === 'completed' || status === 'failed' || status === 'terminated';
 }

@@ -50,17 +50,20 @@ export async function executeLogin(
   storeSession: (session: any) => void
 ): Promise<AuthResponse> {
   try {
+    // 使用 fetch API 发送登录请求到后端
     // 发送登录请求到后端 API
     const response = await fetch(`${baseUrl}${API_ENDPOINTS.LOGIN}`, {
       method: HTTP_METHODS.POST,
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(credentials),
+      body: JSON.stringify(credentials), // 将凭据对象序列化为 JSON 字符串
     });
 
+    // 检查 HTTP 响应状态码
     // 检查响应是否成功
     if (!response.ok) {
+      // 尝试从响应体解析错误消息，如果失败则使用默认消息
       // 尝试解析错误消息
       const error = await response.json().catch(() => ({ message: translate('auth.error.loginFailed') }));
       return {
@@ -69,8 +72,10 @@ export async function executeLogin(
       };
     }
 
+    // 登录成功，解析响应数据
     // 解析响应数据
     const data = await response.json();
+    // 构造类型化的认证响应对象
     const authResponse: AuthResponse = {
       success: true,
       user: data.user,
@@ -78,6 +83,7 @@ export async function executeLogin(
       message: data.message,
     };
 
+    // 如果登录成功，将会话信息存储到本地（包含 token、用户信息和认证状态）
     // 如果登录成功，将会话信息存储到本地
     if (authResponse.token) {
       storeSession({
@@ -89,6 +95,7 @@ export async function executeLogin(
 
     return authResponse;
   } catch (error) {
+    // 捕获网络错误或其他异常
     // 记录错误日志
     logger.error('Login error:', error);
     return {
@@ -121,17 +128,20 @@ export async function executeRegister(
   storeSession: (session: any) => void
 ): Promise<AuthResponse> {
   try {
+    // 使用 fetch API 发送注册请求到后端
     // 发送注册请求到后端 API
     const response = await fetch(`${baseUrl}${API_ENDPOINTS.REGISTER}`, {
       method: HTTP_METHODS.POST,
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(data), // 将注册数据序列化为 JSON 字符串
     });
 
+    // 检查 HTTP 响应状态码
     // 检查响应是否成功
     if (!response.ok) {
+      // 尝试从响应体解析错误消息
       // 尝试解析错误消息
       const error = await response.json().catch(() => ({ message: translate(DEFAULT_ERROR_MESSAGES.REGISTRATION_FAILED) }));
       return {
@@ -140,8 +150,10 @@ export async function executeRegister(
       };
     }
 
+    // 注册成功，解析响应数据
     // 解析响应数据
     const responseData = await response.json();
+    // 构造类型化的认证响应对象
     const authResponse: AuthResponse = {
       success: true,
       user: responseData.user,
@@ -149,6 +161,7 @@ export async function executeRegister(
       message: responseData.message,
     };
 
+    // 如果注册成功，将会话信息存储到本地（实现自动登录）
     // 如果注册成功，将会话信息存储到本地（自动登录）
     if (authResponse.token) {
       storeSession({
