@@ -203,13 +203,18 @@ export function useChatScroll(options: UseChatScrollOptions = {}): UseChatScroll
     onScrollChange,
   } = options;
 
-  // Use stable reference for messages to prevent unnecessary effect triggers
+  // 使用稳定的空数组引用，防止消息变化时触发不必要的副作用
   const messages = useMemo(() => rawMessages ?? EMPTY_MESSAGES, [rawMessages]);
 
+  // 滚动容器引用：指向包含消息列表的 DOM 元素
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // 消息列表末尾标记引用：用于自动滚动到底部时定位
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // 用户上滚状态：true 表示用户手动向上滚动了，此时禁用自动滚动
   const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
+  // 滚动位置缓存：记录加载更多消息前的滚动位置，用于恢复
   const scrollPositionRef = useRef({ height: 0, top: 0 });
+  // 加载状态标记：防止加载更多消息时触发滚动事件监听器
   const isLoadingRef = useRef(false);
 
   // Create scroll callbacks

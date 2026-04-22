@@ -200,28 +200,38 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
     consumePendingQuestion,
   } = options;
 
+  // 消息发送处理器：处理用户点击发送按钮或按 Ctrl+Enter 的逻辑
   const handleSend = useCallback(async () => {
+    // 验证输入：非空且不在加载状态
     if (!input.trim() || isLoading) return;
 
+    // 规范化输入内容：去除首尾空格
     const content = input.trim();
+    // 获取附件列表（图片、文件等）
     const files = attachedFiles;
 
-    // Clear input state
+    // 第一步：清空输入框和附件列表，移除 LocalStorage 中的草稿
     clearInputState(input, selectedProject, onSetInput, onSetAttachedFiles);
 
-    // Build and add user message
+    // 第二步：构建用户消息对象（包含文本、图片、文件）并添加到聊天界面
     const userMessage = buildUserMessage(content, files);
     onAddMessage(userMessage);
 
-    // 如果有 Agent 待回答的提问，将用户消息作为回答发送而非新命令
+    // 第三步：检查是否有 Agent 的待回答提问
+    // 如果有，将用户消息作为回答发送（user-answer 类型），不再发送新的 claude-command
     if (consumePendingQuestion?.(content)) {
       return; // 已作为 user-answer 发送，不需要发送 claude-command
     }
 
-    // Prepare message sending
+    // 第四步：准备发送消息
+    // - 标记会话为活跃状态
+    // - 设置加载动画
+    // - 开始流式内容接收
     prepareMessageSending(currentSessionId, onSessionActive, onSetLoading, onStartStream);
 
-    // Send via WebSocket
+    // 第五步：通过 WebSocket 发送消息到后端
+    // 消息类型：claude-command
+    // 携带内容：命令文本、附件、会话 ID、模型名称、权限模式等
     if (sendMessage && ws) {
       sendWebSocketMessage(
         sendMessage,

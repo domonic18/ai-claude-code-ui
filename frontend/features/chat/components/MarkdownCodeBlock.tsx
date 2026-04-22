@@ -6,12 +6,19 @@
  * @module features/chat/components/MarkdownCodeBlock
  */
 
+// 导入 React 核心依赖和 Hooks（状态、缓存、引用、副作用）
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+// 导入 ReactMarkdown 组件，用于将 Markdown 转换为 React 元素
 import ReactMarkdown from 'react-markdown';
+// 导入 Markdown 渲染器 Props 类型定义
 import type { MarkdownRendererProps } from '../types';
+// 导入复制按钮组件，用于代码块一键复制
 import { CopyButton } from './CopyButton';
+// 导入终端风格代码块组件，用于 bash/shell 代码渲染
 import { TerminalCodeBlock } from './TerminalCodeBlock';
 
+// 懒加载阈值：10KB
+// 超过此大小的 Markdown 内容会使用懒加载策略，避免一次性渲染大量 KaTeX 公式导致 UI 卡顿
 const LAZY_LOAD_THRESHOLD = 10 * 1024;
 
 /**
@@ -33,31 +40,47 @@ export function LazyLoadedMarkdown({
   rehypePlugins: any[];
   components: any;
 }) {
+  // 展开状态：false=显示预览，true=显示完整内容
   const [isExpanded, setIsExpanded] = useState(false);
+  // 渲染状态：false=渲染中，true=渲染完成
   const [isRendered, setIsRendered] = useState(false);
+  // 渲染定时器引用，用于延迟渲染（50ms 后显示完整内容）
   const renderTimeoutRef = useRef<NodeJS.Timeout>();
 
+  // 预览内容计算：使用 useMemo 缓存预览内容，避免每次渲染都重新计算
+  // 仅显示前 500 字符，超出部分添加省略提示
   const preview = useMemo(() => {
+    // 将内容按行分割
     const lines = content.split('\n');
     let previewLength = 0;
     const previewLines: string[] = [];
 
+    // 逐行追加，直到达到 500 字符限制
     for (const line of lines) {
       previewLines.push(line);
-      previewLength += line.length + 1;
+      previewLength += line.length + 1;  // +1 是换行符
       if (previewLength > 500) break;
     }
 
+    // 添加中文省略提示
     return previewLines.join('\n') + '\n\n... *(内容过长，点击"查看完整内容"加载)*';
   }, [content]);
 
+  /**
+   * 展开状态变化的副作用
+   *
+   * 当用户点击"查看完整内容"时，延迟 50ms 后设置 isRendered
+   * 延迟的目的是确保 UI 先显示加载动画，再执行昂贵的 KaTeX 渲染
+   */
   useEffect(() => {
     if (!isExpanded) return;
 
+    // 延迟 50ms 后标记为已渲染
     renderTimeoutRef.current = setTimeout(() => {
       setIsRendered(true);
     }, 50);
 
+    // 清理函数：组件卸载或收起时取消定时器
     return () => {
       if (renderTimeoutRef.current) {
         clearTimeout(renderTimeoutRef.current);

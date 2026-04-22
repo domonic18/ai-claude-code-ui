@@ -7,7 +7,9 @@
  * @module features/terminal/hooks/useTerminalCallbacks
  */
 
+// 导入 useCallback Hook
 import { useCallback } from 'react';
+// 导入日志工具
 import { logger } from '@/shared/utils/logger';
 
 /**
@@ -25,6 +27,7 @@ export function createConnectionCallbacks(
 ) {
   /**
    * Disconnect WebSocket connection
+   * 断开 WebSocket 连接
    */
   const disconnect = useCallback(() => {
     if (wsRef.current) {
@@ -37,6 +40,7 @@ export function createConnectionCallbacks(
 
   /**
    * Reconnect WebSocket
+   * 重新连接 WebSocket（先断开）
    */
   const reconnect = useCallback(() => {
     disconnect();
@@ -76,6 +80,7 @@ export function createWebSocketHandlers(
 ) {
   /**
    * Handle WebSocket open event
+   * 处理 WebSocket 连接建立事件
    */
   const handleOpen = useCallback(() => {
     setIsConnected(true);
@@ -85,6 +90,7 @@ export function createWebSocketHandlers(
 
   /**
    * Handle WebSocket close event
+   * 处理 WebSocket 连接关闭事件
    */
   const handleClose = useCallback(() => {
     setIsConnected(false);
@@ -94,6 +100,7 @@ export function createWebSocketHandlers(
 
   /**
    * Handle WebSocket error event
+   * 处理 WebSocket 连接错误事件
    */
   const handleError = useCallback((event: Event) => {
     logger.error('WebSocket error:', event);
@@ -105,6 +112,7 @@ export function createWebSocketHandlers(
 
   /**
    * Handle WebSocket message event
+   * 处理 WebSocket 消息接收事件
    */
   const handleMessage = useCallback((event: MessageEvent) => {
     if (!isMountedRef.current) return;

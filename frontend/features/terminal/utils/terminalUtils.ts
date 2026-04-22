@@ -9,6 +9,7 @@
  */
 
 // Command utilities
+// 命令工具函数：解析、格式化、验证命令
 export {
   formatCommand,
   parseCommand,
@@ -22,18 +23,22 @@ export {
 } from './commandUtils';
 
 // ANSI processing
+// ANSI 处理：解析和移除颜色转义码
 export { parseAnsiColors, stripAnsiCodes } from './ansiProcessor';
 export type { AnsiSegment } from './ansiProcessor';
 
 // Terminal themes
+// 终端主题：获取主题颜色配置
 export { getTerminalThemeColors } from './terminalThemes';
 export type { ThemeColors } from './terminalThemes';
 
 // Process status utilities
+// 进程状态工具：格式化状态、时间、尺寸
 import type { ProcessStatus } from '../types';
 
 /**
  * Get status icon, color, and label for a process status
+ * 获取进程状态对应的图标、颜色和标签
  */
 export function getStatusIconInfo(status: ProcessStatus): {
   icon: string;
@@ -54,6 +59,7 @@ export function getStatusIconInfo(status: ProcessStatus): {
 
 /**
  * Format exit code into readable string
+ * 格式化退出码为可读字符串
  */
 export function formatExitCode(exitCode: number | null): string {
   if (exitCode === null) return 'N/A';
@@ -63,6 +69,7 @@ export function formatExitCode(exitCode: number | null): string {
 
 /**
  * Format duration in milliseconds to human-readable string
+ * 将毫秒时长格式化为人类可读字符串
  */
 export function formatDuration(ms: number): string {
   const seconds = Math.floor(ms / 1000);
@@ -80,6 +87,7 @@ export function formatDuration(ms: number): string {
 
 /**
  * Parse terminal size string (e.g., "80x24")
+ * 解析终端尺寸字符串为数字对象
  */
 export function parseTerminalSize(size: string): { cols: number; rows: number } | null {
   const match = size.match(/^(\d+)x(\d+)$/);
@@ -93,6 +101,7 @@ export function parseTerminalSize(size: string): { cols: number; rows: number } 
 
 /**
  * Format terminal size as string
+ * 格式化终端尺寸为字符串
  */
 export function formatTerminalSize(cols: number, rows: number): string {
   return `${cols}x${rows}`;
@@ -100,6 +109,7 @@ export function formatTerminalSize(cols: number, rows: number): string {
 
 /**
  * Check if process is in an active state
+ * 检查进程是否处于活动状态
  */
 export function isProcessActive(status: ProcessStatus): boolean {
   return status === 'running' || status === 'idle';
@@ -107,6 +117,7 @@ export function isProcessActive(status: ProcessStatus): boolean {
 
 /**
  * Check if process is in a finished state
+ * 检查进程是否已完成
  */
 export function isProcessFinished(status: ProcessStatus): boolean {
   return status === 'completed' || status === 'failed' || status === 'terminated';

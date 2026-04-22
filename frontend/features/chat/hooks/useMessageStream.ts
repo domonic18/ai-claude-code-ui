@@ -75,10 +75,15 @@ interface UseStreamBufferReturn {
 function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn {
   const { throttleInterval, onStreamUpdate, onHasContent } = options;
 
+  // 当前显示的流式内容（已从缓冲区刷新到状态）
   const [streamingContent, setStreamingContent] = useState('');
+  // 当前显示的思考过程内容（已从缓冲区刷新到状态）
   const [streamingThinking, setStreamingThinking] = useState('');
+  // 内容缓冲区：临时存储接收到的流式内容片段
   const streamBufferRef = useRef('');
+  // 思考过程缓冲区：临时存储接收到的思考内容片段
   const thinkingBufferRef = useRef('');
+  // 节流定时器引用：控制缓冲区刷新频率
   const streamTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearStreamTimer = useCallback(() => {
@@ -162,7 +167,9 @@ export function useMessageStream(options: UseMessageStreamOptions = {}): UseMess
     onStreamUpdate,
   } = options;
 
+  // 是否正在流式传输：true 表示正在接收 AI 响应
   const [isStreaming, setIsStreaming] = useState(false);
+  // 内容标志：用于检测是否有实际内容（避免空响应触发回调）
   const hasContentRef = useRef(false);
 
   const setHasContent = useCallback(() => {

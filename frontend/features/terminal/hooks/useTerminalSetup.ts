@@ -5,11 +5,15 @@
  * Handles addon loading, keyboard events, resize observation, and cleanup.
  */
 
+// 导入 React Hooks
 import { useEffect, useRef } from 'react';
+// 导入 xterm.js 核心库
 import { Terminal } from '@xterm/xterm';
+// 导入 xterm.js 插件
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+// 导入日志工具
 import { logger } from '@/shared/utils/logger';
 
 // TerminalSetup 的类型定义
@@ -104,13 +108,15 @@ function createTerminalInstance(
 
   terminal.open(terminalRef.current!);
 
-  // Custom keyboard handling
+  // 自定义键盘处理
   terminal.attachCustomKeyEventHandler((event) => {
+    // Ctrl/Cmd + C 复制选中文本
     if ((event.ctrlKey || event.metaKey) && event.key === 'c' && terminal.hasSelection()) {
       document.execCommand('copy');
       return false;
     }
 
+    // Ctrl/Cmd + V 粘贴剪贴板内容
     if ((event.ctrlKey || event.metaKey) && event.key === 'v') {
       navigator.clipboard.readText().then(text => {
         send({ type: 'input', data: text });
@@ -121,18 +127,18 @@ function createTerminalInstance(
     return true;
   });
 
-  // Initial fit
+  // 初始适配：延迟执行以确保 DOM 完全渲染
   setTimeout(() => {
     fitAddon.fit();
     onResize?.(terminal.cols, terminal.rows);
   }, 100);
 
-  // Data input handler
+  // 数据输入处理器：用户输入时触发
   terminal.onData((data) => {
     onInput?.(data);
   });
 
-  // Resize observer
+  // 尺寸观察器：监听容器尺寸变化
   const resizeObserver = new ResizeObserver(() => {
     setTimeout(() => {
       fitAddon.fit();
@@ -167,6 +173,7 @@ export function useTerminalSetup(options: UseTerminalSetupOptions): TerminalSetu
   const isInitializedRef = useRef(false);
 
   useEffect(() => {
+    // 防止重复初始化
     if (!terminalRef.current || !initKey || isRestarting || terminal.current) {
       return;
     }
@@ -183,6 +190,7 @@ export function useTerminalSetup(options: UseTerminalSetupOptions): TerminalSetu
     isInitializedRef.current = true;
     onInitialized();
 
+    // 清理函数：组件卸载或依赖变化时执行
     return () => {
       resizeObserver.disconnect();
 
