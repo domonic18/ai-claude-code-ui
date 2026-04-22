@@ -6,6 +6,7 @@
  * @module projects/discovery/baseDiscoveryNormalizers
  */
 
+// 在发现项目后调用，将不同 AI 代理的项目数据统一为标准格式
 /**
  * Normalizes project object
  * @param {Object} rawProject - Raw project data
@@ -26,6 +27,7 @@ export function normalizeProject(rawProject, provider) {
   };
 }
 
+// 在发现会话后调用，将不同 AI 代理的会话数据统一为标准格式
 /**
  * Normalizes session object
  * @param {Object} rawSession - Raw session data

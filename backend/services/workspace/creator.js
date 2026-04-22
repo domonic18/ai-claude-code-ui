@@ -20,6 +20,7 @@ import {
 
 const logger = createLogger('services/workspace/creator');
 
+// creator.js 功能函数
 /**
  * 创建工作空间选项
  * @typedef {Object} CreateWorkspaceOptions
@@ -31,6 +32,7 @@ const logger = createLogger('services/workspace/creator');
  * @property {number} userId - 用户 ID
  */
 
+// creator.js 功能函数
 /**
  * 创建工作空间结果
  * @typedef {Object} CreateWorkspaceResult
@@ -41,6 +43,7 @@ const logger = createLogger('services/workspace/creator');
  * @property {string} [details] - 错误详情
  */
 
+// creator.js 功能函数
 /**
  * 创建现有工作空间
  *
@@ -72,6 +75,7 @@ export async function createExistingWorkspace(workspacePath) {
   }
 }
 
+// creator.js 功能函数
 /**
  * 创建新工作空间
  *
@@ -153,6 +157,7 @@ export async function createNewWorkspace(workspacePath, options) {
   }
 }
 
+// 在创建工作区时调用，初始化项目目录和配置
 /**
  * 创建工作空间（统一入口）
  *

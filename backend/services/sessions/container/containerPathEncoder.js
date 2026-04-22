@@ -9,6 +9,8 @@
  * @module sessions/container/containerPathEncoder
  */
 
+// 在构建容器路径时调用，将主机项目路径编码为 Docker 容器内路径格式
+// containerPathEncoder.js 功能函数
 /**
  * 编码项目名称为容器内存储格式
  *

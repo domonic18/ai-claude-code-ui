@@ -12,6 +12,8 @@ import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('services/scm/gitCommitAI');
 
+// 在解析 AI 响应时调用，根据响应类型提取生成的提交消息文本
+// gitCommitAI.js 功能函数
 /**
  * AI 响应类型 → 文本提取器
  * 每种响应类型对应一个提取函数，返回文本或空字符串
@@ -28,6 +30,8 @@ const RESPONSE_EXTRACTORS = {
   'text': (parsed) => parsed.text ?? '',
 };
 
+// 在 AI 生成提交消息后调用，从 AI 响应中提取纯文本内容
+// gitCommitAI.js 功能函数
 /**
  * 从 AI 提供者的原始响应中提取文本
  * @param {string|Object} data - 原始响应数据
@@ -39,6 +43,7 @@ export function extractResponseText(data) {
   return extractor ? extractor(parsed) : '';
 }
 
+// gitCommitAI.js 功能函数
 /**
  * AI provider registry — each provider implements a query function
  * @param {string} provider - AI 提供者
@@ -71,6 +76,7 @@ async function queryAIProvider(prompt, projectPath, provider) {
   return responseText;
 }
 
+// gitCommitAI.js 功能函数
 /**
  * 清理 AI 生成的提交消息
  * @param {string} text - 原始文本
@@ -91,6 +97,7 @@ export function cleanCommitMessage(text) {
   return cleaned.trim();
 }
 
+// gitCommitAI.js 功能函数
 /**
  * 使用 AI 生成提交消息
  * @param {string} projectPath - 项目路径

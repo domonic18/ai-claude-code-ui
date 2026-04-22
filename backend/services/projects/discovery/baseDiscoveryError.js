@@ -6,6 +6,7 @@
  * @module projects/discovery/baseDiscoveryError
  */
 
+// 在项目发现操作失败时调用，统一错误格式并添加元数据便于调试
 /**
  * Standardizes error with metadata
  * @param {Error} error - Original error

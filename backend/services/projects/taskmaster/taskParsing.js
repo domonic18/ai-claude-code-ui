@@ -43,6 +43,7 @@ export function parseTasksData(tasksData) {
     return { tasks, currentTag };
 }
 
+// taskParsing.js 功能函数
 /**
  * 将原始任务数据转换为标准格式
  * @param {Object} task - 原始任务对象
@@ -64,6 +65,7 @@ export function normalizeTask(task) {
     };
 }
 
+// taskParsing.js 功能函数
 /**
  * 按状态统计任务数量
  * @param {Array} tasks - 任务列表

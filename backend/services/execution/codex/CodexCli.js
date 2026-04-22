@@ -12,6 +12,7 @@ import { createLogger } from '../../../utils/logger.js';
 
 const logger = createLogger('services/execution/codex/CodexCli');
 
+// 由 Codex 相关 API 调用，执行 codex CLI 命令并收集输出
 /**
  * 执行 Codex CLI 命令并收集输出
  * @param {string[]} args - CLI 参数
@@ -36,6 +37,7 @@ export async function executeCodexCli(args) {
   });
 }
 
+// 由 API 路由层调用，执行 Codex CLI 命令并格式化为 HTTP 响应
 /**
  * 执行 Codex CLI 命令并格式化 HTTP 响应
  * @param {string[]} args - CLI 参数
@@ -79,6 +81,7 @@ export async function runCodexCliCommand(args, options = {}) {
   }
 }
 
+// 由 MCP 服务器列表 API 调用，解析 codex mcp list 输出
 /**
  * 解析 codex mcp list 的输出
  * @param {string} output - CLI stdout
@@ -113,6 +116,7 @@ export function parseCodexListOutput(output) {
   return servers;
 }
 
+// 由 MCP 服务器详情 API 调用，解析 codex mcp get 输出
 /**
  * 解析 codex mcp get 的输出
  * @param {string} output - CLI stdout

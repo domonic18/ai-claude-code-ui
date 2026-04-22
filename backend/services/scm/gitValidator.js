@@ -15,6 +15,8 @@ import { gitSpawn } from './gitSpawn.js';
 
 const logger = createLogger('services/scm/gitValidator');
 
+// 在 Git 操作前调用，将编码后的项目名称解码为实际文件系统路径
+// gitValidator.js 功能函数
 /**
  * 从编码的项目名称中获取实际项目路径
  * @param {string} projectName - 编码的项目名称
@@ -29,6 +31,8 @@ export async function resolveProjectPath(projectName) {
     }
 }
 
+// 在执行 Git 操作前调用，验证路径是否存在且为 Git 仓库根目录
+// gitValidator.js 功能函数
 /**
  * 验证指定路径是否为有效的 git 仓库
  * @param {string} projectPath - 项目路径

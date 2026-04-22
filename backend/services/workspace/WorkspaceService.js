@@ -13,6 +13,8 @@ import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('services/workspace/WorkspaceService');
 
+// 在容器内执行命令并等待完成，用于工作区初始化和 git 操作
+// WorkspaceService.js 功能函数
 /**
  * Execute a command in the container and wait for it to complete
  * @param {string} userId - User identifier
@@ -61,6 +63,7 @@ async function execAndWait(userId, command, options = {}) {
   });
 }
 
+// WorkspaceService.js 功能函数
 /**
  * Clone a GitHub repository into a container path
  * @param {string} userId - User identifier
@@ -91,6 +94,7 @@ async function cloneRepository(userId, githubUrl, containerPath, auth = {}) {
   await execAndWait(userId, ['rm', '-rf', `${containerPath}/temp-repo`]);
 }
 
+// WorkspaceService.js 功能函数
 /**
  * Build project info object for API response
  * @param {string} projectName - Normalized project name
@@ -111,6 +115,7 @@ function buildProjectInfo(projectName, cleanPath) {
   };
 }
 
+// WorkspaceService.js 功能函数
 /**
  * Create a new workspace in the container
  * @param {string} userId - User identifier
@@ -156,6 +161,7 @@ export async function createNewWorkspace(userId, params) {
   }
 }
 
+// WorkspaceService.js 功能函数
 /**
  * Add an existing workspace from the container
  * @param {string} userId - User identifier
@@ -179,6 +185,7 @@ export async function addExistingWorkspace(userId, workspacePath) {
   return buildProjectInfo(projectName, workspacePath);
 }
 
+// 由删除工作区 API 调用，删除指定工作区
 /**
  * Delete a project directory from the container
  * @param {string} userId - User identifier

@@ -13,11 +13,13 @@ import { normalizeProject, normalizeSession } from './baseDiscoveryNormalizers.j
 import { applyPagination } from './baseDiscoveryPagination.js';
 import { standardizeError } from './baseDiscoveryError.js';
 
+// 基类，由 ClaudeDiscovery、CursorDiscovery、CodexDiscovery 继承，定义统一的项目发现接口
 /**
  * 项目发现器基类
  * 所有 AI 代理的项目发现器必须继承此类
  */
 export class BaseDiscovery {
+  // 初始化发现器配置，验证必需参数（name 和 provider）
   /**
    * 构造函数
    * @param {Object} config - 发现器配置
@@ -38,6 +40,7 @@ export class BaseDiscovery {
     this.provider = config.provider;
   }
 
+// BaseDiscovery.js 功能函数
   /**
    * 获取项目列表
    * @abstract
@@ -48,6 +51,7 @@ export class BaseDiscovery {
     throw new Error(`getProjects() must be implemented by ${this.name}`);
   }
 
+// BaseDiscovery.js 功能函数
   /**
    * 获取项目会话
    * @abstract
@@ -61,6 +65,7 @@ export class BaseDiscovery {
     throw new Error(`getProjectSessions() must be implemented by ${this.name}`);
   }
 
+// BaseDiscovery.js 功能函数
   /**
    * 检查项目是否为空（无会话）
    * @abstract
@@ -71,6 +76,7 @@ export class BaseDiscovery {
     throw new Error(`isProjectEmpty() must be implemented by ${this.name}`);
   }
 
+// BaseDiscovery.js 功能函数
   /**
    * 获取项目根目录
    * @protected
@@ -81,6 +87,7 @@ export class BaseDiscovery {
     throw new Error(`_getProjectsRoot() must be implemented by ${this.name}`);
   }
 
+// BaseDiscovery.js 功能函数
   /**
    * 规范化项目对象
    * @protected
@@ -91,6 +98,7 @@ export class BaseDiscovery {
     return normalizeProject(rawProject, this.provider);
   }
 
+// BaseDiscovery.js 功能函数
   /**
    * 规范化会话对象
    * @protected
@@ -101,6 +109,7 @@ export class BaseDiscovery {
     return normalizeSession(rawSession, this.provider);
   }
 
+// BaseDiscovery.js 功能函数
   /**
    * 应用分页和排序
    * @protected
@@ -112,6 +121,7 @@ export class BaseDiscovery {
     return applyPagination(items, options);
   }
 
+// BaseDiscovery.js 功能函数
   /**
    * 标准化错误
    * @protected
@@ -123,6 +133,7 @@ export class BaseDiscovery {
     return standardizeError(error, operation, this.name, this.provider);
   }
 
+// BaseDiscovery.js 功能函数
   /**
    * 验证项目标识符
    * @protected
@@ -133,6 +144,7 @@ export class BaseDiscovery {
     return validateProjectIdentifier(projectIdentifier);
   }
 
+// BaseDiscovery.js 功能函数
   /**
    * 获取发现器信息
    * @returns {Object} 发现器信息
@@ -146,6 +158,7 @@ export class BaseDiscovery {
     };
   }
 
+// BaseDiscovery.js 功能函数
   /**
    * 获取发现器类型
    * @returns {string} 发现器类型

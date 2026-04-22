@@ -8,6 +8,7 @@
 
 import { spawn } from 'child_process';
 
+// github-service.js 功能函数
 /**
  * GitHub 令牌信息
  * @typedef {Object} GithubToken
@@ -15,6 +16,7 @@ import { spawn } from 'child_process';
  * @property {string} github_token - GitHub 访问令牌
  */
 
+// github-service.js 功能函数
 /**
  * 克隆仓库结果
  * @typedef {Object} CloneResult
@@ -22,6 +24,7 @@ import { spawn } from 'child_process';
  * @property {string} stderr - 标准错误输出
  */
 
+// github-service.js 功能函数
 /**
  * 从数据库获取 GitHub 令牌
  *
@@ -48,6 +51,7 @@ export async function getGithubTokenById(tokenId, userId) {
   return null;
 }
 
+// github-service.js 功能函数
 /**
  * 克隆 GitHub 仓库
  *
@@ -112,6 +116,7 @@ export function cloneGitHubRepository(githubUrl, destinationPath, githubToken = 
   });
 }
 
+// github-service.js 功能函数
 /**
  * 解析 Git 错误消息以提供有用的反馈
  *
@@ -134,6 +139,7 @@ function parseGitError(stderr) {
   return 'Git clone failed';
 }
 
+// github-service.js 功能函数
 /**
  * 验证 GitHub URL 格式
  *

@@ -10,6 +10,7 @@
 import { ISessionManager } from '../../core/interfaces/ISessionManager.js';
 import { JsonlParser } from '../../core/utils/jsonl-parser.js';
 
+// 基类，由 ContainerSessionManager 继承，定义统一的会话管理接口
 /**
  * 抽象会话管理器基类
  * 所有会话管理器都必须继承此类并实现抽象方法
@@ -17,6 +18,7 @@ import { JsonlParser } from '../../core/utils/jsonl-parser.js';
  * @abstract
  */
 export class BaseSessionManager extends ISessionManager {
+  // 初始化会话管理器配置，设置名称和版本
   /**
    * 构造函数
    * @param {Object} config - 管理器配置
@@ -29,6 +31,7 @@ export class BaseSessionManager extends ISessionManager {
     this.version = config.version || '1.0.0';
   }
 
+// 抽象方法，由子类实现获取会话列表
   /**
    * 获取会话列表
    * @abstract
@@ -40,6 +43,7 @@ export class BaseSessionManager extends ISessionManager {
     throw new Error(`getSessions() must be implemented by ${this.name}`);
   }
 
+// 由会话详情 API 调用，获取单个会话的所有消息内容
   /**
    * 获取会话消息
    * @abstract
@@ -52,6 +56,7 @@ export class BaseSessionManager extends ISessionManager {
     throw new Error(`getSessionMessages() must be implemented by ${this.name}`);
   }
 
+// 抽象方法，由子类实现删除会话
   /**
    * 删除会话
    * @abstract
@@ -64,6 +69,7 @@ export class BaseSessionManager extends ISessionManager {
     throw new Error(`deleteSession() must be implemented by ${this.name}`);
   }
 
+// BaseSessionManager.js 功能函数
   /**
    * 获取会话统计信息
    * @abstract
@@ -75,6 +81,7 @@ export class BaseSessionManager extends ISessionManager {
     throw new Error(`getSessionStats() must be implemented by ${this.name}`);
   }
 
+// BaseSessionManager.js 功能函数
   /**
    * 搜索会话
    * @abstract
@@ -87,6 +94,7 @@ export class BaseSessionManager extends ISessionManager {
     throw new Error(`searchSessions() must be implemented by ${this.name}`);
   }
 
+// BaseSessionManager.js 功能函数
   /**
    * 获取管理器类型
    * @returns {string} 管理器类型标识
@@ -95,6 +103,7 @@ export class BaseSessionManager extends ISessionManager {
     return this.managerType || 'base';
   }
 
+// BaseSessionManager.js 功能函数
   /**
    * 解析 JSONL 文件内容
    * @protected
@@ -106,6 +115,7 @@ export class BaseSessionManager extends ISessionManager {
     return JsonlParser.parse(content, options);
   }
 
+// BaseSessionManager.js 功能函数
   /**
    * 序列化会话为 JSONL
    * @protected
@@ -116,6 +126,7 @@ export class BaseSessionManager extends ISessionManager {
     return JsonlParser.serializeAll(sessions);
   }
 
+// BaseSessionManager.js 功能函数
   /**
    * 验证会话 ID
    * @protected
@@ -136,6 +147,7 @@ export class BaseSessionManager extends ISessionManager {
     return { valid: true, error: null };
   }
 
+// BaseSessionManager.js 功能函数
   /**
    * 应用分页和排序
    * @protected
@@ -178,6 +190,7 @@ export class BaseSessionManager extends ISessionManager {
     };
   }
 
+// BaseSessionManager.js 功能函数
   /**
    * 过滤会话
    * @protected
@@ -203,6 +216,7 @@ export class BaseSessionManager extends ISessionManager {
     return filtered;
   }
 
+// BaseSessionManager.js 功能函数
   /**
    * 标准化错误消息
    * @protected
@@ -220,6 +234,7 @@ export class BaseSessionManager extends ISessionManager {
     };
   }
 
+// BaseSessionManager.js 功能函数
   /**
    * 获取管理器信息
    * @returns {Object} 管理器信息

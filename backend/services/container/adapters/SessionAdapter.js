@@ -7,6 +7,7 @@
  * @module container/adapters/SessionAdapter
  */
 
+// 会话管理服务调用此适配器从容器读取和管理会话文件
 import containerManager from '../core/index.js';
 import { CONTAINER } from '../../../config/config.js';
 import { JsonlParser } from '../../core/utils/jsonl-parser.js';
@@ -31,6 +32,7 @@ import {
 
 const logger = createLogger('services/container/adapters/SessionAdapter');
 
+// 容器会话适配器，将容器会话操作适配到 ISessionManager 接口
 /**
  * 容器会话适配器
  * 将容器会话操作适配到 ISessionManager 接口
@@ -47,6 +49,7 @@ export class SessionAdapter {
     this.jsonlParser = new JsonlParser();
   }
 
+  // 会话管理服务调用此函数获取项目的会话列表
   /**
    * 获取项目会话列表
    * @param {string} projectIdentifier - 项目标识
@@ -83,6 +86,7 @@ export class SessionAdapter {
     }
   }
 
+  // 会话管理服务调用此函数获取特定会话的消息列表
   /**
    * 获取会话消息
    * @param {string} projectIdentifier - 项目标识
@@ -124,6 +128,7 @@ export class SessionAdapter {
     }
   }
 
+  // 会话管理服务调用此函数删除特定会话
   /**
    * 删除会话
    * @param {string} projectIdentifier - 项目标识
@@ -165,6 +170,7 @@ export class SessionAdapter {
     }
   }
 
+  // 会话管理服务调用此函数获取项目的会话统计信息
   /**
    * 获取会话统计信息
    * @param {string} projectIdentifier - 项目标识
@@ -187,6 +193,7 @@ export class SessionAdapter {
     }
   }
 
+  // 会话管理服务调用此函数按查询搜索会话
   /**
    * 搜索会话
    * @param {string} query - 搜索查询
@@ -213,6 +220,7 @@ export class SessionAdapter {
     }
   }
 
+  // 内部方法：获取所有项目的所有会话
   /**
    * 获取所有会话
    * @private

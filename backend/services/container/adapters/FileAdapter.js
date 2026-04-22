@@ -7,6 +7,7 @@
  * @module container/adapters/FileAdapter
  */
 
+// 执行引擎和会话管理器调用此适配器在容器内执行文件操作
 import containerManager from '../core/index.js';
 import { PathValidator } from '../../core/utils/path-utils.js';
 import { createLogger } from '../../../utils/logger.js';
@@ -19,6 +20,7 @@ import { toContainerPath, parseStatOutput, buildFileTree } from './fileAdapterHe
 
 const logger = createLogger('services/container/adapters/FileAdapter');
 
+// 容器文件适配器，将容器文件操作适配到 IFileOperations 接口
 /**
  * Container file adapter
  * Adapts container file operations to IFileOperations interface
@@ -35,6 +37,7 @@ export class FileAdapter {
     this.pathValidator = new PathValidator();
   }
 
+  // 执行引擎调用此函数从容器内读取文件内容
   /**
    * Reads file
    * @param {string} filePath - File path
@@ -79,6 +82,7 @@ export class FileAdapter {
     }
   }
 
+  // 执行引擎调用此函数将内容写入容器内文件
   /**
    * Writes file
    * @param {string} filePath - File path
@@ -122,6 +126,7 @@ export class FileAdapter {
     }
   }
 
+  // 会话管理器调用此函数获取容器内目录的文件树结构
   /**
    * Gets file tree
    * @param {string} dirPath - Directory path
@@ -158,6 +163,7 @@ export class FileAdapter {
     }
   }
 
+  // 文件浏览器调用此函数获取容器内文件的统计信息
   /**
    * Gets file stats
    * @param {string} filePath - File path
@@ -186,6 +192,7 @@ export class FileAdapter {
     }
   }
 
+  // 文件浏览器调用此函数删除容器内文件
   /**
    * Deletes file
    * @param {string} filePath - File path
@@ -217,6 +224,7 @@ export class FileAdapter {
     }
   }
 
+  // 执行引擎调用此函数检查容器内文件是否存在
   /**
    * Checks if file exists
    * @param {string} filePath - File path
@@ -231,6 +239,7 @@ export class FileAdapter {
     }
   }
 
+  // 文件浏览器调用此函数在容器内创建目录
   /**
    * Creates directory
    * @param {string} dirPath - Directory path
@@ -265,6 +274,7 @@ export class FileAdapter {
     }
   }
 
+  // 内部方法：从 Docker exec 流读取命令输出
   /**
    * Reads command output stream
    * @private
@@ -275,6 +285,7 @@ export class FileAdapter {
     return readStreamOutput(stream);
   }
 
+  // 内部方法：标准化错误对象以便统一处理
   /**
    * Standardizes error
    * @private
