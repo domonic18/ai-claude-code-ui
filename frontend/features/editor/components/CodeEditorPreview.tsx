@@ -11,6 +11,9 @@ interface CodeEditorPreviewProps {
     previewMode: 'edit' | 'preview' | 'split';
 }
 
+/**
+ * Markdown 实时预览面板：使用 ReactMarkdown + KaTeX 渲染，通过 DOMPurify 防止 XSS
+ */
 export function CodeEditorPreview({ content, previewMode }: CodeEditorPreviewProps) {
     if (previewMode === 'edit') {
         return null;

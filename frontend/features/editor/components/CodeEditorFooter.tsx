@@ -4,6 +4,9 @@ interface CodeEditorFooterProps {
     content: string;
 }
 
+/**
+ * 编辑器底部状态栏：显示行数、字符数和快捷键提示
+ */
 export function CodeEditorFooter({ content }: CodeEditorFooterProps) {
     return (
         <div className="flex items-center justify-between p-3 border-t border-border bg-muted flex-shrink-0">

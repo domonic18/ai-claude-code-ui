@@ -8,6 +8,9 @@ interface CodeEditorLoadingProps {
     fileName: string;
 }
 
+/**
+ * 编辑器文件加载占位组件：侧边栏和全屏两种布局模式
+ */
 export function CodeEditorLoading({ isDarkMode, isSidebar, fileName }: CodeEditorLoadingProps) {
     return (
         <>

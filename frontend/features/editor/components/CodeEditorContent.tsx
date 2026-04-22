@@ -20,6 +20,9 @@ interface CodeEditorContentProps {
     setContent: (content: string) => void;
 }
 
+/**
+ * 编辑器内容区域：根据预览模式组合编辑面板和 Markdown 预览面板的布局
+ */
 export function CodeEditorContent({
     file,
     content,

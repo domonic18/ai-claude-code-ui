@@ -7,6 +7,9 @@ interface CodeEditorWrapperProps {
     children: React.ReactNode;
 }
 
+/**
+ * 编辑器外壳组件：根据侧边栏/全屏模式切换不同的定位和尺寸策略
+ */
 export function CodeEditorWrapper({ isSidebar, isFullscreen, children }: CodeEditorWrapperProps) {
     return (
         <>

@@ -13,16 +13,24 @@ interface UseEditorSettingsReturn {
     setFontSize: (size: string) => void;
 }
 
-/** Initialize state from localStorage with fallback */
+/**
+ * 从 localStorage 读取字符串值，不存在则返回默认值
+ */
 function initFromStorage(key: string, fallback: string): string {
     return localStorage.getItem(key) || fallback;
 }
 
+/**
+ * 从 localStorage 读取布尔值，不存在则返回默认值
+ */
 function initBoolFromStorage(key: string, fallback: boolean): boolean {
     const val = localStorage.getItem(key);
     return val !== null ? val === 'true' : fallback;
 }
 
+/**
+ * 编辑器设置 Hook：管理暗色模式、自动换行、minimap、行号、字号等偏好，持久化到 localStorage 并监听跨标签页同步
+ */
 export function useEditorSettings(): UseEditorSettingsReturn {
     const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
         const saved = localStorage.getItem('codeEditorTheme');
