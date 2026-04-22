@@ -9,7 +9,7 @@
 import React from 'react';
 import type { FileNode } from '../types/file-explorer.types';
 import type { TFunction } from 'i18next';
-import { formatFileSize, formatRelativeTime } from '../utils/fileTreeHelpers';
+import { formatFileSize, formatRelativeTime } from '../utils/fileFormatters';
 
 // Layout props interface
 export interface LayoutProps {

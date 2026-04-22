@@ -25,7 +25,7 @@ function isMessageGrouped(messageType: string, prevMessage?: any): boolean {
 /**
  * 将消息类型映射为头部显示类型
  */
-function getDisplayHeaderType(messageType: string): string {
+function getDisplayHeaderType(messageType: string): 'error' | 'assistant' | 'tool' {
   if (messageType === 'tool') return 'tool';
   if (messageType === 'error') return 'error';
   return 'assistant';

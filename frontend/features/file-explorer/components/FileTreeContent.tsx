@@ -11,13 +11,13 @@ import { ScrollArea } from '@/shared/components/ui/ScrollArea';
 import { cn } from '@/lib/utils';
 import { FileTreeViews } from './FileTreeViews';
 import { FileTreeEmptyStates } from './FileTreeEmptyStates';
-import type { FileNode } from '../types/file-explorer.types';
+import type { FileNode, FileViewMode } from '../types/file-explorer.types';
 
 export interface FileTreeContentProps {
   files: FileNode[];
   filteredFiles: FileNode[];
   searchQuery: string;
-  viewMode: string;
+  viewMode: FileViewMode;
   expandedDirs: Set<string>;
   selectedFolder: FileNode | null;
   renamingFile: string | null;
@@ -38,7 +38,7 @@ export interface FileTreeContentProps {
   onDelete: (item: FileNode) => Promise<void>;
   onDragStart: (item: FileNode, e: React.DragEvent) => void;
   onDragOver: (item: FileNode | null, e: React.DragEvent) => void;
-  onDragLeave: () => void;
+  onDragLeave: (e: React.DragEvent) => void;
   onDrop: (item: FileNode | null, e: React.DragEvent) => void;
 }
 

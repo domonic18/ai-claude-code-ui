@@ -8,7 +8,6 @@
 
 import React from 'react';
 import { Mic, Loader2, Brain } from 'lucide-react';
-import type { MicState } from './micButtonHelpers';
 
 // Re-export recording functions
 export {

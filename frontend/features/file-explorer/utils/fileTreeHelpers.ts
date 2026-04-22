@@ -16,7 +16,7 @@ export const DEFAULT_FILE_CONTENT = '\n';
 export const INVALID_NAME_CHARS = /[\\/:*?"<>|]/;
 
 // Re-export formatting helpers from fileFormatters.ts
-export { formatFileSize, formatRelativeTime, isImageFile } from './fileFormatters';
+export { isImageFile } from './fileFormatters';
 
 /**
  * 从完整容器路径中提取相对路径
