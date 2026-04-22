@@ -15,10 +15,10 @@ interface ChatInputWrapperProps {
   files: FileAttachment[];
   /** Handle remove file */
   handleRemoveFile: (fileId: string) => void;
-  /** Get root props */
-  getRootProps: () => Record<string, unknown>;
-  /** Get input props */
-  getInputProps: () => Record<string, unknown>;
+  /** Get root props (react-dropzone) */
+  getRootProps: (props?: any) => any;
+  /** Get input props (react-dropzone) */
+  getInputProps: (props?: any) => any;
   /** Is drag active */
   isDragActive: boolean;
   /** Is focused */

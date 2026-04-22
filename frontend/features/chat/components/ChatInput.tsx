@@ -8,7 +8,7 @@
 import { useTranslation } from 'react-i18next';
 import { ChatInputWrapper } from './ChatInputWrapper';
 import { useChatInputState, useChatInputSetup } from '../hooks';
-import type { ChatInputProps } from '../types';
+import type { ChatInputProps, FileAttachment } from '../types';
 import { MAX_FILE_SIZE } from '../constants';
 
 import type { SlashCommand } from '../hooks/useSlashCommands';
