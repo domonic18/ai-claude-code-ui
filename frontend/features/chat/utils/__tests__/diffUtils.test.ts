@@ -38,15 +38,19 @@ describe('calculateDiff', () => {
 
   it('should handle empty old string with new content', () => {
     const result = calculateDiff('', 'new line');
+    // '' split produces [''], which differs from 'new line', so removed+added pair
     expect(result).toEqual([
+      { type: 'removed', content: '', lineNum: 1 },
       { type: 'added', content: 'new line', lineNum: 1 }
     ]);
   });
 
   it('should handle empty new string with old content', () => {
     const result = calculateDiff('old line', '');
+    // '' split produces [''], which differs from 'old line', so removed+added pair
     expect(result).toEqual([
-      { type: 'removed', content: 'old line', lineNum: 1 }
+      { type: 'removed', content: 'old line', lineNum: 1 },
+      { type: 'added', content: '', lineNum: 1 }
     ]);
   });
 

@@ -242,7 +242,7 @@ describe('truncateText', () => {
   });
 
   it('should truncate text exceeding default limit', () => {
-    const text = 'This is a very long text that should be truncated';
+    const text = 'This is a very long text that should be truncated and exceeds fifty characters';
     const result = truncateText(text);
     expect(result).toHaveLength(50);
     expect(result).toContain('...');
