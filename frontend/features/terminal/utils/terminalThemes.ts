@@ -1,14 +1,17 @@
 /**
  * Terminal Theme Colors
  *
- * Color scheme definitions for built-in terminal themes.
+ * 终端主题颜色配置模块
+ * 定义内置终端主题的颜色方案，支持多种流行配色方案（Monokai、Dracula、Nord 等）
+ * 与 xterm.js 的主题结构完全兼容
  */
 
 import type { TerminalTheme } from '../types';
 
 // ThemeColors 的类型别名定义
 /**
- * Theme colors type matching xterm.js theme structure
+ * 主题颜色类型定义
+ * 匹配 xterm.js 的主题结构，包含背景色、前景色、光标色、16 基础色和亮色
  */
 export type ThemeColors = {
   background: string;
@@ -34,7 +37,9 @@ export type ThemeColors = {
   brightWhite: string;
 };
 
-/** Built-in theme definitions */
+/** 内置主题定义 */
+// 包含 5 种主流终端配色方案：default（VS Code 默认）、monokai、dracula、nord、solarized
+// 每个主题定义了完整的 16 色 ANSI 调色板和 UI 元素颜色
 const themes: Record<TerminalTheme, ThemeColors> = {
   default: {
     background: '#1e1e1e',
@@ -154,9 +159,13 @@ const themes: Record<TerminalTheme, ThemeColors> = {
 };
 
 /**
- * Get terminal theme colors by theme name
- * @param theme - Theme identifier
- * @returns Theme color object for xterm.js
+ * 根据主题名称获取终端主题颜色配置
+ *
+ * 该函数是主题系统的核心入口，用于将主题标识符转换为 xterm.js 可用的颜色对象
+ * 如果请求的主题不存在，则返回默认主题作为降级方案
+ *
+ * @param theme - 主题标识符（TerminalTheme 枚举值）
+ * @returns 与 xterm.js 兼容的主题颜色对象，包含所有必需的颜色字段
  */
 export function getTerminalThemeColors(theme: TerminalTheme): ThemeColors {
   return themes[theme] || themes.default;

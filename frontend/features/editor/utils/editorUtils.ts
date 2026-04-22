@@ -14,7 +14,7 @@
 import type { EditorLanguage, EditorTheme } from '../types';
 
 // ─── Theme utilities ────────────────────────────────────
-
+// 主题背景色映射：支持 7 种编辑器主题
 const THEME_BG_COLORS: Record<EditorTheme, string> = {
   light: '#ffffff',
   dark: '#1e1e1e',
@@ -25,6 +25,7 @@ const THEME_BG_COLORS: Record<EditorTheme, string> = {
   github: '#ffffff',
 };
 
+// 主题前景色映射：文本颜色
 const THEME_FG_COLORS: Record<EditorTheme, string> = {
   light: '#000000',
   dark: '#d4d4d4',
@@ -52,7 +53,6 @@ export function getThemeForegroundColor(theme: EditorTheme): string {
 }
 
 // ─── JSON utilities ─────────────────────────────────────
-
 // JSON 编辑功能调用此函数格式化 JSON 字符串
 /**
  * Format JSON string with pretty printing
@@ -80,7 +80,7 @@ export function minifyJSON(json: string): string {
 }
 
 // ─── Binary detection ───────────────────────────────────
-
+// 二进制文件扩展名集合：图片、文档、压缩包、可执行文件、音视频、字体
 const BINARY_EXTENSIONS = new Set([
   '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.webp',
   '.pdf', '.zip', '.tar', '.gz', '.rar', '.7z',
@@ -100,6 +100,7 @@ export function isBinaryFile(content: string, filename: string): boolean {
     return true;
   }
 
+  // 检查文件内容是否包含空字节（二进制文件特征）
   if (content.includes('\0')) {
     return true;
   }
@@ -110,7 +111,6 @@ export function isBinaryFile(content: string, filename: string): boolean {
 }
 
 // ─── Position/offset utilities ──────────────────────────
-
 // 编辑器导航功能调用此函数将偏移量转换为行列号
 /**
  * Calculate line and column from offset
@@ -131,6 +131,7 @@ export function getOffsetFromPosition(content: string, line: number, column: num
   const lines = content.split('\n');
   let offset = 0;
 
+  // 累加前面所有行的长度（包含换行符）
   for (let i = 0; i < line - 1 && i < lines.length; i++) {
     offset += lines[i].length + 1; // +1 for newline
   }
@@ -139,7 +140,6 @@ export function getOffsetFromPosition(content: string, line: number, column: num
 }
 
 // ─── Code utilities ─────────────────────────────────────
-
 // 代码预览功能调用此函数截断代码到指定行数
 /**
  * Truncate code for preview
@@ -155,6 +155,7 @@ export function truncateCode(code: string, maxLines: number = 10): string {
 
 /**
  * Check unbalanced brackets in code
+ * 检查代码中的括号平衡：圆括号、方括号、花括号
  */
 function checkBrackets(code: string): string[] {
   const errors: string[] = [];
@@ -163,6 +164,7 @@ function checkBrackets(code: string): string[] {
   const openBrackets = Object.keys(brackets);
   const closeBrackets = Object.values(brackets);
 
+  // 遍历代码字符，检查括号匹配
   for (const char of code) {
     if (openBrackets.includes(char)) {
       stack.push(char);
@@ -191,7 +193,7 @@ export function validateCodeSyntax(code: string, language: EditorLanguage): {
 } {
   const errors: string[] = [];
 
-  // JSON-specific validation
+  // JSON 特殊验证：尝试解析 JSON 字符串
   if (language === 'json') {
     try {
       JSON.parse(code);
@@ -200,7 +202,7 @@ export function validateCodeSyntax(code: string, language: EditorLanguage): {
     }
   }
 
-  // Bracket balance check for all languages
+  // 所有语言都进行括号平衡检查
   errors.push(...checkBrackets(code));
 
   return {

@@ -2,6 +2,7 @@
  * Language Detection Hook
  *
  * Hook for detecting file language from filename and content.
+ * 根据文件扩展名和 shebang 检测编程语言
  */
 
 import { useCallback } from 'react';
@@ -12,6 +13,7 @@ export interface UseLanguageDetectionReturn {
   getLanguageExtension: (language: EditorLanguage) => string[];
 }
 
+// 文件扩展名到编程语言的映射表
 const LANGUAGE_MAP: Record<string, EditorLanguage> = {
   'js': 'javascript',
   'jsx': 'javascript',
@@ -54,18 +56,18 @@ export function useLanguageDetection(): UseLanguageDetectionReturn {
    * Detect language from filename and optional content
    */
   const detectLanguage = useCallback((filename: string, content?: string): EditorLanguage => {
-    // Get extension
+    // 获取文件扩展名
     const ext = filename.split('.').pop()?.toLowerCase();
     if (!ext) {
       return 'text';
     }
 
-    // Check extension map
+    // 检查扩展名映射表
     if (ext in LANGUAGE_MAP) {
       return LANGUAGE_MAP[ext];
     }
 
-    // Try to detect from content (shebang)
+    // 尝试从文件内容（shebang）检测
     if (content) {
       const firstLine = content.split('\n')[0].trim();
       if (firstLine.startsWith('#!')) {

@@ -1,19 +1,35 @@
 /**
  * Shell / Terminal Component
  *
- * Interactive terminal UI component with WebSocket shell support.
- * Connection logic is in hooks/useTerminalConnection.ts
- * Terminal setup is in hooks/useTerminalSetup.ts
+ * 终端 Shell 主组件
+ *
+ * 这是一个基于 xterm.js 的交互式终端组件，通过 WebSocket 与后端建立持久连接
+ * 支持两种模式：
+ * 1. Claude CLI 模式：完整的 AI 辅助命令行体验
+ * 2. Plain Shell 模式：直接执行 shell 命令
+ *
+ * 架构分层：
+ * - 连接逻辑：hooks/useTerminalConnection.ts
+ * - 终端设置：hooks/useTerminalSetup.ts
+ * - 业务逻辑：hooks/useShellLogic.ts
  */
 
+// 导入 React 核心库和 useRef Hook
 import React, { useRef } from 'react';
+// 导入 xterm.js 的默认样式表
 import '@xterm/xterm/css/xterm.css';
+// 导入终端组件的 Props 类型定义
 import type { ShellProps } from '../types/terminal.types';
+// 导入终端业务逻辑 Hook（管理连接、初始化、状态）
 import { useShellLogic } from '../hooks/useShellLogic';
+// 导入终端工具栏组件
 import { TerminalToolbar } from './TerminalToolbar';
+// 导入终端设置 Hook（管理 xterm.js 实例）
 import { useTerminalSetup } from '../hooks/useTerminalSetup';
 
-/** Inject xterm style overrides at module load */
+/** 在模块加载时注入 xterm.js 样式覆盖 */
+// 移除 xterm.js 默认的 focus outline，避免视觉干扰
+// 设置适当的 z-index 确保 terminal 和链接层的层级正确
 const xtermStyles = `
   .xterm .xterm-screen { outline: none !important; }
   .xterm:focus .xterm-screen { outline: none !important; }
@@ -22,6 +38,8 @@ const xtermStyles = `
   .xterm-link-layer { z-index: 2; }
 `;
 
+// 仅在浏览器环境中注入样式
+// 检查 document 是否存在，避免 SSR（服务端渲染）时报错
 if (typeof document !== 'undefined') {
   const styleSheet = document.createElement('style');
   styleSheet.type = 'text/css';
@@ -30,7 +48,8 @@ if (typeof document !== 'undefined') {
 }
 
 /**
- * Empty state when no project is selected
+ * 空状态占位组件
+ * 当用户未选择项目时显示，引导用户选择项目以打开终端
  */
 const NoProjectSelected: React.FC = () => (
   <div className="h-full flex items-center justify-center">
@@ -47,7 +66,9 @@ const NoProjectSelected: React.FC = () => (
 );
 
 /**
- * Overlay shown when terminal is connecting
+ * 连接中状态覆层组件
+ * 显示正在建立 WebSocket 连接的加载动画和提示信息
+ * 包含两种场景的提示文案：普通 Shell 和 Claude CLI
  */
 interface ConnectingOverlayProps {
   isPlainShell: boolean;
@@ -77,7 +98,10 @@ const ConnectingOverlay: React.FC<ConnectingOverlayProps> = ({
 );
 
 /**
- * Prompt shown when terminal is ready but not connected
+ * 连接提示组件
+ * 当终端已初始化但尚未连接时显示，提供"Continue in Shell"按钮
+ * 用户需要主动点击按钮才会发起连接，给予用户控制权
+ * 显示当前会话信息（如果有）和即将执行的操作
  */
 interface ConnectPromptProps {
   onConnect: () => void;
@@ -119,7 +143,18 @@ const ConnectPrompt: React.FC<ConnectPromptProps> = ({
 );
 
 /**
- * 终端 Shell 主组件：管理 xterm 实例、WebSocket 连接、工具栏和状态覆层
+ * 终端 Shell 主组件
+ *
+ * 该组件是终端功能的核心控制器，负责：
+ * 1. 协调 xterm.js 实例的创建和销毁
+ * 2. 管理 WebSocket 连接的生命周期
+ * 3. 渲染工具栏和各种状态覆层（连接中、已初始化、空状态）
+ * 4. 处理用户交互（断开连接、重启 Shell）
+ *
+ * 根据不同的 props 组合，可以渲染为：
+ * - 空状态（无项目）
+ * - 最小化模式（minimal=true，无工具栏）
+ * - 完整模式（带工具栏和状态覆层）
  */
 function Shell({
   selectedProject,
@@ -131,7 +166,12 @@ function Shell({
   autoConnect = false,
   isActive = false
 }: ShellProps) {
+  // 终端实例引用，用于在 useShellLogic 中访问 xterm.js 对象
+  // 使用 MutableRefObject 因为 xterm.js 实例会在 Hook 内部被修改
   const terminal = useRef<ReturnType<typeof useTerminalSetup>['terminal']['current']>(null);
+
+  // 使用自定义 Hook 管理所有 Shell 状态和逻辑
+  // 该 Hook 封装了连接管理、终端初始化、自动重连等复杂逻辑
   const shellState = useShellLogic({
     selectedProject,
     selectedSession,
@@ -142,14 +182,21 @@ function Shell({
     terminal
   });
 
+  // 空状态：未选择项目时显示占位组件
+  // 早期返回，避免渲染不必要的组件
   if (!selectedProject) {
     return <NoProjectSelected />;
   }
 
+  // 最小化模式：不显示工具栏和状态覆层，仅显示终端本身
+  // 适用于嵌入式场景或不需要 UI 控制的情况
+  // 早期返回优化，减少条件判断
   if (minimal) {
     return <MinimalTerminal terminalRef={shellState.terminalRef} />;
   }
 
+  // 完整模式：显示工具栏、终端和各种状态覆层
+  // 将所有状态和回调函数通过 props 传递给子组件
   return (
     <TerminalShell
       terminalRef={shellState.terminalRef}
@@ -170,7 +217,9 @@ function Shell({
 }
 
 /**
- * Minimal terminal view without toolbar
+ * 最小化终端组件
+ * 仅显示 xterm.js 终端实例，无工具栏和状态覆层
+ * 用于需要纯净终端体验的场景（如嵌入式视图、模态框等）
  */
 interface MinimalTerminalProps {
   terminalRef: React.RefObject<HTMLDivElement>;
@@ -178,12 +227,16 @@ interface MinimalTerminalProps {
 
 const MinimalTerminal: React.FC<MinimalTerminalProps> = ({ terminalRef }) => (
   <div className="h-full w-full bg-gray-900">
+    {/* 终端容器 ref 用于 xterm.js 挂载 DOM 元素 */}
+    {/* focus:outline-none 和 style={{ outline: 'none' }} 双重确保无焦点轮廓 */}
     <div ref={terminalRef} className="h-full w-full focus:outline-none" style={{ outline: 'none' }} />
   </div>
 );
 
 /**
- * Full terminal view with toolbar and overlays
+ * 完整终端视图组件
+ * 包含工具栏和所有状态覆层的完整终端界面
+ * 这是最常用的终端展示模式，提供完整的用户交互功能
  */
 interface TerminalShellProps {
   terminalRef: React.RefObject<HTMLDivElement>;
@@ -217,6 +270,7 @@ const TerminalShell: React.FC<TerminalShellProps> = ({
   onConnect
 }) => (
   <div className="h-full flex flex-col bg-gray-900 w-full">
+    {/* 终端工具栏：显示连接状态、会话信息和操作按钮 */}
     <TerminalToolbar
       isConnected={isConnected}
       isInitialized={isInitialized}
@@ -226,15 +280,20 @@ const TerminalShell: React.FC<TerminalShellProps> = ({
       onRestart={onRestart}
     />
 
+    {/* 终端容器：包含 xterm.js 实例和状态覆层 */}
     <div className="flex-1 p-2 overflow-hidden relative">
+      {/* xterm.js 终端实例挂载点 */}
       <div ref={terminalRef} className="h-full w-full focus:outline-none" style={{ outline: 'none' }} />
 
+      {/* 初始化中状态覆层：xterm.js 实例创建时显示 */}
       {!isInitialized && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-90 z-50">
           <div className="text-white">Loading terminal...</div>
         </div>
       )}
 
+      {/* 连接提示覆层：终端已初始化但未连接时显示 */}
+      {/* 仅在非连接状态下显示，提供用户主动连接的入口 */}
       {isInitialized && !isConnected && !isConnecting && (
         <ConnectPrompt
           onConnect={onConnect}
@@ -245,6 +304,7 @@ const TerminalShell: React.FC<TerminalShellProps> = ({
         />
       )}
 
+      {/* 连接中状态覆层：正在建立 WebSocket 连接时显示 */}
       {isConnecting && (
         <ConnectingOverlay
           isPlainShell={isPlainShell}

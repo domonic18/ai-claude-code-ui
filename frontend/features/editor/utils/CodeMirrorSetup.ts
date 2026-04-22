@@ -7,6 +7,7 @@
  * @module features/editor/utils/CodeMirrorSetup
  */
 
+// CodeMirror 语言支持：JavaScript、Python、HTML、CSS、JSON、Markdown
 import { javascript } from '@codemirror/lang-javascript';
 import { python } from '@codemirror/lang-python';
 import { html } from '@codemirror/lang-html';
@@ -25,7 +26,7 @@ import {
 } from './editorToolbarAssets.js';
 
 // ─── 语言扩展 ───────────────────────────────────────
-
+// 文件扩展名集合，用于快速判断语言类型
 const JS_TS_EXTS = new Set(['js', 'jsx', 'ts', 'tsx']);
 const HTML_EXTS = new Set(['html', 'htm']);
 const CSS_EXTS = new Set(['css', 'scss', 'less']);
@@ -50,7 +51,6 @@ export function getLanguageExtension(filename: string): Extension[] {
 }
 
 // ─── Minimap 扩展 ────────────────────────────────────
-
 /**
  * 创建 minimap 扩展（带 diff chunk gutter 标记）
  */
@@ -64,6 +64,7 @@ export function createMinimapExtension(options: {
 
     if (!diffInfo || !showDiff || !minimapEnabled) return [];
 
+    // 记录每行的 gutter 颜色（用于标记 diff chunk）
     const gutters: Record<number, string> = {};
 
     return [
@@ -71,8 +72,10 @@ export function createMinimapExtension(options: {
             const chunksData = getChunks(state);
             const chunks = chunksData?.chunks || [];
 
+            // 清空之前的 gutter 标记
             Object.keys(gutters).forEach(key => delete gutters[key]);
 
+            // 为每个 diff chunk 的所有行添加绿色 gutter 标记
             chunks.forEach(chunk => {
                 const fromLine = state.doc.lineAt(chunk.fromB).number;
                 const toLine = state.doc.lineAt(Math.min(chunk.toB, state.doc.length)).number;
@@ -93,7 +96,6 @@ export function createMinimapExtension(options: {
 }
 
 // ─── 滚动到第一个 chunk 扩展 ────────────────────────────
-
 /**
  * 创建初始化时自动滚动到第一个 diff chunk 的扩展
  */
@@ -106,10 +108,12 @@ export function createScrollToFirstChunkExtension(
     return [
         ViewPlugin.fromClass(class {
             constructor(view: EditorView) {
+                // 延迟 100ms 滚动，确保编辑器已完全渲染
                 setTimeout(() => {
                     const chunksData = getChunks(view.state);
                     const chunks = chunksData?.chunks || [];
 
+                    // 滚动到第一个变更块，方便用户快速定位
                     if (chunks.length > 0) {
                         view.dispatch({
                             effects: EditorView.scrollIntoView(chunks[0].fromB, { y: 'center' })
@@ -124,7 +128,6 @@ export function createScrollToFirstChunkExtension(
 }
 
 // ─── 工具栏面板扩展 ────────────────────────────────────
-
 /**
  * 创建编辑器顶部工具栏面板扩展
  */
@@ -136,6 +139,7 @@ export function createEditorToolbarPanel(options: ToolbarPanelOptions): Extensio
         dom.className = 'cm-editor-toolbar-panel';
         const currentIndexRef = { value: 0 };
 
+        // 更新工具栏面板 HTML：根据 diff 状态和选项生成按钮
         const updatePanel = () => {
             const hasDiff = diffInfo && showDiff;
             const chunksData = hasDiff ? getChunks(view.state) : null;
@@ -147,6 +151,7 @@ export function createEditorToolbarPanel(options: ToolbarPanelOptions): Extensio
                 ${buildActionsHTML(options)}
             </div>`;
 
+            // 绑定工具栏按钮点击事件
             bindToolbarEvents(dom, view, chunks, currentIndexRef, updatePanel, options);
         };
 

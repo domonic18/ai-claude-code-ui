@@ -7,7 +7,9 @@
  * @module features/terminal/hooks/useTerminal
  */
 
+// 导入 React 核心 Hooks
 import { useState, useCallback, useRef, useMemo } from 'react';
+// 导入终端相关的类型定义
 import type {
   TerminalOutput,
   TerminalProcess,
@@ -16,12 +18,17 @@ import type {
   TerminalOptions,
   TerminalTheme
 } from '../types';
+// 导入日志工具
 import { logger } from '@/shared/utils/logger';
+// 导入连接回调和 WebSocket 处理器
 import { createConnectionCallbacks, createWebSocketHandlers } from './useTerminalCallbacks';
+// 导入终端历史管理 Hook
 import { useTerminalHistory } from './useTerminalHistory';
+// 导入终端操作函数集合
 import { createTerminalOperations } from './useTerminalOperations';
 
-// Stable empty array reference to prevent unnecessary re-renders
+// 稳定的空数组引用，防止不必要的重新渲染
+// 这是 React 优化模式，避免每次渲染都创建新数组
 const EMPTY_ARGS: string[] = [];
 
 // UseTerminalOptions 的类型定义
@@ -67,10 +74,11 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
     onError,
   } = options;
 
-  // Use stable reference for args to prevent unnecessary callback recreations
+  // 使用稳定的引用来避免不必要的回调重新创建
+  // 如果 rawArgs 为 undefined，则使用空数组引用
   const args = useMemo(() => rawArgs ?? EMPTY_ARGS, [rawArgs]);
 
-  // State
+  // 状态管理：跟踪终端的各种状态
   const [process, setProcess] = useState<TerminalProcess | null>(null);
   const [outputs, setOutputs] = useState<TerminalOutput[]>([]);
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -78,11 +86,11 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
 
-  // Refs
+  // Refs：存储可变值，避免闭包陷阱
   const wsRef = useRef<WebSocket | null>(null);
   const isMountedRef = useRef(true);
 
-  // Create terminal operations
+  // 创建终端操作函数集合
   const operations = createTerminalOperations(
     wsRef,
     isConnected,
@@ -99,10 +107,10 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
     onOutput
   );
 
-  // Create connection callbacks
+  // 创建连接管理回调
   const connection = createConnectionCallbacks(wsRef, setIsConnected, setIsConnecting);
 
-  // Simple operations
+  // 清空输出的简单操作
   const clearOutput = useCallback(() => {
     setOutputs([]);
   }, []);
@@ -156,15 +164,16 @@ export function useTerminalOptions(
 
   /**
    * Update terminal options
+   * 更新终端选项并持久化到 localStorage
    */
   const updateOptions = useCallback((updates: Partial<TerminalOptions>) => {
     setOptions(prev => {
       const newOptions = { ...prev, ...updates };
-      // Persist to localStorage
+      // 持久化到 localStorage
       try {
         localStorage.setItem('terminal-options', JSON.stringify(newOptions));
       } catch {
-        // Ignore localStorage errors
+        // 忽略 localStorage 错误（如隐私模式或存储已满）
       }
       return newOptions;
     });
@@ -172,6 +181,7 @@ export function useTerminalOptions(
 
   /**
    * Set terminal theme
+   * 设置终端主题
    */
   const setTheme = useCallback((newTheme: TerminalTheme) => {
     updateOptions({ theme: newTheme });
@@ -179,13 +189,14 @@ export function useTerminalOptions(
 
   /**
    * Reset to defaults
+   * 重置为默认选项并清除 localStorage
    */
   const resetToDefaults = useCallback(() => {
     setOptions(DEFAULT_TERMINAL_OPTIONS);
     try {
       localStorage.removeItem('terminal-options');
     } catch {
-      // Ignore localStorage errors
+      // 忽略 localStorage 错误
     }
   }, []);
 
@@ -217,6 +228,7 @@ export function useTerminalScroll(): UseTerminalScrollReturn {
 
   /**
    * Scroll to bottom
+   * 滚动到终端底部
    */
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -226,13 +238,14 @@ export function useTerminalScroll(): UseTerminalScrollReturn {
 
   /**
    * Toggle auto-scroll
+   * 切换自动滚动模式并持久化到 localStorage
    */
   const toggleAutoScroll = useCallback(() => {
     setShouldAutoScroll(prev => !prev);
     try {
       localStorage.setItem('terminal-auto-scroll', String(!shouldAutoScroll));
     } catch {
-      // Ignore localStorage errors
+      // 忽略 localStorage 错误
     }
   }, [shouldAutoScroll]);
 

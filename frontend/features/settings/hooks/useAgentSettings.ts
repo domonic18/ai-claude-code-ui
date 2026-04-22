@@ -57,12 +57,18 @@ export interface UseAgentSettingsReturn {
 /**
  * Sub-hook for managing permission tool state and actions
  */
+// 管理权限工具状态的子 Hook
 function usePermissionTools() {
+  // 允许的工具列表状态
   const [allowedTools, setAllowedTools] = useState<string[]>([]);
+  // 禁止的工具列表状态
   const [disallowedTools, setDisallowedTools] = useState<string[]>([]);
+  // 新添加的允许工具输入值
   const [newAllowedTool, setNewAllowedTool] = useState('');
+  // 新添加的禁止工具输入值
   const [newDisallowedTool, setNewDisallowedTool] = useState('');
 
+  // 添加允许的工具到列表
   const addAllowedTool = useCallback(() => {
     if (newAllowedTool.trim() && !allowedTools.includes(newAllowedTool.trim())) {
       setAllowedTools(prev => [...prev, newAllowedTool.trim()]);
@@ -70,10 +76,12 @@ function usePermissionTools() {
     }
   }, [newAllowedTool, allowedTools]);
 
+  // 从允许列表中移除工具
   const removeAllowedTool = useCallback((tool: string) => {
     setAllowedTools(prev => prev.filter(t => t !== tool));
   }, []);
 
+  // 添加禁止的工具到列表
   const addDisallowedTool = useCallback(() => {
     if (newDisallowedTool.trim() && !disallowedTools.includes(newDisallowedTool.trim())) {
       setDisallowedTools(prev => [...prev, newDisallowedTool.trim()]);
@@ -81,6 +89,7 @@ function usePermissionTools() {
     }
   }, [newDisallowedTool, disallowedTools]);
 
+  // 从禁止列表中移除工具
   const removeDisallowedTool = useCallback((tool: string) => {
     setDisallowedTools(prev => prev.filter(t => t !== tool));
   }, []);
@@ -104,6 +113,7 @@ function usePermissionTools() {
 /**
  * Create load settings callback
  */
+// 创建加载设置的回调函数
 function createLoadSettingsCallback(
   agentType: AgentType,
   settingsService: ReturnType<typeof getSettingsService>,
@@ -116,12 +126,14 @@ function createLoadSettingsCallback(
     setIsLoading(true);
     try {
       // Load permissions using getPermissions()
+      // 从后端加载权限设置
       const permissions = await settingsService.getPermissions();
       permissionTools.setAllowedTools(permissions.allowedTools || []);
       permissionTools.setDisallowedTools(permissions.disallowedTools || []);
       setSkipPermissions(permissions.skipPermissions || false);
 
       // Load MCP servers (no parameters needed)
+      // 从后端加载 MCP 服务器列表
       const servers = await settingsService.getMcpServers();
       setMcpServers(servers);
     } catch (error) {
@@ -135,6 +147,7 @@ function createLoadSettingsCallback(
 /**
  * Create save permissions callback
  */
+// 创建保存权限设置的回调函数
 function createSavePermissionsCallback(
   settingsService: ReturnType<typeof getSettingsService>,
   skipPermissions: boolean,
@@ -148,12 +161,14 @@ function createSavePermissionsCallback(
     setSaveStatus('idle');
 
     try {
+      // 调用后端 API 更新权限设置
       const result = await settingsService.updatePermissions({
         skipPermissions,
         allowedTools,
         disallowedTools,
       });
 
+      // 根据保存结果设置状态
       if (result.success) {
         setSaveStatus('success');
       } else {
@@ -171,6 +186,7 @@ function createSavePermissionsCallback(
 /**
  * Build the return object for useAgentSettings
  */
+// 构建 useAgentSettings Hook 的返回对象
 function buildAgentSettingsReturn(
   permissionTools: ReturnType<typeof usePermissionTools>,
   skipPermissions: boolean,
@@ -189,6 +205,7 @@ function buildAgentSettingsReturn(
 ): UseAgentSettingsReturn {
   return {
     // Permission settings
+    // 返回权限设置相关状态和操作
     allowedTools: permissionTools.allowedTools,
     disallowedTools: permissionTools.disallowedTools,
     skipPermissions,
@@ -197,27 +214,32 @@ function buildAgentSettingsReturn(
     setSkipPermissions,
 
     // MCP servers
+    // 返回 MCP 服务器相关状态和操作
     mcpServers,
     setMcpServers,
 
     // Form state
+    // 返回表单输入状态
     newAllowedTool: permissionTools.newAllowedTool,
     setNewAllowedTool: permissionTools.setNewAllowedTool,
     newDisallowedTool: permissionTools.newDisallowedTool,
     setNewDisallowedTool: permissionTools.setNewDisallowedTool,
 
     // UI state
+    // 返回 UI 状态（表单显示、编辑状态）
     showMcpForm,
     setShowMcpForm,
     editingMcpServer,
     setEditingMcpServer,
 
     // Loading state
+    // 返回加载和保存状态
     isLoading,
     isSaving,
     saveStatus,
 
     // Actions
+    // 返回操作函数（加载、保存、增删改工具）
     loadSettings,
     savePermissions,
     addAllowedTool: permissionTools.addAllowedTool,
@@ -234,27 +256,37 @@ function buildAgentSettingsReturn(
 export function useAgentSettings(params: UseAgentSettingsParams): UseAgentSettingsReturn {
   const { agentType } = params;
 
+  // 获取设置服务实例
   const settingsService = getSettingsService();
 
   // Permission tools management
+  // 使用权限工具管理子 Hook
   const permissionTools = usePermissionTools();
 
   // Additional permission state
+  // 跳过权限确认的开关状态
   const [skipPermissions, setSkipPermissions] = useState<boolean>(false);
 
   // MCP servers state
+  // MCP 服务器列表状态
   const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
 
   // UI state
+  // MCP 表单显示状态
   const [showMcpForm, setShowMcpForm] = useState(false);
+  // 正在编辑的 MCP 服务器状态
   const [editingMcpServer, setEditingMcpServer] = useState<McpServer | null>(null);
 
   // Loading state
+  // 加载状态标志
   const [isLoading, setIsLoading] = useState(false);
+  // 保存状态标志
   const [isSaving, setIsSaving] = useState(false);
+  // 保存结果状态（成功/失败/空闲）
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   // Create callbacks
+  // 创建加载设置回调函数
   const loadSettings = createLoadSettingsCallback(
     agentType,
     settingsService,
@@ -264,6 +296,7 @@ export function useAgentSettings(params: UseAgentSettingsParams): UseAgentSettin
     setIsLoading
   );
 
+  // 创建保存权限设置回调函数
   const savePermissions = createSavePermissionsCallback(
     settingsService,
     skipPermissions,
@@ -274,6 +307,7 @@ export function useAgentSettings(params: UseAgentSettingsParams): UseAgentSettin
   );
 
   // Load settings when agent type changes
+  // 当 Agent 类型改变时重新加载设置
   useEffect(() => {
     loadSettings();
   }, [loadSettings, agentType]);
