@@ -20,6 +20,9 @@ import SettingsPanelLayout from './quick-settings/SettingsPanelLayout';
  * @param {Function} props.onSendByCtrlEnterChange - Send by Ctrl+Enter change handler
  * @param {boolean} props.isMobile - Whether in mobile view
  */
+/**
+ * 快捷设置面板：右侧拉手导航 + 遮罩层，聚合各项聊天行为偏好开关
+ */
 const QuickSettingsPanel = ({
   isOpen,
   onToggle,
