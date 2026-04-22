@@ -15,6 +15,9 @@ export interface ClaudeStatusProps {
   provider?: 'claude' | 'cursor' | 'codex';
 }
 
+/**
+ * Claude AI 推理状态栏：展示实时推理进度，模拟 token 生成速率和已用时间，支持中断按钮
+ */
 function ClaudeStatus({ status, onAbort, isLoading, provider = 'claude' }: ClaudeStatusProps) {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [animationPhase, setAnimationPhase] = useState(0);

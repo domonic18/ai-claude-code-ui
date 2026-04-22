@@ -24,6 +24,9 @@ interface MobileMenuButtonProps {
   onMenuClick: () => void;
 }
 
+/**
+ * 移动端汉堡菜单按钮：触摸优化，带 active 缩放反馈
+ */
 export function MobileMenuButton({ onMenuClick }: MobileMenuButtonProps) {
   return (
     <button
@@ -47,6 +50,9 @@ interface SessionProjectTitleProps {
   selectedProject?: Project | null;
 }
 
+/**
+ * 会话/项目标题区：根据当前 Tab 显示对应 Logo、会话名称或项目名
+ */
 export function SessionProjectTitle({ activeTab, selectedSession, selectedProject }: SessionProjectTitleProps) {
   const { t } = useTranslation();
 
@@ -119,6 +125,9 @@ interface TabNavigationProps {
   isAdmin: boolean;
 }
 
+/**
+ * Tab 导航栏：聊天 / Shell / 文件 三个标签页切换，带 Tooltip 提示
+ */
 export function TabNavigation({ activeTab, setActiveTab, isAdmin }: TabNavigationProps) {
   const { t } = useTranslation();
 

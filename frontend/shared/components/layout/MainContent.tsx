@@ -69,6 +69,10 @@ export interface MainContentProps {
   externalMessageUpdate?: number;
 }
 
+/**
+ * 主内容区域：根据加载状态和项目选择分发 Loading/Empty/Layout 视图，
+ * 同时作为会话保护 props 的桥接层
+ */
 function MainContent(props: MainContentProps) {
   const {
     selectedProject,

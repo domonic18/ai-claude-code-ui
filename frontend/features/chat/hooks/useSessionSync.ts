@@ -2,6 +2,9 @@
 import { useEffect, useRef } from 'react';
 import { STORAGE_KEYS } from '../constants';
 
+/**
+ * 会话选择同步 Hook：将 sidebar 的会话选择同步到聊天状态，切换时清理草稿输入
+ */
 export function useSessionSync({
   selectedSession,
   selectedProject,
