@@ -34,7 +34,7 @@ interface UseMessageStreamReturn {
   updateStreamThinking: (thinking: string) => void;
   /** Complete the stream */
   completeStream: () => void;
-  /** Reset stream state */
+  /** Reset stream state, discards any unflushed buffered content */
   resetStream: () => void;
 }
 
@@ -101,15 +101,20 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
     }
   }, []);
 
+  // Design: ref 先于 setState 更新，确保 timer callback 和 getBufferContent
+  // 能立即读到最新值（避免 stale closure）。setState 是异步的，
+  // 仅用于驱动 React 重渲染使 streamingContent state 对外可见。
+  // 因此测试中应通过 onStreamUpdate 回调或 completeStream 验证内容，
+  // 而非直接读取 streamingContent state（它可能尚未刷新）。
   const flushBuffer = useCallback(() => {
     if (streamBufferRef.current.length > 0) {
-      setStreamingContent(prev => prev + streamBufferRef.current);
       streamingContentRef.current += streamBufferRef.current;
+      setStreamingContent(prev => prev + streamBufferRef.current);
       streamBufferRef.current = '';
     }
     if (thinkingBufferRef.current.length > 0) {
-      setStreamingThinking(prev => prev + thinkingBufferRef.current);
       streamingThinkingRef.current += thinkingBufferRef.current;
+      setStreamingThinking(prev => prev + thinkingBufferRef.current);
       thinkingBufferRef.current = '';
     }
   }, []);
@@ -140,6 +145,7 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
     }, throttleInterval);
   }, [flushBuffer, clearStreamTimer, throttleInterval, onStreamUpdate]);
 
+  // 空依赖数组：内部只读 ref，不依赖任何 state，避免 stale closure
   const getBufferContent = useCallback(() => {
     return {
       content: streamingContentRef.current + streamBufferRef.current,
@@ -222,6 +228,9 @@ export function useMessageStream(options: UseMessageStreamOptions = {}): UseMess
     }
   }, [buffer, onStreamComplete]);
 
+  // 重置流状态。注意：与 completeStream 不同，resetStream 不刷新缓冲区，
+  // 会丢弃未发送的内容。这是有意为之——resetStream 用于取消/中止流，
+  // 而 completeStream 用于正常结束流并保留内容。
   const resetStream = useCallback(() => {
     buffer.clearStreamTimer();
     setIsStreaming(false);

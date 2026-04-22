@@ -162,8 +162,9 @@ describe('commandUtils', () => {
       });
     });
 
-    it('should accept safe > /dev/null usage', () => {
-      // Implementation treats > /dev/null as potentially dangerous
+    // NOTE: 当前实现对 > 重定向采用严格检测策略，即使是安全的 echo > /dev/null
+    // 也视为无效。这是已知的实现限制（正则 /|/ 不解析引号和上下文）。
+    it('should reject > /dev/null due to strict redirect detection', () => {
       expect(validateCommand('echo "test" > /dev/null')).toEqual({
         valid: false,
         error: expect.any(String)
