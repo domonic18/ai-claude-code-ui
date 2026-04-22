@@ -8,6 +8,7 @@
 
 import { logger } from '@/shared/utils/logger';
 import { buildInitMessage } from '../utils/webSocketFactory';
+import type { WebSocketConnectionParams } from './useTerminalConnection';
 
 /**
  * Extract process exit code from terminal output
