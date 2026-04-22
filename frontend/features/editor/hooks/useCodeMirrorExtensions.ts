@@ -24,6 +24,9 @@ interface UseCodeMirrorExtensionsReturn {
     editorToolbarPanel: any[];
 }
 
+/**
+ * CodeMirror 扩展组合 Hook：按依赖项缓存 minimap、diff 滚动定位、工具栏面板等扩展
+ */
 export function useCodeMirrorExtensions({
     file,
     showDiff,

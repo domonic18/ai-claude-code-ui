@@ -25,13 +25,16 @@ export interface UseEditorFileOpsReturn {
     handleDownload: () => void;
 }
 
+/**
+ * 根据文件扩展名判断是否为二进制文件（图片、文档、压缩包等）
+ */
 function isBinaryFile(filename: string): boolean {
     const ext = '.' + filename.split('.').pop()?.toLowerCase() || '';
     return BINARY_EXTENSIONS.includes(ext);
 }
 
 /**
- * Loads file content from disk or diff info
+ * 加载文件内容：优先使用 diffInfo 中的新内容，二进制文件返回提示文本，其余从 API 读取
  */
 async function loadFileContent(file: EditorFile): Promise<string> {
     // If we have diffInfo with both old and new content, show the diff directly
@@ -56,7 +59,7 @@ async function loadFileContent(file: EditorFile): Promise<string> {
 }
 
 /**
- * Handles file download (binary or text)
+ * 触发文件下载：二进制文件走服务端下载接口，文本文件使用 Blob URL
  */
 function downloadFile(file: EditorFile, content: string): void {
     if (isBinaryFile(file.name)) {
@@ -80,6 +83,9 @@ function downloadFile(file: EditorFile, content: string): void {
     }
 }
 
+/**
+ * 编辑器文件操作 Hook：管理文件内容加载、保存、下载的生命周期
+ */
 export function useEditorFileOps({ file, projectPath }: UseEditorFileOpsOptions): UseEditorFileOpsReturn {
     const [content, setContent] = useState<string>('');
     const [loading, setLoading] = useState<boolean>(true);

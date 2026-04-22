@@ -10,6 +10,9 @@ import { CodeEditorHeader } from './CodeEditorHeader';
 import { CodeEditorContent } from './CodeEditorContent';
 import { CodeEditorFooter } from './CodeEditorFooter';
 
+/**
+ * 代码编辑器主入口组件：组装 Header/Content/Footer 子组件，协调编辑器状态和 CodeMirror 扩展
+ */
 function CodeEditor({
     file,
     onClose,

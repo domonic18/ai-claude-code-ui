@@ -37,6 +37,9 @@ interface UseCodeEditorStateReturn {
     handleToggleDiff: () => void;
 }
 
+/**
+ * 代码编辑器核心状态 Hook：聚合编辑器设置、文件操作、快捷键、diff 切换等状态
+ */
 export function useCodeEditorState({
     file,
     projectPath,

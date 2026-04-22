@@ -18,15 +18,16 @@ interface CodeEditorHeaderProps {
 }
 
 /**
- * Markdown Preview Toggle Component
- *
- * Renders edit/split/preview mode toggle buttons for markdown files.
+ * Markdown 预览模式切换按钮组属性
  */
 interface MarkdownPreviewToggleProps {
     previewMode: 'edit' | 'preview' | 'split';
     onSetPreviewMode: (mode: 'edit' | 'preview' | 'split') => void;
 }
 
+/**
+ * Markdown 预览模式切换按钮组：编辑 / 分屏 / 纯预览
+ */
 function MarkdownPreviewToggle({ previewMode, onSetPreviewMode }: MarkdownPreviewToggleProps) {
     return (
         <div className="hidden md:flex items-center bg-gray-100 dark:bg-gray-800 rounded-md p-1">
@@ -70,9 +71,7 @@ function MarkdownPreviewToggle({ previewMode, onSetPreviewMode }: MarkdownPrevie
 }
 
 /**
- * Save Button Component
- *
- * Renders save button with loading/success states.
+ * 保存按钮属性
  */
 interface SaveButtonProps {
     saving: boolean;
@@ -80,6 +79,9 @@ interface SaveButtonProps {
     onSave: () => void;
 }
 
+/**
+ * 保存按钮：带加载中/保存成功两种视觉状态
+ */
 function SaveButton({ saving, saveSuccess, onSave }: SaveButtonProps) {
     return (
         <button
@@ -109,9 +111,7 @@ function SaveButton({ saving, saveSuccess, onSave }: SaveButtonProps) {
 }
 
 /**
- * Editor Toolbar Component
- *
- * Renders the toolbar buttons including markdown preview toggles, download, save, fullscreen, and close buttons.
+ * 编辑器工具栏属性
  */
 interface EditorToolbarProps {
     isMarkdownFile: boolean;
@@ -127,6 +127,9 @@ interface EditorToolbarProps {
     onSetPreviewMode: (mode: 'edit' | 'preview' | 'split') => void;
 }
 
+/**
+ * 编辑器工具栏：Markdown 预览切换、下载、保存、全屏、关闭按钮
+ */
 function EditorToolbar({
     isMarkdownFile,
     previewMode,
@@ -177,6 +180,9 @@ function EditorToolbar({
     );
 }
 
+/**
+ * 编辑器头部栏：显示文件名/路径、diff 标记，并嵌入工具栏
+ */
 export function CodeEditorHeader({
     file,
     isSidebar,

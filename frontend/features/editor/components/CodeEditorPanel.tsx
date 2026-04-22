@@ -24,6 +24,9 @@ interface CodeEditorPanelProps {
     setContent: (content: string) => void;
 }
 
+/**
+ * CodeMirror 编辑器面板：封装编辑器实例，支持 diff 对比视图、minimap、自动换行等扩展
+ */
 export function CodeEditorPanel({
     file,
     content,
