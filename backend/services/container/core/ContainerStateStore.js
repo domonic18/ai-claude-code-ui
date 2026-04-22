@@ -16,6 +16,7 @@ const logger = createLogger('services/container/core/ContainerStateStore');
 
 const { ContainerState: ContainerStateModel } = repositories;
 
+// ContainerLifecycle 使用此单例将状态机更改持久化到数据库
 /**
  * 容器状态存储类
  */
@@ -29,6 +30,7 @@ export class ContainerStateStore {
     this.ttl = options.ttl || 300000; // 缓存 5 分钟
   }
 
+  // 在每次状态转换后由 ContainerLifecycle 调用
   /**
    * 保存状态机状态到数据库和缓存
    * @param {ContainerStateMachine} stateMachine - 状态机实例
@@ -57,6 +59,7 @@ export class ContainerStateStore {
     }
   }
 
+  // 由 ContainerManager.getOrCreateContainer() 调用以恢复之前的状态
   /**
    * 从数据库加载状态机状态
    * @param {number} userId - 用户 ID
@@ -105,6 +108,7 @@ export class ContainerStateStore {
     }
   }
 
+  // 当用户被删除或容器被重置时由 ContainerManager 调用
   /**
    * 删除状态机状态
    * @param {number} userId - 用户 ID
@@ -125,6 +129,7 @@ export class ContainerStateStore {
     }
   }
 
+  // 由 ContainerManager 调用以确保用户的状态机存在
   /**
    * 获取或创建状态机
    * @param {number} userId - 用户 ID
@@ -150,6 +155,7 @@ export class ContainerStateStore {
     return stateMachine;
   }
 
+  // 由管理仪表板调用以显示卡在 creating/stopping 状态的容器
   /**
    * 列出所有处于指定状态的用户
    * @param {string} state - 状态
@@ -164,6 +170,7 @@ export class ContainerStateStore {
     }
   }
 
+  // 由定期计时器调用以释放不活动容器的内存
   /**
    * 清理过期的缓存条目
    */
@@ -177,6 +184,7 @@ export class ContainerStateStore {
     }
   }
 
+  // 由管理 API 调用以显示缓存统计信息
   /**
    * 获取所有缓存的状态机信息
    * @returns {Array} 状态机信息数组

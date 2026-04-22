@@ -12,6 +12,7 @@ import containerStateStore from './ContainerStateStore.js';
 import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('container/core/ContainerLifecycleHelpers');
 
+// 在创建新容器后由 LifecycleManager 调用
 /**
  * 保存容器信息到数据库
  * @param {Object} Container - Container 数据库仓库
@@ -26,6 +27,7 @@ export function saveContainerToDb(Container, userId, containerInfo) {
   }
 }
 
+// 在每次容器访问时由 LifecycleManager 调用以进行清理跟踪
 /**
  * 更新容器最后活跃时间
  * @param {Object} Container - Container 数据库仓库
@@ -37,6 +39,7 @@ export function updateLastActive(Container, containerInfo) {
   } catch {}
 }
 
+// 在容器恢复期间调用以重置已停止容器的状态机
 /**
  * 处理停止的容器
  */
@@ -49,6 +52,7 @@ export function handleStoppedContainer(Container, containerId, userId, stateMach
   }
 }
 
+// 在恢复/检查期间容器在 Docker 中不存在时调用
 /**
  * 处理 Docker 中不存在的容器
  */
@@ -69,6 +73,7 @@ export async function handleMissingContainer(dockerErr, Container, userId, conta
   }
 }
 
+// 在 ContainerManager 初始化期间从数据库恢复单个容器
 /**
  * 从数据库记录恢复容器
  */
@@ -92,6 +97,7 @@ export async function restoreContainerFromDb(docker, Container, dbContainer, con
   }
 }
 
+// 由 ContainerManager 构造函数调用以在服务器重启后恢复容器
 /**
  * 从数据库加载所有活跃容器
  */

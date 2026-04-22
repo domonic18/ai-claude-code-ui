@@ -15,6 +15,7 @@ const OPERATION_TIMEOUT_MS = 5000;
 /** Check file exists timeout in milliseconds */
 const CHECK_EXISTS_TIMEOUT_MS = 2000;
 
+// 文件操作处理程序使用此函数防止异步 Docker exec 中的竞态条件
 /**
  * Create a single-resolve promise wrapper with timeout support
  * Prevents multiple resolve/reject calls on the same promise
@@ -50,7 +51,7 @@ export function createResolvablePromise(timeoutMs, onTimeout) {
       }
     };
 
-    // Store resolvers on promise for external access
+    // 在 promise 上存储解析器以供外部访问
     promise._resolve = safeResolve;
     promise._reject = safeReject;
   });
@@ -63,6 +64,7 @@ export function createResolvablePromise(timeoutMs, onTimeout) {
   };
 }
 
+// 删除操作使用此函数在返回成功之前确认文件已删除
 /**
  * Verify that a file has been deleted from the container
  * @param {string} containerPath - Path to check
@@ -82,6 +84,7 @@ export async function verifyFileDeleted(containerPath, userId) {
   });
 }
 
+// FileAdapter.deleteFile 使用此函数处理删除操作的 Docker exec 流
 /**
  * Handle delete response stream with verification
  * @param {Object} stream - Docker command output stream
@@ -122,6 +125,7 @@ export function handleDeleteStream(stream, containerPath, userId) {
   });
 }
 
+// FileAdapter.fileExists 使用此函数解析 Docker exec 流输出
 /**
  * Handle file existence check stream
  * @param {Object} stream - Docker command output stream

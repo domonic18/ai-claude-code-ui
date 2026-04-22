@@ -20,6 +20,7 @@ import { createLogger } from '../../../utils/logger.js';
 
 const logger = createLogger('container/core/ContainerSetup');
 
+// 所有 ContainerSetup 操作使用的实用函数，用于安全运行命令
 /**
  * 在容器内执行命令并设置超时
  * @param {Object} container - Docker 容器实例
@@ -49,6 +50,7 @@ export async function execWithTimeout(container, command, timeout = 15000) {
     ]);
 }
 
+// 在容器创建后由 LifecycleManager 调用以设置工作区结构
 /**
  * 确保容器内有默认工作区目录结构
  * @param {Object} container - Docker 容器实例
@@ -66,6 +68,7 @@ export async function ensureDefaultWorkspace(container) {
     }
 }
 
+// 由 LifecycleManager 调用以将 skills/agents/commands/hooks 复制到容器工作区
 /**
  * 同步扩展文件到容器内
  * 通过 docker.putArchive 将扩展文件上传到命名卷
@@ -114,6 +117,7 @@ export async function syncExtensionsToContainer(container) {
     await createMemoryDirectoryAndFile(container);
 }
 
+// 由 syncExtensionsToContainer 调用以使 hook 脚本可执行
 /**
  * 设置容器内 hooks 脚本的执行权限（两处都要设置）
  * @param {Object} container - Docker 容器实例
@@ -130,6 +134,7 @@ export async function setHooksPermissions(container) {
     }
 }
 
+// 由 LifecycleManager 调用以初始化新容器的记忆功能
 /**
  * 创建用户级记忆目录和默认记忆文件
  * @param {Object} container - Docker 容器实例
@@ -167,6 +172,7 @@ export async function createMemoryDirectoryAndFile(container) {
     }
 }
 
+// 由 LifecycleManager 调用以提供用户友好的工作区文档
 /**
  * 在容器内创建 README.md 文件
  * @param {Object} container - Docker 容器实例

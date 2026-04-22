@@ -22,6 +22,7 @@ import { createLogger } from '../../../utils/logger.js';
 
 const logger = createLogger('container/core/ContainerOperations');
 
+// ContainerLifecycle 在创建容器之前调用此函数以确保卷存在
 /**
  * 确保命名卷存在，如果不存在则创建
  * @param {Object} docker - Docker 客户端
@@ -48,6 +49,7 @@ export async function ensureVolumeExists(docker, volumeName) {
     }
 }
 
+// 当容器在 Docker 中存在但不在数据库中时由 LifecycleManager 调用
 /**
  * 同步删除孤立容器
  * @param {Object} docker - Docker 客户端
@@ -75,6 +77,7 @@ export async function removeOrphanedContainer(docker, containerName) {
     }
 }
 
+// 由 removeOrphanedContainer 调用以确保 Docker 在继续之前完全删除容器
 /**
  * 等待容器被删除
  * @param {Object} docker - Docker 客户端
@@ -98,6 +101,7 @@ export async function waitForContainerRemoved(docker, containerName, timeout = C
     throw new Error(`Timeout waiting for container ${containerName} to be removed`);
 }
 
+// 当从 non_existent 转换到 creating 时由 ContainerLifecycle 调用
 /**
  * 创建并启动新容器
  * @param {Object} docker - Docker 客户端
@@ -164,6 +168,7 @@ export async function createAndStartContainer(docker, params) {
     return container;
 }
 
+// 当从运行转换到停止时由 ContainerLifecycle 调用
 /**
  * 停止容器
  * @param {Object} docker - Docker 客户端
@@ -182,6 +187,7 @@ export async function stopContainer(docker, containerId, timeout = CONTAINER_TIM
     }
 }
 
+// 当从停止转换到运行时由 ContainerLifecycle 调用
 /**
  * 启动已停止的容器
  * @param {Object} docker - Docker 客户端
@@ -196,6 +202,7 @@ export async function startContainer(docker, containerId) {
     await healthMonitor.waitForContainerReady(containerId);
 }
 
+// 当转换到已销毁状态或进行手动清理时由 ContainerLifecycle 调用
 /**
  * 销毁容器（停止 + 删除）
  * @param {Object} docker - Docker 客户端
@@ -225,6 +232,7 @@ export async function destroyContainer(docker, containerId, dataDir, userId, rem
     }
 }
 
+// 由 ExecutionAdapter 调用以在容器中运行一次性命令
 /**
  * 在容器内执行命令
  * @param {Object} docker - Docker 客户端
@@ -243,6 +251,7 @@ export async function execInContainer(docker, containerId, command, options = {}
     return { exec, stream };
 }
 
+// 由 PTY 会话管理调用以将交互式 shell 附加到容器
 /**
  * 附加到容器的交互式 shell
  * @param {Object} docker - Docker 客户端

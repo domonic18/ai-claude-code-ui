@@ -16,6 +16,7 @@ import { CONTAINER } from '../../../config/config.js';
 import { PathUtils } from '../../core/utils/path-utils.js';
 import { normalizePath } from '../utils/file-utils.js';
 
+// FileAdapter._validatePath 在所有文件操作之前调用此函数以防止路径遍历
 /**
  * Validate path security
  *
@@ -24,7 +25,7 @@ import { normalizePath } from '../utils/file-utils.js';
  * @returns {Object} { valid: boolean, error: string|null, safePath: string }
  */
 export function validatePath(filePath, options = {}) {
-  // Basic path validation
+  // 基本路径验证
   if (!filePath || typeof filePath !== 'string') {
     return {
       valid: false,
@@ -33,8 +34,8 @@ export function validatePath(filePath, options = {}) {
     };
   }
 
-  // Check for path traversal attacks - use stricter validation
-  // 1. Check for raw .. patterns
+  // 检查路径遍历攻击 - 使用更严格的验证
+  // 1. 检查原始 .. 模式
   if (filePath.includes('..')) {
     return {
       valid: false,
@@ -43,7 +44,7 @@ export function validatePath(filePath, options = {}) {
     };
   }
 
-  // 2. Check for URL-encoded path traversal attempts
+  // 2. 检查 URL 编码的路径遍历尝试
   try {
     const decodedPath = decodeURIComponent(filePath);
     if (decodedPath.includes('..')) {
@@ -54,7 +55,7 @@ export function validatePath(filePath, options = {}) {
       };
     }
   } catch (e) {
-    // URI decode failed, treat as invalid path
+    // URI 解码失败，视为无效路径
     return {
       valid: false,
       error: ERROR_MESSAGES[ERROR_TYPES.INVALID_PATH].replace('{path}', filePath),
@@ -62,7 +63,7 @@ export function validatePath(filePath, options = {}) {
     };
   }
 
-  // 3. Check for null byte injection
+  // 3. 检查空字节注入
   if (filePath.includes('\0')) {
     return {
       valid: false,
@@ -74,6 +75,7 @@ export function validatePath(filePath, options = {}) {
   return { valid: true, error: null, safePath: filePath };
 }
 
+// FileReader、FileWriter 和 FileTreeBuilder 使用此函数将用户路径转换为容器路径
 /**
  * Resolve container path
  * Parse and standardize container paths, handling both relative and absolute paths
@@ -88,33 +90,34 @@ export function validatePath(filePath, options = {}) {
 export function resolveContainerPath(filePath, options = {}) {
   const { projectPath = '', isContainerProject = false } = options;
 
-  // Clean ./ and // from path
+  // 清理路径中的 ./ 和 //
   let cleanPath = normalizePath(filePath);
 
-  // Check if it's an absolute path (starts with /workspace)
+  // 检查是否为绝对路径（以 /workspace 开头）
   if (cleanPath.startsWith('/workspace')) {
-    // Validate path security
+    // 验证路径安全性
     if (cleanPath.includes('..')) {
       throw new Error('Path traversal detected');
     }
     return cleanPath;
   }
 
-  // Relative path handling
+  // 相对路径处理
   if (cleanPath.startsWith('/')) {
     cleanPath = cleanPath.substring(1);
   }
 
-  // Validate path
+  // 验证路径
   const validation = validatePath(cleanPath, options);
   if (!validation.valid) {
     throw new Error(validation.error);
   }
 
-  // Build container path
+  // 构建容器路径
   return buildContainerPath(validation.safePath, { projectPath, isContainerProject });
 }
 
+// resolveContainerPath 使用此函数构建最终的 /workspace 或 /projects 路径
 /**
  * Build container path
  *
@@ -127,22 +130,22 @@ export function resolveContainerPath(filePath, options = {}) {
 export function buildContainerPath(safePath, options = {}) {
   const { projectPath = '', isContainerProject = false } = options;
 
-  // Handle current directory '.' case
+  // 处理当前目录 '.' 的情况
   const processedSafePath = (safePath === '.' || safePath === './') ? '' : safePath;
 
   let path;
   if (isContainerProject && projectPath) {
-    // Container project: project code is under /workspace
+    // 容器项目：项目代码位于 /workspace 下
     path = processedSafePath
       ? `${CONTAINER.paths.workspace}/${projectPath}/${processedSafePath}`
       : `${CONTAINER.paths.workspace}/${projectPath}`;
   } else if (projectPath) {
-    // Session project: use .claude/projects
+    // 会话项目：使用 .claude/projects
     path = processedSafePath
       ? `${CONTAINER.paths.projects}/${PathUtils.encodeProjectName(projectPath)}/${processedSafePath}`
       : `${CONTAINER.paths.projects}/${PathUtils.encodeProjectName(projectPath)}`;
   } else {
-    // Default: workspace
+    // 默认：workspace
     path = processedSafePath
       ? `${CONTAINER.paths.workspace}/${processedSafePath}`
       : CONTAINER.paths.workspace;

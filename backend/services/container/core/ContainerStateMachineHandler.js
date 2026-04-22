@@ -21,6 +21,7 @@ import { createLogger } from '../../../utils/logger.js';
 
 const logger = createLogger('container/core/ContainerStateMachineHandler');
 
+// 在容器创建期间编排状态机转换
 /**
  * Create container with state machine workflow
  * @param {Object} docker - Dockerode instance

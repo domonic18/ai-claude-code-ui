@@ -14,6 +14,7 @@ import { PathUtils } from '../../../core/utils/path-utils.js';
 /** Operation timeout in milliseconds */
 const OPERATION_TIMEOUT_MS = 5000;
 
+// 文件适配器在用户在文件浏览器中拖放文件时使用此函数移动文件
 /**
  * 文件移动器类
  */
@@ -26,6 +27,7 @@ export class FileMover {
     this.adapter = adapter;
   }
 
+  // 文件浏览器拖放处理程序调用此函数在目录之间移动文件
   /**
    * 移动文件或目录
    * @param {string} sourcePath - 源路径

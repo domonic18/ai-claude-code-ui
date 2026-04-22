@@ -12,6 +12,7 @@ import path from 'path';
 import fs from 'fs';
 import { CONTAINER } from '../../../config/config.js';
 
+// ContainerManager 使用此函数在初始化期间创建 Docker 客户端
 /**
  * Docker 连接管理器类
  */
@@ -29,6 +30,7 @@ export class DockerConnectionManager {
     this.docker = this._initializeDocker(options);
   }
 
+  // 构造函数调用此函数以使用 socket/HTTP/TLS 设置 Dockerode 客户端
   /**
    * 初始化 Docker 客户端
    * @param {object} options - 连接选项
@@ -64,6 +66,7 @@ export class DockerConnectionManager {
     return new Docker(dockerOptions);
   }
 
+  // ContainerManager 调用此函数以获取 Docker 客户端用于容器操作
   /**
    * 获取 Docker 客户端实例
    * @returns {Docker} Docker 客户端实例
@@ -72,6 +75,7 @@ export class DockerConnectionManager {
     return this.docker;
   }
 
+  // ContainerManager 调用此函数以按 ID 获取特定的容器对象
   /**
    * 获取容器实例
    * @param {string} containerId - 容器 ID
@@ -81,6 +85,7 @@ export class DockerConnectionManager {
     return this.docker.getContainer(containerId);
   }
 
+  // ContainerManager 在健康检查或容器发现期间调用此函数
   /**
    * 列出所有容器
    * @param {object} options - 列出选项

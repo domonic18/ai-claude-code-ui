@@ -16,6 +16,7 @@ const OPERATION_TIMEOUT_MS = 5000;
 /** Write response timeout in milliseconds */
 const WRITE_TIMEOUT_MS = 10000;
 
+// 文件适配器将所有写入操作的内容保存委托给此类
 /**
  * 文件写入器类
  */
@@ -28,6 +29,7 @@ export class FileWriter {
     this.adapter = adapter;
   }
 
+  // 代码编辑器和文件操作调用此函数保存文件更改
   /**
    * 写入文件内容
    * @param {string} filePath - 文件路径

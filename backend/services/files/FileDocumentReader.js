@@ -10,6 +10,7 @@
 import path from 'path';
 import { FILE_TYPE_MAP } from './constants.js';
 
+// 前端文件上传组件从文件输入发送 MIME 类型以确定文档类型
 /**
  * MIME 类型映射
  * 用于根据 MIME 类型判断文件类型
@@ -24,6 +25,7 @@ const MIME_TYPE_MAP = {
   'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx'
 };
 
+// 聊天界面使用这些映射将文件上传转换为 Claude CLI 工具命令
 /**
  * 文档读取器配置
  * 每种文件类型对应的读取命令模板
@@ -54,6 +56,7 @@ const DOCUMENT_READERS = {
   default: () => 'Read tool'
 };
 
+// 当浏览器无法提供 MIME 类型时，文件类型检测系统调用此函数
 /**
  * 获取文件扩展名（带点）
  * @param {string} fileName - 文件名
@@ -65,6 +68,7 @@ function getFileExtension(fileName) {
   return ext || '';
 }
 
+// 会话文件上传流程在 MIME 类型检测失败时使用此函数作为回退
 /**
  * 根据文件扩展名获取文件类型
  * @param {string} fileName - 文件名
@@ -75,6 +79,7 @@ function getFileTypeByExtension(fileName) {
   return FILE_TYPE_MAP[ext] || null;
 }
 
+// 前端拖放文件上传从 File API 提供 MIME 类型
 /**
  * 根据 MIME 类型获取文件类型
  * @param {string} mimeType - MIME 类型
@@ -85,6 +90,7 @@ function getFileTypeByMimeType(mimeType) {
   return MIME_TYPE_MAP[mimeType] || null;
 }
 
+// 文件上传处理程序链接 MIME 类型和扩展名检测以实现可靠的类型判断
 /**
  * 获取文件类型
  * 优先使用 MIME 类型，回退到文件扩展名
@@ -96,6 +102,7 @@ function getFileType(fileName, mimeType) {
   return getFileTypeByMimeType(mimeType) || getFileTypeByExtension(fileName);
 }
 
+// 消息格式化程序调用此函数将工具命令注入到用户提示中
 /**
  * 生成文档读取命令
  * 根据文件类型返回对应的读取命令
@@ -112,6 +119,7 @@ export function getReadCommand(filePath, fileName, mimeType = null) {
   return reader(filePath);
 }
 
+// 聊天消息预处理使用此函数将文件附件格式化为编号指令
 /**
  * 生成文件读取指令文本
  * 用于在 Claude 命令中描述如何读取文件
@@ -126,6 +134,7 @@ export function formatReadInstruction(filePath, fileName, index, mimeType = null
   return `${index}. \`${filePath}\` (${fileName}) - Use ${readMethod}`;
 }
 
+// 聊天界面中的多文件上传处理程序批量处理文件读取指令
 /**
  * 批量生成文件读取指令
  * @param {Array<{path: string, name: string, type?: string}>} files - 文件列表
@@ -137,6 +146,7 @@ export function formatReadInstructions(files) {
     .join('\n');
 }
 
+// 文件上传 UI 使用此函数来确定是否需要特殊工具警告
 /**
  * 判断文件是否为需要特殊工具的文档类型
  * @param {string} fileName - 文件名

@@ -15,11 +15,12 @@ import { memoryService } from '../../memory/index.js';
 import { createLogger, sanitizePreview } from '../../../utils/logger.js';
 const logger = createLogger('services/container/claude/ClaudeQuery');
 
-// Memory markers used to wrap memory context in commands
+// 用于在命令中包装记忆上下文的记忆标记
 const MEMORY_START = '--- Memory Context ---';
 const MEMORY_END = '--- End Memory Context ---';
 const MEMORY_SEPARATOR = '\n';
 
+// 用于解析 SDK 执行的正确工作目录路径的辅助函数
 /**
  * 映射工作目录
  * @param {boolean} isContainerProject - 是否为容器项目
@@ -45,6 +46,7 @@ function mapWorkingDirectory(isContainerProject, projectPath, cwd) {
   }
 }
 
+// 加载用户的记忆文件以作为 Claude 对话的上下文包含在内
 /**
  * 加载记忆内容
  * @param {number} userId - 用户 ID
@@ -68,6 +70,7 @@ async function loadMemoryContext(userId, options) {
   return null;
 }
 
+// 为 SDK 执行将记忆上下文前置到用户命令
 /**
  * 构建增强命令（添加记忆上下文）
  * @param {string} command - 原始命令
@@ -83,6 +86,7 @@ function buildEnhancedCommand(command, memoryContext) {
   return `${command}${MEMORY_SEPARATOR}${MEMORY_SEPARATOR}${MEMORY_START}${MEMORY_SEPARATOR}${memoryContext}${MEMORY_SEPARATOR}${MEMORY_END}${MEMORY_SEPARATOR}${MEMORY_SEPARATOR}`;
 }
 
+// 通知前端会话启动并在 UI 中包含记忆上下文
 /**
  * 发送会话启动和记忆上下文消息
  * @param {object} writer - WebSocket 写入器
@@ -113,6 +117,7 @@ function sendSessionStart(writer, sessionId, containerId, memoryContext) {
   });
 }
 
+// 查询失败的集中错误处理程序
 /**
  * 处理查询错误
  * @param {object} writer - WebSocket 写入器
@@ -135,6 +140,7 @@ function handleQueryError(writer, sessionId, error) {
   }
 }
 
+// 在 SessionManager 中注册会话以进行跟踪和中止功能
 /**
  * 创建并配置会话
  * @param {string} sessionId - 会话 ID
@@ -152,6 +158,7 @@ function setupSession(sessionId, container, command, mappedOptions) {
   logger.info({ sessionId }, '[ClaudeQuery] Session created');
 }
 
+// 由 /api/claude/chat WebSocket 处理程序调用的主入口点
 /**
  * 在用户容器内执行 Claude SDK 查询
  * @param {string} command - 用户命令

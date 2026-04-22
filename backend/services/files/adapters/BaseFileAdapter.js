@@ -31,6 +31,7 @@ import {
   buildContainerPath,
 } from './filePathSecurity.js';
 
+// FileAdapter 和其他适配器继承此类以实现基于容器的文件操作
 /**
  * 抽象文件适配器基类
  * 所有文件操作适配器都必须继承此类并实现抽象方法
@@ -52,6 +53,7 @@ export class BaseFileAdapter extends IFileOperations {
     this.excludedDirs = config.excludedDirs || FILE_TREE_CONFIG.DEFAULT_EXCLUDED_DIRS;
   }
 
+  // 子类必须实现此方法以通过 Docker exec 读取文件
   /**
    * 读取文件内容
    * @abstract
@@ -64,6 +66,7 @@ export class BaseFileAdapter extends IFileOperations {
     throw new Error(`readFile() must be implemented by ${this.name}`);
   }
 
+  // 子类必须实现此方法以通过 Docker exec 写入文件
   /**
    * 写入文件内容
    * @abstract
@@ -77,6 +80,7 @@ export class BaseFileAdapter extends IFileOperations {
     throw new Error(`writeFile() must be implemented by ${this.name}`);
   }
 
+  // 子类必须实现此方法以通过 Docker find 列出目录
   /**
    * 获取文件树结构
    * @abstract
