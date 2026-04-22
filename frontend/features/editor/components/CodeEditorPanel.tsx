@@ -4,11 +4,11 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { githubLight } from '@uiw/codemirror-theme-github';
 import { unifiedMergeView } from '@codemirror/merge';
 import { EditorView } from '@codemirror/view';
-import type { CodeEditorFile } from '../types/editor.types';
+import type { EditorFile } from '../types/editor.types';
 import { getLanguageExtension } from '../utils/CodeMirrorSetup';
 
 interface CodeEditorPanelProps {
-    file: CodeEditorFile;
+    file: EditorFile;
     content: string;
     showDiff: boolean;
     wordWrap: boolean;

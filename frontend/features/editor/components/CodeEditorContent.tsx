@@ -1,10 +1,10 @@
 import React from 'react';
-import type { CodeEditorFile } from '../types/editor.types';
+import type { EditorFile } from '../types/editor.types';
 import { CodeEditorPanel } from './CodeEditorPanel';
 import { CodeEditorPreview } from './CodeEditorPreview';
 
 interface CodeEditorContentProps {
-    file: CodeEditorFile;
+    file: EditorFile;
     content: string;
     showDiff: boolean;
     wordWrap: boolean;

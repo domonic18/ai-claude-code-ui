@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { CodeEditorFile } from '../types/editor.types';
+import type { EditorFile } from '../types/editor.types';
 import {
     createMinimapExtension,
     createScrollToFirstChunkExtension,
@@ -7,7 +7,7 @@ import {
 } from '../utils/CodeMirrorSetup';
 
 interface UseCodeMirrorExtensionsProps {
-    file: CodeEditorFile;
+    file: EditorFile;
     showDiff: boolean;
     isDarkMode: boolean;
     isSidebar: boolean;

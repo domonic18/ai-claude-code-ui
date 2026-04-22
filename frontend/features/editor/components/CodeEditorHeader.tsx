@@ -1,9 +1,9 @@
 import React from 'react';
 import { X, Save, Download, Maximize2, Minimize2, Eye, Edit } from 'lucide-react';
-import type { CodeEditorFile } from '../types/editor.types';
+import type { EditorFile } from '../types/editor.types';
 
 interface CodeEditorHeaderProps {
-    file: CodeEditorFile;
+    file: EditorFile;
     isSidebar: boolean;
     isFullscreen: boolean;
     isMarkdownFile: boolean;
