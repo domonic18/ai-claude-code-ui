@@ -826,17 +826,14 @@ export class McpService {
    * @returns {Promise<Object>} 测试结果
    */
   static async testServer(id, userId) {
-    const server = await McpServer.getById(id);
-    if (!server || server.userId !== userId) {
-      throw new Error('MCP server not found or access denied');
+    try {
+      const server = await this.getServer(id, userId);
+      const { McpClient } = await import('./McpClient.js');
+      const client = new McpClient(server);
+      return await client.test();
+    } catch (error) {
+      return { success: false, status: 'failed', message: error.message };
     }
-
-    // TODO: 实现实际的连接测试
-    return {
-      success: true,
-      status: 'connected',
-      message: 'MCP server is responding'
-    };
   }
 
   /**
@@ -846,16 +843,14 @@ export class McpService {
    * @returns {Promise<Object>} 工具列表
    */
   static async discoverTools(id, userId) {
-    const server = await McpServer.getById(id);
-    if (!server || server.userId !== userId) {
-      throw new Error('MCP server not found or access denied');
+    try {
+      const server = await this.getServer(id, userId);
+      const { McpClient } = await import('./McpClient.js');
+      const client = new McpClient(server);
+      return await client.discoverTools();
+    } catch (error) {
+      return { success: false, error: error.message, tools: [] };
     }
-
-    // TODO: 实现实际的工具发现
-    return {
-      success: true,
-      tools: []
-    };
   }
 
   /**

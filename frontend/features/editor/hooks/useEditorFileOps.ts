@@ -165,9 +165,8 @@ export function useEditorFileOps({ file, projectPath }: UseEditorFileOpsOptions)
             setSaveSuccess(true);
             setTimeout(() => setSaveSuccess(false), 2000);
         } catch (error) {
-            // 保存失败时弹出错误提示
-            // TODO: 替换为更友好的提示组件（如 toast）
-            alert(`Error saving file: ${error.message}`);
+            // 保存失败时记录错误日志（与加载失败处理方式一致）
+            logger.error('Error saving file:', error);
         } finally {
             // 无论成功失败都重置保存状态
             setSaving(false);
