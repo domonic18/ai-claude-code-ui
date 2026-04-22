@@ -13,6 +13,9 @@ interface SettingsPanelLayoutProps {
   children: React.ReactNode;
 }
 
+/**
+ * 设置面板布局：右侧滑出面板，适配桌面/移动端
+ */
 const SettingsPanelLayout = ({ isOpen, isMobile, children }: SettingsPanelLayoutProps) => {
   return (
     <div
