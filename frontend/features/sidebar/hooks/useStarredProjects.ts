@@ -46,20 +46,24 @@ function saveStarredProjectsToStorage(starredProjects: StarredProjects): void {
  * Hook return type
  */
 export interface UseStarredProjectsReturn {
+// Sidebar 组件使用此 hook 管理用户收藏的项目列表
   /** Set of starred project names */
   starredProjects: StarredProjects;
   /** Toggle star status for a project */
   toggleStar: (projectName: string) => void;
+// Sidebar 组件使用此 hook 管理用户收藏的项目列表
   /** Check if a project is starred */
   isStarred: (projectName: string) => boolean;
   /** Add to starred projects */
   addStar: (projectName: string) => void;
+// Sidebar 组件使用此 hook 管理用户收藏的项目列表
   /** Remove from starred projects */
   removeStar: (projectName: string) => void;
   /** Clear all starred projects */
   clearStars: () => void;
 }
 
+// Sidebar 组件使用此 hook 管理用户收藏的项目列表
 /**
  * useStarredProjects Hook
  */

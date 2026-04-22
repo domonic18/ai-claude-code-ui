@@ -13,7 +13,6 @@ import { getAssistantMessages, getTotalTokens } from './agentTokenUtils.js';
  * SSE 流写入器 - 将 SDK/CLI 输出适配到 Server-Sent Events
  */
 export class SSEStreamWriter {
-// 内部功能调用
     /**
      * @param {import('http').ServerResponse} res - Express 响应对象
      */

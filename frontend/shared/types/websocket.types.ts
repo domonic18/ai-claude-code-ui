@@ -13,21 +13,25 @@ export interface WebSocketMessage {
   [key: string]: any;
 }
 
+// WebSocketConnectionState 的类型别名定义
 /**
  * WebSocket connection state
  */
 export type WebSocketConnectionState = 'connecting' | 'connected' | 'disconnected' | 'error';
 
+// WebSocketEventType 的类型别名定义
 /**
  * WebSocket event types
  */
 export type WebSocketEventType = 'open' | 'message' | 'close' | 'error';
 
+// WebSocketEventHandler 的类型别名定义
 /**
  * WebSocket event handler
  */
 export type WebSocketEventHandler = (event: Event | MessageEvent | CloseEvent) => void;
 
+// WebSocketConfig 的类型定义
 /**
  * WebSocket configuration
  */
@@ -38,6 +42,7 @@ export interface WebSocketConfig {
   protocols?: string | string[];
 }
 
+// MessageQueueItem 的类型定义
 /**
  * Message queue item
  */
@@ -47,6 +52,7 @@ export interface MessageQueueItem {
   retries: number;
 }
 
+// MemoryContextMessage 的类型定义
 /**
  * Memory context message
  * Sent by backend to provide memory context to the AI

@@ -8,6 +8,7 @@
 
 import { ValidationError } from '../../middleware/error-handler.middleware.js';
 
+// 处理业务逻辑，供路由层调用
 /**
  * Validates display name for project renaming
  * @param {string} displayName - Display name to validate
@@ -19,6 +20,7 @@ export function validateDisplayName(displayName) {
   }
 }
 
+// 处理业务逻辑，供路由层调用
 /**
  * Validates summary for session renaming
  * @param {string} summary - Summary to validate
@@ -42,6 +44,7 @@ export function validateSummary(summary) {
   return trimmedSummary;
 }
 
+// 处理业务逻辑，供路由层调用
 /**
  * Validates workspace creation parameters
  * @param {string} workspaceType - Type of workspace ('new' or 'existing')
@@ -54,6 +57,7 @@ export function validateWorkspaceParams(workspaceType, workspacePath) {
   }
 }
 
+// 处理业务逻辑，供路由层调用
 /**
  * Validates manual project creation parameters
  * @param {string} inputPath - Path to validate
@@ -76,6 +80,7 @@ export function validateProjectCreation(inputPath) {
   return { cleanPath, projectName };
 }
 
+// 处理业务逻辑，供路由层调用
 /**
  * Finds project by name or ID from list of projects
  * @param {Array} projects - Array of projects
@@ -85,3 +90,4 @@ export function validateProjectCreation(inputPath) {
 export function findProjectByIdentifier(projects, projectId) {
   return projects.find(p => p.name === projectId || p.id === projectId) || null;
 }
+

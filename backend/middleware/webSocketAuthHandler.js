@@ -14,6 +14,7 @@ import { handlePlatformAuth } from './platformAuthHandler.js';
 
 const { User } = repositories;
 
+// 中间件函数，在请求处理链中执行
 /**
  * Handle WebSocket platform authentication
  * @returns {Object|null} User info or null
@@ -30,6 +31,7 @@ function handleWebSocketPlatformAuth() {
   return null;
 }
 
+// 中间件函数，在请求处理链中执行
 /**
  * Handle WebSocket JWT authentication
  * @param {string} token - JWT token
@@ -54,6 +56,7 @@ function handleWebSocketJwtAuth(token) {
   }
 }
 
+// 中间件函数，在请求处理链中执行
 /**
  * Authenticate WebSocket connection
  * @param {string} token - JWT token
@@ -67,3 +70,4 @@ export function authenticateWebSocket(token) {
 
   return handleWebSocketJwtAuth(token);
 }
+

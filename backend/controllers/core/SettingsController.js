@@ -17,6 +17,7 @@ const { ApiKey } = repositories;
  * 设置控制器
  */
 export class SettingsController extends BaseController {
+// 获取资源，供路由层调用
   /**
    * 获取用户设置
    * @param {Object} req - Express 请求对象
@@ -45,6 +46,7 @@ export class SettingsController extends BaseController {
     }
   }
 
+// 创建新资源，供路由层调用
   /**
    * 创建 API 密钥
    * @param {Object} req - Express 请求对象
@@ -83,6 +85,7 @@ export class SettingsController extends BaseController {
     }
   }
 
+// 删除资源，供路由层调用
   /**
    * 删除 API 密钥
    * @param {Object} req - Express 请求对象
@@ -115,6 +118,7 @@ export class SettingsController extends BaseController {
     }
   }
 
+// 更新资源，供路由层调用
   /**
    * 更新设置
    * @param {Object} req - Express 请求对象
@@ -142,6 +146,7 @@ export class SettingsController extends BaseController {
     }
   }
 
+// 更新资源，供路由层调用
   /**
    * 更新单个设置项
    * @param {Object} req - Express 请求对象
@@ -167,6 +172,7 @@ export class SettingsController extends BaseController {
     }
   }
 
+// 删除资源，供路由层调用
   /**
    * 删除单个设置项（恢复默认值）
    * @param {Object} req - Express 请求对象
@@ -189,3 +195,4 @@ export class SettingsController extends BaseController {
 }
 
 export default SettingsController;
+

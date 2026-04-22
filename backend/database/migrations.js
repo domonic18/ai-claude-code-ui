@@ -18,6 +18,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const INIT_SQL_PATH = path.join(__dirname, 'init.sql');
 
+// 执行数据库架构迁移，添加新表和字段，在应用启动时调用
 /**
  * 执行数据库迁移
  */
@@ -69,6 +70,7 @@ export function runMigrations() {
     }
 }
 
+// 创建 SSO 相关的数据库索引，提升查询性能
 /**
  * 运行 SSO 相关索引的迁移
  * @param {Database} database - 数据库实例
@@ -90,6 +92,7 @@ function runSSOIndexMigrations(database) {
     }
 }
 
+// 创建容器相关的数据库表（user_containers、container_metrics、container_states）
 /**
  * 运行容器相关表的迁移
  * @param {Database} database - 数据库实例
@@ -156,6 +159,7 @@ function runContainerMigrations(database) {
     }
 }
 
+// 创建用户设置和 MCP 服务相关表（user_settings、user_mcp_servers）
 /**
  * 运行用户设置和 MCP 服务相关表的迁移
  * @param {Database} database - 数据库实例
@@ -176,6 +180,7 @@ function runUserSettingsMigrations(database) {
     }
 }
 
+// 初始化数据库基础架构，执行 init.sql 创建核心表
 /**
  * 初始化数据库架构
  */

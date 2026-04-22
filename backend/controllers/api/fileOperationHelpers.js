@@ -36,6 +36,7 @@ const CONTENT_TYPES = {
   'default': 'application/octet-stream'
 };
 
+// 获取资源，供路由层调用
 /**
  * Gets content type for file extension
  * @param {string} ext - File extension (without dot)
@@ -45,6 +46,7 @@ export function getContentType(ext) {
   return CONTENT_TYPES[ext.toLowerCase()] || CONTENT_TYPES.default;
 }
 
+// 处理业务逻辑，供路由层调用
 /**
  * Builds container path from file path and project name
  * @param {string} filePath - File path
@@ -58,6 +60,7 @@ export function buildContainerPath(filePath, projectName) {
   return `/workspace/${projectName}/${filePath}`;
 }
 
+// 处理业务逻辑，供路由层调用
 /**
  * Validates file extension for upload
  * @param {string} filename - Original filename
@@ -78,3 +81,4 @@ export function validateFileExtension(filename, allowedExtensions) {
 
   return ext;
 }
+

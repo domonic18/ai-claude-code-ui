@@ -14,12 +14,14 @@ export interface MenuPosition {
 }
 
 export interface UseMenuPositionOptions {
+// ChatInputMenus 组件使用此 hook 计算命令自动完成菜单的动态定位
   /** Menu height in pixels for responsive positioning */
   menuHeight?: number;
   /** Offset from anchor in pixels */
   offset?: number;
 }
 
+// ChatInputMenus 组件使用此 hook 计算命令自动完成菜单的动态定位
 /**
  * Hook for calculating menu position
  *

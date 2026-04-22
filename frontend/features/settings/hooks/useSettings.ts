@@ -210,6 +210,7 @@ export interface UseSettingsReturn {
   discoverMcpTools: (id: string) => Promise<{ success: boolean; data?: any; error?: string }>;
 }
 
+// 由组件调用，自定义 Hook：useSettings
 /**
  * useSettings - Hook for managing settings state and operations
  */

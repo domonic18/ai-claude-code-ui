@@ -17,6 +17,7 @@ import path from 'path';
  */
 const MAX_INCLUDE_DEPTH = 3;
 
+// 工具函数，供多个模块调用
 /**
  * 验证文件路径以防止目录遍历攻击
  * @param {string} filePath - 要验证的路径
@@ -34,6 +35,7 @@ export function isPathSafe(filePath, basePath) {
   );
 }
 
+// 工具函数，供多个模块调用
 /**
  * 处理内容中的文件包含（@filename 语法）
  * @param {string} content - 包含 @filename 包含的内容
@@ -87,3 +89,4 @@ export async function processFileIncludes(content, basePath, depth = 0) {
 
   return result;
 }
+

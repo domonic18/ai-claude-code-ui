@@ -8,6 +8,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
+// OpenCode 设置页面的占位组件，显示"即将推出"提示
 /**
  * OpenCodePlaceholder - Coming soon placeholder for OpenCode settings
  */

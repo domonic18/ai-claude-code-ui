@@ -14,6 +14,7 @@ const db = getDatabase;
  * GitHub Token 数据仓库
  */
 export const GitHubToken = {
+// 数据库操作函数，供控制器调用
     /**
      * 保存GitHub Token
      * @param {number} userId
@@ -24,6 +25,7 @@ export const GitHubToken = {
         stmt.run(userId, token);
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 获取GitHub Token
      * @param {number} userId
@@ -34,6 +36,7 @@ export const GitHubToken = {
         return row?.token;
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 获取活动的GitHub Token（别名方法）
      * @param {number} userId
@@ -43,6 +46,7 @@ export const GitHubToken = {
         return GitHubToken.get(userId);
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 删除GitHub Token
      * @param {number} userId
@@ -52,3 +56,4 @@ export const GitHubToken = {
         stmt.run(userId);
     }
 };
+

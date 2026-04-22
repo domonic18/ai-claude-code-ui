@@ -18,6 +18,7 @@ interface ToggleSwitchProps {
   icon?: 'theme';
 }
 
+// 由父组件调用，React 组件或常量：ToggleSwitch
 /**
  * Accessible toggle switch with optional theme icon
  */

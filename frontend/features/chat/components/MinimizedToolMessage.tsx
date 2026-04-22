@@ -12,6 +12,7 @@ export interface MinimizedToolMessageProps {
   message: ChatMessageType;
 }
 
+// ChatMessageList 组件使用此组件渲染高频工具（Grep、Glob）的紧凑指示器
 /**
  * MinimizedToolMessage Component
  *

@@ -59,6 +59,7 @@ interface UseChatWebSocketProcessorOptions {
   setPendingQuestion?: (toolUseID: string, sessionId: string) => void;
 }
 
+// 由组件调用，自定义 Hook：useChatWebSocketProcessor
 /**
  * Hook to process WebSocket messages for chat interface
  *

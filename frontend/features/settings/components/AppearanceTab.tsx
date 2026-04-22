@@ -109,6 +109,7 @@ function CodeEditorSettings({
   );
 }
 
+// 由父组件调用，React 组件或常量：AppearanceTab
 /**
  * AppearanceTab Component
  */

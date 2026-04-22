@@ -55,6 +55,7 @@ const COLOR_CLASSES = {
   },
 } as const;
 
+// 由父组件调用，React 组件或常量：ExtensionStatCard
 /**
  * Displays a colored stat card with icon, label, and count
  */

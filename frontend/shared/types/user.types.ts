@@ -9,6 +9,7 @@
  */
 export type UserRole = 'admin' | 'user' | 'guest';
 
+// UserSettings 的类型定义
 /**
  * User settings
  */
@@ -20,6 +21,7 @@ export interface UserSettings {
   autoSave?: boolean;
 }
 
+// 用户信息的类型定义
 /**
  * User profile
  */
@@ -35,6 +37,7 @@ export interface User {
   lastLogin?: Date;
 }
 
+// UserCredentials 的类型定义
 /**
  * User credentials
  */
@@ -43,6 +46,7 @@ export interface UserCredentials {
   password: string;
 }
 
+// AuthSession 的类型定义
 /**
  * Authentication session
  */
@@ -53,6 +57,7 @@ export interface AuthSession {
   isAuthenticated: boolean;
 }
 
+// UserPreferences 的类型定义
 /**
  * User preferences
  */

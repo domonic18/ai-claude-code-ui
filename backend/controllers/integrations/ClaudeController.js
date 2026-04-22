@@ -15,6 +15,7 @@ import { NotFoundError, ValidationError } from '../../middleware/error-handler.m
  * Claude 控制器
  */
 export class ClaudeController extends BaseController {
+// 处理业务逻辑，供路由层调用
   /**
    * 构造函数
    * @param {Object} dependencies - 依赖注入对象
@@ -24,6 +25,7 @@ export class ClaudeController extends BaseController {
     this.claudeExecutor = dependencies.claudeExecutor || new ClaudeExecutor();
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 执行 Claude 命令
    * @param {Object} req - Express 请求对象
@@ -61,6 +63,7 @@ export class ClaudeController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 中止会话
    * @param {Object} req - Express 请求对象
@@ -83,6 +86,7 @@ export class ClaudeController extends BaseController {
     }
   }
 
+// 获取资源，供路由层调用
   /**
    * 获取活动会话列表
    * @param {Object} req - Express 请求对象
@@ -104,6 +108,7 @@ export class ClaudeController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 检查会话是否活动
    * @param {Object} req - Express 请求对象
@@ -126,6 +131,7 @@ export class ClaudeController extends BaseController {
     }
   }
 
+// 获取资源，供路由层调用
   /**
    * 获取会话信息
    * @param {Object} req - Express 请求对象
@@ -148,6 +154,7 @@ export class ClaudeController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 创建 WebSocket 写入器包装器
    * @private
@@ -175,3 +182,4 @@ export class ClaudeController extends BaseController {
 }
 
 export default ClaudeController;
+

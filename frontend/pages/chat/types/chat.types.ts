@@ -6,6 +6,7 @@
 
 import type { Project as SidebarProject, Session as SidebarSession } from '@/features/sidebar/types/sidebar.types';
 
+// Project 的类型定义
 /**
  * Extended Project type for ChatPage
  */
@@ -13,6 +14,7 @@ export interface Project extends SidebarProject {
   path?: string; // Legacy property, use fullPath instead
 }
 
+// Session 的类型定义
 /**
  * Extended Session type for ChatPage
  */
@@ -22,6 +24,7 @@ export interface Session extends SidebarSession {
   [key: string]: any;
 }
 
+// ChatPageProps 的类型定义
 /**
  * ChatPage props
  */

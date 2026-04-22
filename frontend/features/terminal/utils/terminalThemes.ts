@@ -6,6 +6,7 @@
 
 import type { TerminalTheme } from '../types';
 
+// ThemeColors 的类型别名定义
 /**
  * Theme colors type matching xterm.js theme structure
  */

@@ -13,6 +13,7 @@ import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('routes/integrations/agentGitOperations');
 
+// 定义 HTTP 路由处理器
 /**
  * Handle GitHub branch/PR workflow (optional)
  *
@@ -39,6 +40,7 @@ export async function handleGitHubWorkflow(params, projectPath, user, writer) {
     }
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Send successful response
  *
@@ -66,6 +68,7 @@ export function sendResponse(params, res, writer, projectPath, ghResult) {
     res.json(response);
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Handle Agent error
  *
@@ -95,6 +98,7 @@ export function handleAgentError(error, params, res, writer, finalProjectPath) {
     }
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Schedule cleanup task
  *
@@ -107,3 +111,4 @@ export function scheduleCleanup(params, finalProjectPath, writer) {
         setTimeout(() => cleanupProject(finalProjectPath, writer.getSessionId()), 5000);
     }
 }
+

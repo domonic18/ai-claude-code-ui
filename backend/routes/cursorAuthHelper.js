@@ -45,6 +45,7 @@ export function parseCursorStatusOutput(stdout, code, stderr) {
   }
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Check Cursor CLI authentication status
  * @returns {Promise<Object>} Authentication status
@@ -113,3 +114,4 @@ export function checkCursorStatus() {
     });
   });
 }
+

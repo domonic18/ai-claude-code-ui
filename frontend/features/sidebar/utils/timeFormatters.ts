@@ -71,6 +71,7 @@ export function isSessionActive(session: Session, currentTime: Date): boolean {
   return diffInMs < ACTIVE_SESSION_THRESHOLD;
 }
 
+// ProjectCard 组件调用此函数格式化最后活动时间
 /**
  * Format the last activity time for a project
  *

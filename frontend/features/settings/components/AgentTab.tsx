@@ -30,6 +30,7 @@ interface AgentTabProps {
   // Currently self-contained
 }
 
+// AgentTabHandle 的类型定义
 /**
  * Exposed methods for parent component
  */

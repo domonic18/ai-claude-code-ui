@@ -23,6 +23,7 @@ import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('websocket/handlers/shell');
 
+// WebSocket 消息或事件处理
 /**
  * Handle shell initialization message
  * @param {WebSocket} ws - WebSocket connection
@@ -81,6 +82,7 @@ async function handleInitMessage(ws, data, ptySessionsMap) {
     return newSessionKey;
 }
 
+// WebSocket 消息或事件处理
 /**
  * 处理 shell WebSocket 连接
  *
@@ -143,3 +145,4 @@ export function handleShellConnection(ws, ptySessionsMap) {
 }
 
 export { PTY_SESSION_TIMEOUT };
+

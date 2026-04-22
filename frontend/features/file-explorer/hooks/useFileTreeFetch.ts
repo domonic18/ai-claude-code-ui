@@ -54,6 +54,7 @@ async function fetchFilesFromApi(
   }
 }
 
+// 由组件调用，自定义 Hook：useFileTreeFetch
 /**
  * Fetch files from API with timeout handling
  */

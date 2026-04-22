@@ -48,11 +48,13 @@ import { createPortal } from 'react-dom';
 import { Button } from './Button';
 import { cn } from '@/lib/utils';
 
+// DialogType 的类型别名定义
 /**
  * Dialog type variants
  */
 export type DialogType = 'danger' | 'warning' | 'info';
 
+// ConfirmDialogProps 的类型定义
 /**
  * ConfirmDialog Props
  */
@@ -221,6 +223,7 @@ function useDialogEffects(isOpen: boolean, isLoading: boolean, onCancel: () => v
   }, [isOpen, isLoading, onCancel]);
 }
 
+// 由父组件调用，React 组件或常量：ConfirmDialog
 /**
  * ConfirmDialog Component
  *

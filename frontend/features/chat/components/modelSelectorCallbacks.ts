@@ -28,6 +28,7 @@ export interface ModelOption {
   maxTokens?: number;
 }
 
+// 由组件调用，自定义 Hook：useModelSelectorState
 /**
  * Custom hook to manage ModelSelector state and logic
  */

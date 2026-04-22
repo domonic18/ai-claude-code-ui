@@ -217,6 +217,7 @@ Custom commands can be created in:
     };
   },
 
+// 定义 HTTP 路由处理器
   /**
    * /memory — 定位或提示创建项目的 CLAUDE.md 文件
    * 需要已选中项目才能使用
@@ -297,3 +298,4 @@ Custom commands can be created in:
     };
   }
 };
+

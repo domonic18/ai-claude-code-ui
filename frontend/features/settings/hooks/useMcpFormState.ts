@@ -48,6 +48,7 @@ export interface UseMcpFormStateReturn {
   setJsonValidationError: (error: string) => void;
 }
 
+// 由组件调用，自定义 Hook：useMcpFormState
 /**
  * Custom hook to manage MCP server form state
  * @returns {UseMcpFormStateReturn} Form state and handlers

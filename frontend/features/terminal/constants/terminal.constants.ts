@@ -4,6 +4,7 @@
  * Constants for terminal component.
  */
 
+// Terminal 支持的主题
 /**
  * Terminal themes
  */
@@ -15,6 +16,7 @@ export const TERMINAL_THEMES = {
   SOLARIZED: 'solarized',
 } as const;
 
+// Terminal 默认配置选项
 /**
  * Default terminal options
  */
@@ -26,6 +28,7 @@ export const DEFAULT_TERMINAL_OPTIONS = {
   convertEol: true,
 } as const;
 
+// 常用 Shell 路径
 /**
  * Common shells
  */
@@ -38,6 +41,7 @@ export const SHELLS = {
   CMD: 'cmd.exe',
 } as const;
 
+// Terminal 预设尺寸
 /**
  * Default terminal sizes
  */
@@ -48,16 +52,19 @@ export const TERMINAL_SIZES = {
   X_LARGE: { cols: 200, rows: 50 },
 } as const;
 
+// Terminal 字体大小选项
 /**
  * Font size options
  */
 export const FONT_SIZES = [12, 14, 16, 18, 20, 24] as const;
 
+// Terminal 滚动缓冲区大小选项
 /**
  * Scrollback options
  */
 export const SCROLLBACK_OPTIONS = [100, 500, 1000, 2000, 5000, 10000] as const;
 
+// WebSocket 连接状态
 /**
  * WebSocket connection states
  */
@@ -68,6 +75,7 @@ export const WS_STATES = {
   CLOSED: 3,
 } as const;
 
+// WebSocket 消息类型
 /**
  * WebSocket message types
  */
@@ -82,6 +90,7 @@ export const WS_MESSAGE_TYPES = {
   CLOSE: 'close',
 } as const;
 
+// 进程信号类型
 /**
  * Process signals
  */
@@ -94,6 +103,7 @@ export const PROCESS_SIGNALS = {
   SIGCONT: 'SIGCONT',
 } as const;
 
+// 默认 Shell 环境变量
 /**
  * Default shell environments
  */
@@ -112,6 +122,7 @@ export const SHELL_ENVS = {
   },
 } as const;
 
+// 命令历史记录限制
 /**
  * Command history limits
  */
@@ -121,6 +132,7 @@ export const HISTORY_LIMITS = {
   MAX: 10000,
 } as const;
 
+// 自动滚动模式
 /**
  * Auto-scroll modes
  */
@@ -130,6 +142,7 @@ export const AUTO_SCROLL_MODES = {
   MANUAL: 'manual',
 } as const;
 
+// 输出流类型
 /**
  * Output types
  */
@@ -140,6 +153,7 @@ export const OUTPUT_TYPES = {
   SYSTEM: 'system',
 } as const;
 
+// 特殊快捷键组合
 /**
  * Special key combinations
  */
@@ -151,6 +165,7 @@ export const KEY_COMBINATIONS = {
   EOF: 'Ctrl+D',
 } as const;
 
+// ANSI 转义码（颜色和样式）
 /**
  * ANSI color codes
  */

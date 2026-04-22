@@ -15,6 +15,7 @@ import { ValidationError } from '../../middleware/error-handler.middleware.js';
  * 用户设置控制器
  */
 export class UserSettingsController extends BaseController {
+// 处理业务逻辑，供路由层调用
   /**
    * 构造函数
    * @param {Object} dependencies - 依赖注入对象
@@ -23,6 +24,7 @@ export class UserSettingsController extends BaseController {
     super(dependencies);
   }
 
+// 获取资源，供路由层调用
   /**
    * 获取用户设置
    * @param {Object} req - Express 请求对象
@@ -48,6 +50,7 @@ export class UserSettingsController extends BaseController {
     }
   }
 
+// 更新资源，供路由层调用
   /**
    * 更新用户设置
    * @param {Object} req - Express 请求对象
@@ -78,6 +81,7 @@ export class UserSettingsController extends BaseController {
     }
   }
 
+// 获取资源，供路由层调用
   /**
    * 获取默认设置
    * @param {Object} req - Express 请求对象
@@ -102,6 +106,7 @@ export class UserSettingsController extends BaseController {
     }
   }
 
+// 获取资源，供路由层调用
   /**
    * 获取SDK配置
    * @param {Object} req - Express 请求对象
@@ -127,6 +132,7 @@ export class UserSettingsController extends BaseController {
     }
   }
 
+// 获取资源，供路由层调用
   /**
    * 获取所有提供商的设置
    * @param {Object} req - Express 请求对象
@@ -145,6 +151,7 @@ export class UserSettingsController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 重置设置为默认值
    * @param {Object} req - Express 请求对象
@@ -172,3 +179,4 @@ export class UserSettingsController extends BaseController {
 }
 
 export default UserSettingsController;
+

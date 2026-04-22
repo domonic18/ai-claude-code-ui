@@ -17,6 +17,7 @@ interface SyncActionsProps {
   onSync: (overwrite: boolean) => void;
 }
 
+// 由父组件调用，React 组件或常量：SyncActions
 /**
  * Renders sync action buttons and sync result summary
  */

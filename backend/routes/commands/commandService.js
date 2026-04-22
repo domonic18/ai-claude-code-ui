@@ -15,6 +15,7 @@ import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('commands/service');
 
+// 定义 HTTP 路由处理器
 /**
  * Validate that a command path is within allowed directories
  * Prevents path traversal attacks by ensuring the path is under
@@ -39,6 +40,7 @@ export function isCommandPathAllowed(commandPath, projectPath) {
   return isUnder(userBase) || (projectBase && isUnder(projectBase));
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Validate that a load path is within user home or .claude/commands
  * Used for the /load endpoint with simpler validation
@@ -52,6 +54,7 @@ export function isLoadPathAllowed(commandPath) {
     resolvedPath.includes('.claude/commands');
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Load and parse a command file
  *
@@ -70,6 +73,7 @@ export async function loadCommandFile(commandPath) {
   };
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Apply parameter substitution to command content
  * Replaces $ARGUMENTS with all args joined, and $1, $2, etc. with positional args
@@ -97,3 +101,4 @@ export function processCommandContent(content, args = []) {
     hasBashCommands: processedContent.includes('!')
   };
 }
+

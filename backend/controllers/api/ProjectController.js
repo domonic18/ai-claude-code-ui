@@ -34,6 +34,7 @@ const logger = createLogger('controllers/api/ProjectController');
  * Project controller
  */
 export class ProjectController extends BaseController {
+// 处理业务逻辑，供路由层调用
   /**
    * Constructor
    * @param {Object} dependencies - Dependency injection object
@@ -43,6 +44,7 @@ export class ProjectController extends BaseController {
     this.claudeDiscovery = dependencies.claudeDiscovery || new ClaudeDiscovery();
   }
 
+// 获取资源，供路由层调用
   /**
    * Gets project list
    */
@@ -60,6 +62,7 @@ export class ProjectController extends BaseController {
     }
   }
 
+// 获取资源，供路由层调用
   /**
    * Gets project details
    */
@@ -81,6 +84,7 @@ export class ProjectController extends BaseController {
     }
   }
 
+// 获取资源，供路由层调用
   /**
    * Gets project sessions
    */
@@ -117,6 +121,7 @@ export class ProjectController extends BaseController {
     }
   }
 
+// 获取资源，供路由层调用
   /**
    * Gets project session messages
    */
@@ -134,6 +139,7 @@ export class ProjectController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * Renames project
    */
@@ -153,6 +159,7 @@ export class ProjectController extends BaseController {
     }
   }
 
+// 删除资源，供路由层调用
   /**
    * Deletes project
    */
@@ -173,6 +180,7 @@ export class ProjectController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * Checks if project is empty
    */
@@ -188,6 +196,7 @@ export class ProjectController extends BaseController {
     }
   }
 
+// 创建新资源，供路由层调用
   /**
    * Manually creates project (adds existing path)
    */
@@ -207,6 +216,7 @@ export class ProjectController extends BaseController {
     }
   }
 
+// 创建新资源，供路由层调用
   /**
    * Creates workspace (new or existing)
    */
@@ -239,6 +249,7 @@ export class ProjectController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * Renames session summary
    */
@@ -258,6 +269,7 @@ export class ProjectController extends BaseController {
     }
   }
 
+// 删除资源，供路由层调用
   /**
    * Deletes session
    */
@@ -276,3 +288,4 @@ export class ProjectController extends BaseController {
 }
 
 export default ProjectController;
+

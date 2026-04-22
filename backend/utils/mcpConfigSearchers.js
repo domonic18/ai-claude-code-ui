@@ -24,6 +24,7 @@ export function findTaskMasterEntry(mcpServers) {
   return entry;
 }
 
+// 工具函数，供多个模块调用
 /**
  * Build server result object
  * @param {string} name - Server name
@@ -42,6 +43,7 @@ export function buildServerResult(name, config, scope, projectPath) {
   };
 }
 
+// 工具函数，供多个模块调用
 /**
  * Search for task-master in configuration data
  * @param {Object} configData - Configuration data
@@ -71,6 +73,7 @@ export function searchTaskMasterInConfig(configData, findEntry, buildResult) {
   return null;
 }
 
+// 工具函数，供多个模块调用
 /**
  * Collect all available MCP server names
  * @param {Object} configData - Configuration data
@@ -94,6 +97,7 @@ export function collectAvailableServers(configData) {
   return servers;
 }
 
+// 工具函数，供多个模块调用
 /**
  * Format server found result
  * @param {Object} server - Server object
@@ -117,3 +121,4 @@ export function formatServerFound(server) {
     },
   };
 }
+

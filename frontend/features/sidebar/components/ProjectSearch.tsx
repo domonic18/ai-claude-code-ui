@@ -17,6 +17,7 @@ import { Input } from '@/shared/components/ui/Input';
 import { Button } from '@/shared/components/ui/Button';
 import type { ProjectSearchProps } from '../types/sidebar.types';
 
+// Sidebar 组件使用此组件提供项目搜索和过滤功能
 /**
  * ProjectSearch Component
  */

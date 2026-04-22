@@ -25,6 +25,7 @@ interface DesktopSidebarProps {
   onToggleSidebar: (visible: boolean) => void;
 }
 
+// 由父组件调用，React 组件或常量：DesktopSidebar
 /**
  * Renders the fixed desktop sidebar with optional collapsed state
  */

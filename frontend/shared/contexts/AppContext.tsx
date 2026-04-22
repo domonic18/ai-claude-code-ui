@@ -11,6 +11,7 @@ import type { Project } from '@/features/sidebar/types/sidebar.types';
 import type { Session, ApiSession } from '@/features/system/types/projectManagement.types';
 import type { SettingsTab } from '@/features/settings/types/settings.types';
 
+// 版本升级状态的类型定义
 /**
  * Version upgrade state
  */
@@ -21,6 +22,7 @@ export interface VersionUpgradeState {
   releaseInfo: ReleaseInfo | null;
 }
 
+// PWA（渐进式 Web 应用）状态的类型定义
 /**
  * PWA state
  */
@@ -30,6 +32,7 @@ export interface PWAState {
   displayMode: string;
 }
 
+// UI 状态的类型定义
 /**
  * UI state
  */
@@ -49,6 +52,7 @@ export interface UIState {
   sendByCtrlEnter: boolean;
 }
 
+// 应用全局状态的类型定义
 /**
  * App context state
  */
@@ -74,6 +78,7 @@ export interface AppState {
   ui: UIState;
 }
 
+// 应用全局操作方法的类型定义
 /**
  * App context actions
  */
@@ -120,16 +125,19 @@ export interface AppActions {
   openSettings: (tab?: SettingsTab) => void;
 }
 
+// AppContext 的值类型定义
 /**
  * App context type
  */
 export interface AppContextType extends AppState, AppActions {}
 
+// 由需要访问全局应用状态的组件调用，获取项目、会话、UI 等状态和操作方法
 /**
  * App context
  */
 export const AppContext = createContext<AppContextType | null>(null);
 
+// 由需要访问全局应用状态的组件调用，获取项目、会话、UI 等状态和操作方法
 /**
  * Use App Context hook
  *
@@ -144,6 +152,7 @@ export function useAppContext(): AppContextType {
   return context;
 }
 
+// AppProvider 组件的属性类型定义
 /**
  * App Provider props
  */
@@ -152,6 +161,7 @@ export interface AppProviderProps {
   value: AppContextType;
 }
 
+// 由应用根组件调用，包装整个组件树以提供全局状态上下文
 /**
  * App Provider component
  */

@@ -73,6 +73,7 @@ const HttpStatusMap = {
  * 继承自 Error，添加额外的错误信息
  */
 class AppError extends Error {
+// 中间件函数，在请求处理链中执行
   /**
    * 构造函数
    * @param {string} message - 错误消息
@@ -89,6 +90,7 @@ class AppError extends Error {
     this.timestamp = new Date().toISOString();
   }
 
+// 中间件函数，在请求处理链中执行
   /**
    * 转换为响应对象
    * @returns {Object} 响应对象
@@ -111,6 +113,7 @@ class AppError extends Error {
  * 验证错误类
  */
 class ValidationError extends AppError {
+// 中间件函数，在请求处理链中执行
   /**
    * 构造函数
    * @param {string} message - 错误消息
@@ -126,6 +129,7 @@ class ValidationError extends AppError {
  * 未找到错误类
  */
 class NotFoundError extends AppError {
+// 中间件函数，在请求处理链中执行
   /**
    * 构造函数
    * @param {string} resource - 资源名称
@@ -144,6 +148,7 @@ class NotFoundError extends AppError {
  * 未授权错误类
  */
 class UnauthorizedError extends AppError {
+// 中间件函数，在请求处理链中执行
   /**
    * 构造函数
    * @param {string} message - 错误消息
@@ -154,6 +159,7 @@ class UnauthorizedError extends AppError {
   }
 }
 
+// 中间件函数，在请求处理链中执行
 /**
  * 错误处理中间件
  * 捕获所有错误并返回统一的响应格式
@@ -220,6 +226,7 @@ function errorHandler(err, req, res, next) {
   });
 }
 
+// 中间件函数，在请求处理链中执行
 /**
  * 404 处理中间件
  * @param {Object} req - Express 请求对象
@@ -232,6 +239,7 @@ function notFoundHandler(req, res) {
   });
 }
 
+// 中间件函数，在请求处理链中执行
 /**
  * 异步路由包装器
  * 捕获异步路由中的错误并传递给错误处理中间件
@@ -244,6 +252,7 @@ function asyncHandler(fn) {
   };
 }
 
+// 中间件函数，在请求处理链中执行
 /**
  * 记录错误
  * @private
@@ -279,6 +288,7 @@ function _logError(err, req) {
   }
 }
 
+// 中间件函数，在请求处理链中执行
 /**
  * 清理请求体（避免记录敏感信息）
  * @private
@@ -310,3 +320,4 @@ export {
   notFoundHandler,
   asyncHandler
 };
+

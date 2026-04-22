@@ -25,6 +25,7 @@ export function shouldGroupWithPrevious(
   );
 }
 
+// ChatMessage 组件调用此函数根据消息类型获取显示名称
 /**
  * Get display name for a message type
  * @param type - Message type
@@ -42,6 +43,7 @@ export function getDisplayName(
   return 'Claude';
 }
 
+// ChatMessage 组件调用此函数生成消息容器的 CSS 类名
 /**
  * Get CSS classes for message container
  * @param type - Message type
@@ -55,6 +57,7 @@ export function getMessageContainerClasses(
   return `chat-message ${type} ${isGrouped ? 'grouped' : ''} px-3 sm:px-0`;
 }
 
+// ChatMessage 组件调用此函数获取头像背景颜色类名
 /**
  * Get avatar background color based on message type
  * @param type - Message type
@@ -71,6 +74,7 @@ export function getAvatarBackgroundClass(type: string): string {
   }
 }
 
+// ChatMessage 组件调用此函数获取头像内容（emoji 或图标）
 /**
  * Get avatar content based on message type
  * @param type - Message type

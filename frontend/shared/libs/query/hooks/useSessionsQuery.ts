@@ -61,6 +61,7 @@ import { getSidebarService } from '@/features/sidebar/services';
 import { queryKeys } from '../queryKeys';
 import type { Session, SessionProvider } from '@/features/sidebar/types/sidebar.types';
 
+// UseSessionsQueryOptions 的类型定义
 /**
  * 会话查询参数
  */
@@ -104,6 +105,7 @@ export function useSessionsQuery(options: UseSessionsQueryOptions) {
   });
 }
 
+// RenameSessionMutationParams 的类型定义
 /**
  * 重命名会话的参数
  */
@@ -156,6 +158,7 @@ export function useRenameSessionMutation() {
   });
 }
 
+// DeleteSessionMutationParams 的类型定义
 /**
  * 删除会话的参数
  */

@@ -37,6 +37,7 @@ interface FileTreeEmptyStatesProps {
   searchQuery: string;
 }
 
+// 由父组件调用，React 组件或常量：FileTreeEmptyStates
 /**
  * File tree empty states
  * Shows appropriate empty state based on file list status

@@ -17,6 +17,7 @@ const logger = createLogger('database/connection');
 let _db = null;
 let _isInitialized = false;
 
+// 获取数据库文件的绝对路径，用于连接和日志显示
 /**
  * 获取数据库路径
  * @returns {string} 数据库文件的绝对路径
@@ -30,6 +31,7 @@ export function getDatabasePath() {
     return dbPath;
 }
 
+// 获取数据库连接实例（单例模式），用于数据库操作
 /**
  * 获取数据库实例（单例模式）
  * @returns {Database} better-sqlite3 数据库实例
@@ -50,6 +52,7 @@ export function getDatabase() {
     return _db;
 }
 
+// 导出数据库实例访问函数，用于事务等需要直接访问数据库的场景
 /**
  * 导出 db 函数供外部直接使用（如事务操作）
  */
@@ -57,6 +60,7 @@ export function db() {
     return getDatabase();
 }
 
+// 重置数据库连接，主要用于测试环境清理
 /**
  * 重置数据库连接（主要用于测试）
  */
@@ -68,6 +72,7 @@ export function resetDatabase() {
     }
 }
 
+// 检查数据库是否已完成初始化，避免重复初始化
 /**
  * 检查数据库是否已初始化
  */
@@ -75,6 +80,7 @@ export function isDatabaseInitialized() {
     return _isInitialized;
 }
 
+// 标记数据库已完成初始化，在执行迁移后调用
 /**
  * 标记数据库为已初始化
  */

@@ -12,6 +12,7 @@ import { ChevronRight, Check } from 'lucide-react';
 import type { HighlightRect, Position } from './tourUtils';
 import { TOUR_STEP_CONTENT, getTooltipStyle } from './tourUtils';
 
+// 由父组件调用，React 组件或常量：StepIndicators
 /**
  * Step indicators component
  */
@@ -38,6 +39,7 @@ function TourButtonContent({ elementNotFound, isLastStep, t }: { elementNotFound
   return (<>{t('tour.nextStep')}<ChevronRight className="w-4 h-4" /></>);
 }
 
+// 由父组件调用，React 组件或常量：TourMask
 /**
  * Tour mask component with SVG overlay
  */
@@ -72,6 +74,7 @@ export function TourMask({ maskId, highlightRect, highlightBorderRef, svgMaskRef
   );
 }
 
+// 由父组件调用，React 组件或常量：TourTooltip
 /**
  * Tour tooltip component
  */

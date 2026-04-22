@@ -4,26 +4,31 @@
  * TypeScript types for Settings feature module.
  */
 
+// Settings 模块支持的标签页类型
 /**
  * Available settings tabs
  */
 export type SettingsTab = 'agents' | 'appearance' | 'api' | 'tasks';
 
+// Agent 类型选择
 /**
  * Agent type selection
  */
 export type AgentType = 'claude' | 'opencode';
 
+// MCP 服务器传输类型
 /**
  * MCP Server transport type
  */
 export type McpTransportType = 'stdio' | 'sse' | 'http';
 
+// MCP 服务器作用域类型
 /**
  * MCP Server scope type
  */
 export type McpScope = 'user' | 'project';
 
+// MCP 服务器配置接口
 /**
  * MCP Server configuration
  */
@@ -47,6 +52,7 @@ export interface McpServer {
   importMode?: 'form' | 'json';
 }
 
+// 权限设置接口
 /**
  * Permission settings
  */
@@ -56,6 +62,7 @@ export interface PermissionSettings {
   skipPermissions: boolean;
 }
 
+// 代码编辑器设置接口
 /**
  * Code Editor settings
  */
@@ -67,6 +74,7 @@ export interface CodeEditorSettings {
   fontSize: string;
 }
 
+// Settings 模态框组件 Props 接口
 /**
  * Settings modal props
  */
@@ -79,11 +87,13 @@ export interface SettingsProps {
   initialTab?: SettingsTab;
 }
 
+// 保存状态类型
 /**
  * Save status
  */
 export type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 
+// MCP 服务器测试结果接口
 /**
  * MCP Server test result
  */
@@ -93,6 +103,7 @@ export interface McpTestResult {
   error?: string;
 }
 
+// API 密钥配置接口
 /**
  * API Key configuration
  */

@@ -27,6 +27,7 @@ export const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 
 const ENV_FILE_CANDIDATES = ['.env', '.env.deploy'];
 
+// 查找环境文件路径，按优先级返回第一个存在的配置文件
 /**
  * 查找环境文件路径
  * 按 ENV_FILE > .env > .env.deploy 的优先级查找
@@ -51,6 +52,7 @@ function findEnvFile() {
   return null;
 }
 
+// 从文件内容中解析环境变量并加载到 process.env，环境变量优先于文件配置
 /**
  * 从 .env 文件内容中加载变量到 process.env
  * 只加载尚未设置的变量（环境变量优先于文件配置）
@@ -79,6 +81,7 @@ function loadEnvVars(content) {
   return loadedCount;
 }
 
+// 格式化环境变量值用于日志输出，隐藏敏感信息（TOKEN、KEY等）
 /**
  * 格式化关键变量的显示值（隐藏敏感信息）
  * @param {string} varName - 变量名
@@ -96,6 +99,7 @@ function formatSafeValue(varName) {
   return value;
 }
 
+// 从环境文件加载环境变量到 process.env，在应用启动时调用
 /**
  * 从环境文件加载环境变量
  * 如果环境变量尚不存在，则设置它们

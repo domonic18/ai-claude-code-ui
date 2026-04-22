@@ -25,6 +25,7 @@ const { User } = repositories;
  * 认证控制器
  */
 export class AuthController extends BaseController {
+// 获取资源，供路由层调用
   /**
    * 获取认证状态
    * @param {Object} req - Express 请求对象
@@ -44,6 +45,7 @@ export class AuthController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 用户注册（仅在没有用户存在时）
    * @param {Object} req - Express 请求对象
@@ -103,6 +105,7 @@ export class AuthController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 用户登录
    * @param {Object} req - Express 请求对象
@@ -150,6 +153,7 @@ export class AuthController extends BaseController {
     }
   }
 
+// 获取资源，供路由层调用
   /**
    * 获取当前用户信息
    * @param {Object} req - Express 请求对象
@@ -171,6 +175,7 @@ export class AuthController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 修改密码
    * @param {Object} req - Express 请求对象
@@ -212,6 +217,7 @@ export class AuthController extends BaseController {
     }
   }
 
+// 获取资源，供路由层调用
   /**
    * 获取 WebSocket 认证令牌
    * WebSocket 无法自动发送 cookie，需要提供 token
@@ -235,6 +241,7 @@ export class AuthController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 注销
    * @param {Object} req - Express 请求对象
@@ -255,3 +262,4 @@ export class AuthController extends BaseController {
 }
 
 export default AuthController;
+

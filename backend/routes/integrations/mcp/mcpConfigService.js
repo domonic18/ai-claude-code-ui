@@ -14,6 +14,7 @@ import { createLogger } from '../../../utils/logger.js';
 
 const logger = createLogger('mcp/configService');
 
+// 定义 HTTP 路由处理器
 /**
  * Build stdio-type server config
  * @param {object} config - Raw config from JSON
@@ -30,6 +31,7 @@ function buildStdioConfig(config) {
   };
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Build HTTP-type server config
  * @param {object} config - Raw config from JSON
@@ -45,6 +47,7 @@ function buildHttpConfig(config) {
   };
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Resolve server type and config from raw config
  * @param {object} config - Raw config from JSON
@@ -56,6 +59,7 @@ function resolveServerConfig(config) {
   return { type: 'stdio', config: {} };
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Extract server info from a raw config object
  *
@@ -78,6 +82,7 @@ function extractServerInfo(name, config, scope, projectPath) {
   };
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Check if mcpServers object is empty or invalid
  * @param {Object} mcpServers - MCP servers object from config
@@ -87,6 +92,7 @@ function isEmptyServers(mcpServers) {
   return !mcpServers || typeof mcpServers !== 'object' || Object.keys(mcpServers).length === 0;
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Collect servers from a config section (user-scoped or project-scoped)
  * @param {Object} mcpServers - MCP servers object from config
@@ -108,6 +114,7 @@ const CONFIG_PATHS = [
   () => path.join(os.homedir(), '.claude', 'settings.json')
 ];
 
+// 定义 HTTP 路由处理器
 /**
  * Try to load and parse a config file
  * @param {string} filepath - Path to config file
@@ -123,6 +130,7 @@ async function tryLoadConfigFile(filepath) {
   }
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Find and load the first valid config file
  * @returns {Promise<{configPath: string|null, configData: Object|null}>}
@@ -139,6 +147,7 @@ async function findConfigFile() {
   return { configPath: null, configData: null };
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Collect all servers (user-scoped + project-scoped) from config data
  * @param {Object} configData - Parsed config data
@@ -157,6 +166,7 @@ function collectAllServers(configData) {
   return servers;
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Read MCP server configurations from Claude config files
  * Checks both ~/.claude.json and ~/.claude/settings.json
@@ -171,3 +181,4 @@ export async function readMcpConfig() {
   logger.info(`Found ${servers.length} MCP servers in config`);
   return { configPath, servers };
 }
+

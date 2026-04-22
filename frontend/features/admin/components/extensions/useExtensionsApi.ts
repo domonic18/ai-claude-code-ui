@@ -8,6 +8,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { logger } from '@/shared/utils/logger';
 import type { ExtensionsData, SyncResults } from './types';
 
+// 由组件调用，自定义 Hook：useExtensionsApi
 /**
  * Manages extension data fetching and sync operations
  * @returns State and handlers for extension management

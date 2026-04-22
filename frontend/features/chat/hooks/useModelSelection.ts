@@ -25,12 +25,14 @@ export interface UseModelSelectionOptions {
 export interface UseModelSelectionResult {
   /** Currently selected model (backend format, e.g., 'glm-4.7') */
   selectedModel: string;
+// ChatInterface 和 ModelSelector 组件使用此 hook 管理 AI 模型的选择和切换
   /** Current provider (claude, openai, etc.) */
   provider: string;
   /** Handle model selection */
   handleModelSelect: (modelId: string) => void;
 }
 
+// ChatInterface 和 ModelSelector 组件使用此 hook 管理 AI 模型的选择和切换
 /**
  * Hook for managing model selection
  *

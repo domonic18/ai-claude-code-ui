@@ -16,6 +16,7 @@ const execFileAsync = promisify(execFile);
 // Configuration
 const BASH_TIMEOUT = 30000; // 30 seconds
 
+// 工具函数，供多个模块调用
 /**
  * Replace argument placeholders in content
  * @param {string} content - Content with placeholders
@@ -44,6 +45,7 @@ export function replaceArguments(content, args) {
   return result;
 }
 
+// 工具函数，供多个模块调用
 /**
  * Sanitize bash command output
  * @param {string} output - Raw command output
@@ -64,6 +66,7 @@ export function sanitizeOutput(output) {
     .join('');
 }
 
+// 工具函数，供多个模块调用
 /**
  * Process bash commands in content (!command syntax)
  * @param {string} content - Content with !command syntax
@@ -124,3 +127,4 @@ export async function processBashCommands(content, options = {}) {
 
   return result;
 }
+

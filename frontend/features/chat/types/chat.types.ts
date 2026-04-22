@@ -86,6 +86,7 @@ export interface ChatMessage {
   exitCode?: number;
 }
 
+// FileAttachment 的类型定义
 /**
  * File attachment structure
  */
@@ -124,6 +125,7 @@ export interface ChatState {
   streamingThinking: string;
 }
 
+// ChatInputState 的类型定义
 /**
  * Chat input state
  */
@@ -136,6 +138,7 @@ export interface ChatInputState {
   isFocused: boolean;
 }
 
+// ChatActions 的类型定义
 /**
  * Chat actions for manipulating state
  */
@@ -192,6 +195,7 @@ export interface ChatMessageProps {
   selectedProject?: string;
 }
 
+// ChatInputProps 的类型定义
 /**
  * Chat input component props
  */
@@ -234,6 +238,7 @@ export interface MarkdownRendererProps {
   isTerminalOutput?: boolean;
 }
 
+// FileUploadHandlerProps 的类型定义
 /**
  * File upload handler props
  */
@@ -250,6 +255,7 @@ export interface FileUploadHandlerProps {
   allowedTypes?: string[];
 }
 
+// StreamingIndicatorProps 的类型定义
 /**
  * Streaming indicator props
  */

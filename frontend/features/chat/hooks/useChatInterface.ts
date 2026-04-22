@@ -139,6 +139,7 @@ export interface UseChatInterfaceResult {
   setPendingQuestion: (toolUseID: string, sessionId: string) => void;
 }
 
+// 由组件调用，自定义 Hook：useChatInterface
 /**
  * Main hook for ChatInterface component
  * Extracts all complex logic and state management

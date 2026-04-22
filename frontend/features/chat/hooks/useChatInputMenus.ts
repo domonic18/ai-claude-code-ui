@@ -23,6 +23,7 @@ interface MenuPositions {
   fileMenuPosition: { top: number; left: number };
 }
 
+// 由组件调用，自定义 Hook：useChatInputMenus
 /**
  * Hook for managing menu positions in ChatInput
  */

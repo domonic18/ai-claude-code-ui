@@ -153,6 +153,7 @@ function useEditorConfig(readOnly: boolean) {
   };
 }
 
+// CodeEditor 组件使用此 hook 管理 CodeMirror 实例和编辑器状态
 /**
  * Hook for managing code editor state
  */

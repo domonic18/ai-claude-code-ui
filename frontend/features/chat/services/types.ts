@@ -6,6 +6,7 @@
 
 import type { ChatMessage } from '../types';
 
+// MessageHandlerCallbacks 的类型定义
 /**
  * Callback interface for WebSocket message handlers
  */

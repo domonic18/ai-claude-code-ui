@@ -14,6 +14,7 @@ const db = getDatabase;
  * 用户凭证数据仓库
  */
 export const Credential = {
+// 数据库操作函数，供控制器调用
     /**
      * 获取用户凭证（可按类型过滤）
      * @param {number} userId
@@ -33,6 +34,7 @@ export const Credential = {
         return rows;
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 创建新凭证
      * @param {number} userId
@@ -53,6 +55,7 @@ export const Credential = {
         };
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 删除凭证
      * @param {number} userId
@@ -65,6 +68,7 @@ export const Credential = {
         return result.changes > 0;
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 切换凭证活动状态
      * @param {number} userId
@@ -78,3 +82,4 @@ export const Credential = {
         return result.changes > 0;
     }
 };
+

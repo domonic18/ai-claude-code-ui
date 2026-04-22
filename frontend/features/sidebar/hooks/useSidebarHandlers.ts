@@ -98,6 +98,7 @@ export interface UseSidebarHandlersReturn {
   handleNewSession: () => void;
 }
 
+// 由组件调用，自定义 Hook：useSidebarHandlers
 /**
  * Custom hook to manage sidebar event handlers
  *

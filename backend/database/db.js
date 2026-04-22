@@ -21,6 +21,7 @@ import { McpServer } from './repositories/McpServer.repository.js';
 import { createLogger } from '../utils/logger.js';
 const logger = createLogger('database/db');
 
+// 初始化数据库并执行所有迁移，在应用启动时调用一次
 /**
  * 初始化数据库
  */

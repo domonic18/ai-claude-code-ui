@@ -6,6 +6,7 @@
 
 import type { SettingsTab } from '@/features/settings/types/settings.types';
 
+// SettingsPageProps 的类型定义
 /**
  * SettingsPage props
  */

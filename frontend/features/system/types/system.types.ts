@@ -15,6 +15,7 @@ export interface ReleaseInfo {
   tagName?: string;
 }
 
+// VersionCheckResult 的类型定义
 /**
  * Version check result
  */
@@ -25,6 +26,7 @@ export interface VersionCheckResult {
   releaseInfo: ReleaseInfo | null;
 }
 
+// UpdateProgress 的类型定义
 /**
  * Update progress
  */
@@ -34,6 +36,7 @@ export interface UpdateProgress {
   error: string | null;
 }
 
+// PWAStatus 的类型定义
 /**
  * PWA detection result
  */
@@ -43,6 +46,7 @@ export interface PWAStatus {
   displayMode: string;
 }
 
+// ProjectUpdateDetection 的类型定义
 /**
  * Project update detection
  */

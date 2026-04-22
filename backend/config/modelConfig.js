@@ -16,6 +16,7 @@ const logger = createLogger('config/modelConfig');
  * AI 模型配置
  */
 export const MODELS = {
+// 配置相关函数，在应用启动时调用
   /**
    * 解析并验证 AVAILABLE_MODELS 环境变量
    * @returns {Array<{name: string, provider: string}>} 模型数组
@@ -94,3 +95,4 @@ export const MODELS = {
     apiKey: process.env.ANTHROPIC_API_KEY
   }
 };
+

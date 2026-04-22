@@ -48,6 +48,7 @@ const PROVIDER_STRATEGIES = {
     },
 };
 
+// 定义 HTTP 路由处理器
 /**
  * 执行 AI 会话（策略分发）
  * @param {string} provider - 提供者名称
@@ -63,6 +64,7 @@ export async function executeProvider(provider, message, sdkOptions, writer) {
 
 // ─── 项目路径解析 ──────────────────────────────────────────
 
+// 定义 HTTP 路由处理器
 /**
  * 解析最终的项目路径（克隆或验证本地路径）
  * @param {Object} params - 请求参数
@@ -88,6 +90,7 @@ export async function resolveProjectPath(params, user) {
     return resolvedPath;
 }
 
+// 定义 HTTP 路由处理器
 /**
  * 注册项目到数据库
  * @param {number} userId - 用户 ID
@@ -104,6 +107,7 @@ export async function registerProject(userId, projectPath) {
 
 // ─── GitHub 工作流 ──────────────────────────────────────────
 
+// 定义 HTTP 路由处理器
 /**
  * 执行 GitHub 分支/PR 工作流
  * @param {Object} params - 请求参数
@@ -147,6 +151,7 @@ export async function executeGitHubBranchWorkflow(params, projectPath, user, str
 
 // ─── Writer 创建 ──────────────────────────────────────────
 
+// 处理 POST 请求创建资源
 /**
  * 创建输出 Writer（SSE 流或响应收集器）
  * @param {boolean} stream - 是否流式
@@ -163,3 +168,4 @@ export function createWriter(stream, res) {
     }
     return new ResponseCollector();
 }
+

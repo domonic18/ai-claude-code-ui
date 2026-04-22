@@ -12,6 +12,7 @@ import { getDatabase } from '../connection.js';
 import { createLogger } from '../../utils/logger.js';
 const logger = createLogger('database/repositories/McpServer.repository.helpers');
 
+// 数据库操作函数，供控制器调用
 /**
  * 处理数据库错误，转换 UNIQUE 约束错误为友好消息
  * @param {Error} error - 原始错误对象
@@ -35,6 +36,7 @@ export function handleDbError(error, operation, context = {}) {
   return new Error(`Failed to ${operation} MCP server: ${error.message}`);
 }
 
+// 数据库操作函数，供控制器调用
 /**
  * 构建更新字段和值数组
  * @param {Object} data - 更新数据
@@ -67,6 +69,7 @@ export function buildUpdateFields(data) {
   return { updates, values };
 }
 
+// 数据库操作函数，供控制器调用
 /**
  * 解析 JSON 字段
  * @param {string} jsonString - JSON 字符串
@@ -86,6 +89,7 @@ export function parseJson(jsonString, defaultValue = null) {
   }
 }
 
+// 数据库操作函数，供控制器调用
 /**
  * 将数据库行转换为对象
  * @param {Object} row - 数据库行
@@ -104,6 +108,7 @@ export function rowToObject(row) {
   };
 }
 
+// 数据库操作函数，供控制器调用
 /**
  * 执行 MCP 服务器创建操作
  * @param {number} userId - 用户 ID
@@ -137,6 +142,7 @@ export async function executeCreate(userId, data, getById) {
   return await getById(id);
 }
 
+// 数据库操作函数，供控制器调用
 /**
  * 执行 MCP 服务器启用状态切换
  * @param {number} id - MCP 服务器 ID
@@ -166,6 +172,7 @@ export async function executeToggleEnabled(id, getById) {
   return await getById(id);
 }
 
+// 数据库操作函数，供控制器调用
 /**
  * 获取最后插入的行 ID
  * @returns {number} 最后插入的行 ID
@@ -176,6 +183,7 @@ export function getLastInsertRowId() {
   return row.id;
 }
 
+// 数据库操作函数，供控制器调用
 /**
  * 执行 MCP 服务器更新操作
  * @param {number} id - MCP 服务器 ID
@@ -212,3 +220,4 @@ export async function executeUpdate(id, data, getById) {
   logger.info(`[McpServer] Updated server ${id}`);
   return await getById(id);
 }
+

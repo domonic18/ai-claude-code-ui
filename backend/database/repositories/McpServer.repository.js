@@ -25,6 +25,7 @@ const logger = createLogger('database/repositories/McpServer.repository');
  * MCP 服务器数据仓库类
  */
 export class McpServer {
+// 数据库操作函数，供控制器调用
   /**
    * 获取用户的所有 MCP 服务器
    * @param {number} userId - 用户 ID
@@ -45,6 +46,7 @@ export class McpServer {
     }
   }
 
+// 数据库操作函数，供控制器调用
   /**
    * 根据 ID 获取 MCP 服务器
    * @param {number} id - MCP 服务器 ID
@@ -67,6 +69,7 @@ export class McpServer {
     }
   }
 
+// 数据库操作函数，供控制器调用
   /**
    * 根据名称获取用户的 MCP 服务器
    * @param {number} userId - 用户 ID
@@ -91,6 +94,7 @@ export class McpServer {
     }
   }
 
+// 数据库操作函数，供控制器调用
   /**
    * 创建 MCP 服务器
    * @param {number} userId - 用户 ID
@@ -105,6 +109,7 @@ export class McpServer {
     }
   }
 
+// 数据库操作函数，供控制器调用
   /**
    * 更新 MCP 服务器
    * @param {number} id - MCP 服务器 ID
@@ -119,6 +124,7 @@ export class McpServer {
     }
   }
 
+// 数据库操作函数，供控制器调用
   /**
    * 删除 MCP 服务器
    * @param {number} id - MCP 服务器 ID
@@ -144,6 +150,7 @@ export class McpServer {
     }
   }
 
+// 数据库操作函数，供控制器调用
   /**
    * 检查 MCP 服务器是否属于指定用户
    * @param {number} id - MCP 服务器 ID
@@ -167,6 +174,7 @@ export class McpServer {
     }
   }
 
+// 数据库操作函数，供控制器调用
   /**
    * 获取启用的 MCP 服务器
    * @param {number} userId - 用户 ID
@@ -187,6 +195,7 @@ export class McpServer {
     }
   }
 
+// 数据库操作函数，供控制器调用
   /**
    * 切换 MCP 服务器启用状态
    * @param {number} id - MCP 服务器 ID
@@ -200,6 +209,7 @@ export class McpServer {
     }
   }
 
+// 数据库操作函数，供控制器调用
   /**
    * 获取最后插入的行 ID
    * @private
@@ -212,3 +222,4 @@ export class McpServer {
 }
 
 export default McpServer;
+

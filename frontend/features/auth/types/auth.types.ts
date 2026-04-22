@@ -8,6 +8,7 @@
 import type { User } from '@/shared/types/user.types';
 export type { User };
 
+// 用户个性化设置的类型定义，由 useUserSettings Hook 使用
 /**
  * User settings
  */
@@ -19,6 +20,7 @@ export interface UserSettings {
   autoSave?: boolean;
 }
 
+// 认证会话的类型定义，由 AuthContext 使用
 /**
  * Auth session
  */
@@ -29,6 +31,7 @@ export interface AuthSession {
   isAuthenticated: boolean;
 }
 
+// 登录凭据的类型定义，由 LoginForm 组件使用
 /**
  * Login credentials
  */
@@ -37,6 +40,7 @@ export interface LoginCredentials {
   password: string;
 }
 
+// 注册数据的类型定义，由 SetupForm 组件使用
 /**
  * Registration data
  */
@@ -46,6 +50,7 @@ export interface RegistrationData {
   email?: string;
 }
 
+// 认证响应的类型定义，由 authService 返回
 /**
  * Auth response
  */
@@ -57,6 +62,7 @@ export interface AuthResponse {
   error?: string;
 }
 
+// LoginModal 组件的属性类型定义
 /**
  * Login modal props
  */
@@ -72,6 +78,7 @@ export interface LoginModalProps {
   onComplete?: (exitCode: number) => void;
 }
 
+// AuthContext 提供的值类型定义
 /**
  * Auth context value
  */
@@ -86,6 +93,7 @@ export interface AuthContextValue {
   refreshUser: () => Promise<void>;
 }
 
+// 登录状态的类型定义
 /**
  * Login status
  */

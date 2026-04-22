@@ -20,6 +20,7 @@ export {
   parseCursorStatusOutput
 } from './cursorAuthHelper.js';
 
+// 定义 HTTP 路由处理器
 /**
  * 检查 Claude CLI 的认证状态
  *
@@ -56,6 +57,7 @@ async function checkClaudeCredentials() {
   }
 }
 
+// 定义 HTTP 路由处理器
 /**
  * 从 id_token JWT 中提取邮箱地址
  *
@@ -79,6 +81,7 @@ function extractEmailFromToken(idToken) {
   return 'Authenticated';
 }
 
+// 定义 HTTP 路由处理器
 /**
  * 检查 Codex CLI 的认证状态
  *
@@ -137,3 +140,4 @@ export {
   checkCodexCredentials,
   extractEmailFromToken
 };
+

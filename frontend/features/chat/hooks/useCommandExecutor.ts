@@ -22,10 +22,12 @@ export interface UseCommandExecutorOptions {
 }
 
 export interface UseCommandExecutorResult {
+// ChatInput 组件使用此 hook 处理斜杠命令的执行和历史记录
   /** Handle command execution */
   handleCommandExecute: (command: SlashCommand) => void;
 }
 
+// ChatInput 组件使用此 hook 处理斜杠命令的执行和历史记录
 /**
  * Hook for handling command execution
  *

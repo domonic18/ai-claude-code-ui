@@ -20,6 +20,7 @@ interface FileTreeNewItemProps {
   onCancel: () => void;
 }
 
+// 由父组件调用，React 组件或常量：FileTreeNewItem
 /**
  * File tree new item input section
  */

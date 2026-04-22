@@ -132,6 +132,7 @@ function ErrorMessage({ error }: ErrorMessageProps) {
   );
 }
 
+// 由父组件调用，React 组件或常量：MemoryPage
 /**
  * 记忆页面组件
  */
