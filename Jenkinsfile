@@ -1,10 +1,11 @@
-// Jenkins CI Pipeline - Linux Master 构建
+// Jenkins CI Pipeline - Docker 构建环境
 //
 // 触发方式：GitHub webhook（push 到 develop 分支自动触发）
 //
+// 构建环境：Docker 镜像 node:20-bookworm（Debian，内置 gcc/make/python3，支持原生模块编译）
 // 前置条件：
-//   1. Jenkins Master (Linux) 上已安装：Node.js 20、git
-//   2. Jenkins 插件：Pipeline、Git、GitHub plugin
+//   1. Jenkins 服务器已安装 Docker
+//   2. Jenkins 插件：Pipeline、Git、GitHub plugin、Docker Pipeline
 //   3. GitHub 仓库已配置 webhook（地址在 Jenkins 系统配置中管理）
 //
 // Jenkins Job SCM 配置：
@@ -13,8 +14,12 @@
 //   - Branch: */develop
 
 pipeline {
-    // 在 Jenkins Master (Linux) 上执行
-    agent any
+    // 使用 Docker 镜像构建，Node.js 版本由镜像控制（与 .nvmrc 保持一致）
+    agent {
+        docker {
+            image 'node:20-bookworm'
+        }
+    }
 
     // GitHub webhook 推送触发（仅 develop 分支的 push 事件）
     // webhook 地址在 Jenkins 系统配置中管理
