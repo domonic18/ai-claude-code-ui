@@ -13,6 +13,7 @@ import { createLogger } from '../../utils/logger.js';
 const logger = createLogger('routes/core/samlInstanceFactory');
 const { ServiceProvider: Saml, IdentityProvider: IdP } = saml2;
 
+// 定义 HTTP 路由处理器
 /**
  * 从 PEM 格式字符串中移除 BEGIN/END 标记和空白
  * @param {string} pem - PEM 格式的证书或密钥
@@ -26,6 +27,7 @@ function stripPemHeaders(pem) {
     .replace(/\s/g, '');
 }
 
+// 处理 POST 请求创建资源
 /**
  * 创建 SAML SP/IdP 实例
  * @returns {{ sp: Object, idp: Object }|null}
@@ -69,3 +71,4 @@ function createSamlInstances() {
 }
 
 export { createSamlInstances };
+

@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { authenticatedFetch } from '@/shared/services';
 
+// 由组件调用，自定义 Hook：useMemoryEditor
 /**
  * Manages memory content loading and saving
  * @returns State and handlers for memory editor

@@ -18,6 +18,7 @@ export function parseToolInput(toolInput: string | null): any {
   }
 }
 
+// ToolResultRenderer 组件调用此函数提取工具结果内容和错误状态
 /**
  * Get tool result content and error status
  * @param toolResult - Tool result object
@@ -36,6 +37,7 @@ export function getToolResultData(toolResult: any): { content: string; isError: 
   };
 }
 
+// 各个工具调用和消息处理函数调用此函数获取当前选中的 AI 提供商
 /**
  * Get provider from localStorage
  * @returns Provider name ('claude' | 'cursor' | 'codex')
@@ -45,6 +47,7 @@ export function getProvider(): string {
   return localStorage.getItem('selected-provider') || 'claude';
 }
 
+// ChatMessageList 组件调用此函数判断工具是否应以紧凑模式显示
 /**
  * Check if tool should be displayed in minimized format
  * @param toolName - Name of the tool
@@ -55,6 +58,7 @@ export function isMinimizedTool(toolName: string): boolean {
   return MINIMIZED_TOOLS.includes(toolName);
 }
 
+// ChatMessageList 组件调用此函数判断是否应隐藏某些工具的结果
 /**
  * Check if tool result should be hidden
  * @param toolName - Name of the tool
@@ -66,6 +70,7 @@ export function shouldHideToolResult(toolName: string, isError: boolean): boolea
   return !isError && toolsWithHiddenResult.includes(toolName);
 }
 
+// DiffViewer 和文件相关组件调用此函数从路径提取文件名
 /**
  * Extract filename from file path
  * @param filePath - File path string

@@ -8,6 +8,7 @@ import { useState, useEffect, useCallback } from 'react';
 import useLocalStorage from '@/shared/hooks/useLocalStorage';
 import type { SettingsTab } from '@/features/settings/types/settings.types';
 
+// 由组件调用，自定义 Hook：useAppLayout
 /**
  * Manages layout-related state: mobile detection, PWA, sidebar, settings panel
  */

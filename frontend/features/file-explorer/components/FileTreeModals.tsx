@@ -18,6 +18,7 @@ interface FileTreeModalsProps {
   onCloseImage: () => void;
 }
 
+// 由父组件调用，React 组件或常量：FileTreeModals
 /**
  * File tree modals
  * Renders code editor and image viewer modals

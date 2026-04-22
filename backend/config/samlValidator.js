@@ -7,6 +7,7 @@
  * @module config/samlValidator
  */
 
+// 验证 URL 是否使用 HTTPS 协议，用于 SAML 安全配置检查
 /**
  * 验证 URL 是否使用 https 协议
  * @param {string} url - 要验证的 URL
@@ -25,6 +26,7 @@ function validateHttpsUrl(url, fieldName, errors) {
   }
 }
 
+// 验证 SAML 配置的完整性和安全性，在启用 SAML 时调用
 /**
  * 验证 SAML 配置是否完整
  * @param {Object} config - samlConfig 对象

@@ -11,6 +11,7 @@
 import { useState, useCallback } from 'react';
 import type { CodeEditorSettings } from '../types/settings.types';
 
+// 代码编辑器设置 Hook 的返回类型定义
 export interface UseCodeEditorSettingsReturn {
   settings: CodeEditorSettings;
   setCodeEditorTheme: (theme: string) => void;
@@ -20,6 +21,7 @@ export interface UseCodeEditorSettingsReturn {
   setCodeEditorFontSize: (size: string) => void;
 }
 
+// 触发 codeEditorSettingsChanged 事件以通知 CodeEditor 组件重新加载设置
 /**
  * Trigger codeEditorSettingsChanged event to notify CodeEditor component
  */
@@ -27,6 +29,7 @@ function triggerSettingsChangedEvent() {
   window.dispatchEvent(new Event('codeEditorSettingsChanged'));
 }
 
+// 管理代码编辑器外观设置的自定义 Hook，从 localStorage 读取并持久化设置
 /**
  * Custom hook for code editor settings management
  * Matches original Settings.jsx implementation exactly
@@ -57,6 +60,7 @@ export function useCodeEditorSettings(): UseCodeEditorSettingsReturn {
     localStorage.getItem('codeEditorFontSize') || '14'
   );
 
+  // 设置主题并持久化到 localStorage
   /**
    * Set theme and persist to localStorage
    */
@@ -66,6 +70,7 @@ export function useCodeEditorSettings(): UseCodeEditorSettingsReturn {
     triggerSettingsChangedEvent();
   }, []);
 
+  // 设置自动换行并持久化到 localStorage
   /**
    * Set word wrap and persist to localStorage
    */
@@ -75,6 +80,7 @@ export function useCodeEditorSettings(): UseCodeEditorSettingsReturn {
     triggerSettingsChangedEvent();
   }, []);
 
+  // 设置 minimap 显示并持久化到 localStorage
   /**
    * Set show minimap and persist to localStorage
    */
@@ -84,6 +90,7 @@ export function useCodeEditorSettings(): UseCodeEditorSettingsReturn {
     triggerSettingsChangedEvent();
   }, []);
 
+  // 设置行号显示并持久化到 localStorage
   /**
    * Set line numbers and persist to localStorage
    */
@@ -93,6 +100,7 @@ export function useCodeEditorSettings(): UseCodeEditorSettingsReturn {
     triggerSettingsChangedEvent();
   }, []);
 
+  // 设置字体大小并持久化到 localStorage
   /**
    * Set font size and persist to localStorage
    */

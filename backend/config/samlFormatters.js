@@ -7,6 +7,7 @@
  * @module config/samlFormatters
  */
 
+// 移除字符串两端的引号，用于处理 .env 文件中的带引号值
 /**
  * 移除字符串周围的引号（.env 文件中常见）
  * @param {string} str
@@ -21,6 +22,7 @@ function stripQuotes(str) {
   return str;
 }
 
+// 将 base64 内容按 64 字符换行并包装为 PEM 格式
 /**
  * 将 PEM 内容按 64 字符换行
  * @param {string} content - 纯 base64 内容
@@ -37,6 +39,7 @@ function wrapPem(content, beginLabel, endLabel) {
   return `-----${beginLabel}-----\n${lines.join('\n')}\n-----${endLabel}-----`;
 }
 
+// 格式化 X.509 证书为标准 PEM 格式，用于 SAML 配置
 /**
  * 格式化 X.509 证书
  * @param {string} cert - 证书内容
@@ -54,6 +57,7 @@ export function formatCertificate(cert) {
   return wrapPem(certContent, 'BEGIN CERTIFICATE', 'END CERTIFICATE');
 }
 
+// 格式化私钥为标准 PEM 格式，用于 SAML 签名
 /**
  * 格式化私钥
  * @param {string} key - 私钥内容

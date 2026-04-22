@@ -14,6 +14,7 @@ const db = getDatabase;
  * 容器数据仓库
  */
 export const Container = {
+// 数据库操作函数，供控制器调用
     /**
      * 创建容器记录
      * @param {number} userId
@@ -27,6 +28,7 @@ export const Container = {
         return { id: result.lastInsertRowid };
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 根据用户ID获取容器
      * @param {number} userId
@@ -37,6 +39,7 @@ export const Container = {
         return row;
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 根据容器ID获取容器
      * @param {string} containerId
@@ -47,6 +50,7 @@ export const Container = {
         return row;
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 更新容器状态
      * @param {string} containerId
@@ -57,6 +61,7 @@ export const Container = {
         stmt.run(status, containerId);
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 更新容器最后活动时间
      * @param {string} containerId
@@ -66,6 +71,7 @@ export const Container = {
         stmt.run(containerId);
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 删除容器记录
      * @param {string} containerId
@@ -75,6 +81,7 @@ export const Container = {
         stmt.run(containerId);
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 获取所有已知容器 ID 的集合（用于批量孤儿检测）
      * @returns {Set<string>} 容器 ID 集合
@@ -84,6 +91,7 @@ export const Container = {
         return new Set(rows.map(r => r.container_id));
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 列出所有活动容器
      * @returns {Array}
@@ -99,6 +107,7 @@ export const Container = {
  * 用于状态机持久化
  */
 export const ContainerState = {
+// 数据库操作函数，供控制器调用
     /**
      * 保存或更新状态机数据
      * @param {number} userId - 用户 ID
@@ -115,6 +124,7 @@ export const ContainerState = {
         stmt.run(userId, stateData);
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 根据用户 ID 获取状态数据
      * @param {number} userId - 用户 ID
@@ -125,6 +135,7 @@ export const ContainerState = {
         return row;
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 根据用户 ID 删除状态数据
      * @param {number} userId - 用户 ID
@@ -134,6 +145,7 @@ export const ContainerState = {
         stmt.run(userId);
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 获取处于指定状态的所有用户
      * @param {string} state - 状态名称
@@ -147,6 +159,7 @@ export const ContainerState = {
         return rows.map(row => row.user_id);
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 清理过期的状态记录
      * @param {number} days - 天数
@@ -161,3 +174,4 @@ export const ContainerState = {
         return result.changes;
     }
 };
+

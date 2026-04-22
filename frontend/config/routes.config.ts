@@ -108,6 +108,7 @@ export const ROUTE_TITLES: Record<keyof Omit<typeof ROUTES, 'PROJECT' | 'PROJECT
   FORBIDDEN: 'Forbidden',
 } as const;
 
+// RouteMeta 的类型定义
 /**
  * Route metadata
  */

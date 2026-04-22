@@ -24,6 +24,7 @@ interface MobileSidebarOverlayProps {
   onClose: () => void;
 }
 
+// 由父组件调用，React 组件或常量：MobileSidebarOverlay
 /**
  * Renders a mobile-friendly overlay sidebar with backdrop
  */

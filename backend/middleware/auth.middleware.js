@@ -27,6 +27,7 @@ const { ApiKey } = repositories;
  * @property {Array<string>} requiredRoles - 需要的角色列表
  */
 
+// 中间件函数，在请求处理链中执行
 /**
  * 统一认证中间件
  * 支持 JWT、API 密钥和外部 API 密钥认证
@@ -99,6 +100,7 @@ function authenticate(options = {}) {
   };
 }
 
+// 中间件函数，在请求处理链中执行
 /**
  * 仅 JWT 认证中间件
  * @param {AuthOptions} options - 认证选项
@@ -122,6 +124,7 @@ function authenticateJwt(options = {}) {
   };
 }
 
+// 中间件函数，在请求处理链中执行
 /**
  * 仅外部 API 密钥认证中间件
  * @param {AuthOptions} options - 认证选项
@@ -189,6 +192,7 @@ function authenticateExternalApiKey(options = {}) {
 }
 
 
+// 中间件函数，在请求处理链中执行
 /**
  * 生成 JWT 令牌
  * @param {Object} user - 用户对象
@@ -214,3 +218,4 @@ export {
 
 // Re-export authenticateWebSocket from the handler
 export { authenticateWebSocket } from './webSocketAuthHandler.js';
+

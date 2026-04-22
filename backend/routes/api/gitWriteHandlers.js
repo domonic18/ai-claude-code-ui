@@ -17,6 +17,7 @@ import {
   deleteUntracked
 } from '../../services/scm/index.js';
 
+// 定义 HTTP 路由处理器
 /**
  * Handle initial commit request
  */
@@ -28,6 +29,7 @@ export async function handleInitialCommit(req, res) {
   res.json({ success: true, ...result, message: 'Initial commit created successfully' });
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Handle commit request
  */
@@ -40,6 +42,7 @@ export async function handleCommit(req, res) {
   res.json({ success: true, ...await commitFiles(projectPath, files, message) });
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Handle generate commit message request
  */
@@ -51,6 +54,7 @@ export async function handleGenerateCommitMessage(req, res) {
   res.json({ message: await generateCommitMessage(projectPath, files, provider) });
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Handle checkout request
  */
@@ -61,6 +65,7 @@ export async function handleCheckout(req, res) {
   res.json({ success: true, ...await checkoutBranch(projectPath, branch) });
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Handle create branch request
  */
@@ -71,6 +76,7 @@ export async function handleCreateBranch(req, res) {
   res.json({ success: true, ...await createBranch(projectPath, branch) });
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Handle discard changes request
  */
@@ -82,6 +88,7 @@ export async function handleDiscard(req, res) {
   res.json({ success: true, message: `Changes discarded for ${file}` });
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Handle delete untracked request
  */
@@ -92,3 +99,4 @@ export async function handleDeleteUntracked(req, res) {
   const isDir = await deleteUntracked(projectPath, file);
   res.json({ success: true, message: `Untracked ${isDir ? 'directory' : 'file'} ${file} deleted successfully` });
 }
+

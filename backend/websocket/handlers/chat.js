@@ -26,6 +26,7 @@ import { createLogger, sanitizePreview } from '../../utils/logger.js';
 
 const logger = createLogger('websocket/handlers/chat');
 
+// WebSocket 消息或事件处理
 /**
  * 构建发送给 Claude 的命令，处理文档和图片附件
  *
@@ -55,6 +56,7 @@ function buildClaudeCommand(data) {
   return { command, imageAttachments };
 }
 
+// WebSocket 消息或事件处理
 /**
  * 处理 Claude 命令：构建命令并调用容器内 SDK 执行
  *
@@ -80,6 +82,7 @@ async function handleClaudeCommand(data, ws, writer) {
   await queryClaudeSDKInContainer(command, containerOptions, writer);
 }
 
+// WebSocket 消息或事件处理
 /**
  * 中止指定提供商的活跃会话
  *
@@ -100,6 +103,7 @@ function abortSession(data, writer) {
   return { type: 'session-aborted', sessionId: data.sessionId, provider, success };
 }
 
+// WebSocket 消息或事件处理
 /**
  * 检查指定会话是否仍在处理中
  *
@@ -182,6 +186,7 @@ const COMMAND_HANDLERS = {
   },
 };
 
+// WebSocket 消息或事件处理
 /**
  * 处理新的聊天 WebSocket 连接
  *
@@ -215,3 +220,4 @@ export function handleChatConnection(ws, connectedClients) {
     connectedClients.delete(ws);
   });
 }
+

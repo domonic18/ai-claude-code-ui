@@ -9,6 +9,7 @@
  */
 export type LoadingState = 'idle' | 'loading' | 'success' | 'error';
 
+// Result 的类型别名定义
 /**
  * Generic result type
  */
@@ -16,6 +17,7 @@ export type Result<T, E = Error> =
   | { success: true; data: T }
   | { success: false; error: E };
 
+// PaginatedData 的类型定义
 /**
  * Generic paginated data
  */
@@ -27,6 +29,7 @@ export interface PaginatedData<T> {
   hasMore: boolean;
 }
 
+// Entity 的类型定义
 /**
  * Entity with ID
  */
@@ -34,6 +37,7 @@ export interface Entity {
   id: string;
 }
 
+// Timestamped 的类型定义
 /**
  * Entity with timestamps
  */
@@ -42,6 +46,7 @@ export interface Timestamped {
   updatedAt: string;
 }
 
+// SelectOption 的类型定义
 /**
  * Select option
  */
@@ -51,6 +56,7 @@ export interface SelectOption {
   disabled?: boolean;
 }
 
+// TreeNode 的类型定义
 /**
  * Tree node
  */
@@ -63,6 +69,7 @@ export interface TreeNode<T = any> {
   selected?: boolean;
 }
 
+// FileSystemEntry 的类型定义
 /**
  * File system entry
  */

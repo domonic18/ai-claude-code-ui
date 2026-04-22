@@ -15,6 +15,7 @@ const logger = createLogger('controllers/core/BaseController');
  * 所有控制器的基类，提供通用功能
  */
 export class BaseController {
+// 处理业务逻辑，供路由层调用
   /**
    * 构造函数
    * @param {Object} dependencies - 依赖注入对象
@@ -23,6 +24,7 @@ export class BaseController {
     this.dependencies = dependencies;
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 获取请求中的用户 ID
    * @protected
@@ -36,6 +38,7 @@ export class BaseController {
     return req.user.userId || req.user.id;
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 获取请求中的项目路径
    * @protected
@@ -61,6 +64,7 @@ export class BaseController {
     throw new Error('Project path not found in request');
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 获取分页参数
    * @protected
@@ -76,6 +80,7 @@ export class BaseController {
     return { page, limit, offset };
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 获取排序参数
    * @protected
@@ -90,6 +95,7 @@ export class BaseController {
     return { sort, order };
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 构建成功响应
    * @protected
@@ -103,6 +109,7 @@ export class BaseController {
     return res.success(data, message, statusCode);
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 构建分页成功响应
    * @protected
@@ -116,6 +123,7 @@ export class BaseController {
     return res.successWithPagination(items, pagination, message);
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 构建错误响应
    * @protected
@@ -130,6 +138,7 @@ export class BaseController {
     return res.error(message, code, statusCode, details);
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 处理控制器错误
    * @protected
@@ -151,6 +160,7 @@ export class BaseController {
     next(error);
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 异步处理包装器
    * @protected
@@ -167,6 +177,7 @@ export class BaseController {
     };
   }
 
+// 获取资源，供路由层调用
   /**
    * 获取控制器信息
    * @returns {Object} 控制器信息
@@ -180,3 +191,4 @@ export class BaseController {
 }
 
 export default BaseController;
+

@@ -9,6 +9,7 @@
  */
 export type StorageValue = string | number | boolean | object | null | undefined;
 
+// StorageItem 的类型定义
 /**
  * Storage item with TTL metadata
  */
@@ -19,6 +20,7 @@ export interface StorageItem<T = StorageValue> {
   expiresAt?: number;
 }
 
+// IStorageService 的类型定义
 /**
  * Generic storage service interface
  */
@@ -62,6 +64,7 @@ export interface IStorageService {
    */
   keys(): string[];
 
+// StorageConfig 的类型定义
   /**
    * Get the number of items in storage
    * @returns The count of stored items
@@ -69,6 +72,7 @@ export interface IStorageService {
   size(): number;
 }
 
+// StorageConfig 的类型定义
 /**
  * Storage configuration options
  */

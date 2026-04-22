@@ -37,6 +37,7 @@ const SENSITIVE_PATTERNS = [
   /["'][a-f0-9]{32,}["']/gi,              // hex secrets in quotes
 ];
 
+// 工具函数，供多个模块调用
 /**
  * 对日志预览文本进行脱敏处理
  *
@@ -105,6 +106,7 @@ const rootLogger = pino({
     }),
 });
 
+// 工具函数，供多个模块调用
 /**
  * 创建带模块标签的子 logger
  *
@@ -125,3 +127,4 @@ export function createLogger(moduleName) {
  * 根 logger 实例（用于全局场景，如启动日志）
  */
 export default rootLogger;
+

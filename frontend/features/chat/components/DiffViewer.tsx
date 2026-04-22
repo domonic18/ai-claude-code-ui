@@ -12,18 +12,22 @@ export interface DiffViewerProps {
   oldContent: string;
   /** New content */
   newContent: string;
+// ToolResultRenderer 组件使用此组件展示文件编辑前后的代码差异
   /** File path for display */
   filePath?: string;
   /** Callback when file is clicked */
   onFileOpen?: (filePath: string, diffData?: { old_string: string; new_string: string }) => void;
+// ToolResultRenderer 组件使用此组件展示文件编辑前后的代码差异
   /** Panel title */
   title?: string;
   /** Panel subtitle */
   subtitle?: string;
+// ToolResultRenderer 组件使用此组件展示文件编辑前后的代码差异
   /** Additional CSS classes */
   className?: string;
 }
 
+// ToolResultRenderer 组件使用此组件展示文件编辑前后的代码差异
 /**
  * DiffViewer Component
  *

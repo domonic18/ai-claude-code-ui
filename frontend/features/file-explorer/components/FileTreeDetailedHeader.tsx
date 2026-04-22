@@ -9,6 +9,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
+// 由父组件调用，React 组件或常量：FileTreeDetailedHeader
 /**
  * Column headers for detailed view
  */

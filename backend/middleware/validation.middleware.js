@@ -34,6 +34,7 @@ import { createUuidValidator, createPositiveIntValidator } from './idValidators.
  * @property {Object} [params] - 路径参数验证规则
  */
 
+// 中间件函数，在请求处理链中执行
 /**
  * 验证请求中的某个数据源
  * @param {Object} data - 请求数据源 (body/query/params)
@@ -47,6 +48,7 @@ function _validateSource(data, rules, location, errors) {
   errors.push(...sourceErrors);
 }
 
+// 中间件函数，在请求处理链中执行
 /**
  * 请求验证中间件
  * 根据验证规则验证请求数据
@@ -69,6 +71,7 @@ function validate(schema) {
   };
 }
 
+// 中间件函数，在请求处理链中执行
 /**
  * 验证对象
  * @private
@@ -113,6 +116,7 @@ const validateUserId = createPositiveIntValidator('userId', [
   'params.userId', 'params.id', 'body.userId'
 ]);
 
+// 中间件函数，在请求处理链中执行
 /**
  * 内容类型验证中间件
  * 验证请求的 Content-Type 是否为预期的类型
@@ -151,3 +155,4 @@ export {
   validateUserId,
   validateContentType
 };
+

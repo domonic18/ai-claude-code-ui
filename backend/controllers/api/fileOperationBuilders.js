@@ -23,6 +23,7 @@ export function buildFileOperationOptions(userId, projectName, req) {
   };
 }
 
+// 处理业务逻辑，供路由层调用
 /**
  * Builds file operation options with depth and hidden file settings
  * @param {string} userId - User ID
@@ -44,6 +45,7 @@ export function buildFileTreeOptions(userId, projectName, req, query) {
   };
 }
 
+// 处理业务逻辑，供路由层调用
 /**
  * Validates required file path parameter
  * @param {string} filePath - File path to validate
@@ -56,3 +58,4 @@ export function validateFilePath(filePath, paramName = 'filePath') {
     throw new ValidationError(`${paramName} is required`);
   }
 }
+

@@ -11,6 +11,7 @@ import { AuthType } from './authStrategies.js';
 
 const { User } = repositories;
 
+// 中间件函数，在请求处理链中执行
 /**
  * Handle platform mode authentication
  * @param {Object} req - Express request object
@@ -55,3 +56,4 @@ export function handlePlatformAuth(req, next, optional = false) {
     };
   }
 }
+

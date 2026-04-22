@@ -26,6 +26,7 @@ interface FileTreeHeaderProps {
   onCloseNewMenu: () => void;
 }
 
+// 由父组件调用，React 组件或常量：FileTreeHeader
 /**
  * 文件树头部组件
  * 包含视图切换、搜索和新建按钮

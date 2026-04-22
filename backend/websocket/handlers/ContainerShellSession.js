@@ -15,6 +15,7 @@ const logger = createLogger('websocket/handlers/ContainerShellSession');
  * 管理容器 shell 会话的生命周期和交互
  */
 export class ContainerShellSession {
+// WebSocket 消息或事件处理
   /**
    * 创建容器 shell 会话
    * @param {Object} attachResult - 容器附加结果
@@ -35,6 +36,7 @@ export class ContainerShellSession {
     this.timeoutId = null;
   }
 
+// WebSocket 消息或事件处理
   /**
    * 调整终端大小
    * @param {number} cols - 列数
@@ -51,6 +53,7 @@ export class ContainerShellSession {
     }
   }
 
+// WebSocket 消息或事件处理
   /**
    * 向会话写入数据
    * @param {string} inputData - 输入数据
@@ -68,6 +71,7 @@ export class ContainerShellSession {
     }
   }
 
+// WebSocket 消息或事件处理
   /**
    * 终止会话
    * @returns {Promise<void>}
@@ -83,6 +87,7 @@ export class ContainerShellSession {
     }
   }
 
+// WebSocket 消息或事件处理
   /**
    * 设置会话超时
    * @param {string} ptySessionKey - 会话键
@@ -101,6 +106,7 @@ export class ContainerShellSession {
     }
   }
 
+// WebSocket 消息或事件处理
   /**
    * 启动流数据监听
    * @param {string} ptySessionKey - 会话键
@@ -127,6 +133,7 @@ export class ContainerShellSession {
     });
   }
 
+// WebSocket 消息或事件处理
   /**
    * 处理流数据
    * @private
@@ -148,6 +155,7 @@ export class ContainerShellSession {
     }
   }
 
+// WebSocket 消息或事件处理
   /**
    * 处理流结束
    * @private
@@ -165,6 +173,7 @@ export class ContainerShellSession {
     ptySessionsMap.delete(ptySessionKey);
   }
 
+// WebSocket 消息或事件处理
   /**
    * 处理流错误
    * @private
@@ -180,3 +189,4 @@ export class ContainerShellSession {
     }
   }
 }
+

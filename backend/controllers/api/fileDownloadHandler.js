@@ -14,6 +14,7 @@ import { buildContainerPath, getContentType } from './fileOperationHelpers.js';
 
 const logger = createLogger('controllers/api/fileDownloadHandler');
 
+// 处理业务逻辑，供路由层调用
 /**
  * Downloads file from container using Docker getArchive API
  * @param {string} userId - User ID
@@ -92,3 +93,4 @@ export async function handleFileDownload(userId, filePath, projectName) {
     fileName
   };
 }
+

@@ -13,11 +13,13 @@ export interface WebSocketMessage {
   [key: string]: any;
 }
 
+// WebSocketState 的类型别名定义
 /**
  * WebSocket connection state
  */
 export type WebSocketState = 'connecting' | 'connected' | 'disconnected' | 'error';
 
+// WebSocketConfig 的类型定义
 /**
  * WebSocket client configuration
  */
@@ -32,6 +34,7 @@ export interface WebSocketConfig {
   reconnectInterval?: number;
 }
 
+// IWebSocketClient 的类型定义
 /**
  * WebSocket client interface
  */
@@ -48,6 +51,7 @@ export interface IWebSocketClient {
   disconnect: () => void;
 }
 
+// WebSocketEventHandlers 的类型定义
 /**
  * WebSocket event handlers
  */

@@ -18,6 +18,7 @@ export function scrollToTop(behavior: ScrollBehavior = 'smooth'): void {
   window.scrollTo({ top: 0, behavior });
 }
 
+// 由聊天界面调用，滚动到消息列表底部
 /**
  * Scroll to bottom of element
  */

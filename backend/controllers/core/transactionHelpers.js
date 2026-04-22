@@ -11,6 +11,7 @@ import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('controllers/core/transactionHelpers');
 
+// 处理业务逻辑，供路由层调用
 /**
  * Safely rollback transaction with error handling
  * @param {boolean} transactionActive - Whether transaction is active
@@ -27,6 +28,7 @@ export function safeRollback(transactionActive) {
   }
 }
 
+// 创建新资源，供路由层调用
 /**
  * Safely create container for user in background
  * @param {number} userId - User ID
@@ -37,3 +39,4 @@ export function createUserContainerInBackground(userId, containerManager) {
     logger.error(`[Transaction] Failed to create container for user ${userId}:`, err.message);
   });
 }
+

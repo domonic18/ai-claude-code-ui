@@ -20,6 +20,7 @@ import { handleTranscription } from './transcriptionHandler.js';
 const logger = createLogger('routes/tools/uploads');
 const router = express.Router();
 
+// 定义 HTTP 路由处理器
 /**
  * Process image upload and convert to base64 data URLs
  */
@@ -141,3 +142,4 @@ router.post('/:projectName/upload-images', async (req, res) => {
 });
 
 export default router;
+

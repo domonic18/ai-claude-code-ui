@@ -96,6 +96,7 @@ function stopRecording(
   }
 }
 
+// 由组件调用，自定义 Hook：useAudioRecorder
 /**
  * Hook for recording audio from the microphone
  *

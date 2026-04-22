@@ -4,6 +4,7 @@
  * @module config/consoleUtils
  */
 
+// ANSI 转义序列颜色代码常量，用于终端彩色输出
 /**
  * ANSI 颜色代码
  */
@@ -18,6 +19,7 @@ export const COLORS = {
   dim: '\x1b[2m',
 };
 
+// 彩色控制台输出工具函数集合，用于格式化日志输出
 /**
  * 彩色控制台输出工具
  */

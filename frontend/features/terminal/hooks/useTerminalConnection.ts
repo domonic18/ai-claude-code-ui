@@ -10,6 +10,7 @@ import { logger } from '@/shared/utils/logger';
 import { createWebSocket, buildInitMessage } from '../utils/webSocketFactory';
 import { extractExitCode, createWebSocketMessageHandler, configureWebSocketHandlers } from './terminalMessageHandlers';
 
+// TerminalConnection 的类型定义
 /**
  * Hook return type
  */
@@ -153,6 +154,7 @@ function useTerminalConnectionCallbacks(
   return { connect, disconnect, send };
 }
 
+// 由组件调用，自定义 Hook：useTerminalConnection
 /**
  * Custom hook for terminal WebSocket connection management
  */

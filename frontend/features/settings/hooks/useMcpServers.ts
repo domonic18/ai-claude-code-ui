@@ -202,6 +202,7 @@ export interface UseMcpServersReturn {
   clearError: () => void;
 }
 
+// 由组件调用，自定义 Hook：useMcpServers
 /**
  * useMcpServers - Hook for managing MCP server state and operations
  */

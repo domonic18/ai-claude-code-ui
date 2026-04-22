@@ -82,6 +82,7 @@ const DEFAULT_INPUT_PROPS = {
   filesLoading: false,
 };
 
+// 由父组件调用，React 组件或常量：ChatInput
 /**
  * ChatInput Component
  *

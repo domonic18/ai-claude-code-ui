@@ -105,6 +105,7 @@ async function fetchProjects(): Promise<Project[]> {
   return data;
 }
 
+// UseProjectsQueryOptions 的类型定义
 /**
  * 项目列表查询 Hook 选项
  */

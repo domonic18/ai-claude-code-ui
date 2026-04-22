@@ -12,6 +12,7 @@ import { WebglAddon } from '@xterm/addon-webgl';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { logger } from '@/shared/utils/logger';
 
+// TerminalSetup 的类型定义
 /**
  * Hook return type
  */
@@ -146,6 +147,7 @@ function createTerminalInstance(
   return { terminal, fitAddon, resizeObserver };
 }
 
+// 由组件调用，自定义 Hook：useTerminalSetup
 /**
  * Custom hook for terminal instance setup and lifecycle management
  */

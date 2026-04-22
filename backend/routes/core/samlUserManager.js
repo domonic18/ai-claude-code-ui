@@ -27,6 +27,7 @@ const ATTRIBUTE_MAPPINGS = {
   displayName: ['displayName', 'display_name', 'name', 'username'],
 };
 
+// 定义 HTTP 路由处理器
 /**
  * 从 SAML 属性中提取第一个有效值
  * @param {Object} attributes - SAML 属性（数组格式）
@@ -41,6 +42,7 @@ function extractAttribute(attributes, candidates, fallback = '') {
   return fallback;
 }
 
+// 定义 HTTP 路由处理器
 /**
  * 从 SAML 响应中提取用户信息
  * @param {Object} spResponse - saml2-js 解析后的响应
@@ -61,6 +63,7 @@ function extractUserInfo(spResponse) {
   return { externalId, email, firstName, lastName, displayName };
 }
 
+// 定义 HTTP 路由处理器
 /**
  * 查找或创建 SAML 用户
  * @param {string} externalId - SAML NameID
@@ -102,6 +105,7 @@ async function findOrCreateUser(externalId, profile) {
   }
 }
 
+// 定义 HTTP 路由处理器
 /**
  * 设置认证 Cookie
  * @param {Object} res - Express 响应对象
@@ -124,6 +128,7 @@ function setAuthCookie(res, user) {
   res.cookie('auth_token', token, cookieOptions);
 }
 
+// 定义 HTTP 路由处理器
 /**
  * 异步创建用户容器（不阻塞登录流程）
  * @param {Object} user - 用户对象
@@ -134,6 +139,7 @@ function initiateContainerCreation(user) {
     .catch(err => logger.error(`[SAML] Failed to create container for user ${user.id}:`, err.message));
 }
 
+// 定义 HTTP 路由处理器
 /**
  * 重定向到前端
  * @param {Object} res - Express 响应对象
@@ -152,3 +158,4 @@ export {
   initiateContainerCreation,
   redirectToFrontend,
 };
+

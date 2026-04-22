@@ -11,6 +11,7 @@ import { useState, useCallback } from 'react';
 
 const MAX_HISTORY_SIZE = 1000;
 
+// 由组件调用，自定义 Hook：useTerminalHistory
 /**
  * Hook for terminal history
  *
@@ -102,6 +103,7 @@ export function useTerminalHistory() {
   };
 }
 
+// UseTerminalHistoryReturn 的类型定义
 /**
  * Hook export types
  */

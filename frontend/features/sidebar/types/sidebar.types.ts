@@ -234,6 +234,7 @@ export interface ProjectCardProps {
   onNewSession?: () => void;
 }
 
+// SessionItemProps 的类型定义
 /**
  * Session item props
  */
@@ -276,6 +277,7 @@ export interface ProjectSearchProps {
   onClearSearch: () => void;
 }
 
+// QuickActionsProps 的类型定义
 /**
  * Quick actions props
  */
@@ -296,6 +298,7 @@ export interface QuickActionsProps {
   isExpanded: boolean;
 }
 
+// VersionBannerProps 的类型定义
 /**
  * Version banner props
  */

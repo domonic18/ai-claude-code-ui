@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react';
 import type { PWAStatus } from '../types';
 
+// UsePWAReturn 的类型定义
 /**
  * Hook for PWA detection and management
  */

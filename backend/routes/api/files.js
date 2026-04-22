@@ -148,6 +148,7 @@ router.get('/:projectName/files/exists', authenticate(), validate({
   }
 }), fileController._asyncHandler(fileController.fileExists));
 
+// 定义 HTTP 路由处理器
 /**
  * POST /api/files/upload
  * 上传文件附件
@@ -163,3 +164,4 @@ router.post('/upload', authenticate(), (req, res, next) => {
 }, fileController._asyncHandler(fileController.uploadFile));
 
 export default router;
+

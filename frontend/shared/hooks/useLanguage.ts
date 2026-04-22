@@ -15,6 +15,7 @@ export interface UseLanguageReturn {
   t: (key: string) => string;
 }
 
+// 由需要获取当前语言或切换语言的组件调用（如顶部导航栏的语言切换器）
 /**
  * Hook for managing application language
  */

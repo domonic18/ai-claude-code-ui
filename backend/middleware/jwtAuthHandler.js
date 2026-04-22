@@ -13,6 +13,7 @@ import { AuthType, _checkRoles } from './authStrategies.js';
 
 const { User } = repositories;
 
+// 中间件函数，在请求处理链中执行
 /**
  * Verify JWT token and return user
  * @param {string} token - JWT token
@@ -28,6 +29,7 @@ function verifyJwtToken(token) {
   }
 }
 
+// 中间件函数，在请求处理链中执行
 /**
  * Extract token from authorization header
  * @param {Object} headers - Request headers
@@ -39,6 +41,7 @@ function extractToken(headers) {
   return authHeader.split(' ')[1];
 }
 
+// 中间件函数，在请求处理链中执行
 /**
  * Handle JWT authentication for API routes
  * @param {Object} req - Express request object
@@ -84,3 +87,4 @@ export function handleJwtAuth(req, res, next, optional = false, requiredRoles = 
 }
 
 export { verifyJwtToken, extractToken };
+

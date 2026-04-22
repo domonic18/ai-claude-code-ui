@@ -9,6 +9,7 @@ import { authenticatedFetch } from '@/shared/services';
 import type { ReleaseInfo, UpdateProgress } from '../types';
 import { getSystemService } from '../services';
 
+// UseVersionUpgradeReturn 的类型定义
 /**
  * Hook for version upgrade functionality
  */

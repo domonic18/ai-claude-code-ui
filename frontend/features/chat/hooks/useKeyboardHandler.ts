@@ -81,6 +81,7 @@ export interface KeyboardHandlerResult {
   handleKeyDown: (e: React.KeyboardEvent) => void;
 }
 
+// 由组件调用，自定义 Hook：useKeyboardHandler
 /**
  * Hook for handling keyboard events
  *

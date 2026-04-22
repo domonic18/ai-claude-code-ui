@@ -13,6 +13,7 @@ import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('commands/scanner');
 
+// 定义 HTTP 路由处理器
 /**
  * Parse a single command file and return command metadata
  * @param {string} fullPath - Full path to the .md file
@@ -45,6 +46,7 @@ async function parseCommandFile(fullPath, baseDir, namespace) {
   }
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Recursively scan directory for command files (.md)
  * @param {string} dir - Directory to scan
@@ -79,3 +81,4 @@ export async function scanCommandsDirectory(dir, baseDir, namespace) {
 
   return commands;
 }
+

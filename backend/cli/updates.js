@@ -19,6 +19,7 @@ const __dirname = dirname(__filename);
 const packageJsonPath = path.join(__dirname, '../../package.json');
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
+// 比较两个语义化版本号，用于检查是否有新版本
 /**
  * 比较语义化版本
  * @param {string} v1 - 版本1 (例如 "1.2.3")
@@ -35,6 +36,7 @@ export function isNewerVersion(v1, v2) {
     return false;
 }
 
+// 从 npm 检查是否有新版本可用，在启动时或执行 update 命令时调用
 /**
  * 检查更新
  * @param {boolean} silent - 是否静默模式（不输出信息）
@@ -62,6 +64,7 @@ export async function checkForUpdates(silent = false) {
     }
 }
 
+// 更新应用到最新版本，供 `update` 命令调用
 /**
  * 更新包到最新版本
  * @returns {Promise<void>}

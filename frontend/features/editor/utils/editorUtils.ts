@@ -35,6 +35,7 @@ const THEME_FG_COLORS: Record<EditorTheme, string> = {
   github: '#24292e',
 };
 
+// CodeEditor 组件调用此函数获取主题背景颜色
 /**
  * Get theme background color
  */
@@ -42,6 +43,7 @@ export function getThemeBackgroundColor(theme: EditorTheme): string {
   return THEME_BG_COLORS[theme] || '#1e1e1e';
 }
 
+// CodeEditor 组件调用此函数获取主题前景颜色
 /**
  * Get theme foreground color
  */
@@ -51,6 +53,7 @@ export function getThemeForegroundColor(theme: EditorTheme): string {
 
 // ─── JSON utilities ─────────────────────────────────────
 
+// JSON 编辑功能调用此函数格式化 JSON 字符串
 /**
  * Format JSON string with pretty printing
  */
@@ -63,6 +66,7 @@ export function formatJSON(json: string): string {
   }
 }
 
+// JSON 编辑功能调用此函数压缩 JSON 字符串
 /**
  * Minify JSON string
  */
@@ -86,6 +90,7 @@ const BINARY_EXTENSIONS = new Set([
   '.class', '.jar',
 ]);
 
+// 文件查看器调用此函数检查文件是否为二进制文件
 /**
  * Check if a file is binary
  */
@@ -106,6 +111,7 @@ export function isBinaryFile(content: string, filename: string): boolean {
 
 // ─── Position/offset utilities ──────────────────────────
 
+// 编辑器导航功能调用此函数将偏移量转换为行列号
 /**
  * Calculate line and column from offset
  */
@@ -117,6 +123,7 @@ export function getPositionFromOffset(content: string, offset: number): { line: 
   };
 }
 
+// 编辑器导航功能调用此函数将行列号转换为偏移量
 /**
  * Calculate offset from line and column
  */
@@ -133,6 +140,7 @@ export function getOffsetFromPosition(content: string, line: number, column: num
 
 // ─── Code utilities ─────────────────────────────────────
 
+// 代码预览功能调用此函数截断代码到指定行数
 /**
  * Truncate code for preview
  */
@@ -173,6 +181,7 @@ function checkBrackets(code: string): string[] {
   return errors;
 }
 
+// 代码编辑器调用此函数验证代码语法（括号平衡、JSON 格式等）
 /**
  * Validate code syntax (basic validation)
  */
@@ -200,6 +209,7 @@ export function validateCodeSyntax(code: string, language: EditorLanguage): {
   };
 }
 
+// 编辑器调用此函数获取光标位置的单词
 /**
  * Get word at position
  */

@@ -15,6 +15,7 @@ import { Server, Plus } from 'lucide-react';
 import { McpServer } from '../../types/settings.types';
 import { McpServerCard } from './McpServerCard';
 
+// Agent 设置页面中的 MCP 服务器列表组件，用于显示和管理 MCP 服务器
 interface McpServerListProps {
   agent: string;
   servers: McpServer[];

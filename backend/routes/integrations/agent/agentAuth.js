@@ -13,6 +13,7 @@ import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('routes/integrations/agent/auth');
 const { User, ApiKey } = repositories;
 
+// 定义 HTTP 路由处理器
 /**
  * 验证代理 API 请求的中间件。
  * 支持平台模式（外部代理认证）和 API Key 模式（自托管）。
@@ -24,6 +25,7 @@ export function validateExternalApiKey(req, res, next) {
     return handleApiKeyMode(req, res, next);
 }
 
+// 定义 HTTP 路由处理器
 /**
  * 平台模式认证处理
  */
@@ -41,6 +43,7 @@ function handlePlatformMode(req, res, next) {
     }
 }
 
+// 定义 HTTP 路由处理器
 /**
  * API Key 模式认证处理
  */
@@ -58,3 +61,4 @@ function handleApiKeyMode(req, res, next) {
     req.user = user;
     next();
 }
+

@@ -28,6 +28,7 @@ export interface UseAgentPermissionsReturn {
   savePermissions: () => void;
 }
 
+// 由组件调用，自定义 Hook：useAgentPermissions
 /**
  * Custom hook to manage Claude agent permissions
  * @returns {UseAgentPermissionsReturn} Permissions state and handlers

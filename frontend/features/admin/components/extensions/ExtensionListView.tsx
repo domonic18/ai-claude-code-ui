@@ -12,6 +12,7 @@ interface ExtensionListViewProps {
   extensions: ExtensionsData;
 }
 
+// 由父组件调用，React 组件或常量：ExtensionListView
 /**
  * Renders a responsive grid of extension list cards for all types
  */

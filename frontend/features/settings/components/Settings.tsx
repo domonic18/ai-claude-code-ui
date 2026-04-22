@@ -27,13 +27,14 @@ import { AppearanceTab } from './AppearanceTab';
 import { AgentTab } from './AgentTab';
 import { ApiTab } from './ApiTab';
 
-// Create a context to expose save functionality to child tabs
+// 创建 Settings 上下文用于向子标签页组件暴露保存功能
 interface SettingsContextValue {
   requestSave: () => void;
 }
 
 export const SettingsContext = React.createContext<SettingsContextValue | null>(null);
 
+// 由父组件调用，React 组件或常量：Settings
 /**
  * Settings Modal Component
  */
@@ -122,6 +123,7 @@ export function Settings({
 /**
  * Settings Header Component
  */
+// Settings 模态框头部组件，显示标题和关闭按钮
 interface SettingsHeaderProps {
   onClose: () => void;
 }
@@ -154,6 +156,7 @@ function SettingsHeader({ onClose }: SettingsHeaderProps) {
 /**
  * Settings Navigation Component
  */
+// Settings 模态框标签导航组件，用于切换不同的设置标签页
 interface SettingsNavigationProps {
   activeTab: SettingsTab;
   onTabChange: (tab: SettingsTab) => void;

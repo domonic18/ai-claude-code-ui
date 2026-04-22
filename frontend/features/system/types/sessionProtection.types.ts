@@ -13,6 +13,7 @@ export interface SessionProtectionState {
   externalMessageUpdate: number;
 }
 
+// SessionProtectionActions 的类型定义
 /**
  * Session protection actions
  */

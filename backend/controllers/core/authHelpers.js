@@ -10,6 +10,7 @@
 import { ValidationError } from '../../middleware/error-handler.middleware.js';
 import { SESSION_TIMEOUTS } from '../../config/config.js';
 
+// 获取资源，供路由层调用
 /**
  * Get Cookie configuration options
  * Ensures the same configuration is used for setting and clearing cookies
@@ -32,6 +33,7 @@ export function getCookieOptions() {
   return cookieOptions;
 }
 
+// 处理业务逻辑，供路由层调用
 /**
  * Validate user credentials
  * @param {string} username - Username
@@ -52,6 +54,7 @@ export function validateCredentials(username, password) {
   }
 }
 
+// 处理业务逻辑，供路由层调用
 /**
  * Validate password change request
  * @param {string} currentPassword - Current password
@@ -68,6 +71,7 @@ export function validatePasswordChange(currentPassword, newPassword) {
   }
 }
 
+// 处理业务逻辑，供路由层调用
 /**
  * Build user response object
  * @param {Object} user - User object
@@ -82,3 +86,4 @@ export function buildUserResponse(user) {
     lastLoginAt: user.lastLoginAt
   };
 }
+

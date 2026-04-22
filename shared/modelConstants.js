@@ -66,6 +66,7 @@ export const CODEX_MODELS = {
   DEFAULT: 'gpt-5.2'
 };
 
+// 由模型选择器组件调用，从后端 API 获取可用模型列表
 /**
  * 获取模型选项的异步函数（前端专用）
  * 从后端 API 获取可用模型列表

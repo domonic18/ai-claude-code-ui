@@ -24,6 +24,7 @@ import { createTerminalOperations } from './useTerminalOperations';
 // Stable empty array reference to prevent unnecessary re-renders
 const EMPTY_ARGS: string[] = [];
 
+// UseTerminalOptions 的类型定义
 /**
  * Hook for terminal functionality
  */
@@ -123,6 +124,7 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
   };
 }
 
+// UseTerminalOptionsReturn 的类型定义
 /**
  * Hook for managing terminal options and theme
  */
@@ -196,6 +198,7 @@ export function useTerminalOptions(
   };
 }
 
+// UseTerminalScrollReturn 的类型定义
 /**
  * Re-export terminal history hook
  */

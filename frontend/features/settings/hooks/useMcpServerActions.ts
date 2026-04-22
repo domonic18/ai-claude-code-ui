@@ -27,6 +27,7 @@ export interface UseMcpServerActionsReturn {
   handleMcpToolsDiscovery: (serverId: string, scope: string) => Promise<void>;
 }
 
+// 由组件调用，自定义 Hook：useMcpServerActions
 /**
  * Custom hook to manage MCP server CRUD operations
  * @returns {UseMcpServerActionsReturn} Server state and action handlers

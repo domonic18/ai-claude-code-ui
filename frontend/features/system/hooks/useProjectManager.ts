@@ -30,11 +30,13 @@ import { useProjects } from './useProjects';
 import { useSessionSelection } from './useSessionSelection';
 import { logger } from '@/shared/utils/logger';
 
+// UseProjectManagerReturn 的类型定义
 /**
  * Hook return type
  */
 export interface UseProjectManagerReturn extends ProjectManagementState, ProjectManagementActions {}
 
+// 由组件调用，自定义 Hook：useProjectManager
 /**
  * Project Manager Hook
  *

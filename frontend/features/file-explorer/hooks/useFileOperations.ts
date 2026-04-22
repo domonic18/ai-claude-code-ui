@@ -40,6 +40,7 @@ interface UseFileOperationsReturn {
   fetchFiles: () => Promise<void>;
 }
 
+// 由组件调用，自定义 Hook：useFileOperations
 /**
  * 文件操作 Hook
  * 处理文件增删改查操作

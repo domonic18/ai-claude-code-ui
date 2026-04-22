@@ -10,6 +10,7 @@ import { createLogger } from '../../../utils/logger.js';
 
 const logger = createLogger('mcp/parsers');
 
+// 定义 HTTP 路由处理器
 /**
  * Extract server name from a list line
  * @param {string} line - A line containing server name and details
@@ -23,6 +24,7 @@ function splitNameAndRest(line) {
   return { name, rest: line.substring(colonIndex + 1).trim() };
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Check if text contains status indicators (✓ or ✗)
  * @param {string} text - Text to check
@@ -32,6 +34,7 @@ function hasStatusIndicator(text) {
   return text.includes('\u2713') || text.includes('\u2717');
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Parse status string from match result
  * @param {string} statusText - Matched status text
@@ -41,6 +44,7 @@ function resolveStatus(statusText) {
   return statusText.includes('\u2713') ? 'connected' : 'failed';
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Parse status match into description and status
  * @param {string} rest - The part after the colon
@@ -55,6 +59,7 @@ function extractDescriptionAndStatus(rest) {
   return { description: statusMatch[1].trim(), status: resolveStatus(statusMatch[2]) };
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Determine server type from its description URL
  * @param {string} description - Server description string
@@ -65,6 +70,7 @@ function inferServerType(description) {
   return 'stdio';
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Parse a single server line from `claude mcp list` output
  * @param {string} line - A line containing server name and details
@@ -83,6 +89,7 @@ function parseListLine(line) {
   };
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Parse output from `claude mcp list` command
  * Extracts server names, types, statuses, and descriptions
@@ -109,6 +116,7 @@ const GET_FIELD_MAP = {
   'URL:': 'url'
 };
 
+// 定义 HTTP 路由处理器
 /**
  * Try to extract JSON from output
  * @param {string} output - Raw CLI output
@@ -120,6 +128,7 @@ function tryParseJson(output) {
   return JSON.parse(jsonMatch[0]);
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Extract trimmed value from a colon-separated line
  * @param {string} line - Line to split
@@ -130,6 +139,7 @@ function extractColonValue(line) {
   return parts.length > 1 ? parts[1].trim() : '';
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Extract a field value from a line if it matches a known prefix
  * @param {string} line - Line to check
@@ -144,6 +154,7 @@ function matchFieldLine(line) {
   return null;
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Parse text-form server fields from get output
  * @param {string} output - Raw CLI output
@@ -158,6 +169,7 @@ function parseTextFields(output) {
   return server;
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Parse output from `claude mcp get <name>` command
  * Attempts JSON extraction first, falls back to text parsing
@@ -172,3 +184,4 @@ export function parseClaudeGetOutput(output) {
     return { raw_output: output, parse_error: error.message };
   }
 }
+

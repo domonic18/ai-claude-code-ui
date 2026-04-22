@@ -15,6 +15,7 @@ const ALLOWED_AUDIO_MIMETYPES = [
   'audio/ogg', 'audio/flac', 'audio/mp4', 'audio/x-m4a',
 ];
 
+// 处理 GET /validatedwhisperurl 请求
 /**
  * 验证并返回 Whisper API URL
  * 强制 https 协议 + 阻止私有网段/链路本地地址（SSRF 防护）
@@ -51,6 +52,7 @@ export function getValidatedWhisperUrl() {
   return url;
 }
 
+// 处理 GET /validatedmodelname 请求
 /**
  * 验证模型名称（仅允许字母、数字、连字符、点号）
  *
@@ -70,6 +72,7 @@ export function getValidatedModelName(envVar, defaultValue) {
   return value;
 }
 
+// 定义 HTTP 路由处理器
 /**
  * 验证音频文件 MIME 类型
  *
@@ -80,6 +83,7 @@ export function isValidAudioMimeType(mimetype) {
   return ALLOWED_AUDIO_MIMETYPES.includes(mimetype);
 }
 
+// 处理 GET /allowedaudiomimetypes 请求
 /**
  * 获取允许的音频 MIME 类型列表
  *
@@ -88,3 +92,4 @@ export function isValidAudioMimeType(mimetype) {
 export function getAllowedAudioMimetypes() {
   return [...ALLOWED_AUDIO_MIMETYPES];
 }
+

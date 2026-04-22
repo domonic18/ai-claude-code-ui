@@ -18,16 +18,19 @@ import { filterBySearchTerm } from '../utils';
  * Hook return type
  */
 export interface UseProjectSearchReturn {
+// ProjectSearch 组件使用此 hook 管理项目搜索的状态和逻辑
   /** Current search filter value */
   searchFilter: string;
   /** Set search filter value */
   setSearchFilter: (value: string) => void;
+// ProjectSearch 组件使用此 hook 管理项目搜索的状态和逻辑
   /** Clear search filter */
   clearSearch: () => void;
   /** Filtered projects based on search */
   filteredProjects: (projects: Project[]) => Project[];
 }
 
+// ProjectSearch 组件使用此 hook 管理项目搜索的状态和逻辑
 /**
  * useProjectSearch Hook
  */

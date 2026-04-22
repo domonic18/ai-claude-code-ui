@@ -14,6 +14,7 @@ import { ContainerShellSession } from './ContainerShellSession.js';
 
 const logger = createLogger('websocket/handlers/container-shell');
 
+// WebSocket 消息或事件处理
 /**
  * 发送认证错误响应
  * @param {WebSocket} ws - WebSocket 连接
@@ -25,6 +26,7 @@ function _determineIsPlainShell(isPlainShell, initialCommand, hasSession, provid
     return false;
 }
 
+// WebSocket 消息或事件处理
 /**
  * 从 WebSocket 中提取用户 ID
  * @param {WebSocket} ws - WebSocket 连接
@@ -34,6 +36,7 @@ function _extractUserId(ws) {
     return ws.user?.userId || ws.user?.id;
 }
 
+// WebSocket 消息或事件处理
 /**
  * 记录调试信息（批量）
  * @param {string} projectPath - 项目路径
@@ -60,6 +63,7 @@ function _sendAuthError(ws) {
     ws.close();
 }
 
+// WebSocket 消息或事件处理
 /**
  * 发送通用错误响应
  * @param {WebSocket} ws - WebSocket 连接
@@ -72,6 +76,7 @@ function _sendError(ws, message) {
     }));
 }
 
+// WebSocket 消息或事件处理
 /**
  * 创建并配置容器 shell 会话
  * @param {Object} attachResult - Attach 结果
@@ -105,6 +110,7 @@ function _createAndConfigureSession(attachResult, stream, ws, projectPath, sessi
     return session;
 }
 
+// WebSocket 消息或事件处理
 /**
  * 处理容器模式下的 shell WebSocket 连接
  *
@@ -184,6 +190,7 @@ export async function handleContainerShell(ws, data, ptySessionsMap) {
     }
 }
 
+// WebSocket 消息或事件处理
 /**
  * 构建会话键
  * @private
@@ -195,6 +202,7 @@ function _buildSessionKey(userId, projectPath, sessionId, isPlainShell, initialC
     return `container_${userId}_${projectPath}_${sessionId || 'default'}${commandSuffix}`;
 }
 
+// WebSocket 消息或事件处理
 /**
  * 发送欢迎消息
  * @private
@@ -236,6 +244,7 @@ const SHELL_COMMAND_BUILDERS = {
             : `cd "${workDir}" && claude`,
 };
 
+// WebSocket 消息或事件处理
 /**
  * 构建 shell 命令
  * @private
@@ -246,6 +255,7 @@ function _buildShellCommand(containerWorkDir, isPlainShell, provider, hasSession
     return builder(containerWorkDir, provider, hasSession, sessionId, initialCommand);
 }
 
+// WebSocket 消息或事件处理
 /**
  * 发送初始命令到 shell
  * @private
@@ -259,3 +269,4 @@ async function _sendInitialCommand(stream, shellCommand) {
         logger.error('[Container Shell] Stream is not writable, cannot send initial command');
     }
 }
+

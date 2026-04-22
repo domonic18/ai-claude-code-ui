@@ -10,6 +10,7 @@ import path from 'path';
 import { createLogger } from './logger.js';
 const logger = createLogger('utils/file-tree');
 
+// 工具函数，供多个模块调用
 /**
  * 将权限位转换为 rwx 格式
  * @param {number} perm - 权限位 (0-7)
@@ -22,6 +23,7 @@ function permToRwx(perm) {
   return r + w + x;
 }
 
+// 工具函数，供多个模块调用
 /**
  * 跳过大型构建目录
  * @param {string} name - 目录/文件名
@@ -32,6 +34,7 @@ function _shouldSkipEntry(name) {
   return SKIP_DIRS.includes(name);
 }
 
+// 工具函数，供多个模块调用
 /**
  * 获取文件元数据（权限、大小、修改时间）
  * @param {Object} item - 文件项对象
@@ -61,6 +64,7 @@ async function _getFileMetadata(item, itemPath) {
   }
 }
 
+// 工具函数，供多个模块调用
 /**
  * 尝试递归读取子目录
  * @param {Object} item - 目录项对象
@@ -77,6 +81,7 @@ async function _tryReadChildren(item, maxDepth, currentDepth, showHidden) {
   }
 }
 
+// 工具函数，供多个模块调用
 /**
  * 排序文件树项（目录优先，然后按名称）
  * @param {Array} items - 文件项数组
@@ -91,6 +96,7 @@ function _sortFileTree(items) {
   });
 }
 
+// 工具函数，供多个模块调用
 /**
  * 获取目录的文件树结构
  * @param {string} dirPath - 要扫描的目录路径
@@ -133,3 +139,4 @@ export async function getFileTree(dirPath, maxDepth = 3, currentDepth = 0, showH
 
   return _sortFileTree(items);
 }
+

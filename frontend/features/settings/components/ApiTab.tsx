@@ -12,11 +12,13 @@
 
 import CredentialsSettings from './CredentialsSettings';
 
+// Settings 页面的 API Keys 标签页组件，用于管理 API 密钥和凭据
 interface ApiTabProps {
   // Props passed from parent Settings if needed
   // Currently self-contained
 }
 
+// 由父组件调用，React 组件或常量：ApiTab
 /**
  * ApiTab Component - Manages API keys and credentials
  */

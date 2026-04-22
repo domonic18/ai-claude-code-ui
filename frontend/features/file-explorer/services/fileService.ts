@@ -6,6 +6,7 @@
 
 import type { FileNode } from '../types';
 
+// 文件操作 API 服务类，用于与后端文件 API 交互
 /**
  * File service for API calls
  */
@@ -18,6 +19,7 @@ export class FileService {
     this.baseUrl = baseUrl;
   }
 
+  // 获取项目文件列表
   /**
    * Get project files
    */
@@ -33,6 +35,7 @@ export class FileService {
     return Array.isArray(data) ? data : [];
   }
 
+  // 读取文件内容
   /**
    * Read file content
    */
@@ -50,6 +53,7 @@ export class FileService {
     return response.json();
   }
 
+  // 写入文件内容
   /**
    * Write file content
    */
@@ -67,6 +71,7 @@ export class FileService {
     return response.json();
   }
 
+  // 删除文件或目录
   /**
    * Delete file or directory
    */
@@ -84,6 +89,7 @@ export class FileService {
     return response.json();
   }
 
+  // 创建目录
   /**
    * Create directory
    */
@@ -101,6 +107,7 @@ export class FileService {
     return response.json();
   }
 
+  // 重命名文件或目录
   /**
    * Rename file or directory
    */
@@ -118,6 +125,7 @@ export class FileService {
     return response.json();
   }
 
+  // 移动文件或目录
   /**
    * Move file or directory
    */
@@ -135,6 +143,7 @@ export class FileService {
     return response.json();
   }
 
+  // 复制文件或目录
   /**
    * Copy file or directory
    */
@@ -152,6 +161,7 @@ export class FileService {
     return response.json();
   }
 
+  // 获取文件详细信息
   /**
    * Get file info
    */
@@ -175,6 +185,7 @@ export class FileService {
     return response.json();
   }
 
+  // 按模式搜索文件
   /**
    * Search files by pattern
    */
@@ -199,6 +210,7 @@ export class FileService {
   }
 }
 
+// 为指定项目创建文件服务实例的工厂函数
 /**
  * Create a file service instance for a project
  */

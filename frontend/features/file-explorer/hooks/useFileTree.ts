@@ -101,6 +101,7 @@ function useFileTreeState() {
   };
 }
 
+// UseFileTreeOptions 的类型定义
 /**
  * Hook for managing file tree state and operations
  */
@@ -201,6 +202,7 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeReturn
   };
 }
 
+// UseFileOperationsOptions 的类型定义
 /**
  * Hook for file operations
  */

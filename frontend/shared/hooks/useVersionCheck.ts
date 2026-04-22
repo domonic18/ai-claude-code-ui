@@ -15,6 +15,7 @@ export interface UseVersionCheckResult {
   releaseInfo: ReleaseInfo | null;
 }
 
+// 由组件调用，自定义 Hook：useVersionCheck
 /**
  * Hook to check for updates from GitHub releases
  *

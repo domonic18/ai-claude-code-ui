@@ -15,6 +15,7 @@ import type {
   AuthResponse,
 } from '../types';
 
+// LoginModal、SetupForm 和各个需要认证信息的页面组件调用此 hook 获取用户状态
 /**
  * Hook for authentication functionality
  * Extends the shared useAuth with additional methods
@@ -32,6 +33,7 @@ export interface UseAuthReturn {
   refreshUser: () => Promise<void>;
 }
 
+// LoginModal、SetupForm 和各个需要认证信息的页面组件调用此 hook 获取用户状态
 /**
  * Hook for managing authentication state
  * Wraps the shared AuthContext with auth-specific types
@@ -83,6 +85,7 @@ export function useAuth(): UseAuthReturn {
   };
 }
 
+// useUserRole Hook 返回值的类型定义
 /**
  * Hook for user role checking
  */
@@ -114,6 +117,7 @@ export function useUserRole(): UseUserRoleReturn {
   };
 }
 
+// usePermissions Hook 返回值的类型定义
 /**
  * Hook for user permissions
  */
@@ -143,6 +147,7 @@ export function usePermissions(): UsePermissionsReturn {
   };
 }
 
+// useAuthStatus Hook 返回值的类型定义
 /**
  * Hook for authentication status
  */
@@ -180,6 +185,7 @@ export function useAuthStatus(): UseAuthStatusReturn {
   return { status, error };
 }
 
+// useUserSettings Hook 返回值的类型定义
 /**
  * Hook for user settings
  */

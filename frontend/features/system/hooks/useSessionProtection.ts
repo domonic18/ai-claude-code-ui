@@ -15,6 +15,7 @@ import {
   createShouldSkipUpdate,
 } from './sessionProtectionHelpers';
 
+// UseSessionProtectionReturn 的类型定义
 /**
  * Hook return type
  */

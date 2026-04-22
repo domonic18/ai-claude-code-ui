@@ -32,16 +32,19 @@ export interface UseInputHandlerOptions {
 export interface UseInputHandlerResult {
   /** Handle input change with command and file reference detection */
   handleInputChangeWithCommands: (value: string, cursorPos: number) => void;
+// ChatInput 组件使用此 hook 管理用户输入的处理、验证和提交
   /** Handle command selection wrapper */
   handleCommandSelectWrapper: (command: SlashCommand, index: number, isHover?: boolean) => void;
   /** Handle command menu close */
   handleCommandMenuClose: () => void;
+// ChatInput 组件使用此 hook 管理用户输入的处理、验证和提交
   /** Handle file selection wrapper */
   handleFileSelectWrapper: (file: FileReference, index: number, input: string, atPosition: number, fileQuery: string, isHover?: boolean) => void;
   /** Handle file menu close */
   handleFileMenuClose: () => void;
 }
 
+// ChatInput 组件使用此 hook 管理用户输入的处理、验证和提交
 /**
  * Hook for handling input changes with command and file reference detection
  *

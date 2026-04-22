@@ -21,6 +21,7 @@ interface UseDragAndDropReturn {
   handleDrop: (targetItem: FileNode | null, e: React.DragEvent) => Promise<void>;
 }
 
+// 由组件调用，自定义 Hook：useDragAndDrop
 /**
  * 拖拽操作 Hook
  * 处理文件/文件夹的拖拽移动

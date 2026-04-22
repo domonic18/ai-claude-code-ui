@@ -12,6 +12,7 @@ import { ValidationError } from './error-handler.middleware.js';
 /** UUID v4 正则 */
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+// 中间件函数，在请求处理链中执行
 /**
  * 创建 UUID 格式验证中间件
  * @param {string} fieldName - 字段名（如 'projectId', 'sessionId'）
@@ -35,6 +36,7 @@ export function createUuidValidator(fieldName, paramSources) {
   };
 }
 
+// 中间件函数，在请求处理链中执行
 /**
  * 创建正整数 ID 验证中间件
  * @param {string} fieldName - 字段名
@@ -68,6 +70,7 @@ export function createPositiveIntValidator(fieldName, paramSources) {
   };
 }
 
+// 中间件函数，在请求处理链中执行
 /**
  * 从 req 对象中按优先级解析参数值
  * @param {Object} req - Express request
@@ -82,3 +85,4 @@ function resolveParamValue(req, sources) {
   }
   return undefined;
 }
+

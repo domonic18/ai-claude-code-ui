@@ -38,6 +38,7 @@ export function filterBySearchTerm(projects: Project[], searchFilter: string): P
   });
 }
 
+// ProjectList 组件调用此函数将收藏项目排序到列表顶部
 /**
  * Filter and sort starred projects to the top
  *
@@ -63,6 +64,7 @@ export function prioritizeStarredProjects(
   });
 }
 
+// 项目过滤功能调用此函数筛选没有会话的空项目
 /**
  * Filter projects that have no sessions
  *
@@ -80,6 +82,7 @@ export function filterEmptyProjects(projects: Project[]): Project[] {
   });
 }
 
+// 项目过滤功能调用此函数筛选有会话的项目
 /**
  * Filter projects that have sessions
  *
@@ -97,6 +100,7 @@ export function filterProjectsWithSessions(projects: Project[]): Project[] {
   });
 }
 
+// 项目组件调用此函数检查项目是否被收藏
 /**
  * Check if a project is starred
  *
@@ -108,6 +112,7 @@ export function isProjectStarred(project: Project, starredProjects: StarredProje
   return starredProjects.has(project.name);
 }
 
+// 项目过滤功能调用此函数筛选最近有活动的项目
 /**
  * Filter projects by activity (recently active)
  *

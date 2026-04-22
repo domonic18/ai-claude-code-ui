@@ -37,6 +37,7 @@ interface UseSessionHandlersOptions {
   hasMore: Record<string, boolean>;
 }
 
+// UseSessionHandlersReturn 的类型定义
 /**
  * Return type for useSessionHandlers hook
  */

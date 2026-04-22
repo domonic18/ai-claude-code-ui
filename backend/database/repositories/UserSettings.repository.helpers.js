@@ -11,6 +11,7 @@ import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('database/repositories/UserSettings.repository.helpers');
 
+// 数据库操作函数，供控制器调用
 /**
  * 解析 JSON 字段
  * @private
@@ -31,6 +32,7 @@ export function parseJsonField(jsonString, defaultValue = null) {
   }
 }
 
+// 数据库操作函数，供控制器调用
 /**
  * 序列化数据为 JSON 字符串
  * @private
@@ -41,6 +43,7 @@ export function serializeJsonField(data) {
   return JSON.stringify(data || []);
 }
 
+// 数据库操作函数，供控制器调用
 /**
  * 构建更新 SQL 语句和参数
  * @param {Object} data - 设置数据
@@ -71,6 +74,7 @@ export function buildUpdateQuery(data, now, userId, provider) {
   return { sql, params };
 }
 
+// 数据库操作函数，供控制器调用
 /**
  * Execute database query to get user settings
  * @param {number} userId - User ID
@@ -105,6 +109,7 @@ export function executeGetByUserId(userId, provider) {
   }
 }
 
+// 数据库操作函数，供控制器调用
 /**
  * Execute database query to delete user settings
  * @param {number} userId - User ID
@@ -133,6 +138,7 @@ export function executeDelete(userId, provider) {
   }
 }
 
+// 数据库操作函数，供控制器调用
 /**
  * Execute database query to get all user settings
  * @param {number} userId - User ID
@@ -162,3 +168,4 @@ export function executeGetAllByUserId(userId) {
     throw new Error(`Failed to get all user settings: ${error.message}`);
   }
 }
+

@@ -45,6 +45,7 @@ const LANGUAGE_MAP: Record<string, EditorLanguage> = {
   'psm1': 'powershell',
 };
 
+// CodeEditor 组件使用此 hook 根据文件扩展名自动检测编程语言
 /**
  * Hook for detecting file language
  */

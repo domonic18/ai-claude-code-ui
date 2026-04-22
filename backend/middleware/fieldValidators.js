@@ -9,6 +9,7 @@
 
 import { FIELD_VALIDATORS } from './fieldValidationRules.js';
 
+// 中间件函数，在请求处理链中执行
 /**
  * 验证单个字段
  * @private
@@ -49,4 +50,5 @@ function _validateField(field, value, rule, location, obj) {
 }
 
 export { _validateField };
+
 

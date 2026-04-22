@@ -14,6 +14,7 @@ import { memoryService } from '../../services/memory/index.js';
  * 记忆控制器
  */
 export class MemoryController extends BaseController {
+// 处理业务逻辑，供路由层调用
   /**
    * 构造函数
    * @param {Object} dependencies - 依赖注入对象
@@ -22,6 +23,7 @@ export class MemoryController extends BaseController {
     super(dependencies);
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 读取记忆文件
    * @param {Object} req - Express 请求对象
@@ -42,6 +44,7 @@ export class MemoryController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 写入记忆文件
    * @param {Object} req - Express 请求对象
@@ -65,3 +68,4 @@ export class MemoryController extends BaseController {
 }
 
 export default MemoryController;
+

@@ -13,6 +13,7 @@ import { ExtensionListView } from './extensions/ExtensionListView';
 import { SyncActions } from './extensions/SyncActions';
 import { useExtensionsApi } from './extensions/useExtensionsApi';
 
+// 由父组件调用，React 组件或常量：ExtensionManagement
 /**
  * ExtensionManagement Component
  */
