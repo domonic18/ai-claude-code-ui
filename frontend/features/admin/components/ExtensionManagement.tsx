@@ -19,6 +19,13 @@ import { useExtensionsApi } from './extensions/useExtensionsApi';
  */
 export function ExtensionManagement() {
   // 从自定义 Hook 获取扩展数据、加载状态、同步状态和操作方法
+  // extensions: 五类扩展的数据对象
+  // loading: 初始加载状态
+  // syncing: 同步操作进行中状态
+  // syncResults: 最近一次同步的结果对象
+  // error: 错误信息字符串
+  // fetchExtensions: 重新拉取扩展数据的函数
+  // syncToAll: 触发同步到所有用户的函数
   const { extensions, loading, syncing, syncResults, error, fetchExtensions, syncToAll } =
     useExtensionsApi();
 
@@ -27,7 +34,9 @@ export function ExtensionManagement() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
+          {/* 旋转的刷新图标，使用主题色 */}
           <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2 text-primary" />
+          {/* 加载提示文字 */}
           <p className="text-muted-foreground">加载扩展中...</p>
         </div>
       </div>
@@ -39,8 +48,11 @@ export function ExtensionManagement() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center max-w-md">
+          {/* 红色警告图标 */}
           <AlertCircle className="w-12 h-12 mx-auto mb-4 text-destructive" />
+          {/* 错误标题 */}
           <h3 className="text-lg font-semibold text-foreground mb-2">加载失败</h3>
+          {/* 具体错误信息 */}
           <p className="text-muted-foreground mb-4">{error}</p>
           {/* 点击重试，重新请求 /api/extensions */}
           <button
