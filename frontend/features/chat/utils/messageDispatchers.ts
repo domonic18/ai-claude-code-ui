@@ -6,7 +6,6 @@
  */
 
 import type { ChatMessage } from '../types';
-import type { ToolResultData } from './messageBuilders';
 import {
   processUserMessage,
   processThinkingMessage,
@@ -16,6 +15,14 @@ import {
 } from './messageProcessors';
 
 // ─── Types ───────────────────────────────────────────────
+
+/** Data extracted from tool_result messages for cross-referencing with tool_use */
+export interface ToolResultData {
+  content: any;
+  isError: boolean;
+  timestamp: Date;
+  toolUseResult: any;
+}
 
 export type MessageDispatcher = {
   match: (msg: any) => boolean;
@@ -46,6 +53,3 @@ export const MESSAGE_DISPATCHERS: MessageDispatcher[] = [
     handle: (msg, out, tr) => processAssistantMessage(msg, out, tr)
   },
 ];
-
-// Re-export types for backward compatibility
-export type { ToolResultData } from './messageBuilders';
