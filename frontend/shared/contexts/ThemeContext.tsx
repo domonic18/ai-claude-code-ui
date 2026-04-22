@@ -8,6 +8,9 @@ export interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
+/**
+ * 获取主题上下文的 Hook，必须在 ThemeProvider 内使用
+ */
 export const useTheme = (): ThemeContextValue => {
   const context = useContext(ThemeContext);
   if (!context) {
@@ -20,6 +23,10 @@ export interface ThemeProviderProps {
   children: React.ReactNode;
 }
 
+/**
+ * 全局暗色模式 Provider：优先读取 localStorage 用户选择，其次跟随系统偏好，
+ * 同步 <html> class 和 <meta> 标签以影响 Tailwind dark: 变量和移动端状态栏
+ */
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   // 优先读取用户显式选择，其次跟随系统偏好，默认浅色
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {

@@ -9,6 +9,9 @@ interface UseFileUploadParams {
   handleFileUpload: (file: File, attachment: FileAttachment) => Promise<void>
 }
 
+/**
+ * 文件上传处理 Hook：校验文件大小，图片类型转 base64 直接传递，其他类型走服务端上传
+ */
 export function useFileUpload({
   maxFileSize,
   onAddFile,

@@ -11,6 +11,9 @@ interface MainContentLoadingProps {
   onMenuClick: () => void;
 }
 
+/**
+ * 主内容加载中视图：旋转动画 + 应用名称 + 移动端菜单按钮
+ */
 export function MainContentLoading({ isMobile, onMenuClick }: MainContentLoadingProps) {
   const { t } = useTranslation();
 

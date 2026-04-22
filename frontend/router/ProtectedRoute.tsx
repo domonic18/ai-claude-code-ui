@@ -10,6 +10,9 @@ export interface ProtectedRouteProps {
   children?: React.ReactNode;
 }
 
+/**
+ * 应用加载中的占位屏幕
+ */
 const LoadingScreen = () => (
   <div className="min-h-screen bg-background flex items-center justify-center p-4">
     <div className="text-center">
@@ -29,6 +32,9 @@ const LoadingScreen = () => (
   </div>
 );
 
+/**
+ * 路由守卫组件：未登录显示登录/注册表单，平台模式直接放行，支持 SAML 回调认证
+ */
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { user, isLoading, needsSetup, checkAuthStatus } = useAuth();
   const location = useLocation();

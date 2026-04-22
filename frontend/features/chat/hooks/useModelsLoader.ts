@@ -2,6 +2,9 @@
 import { useState, useEffect } from 'react';
 import { logger } from '@/shared/utils/logger';
 
+/**
+ * 可用模型列表加载 Hook：挂载时从 /api/models 获取当前部署支持的 AI 模型列表
+ */
 export function useModelsLoader() {
   const [availableModels, setAvailableModels] = useState<Array<{ name: string; provider: string }>>([]);
 

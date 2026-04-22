@@ -19,6 +19,9 @@ interface UseFileEditorReturn {
   handleToggleEditorExpand: () => void;
 }
 
+/**
+ * 文件编辑器状态 Hook：管理当前编辑中文件、展开/折叠等 UI 状态
+ */
 export function useFileEditor(): UseFileEditorReturn {
   const [editingFile, setEditingFile] = useState<File | null>(null);
   const [editorExpanded, setEditorExpanded] = useState(false);

@@ -13,6 +13,9 @@ export interface TooltipProps {
   delay?: number;
 }
 
+/**
+ * 悬停提示气泡组件：延迟显示避免闪烁，支持 top/bottom/left/right 四个方向和箭头指示器
+ */
 const Tooltip = ({
   children,
   content,
