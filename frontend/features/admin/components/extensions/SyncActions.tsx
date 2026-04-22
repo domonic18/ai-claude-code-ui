@@ -31,6 +31,7 @@ interface SyncActionsProps {
 export function SyncActions({ syncing, syncResults, onSync }: SyncActionsProps) {
   return (
     <div className="bg-card border border-border rounded-lg p-6">
+      {/* 同步操作区标题 */}
       <h2 className="text-lg font-semibold text-foreground mb-4">同步操作</h2>
       {/* 两个同步按钮：普通同步（保留用户文件）和强制覆盖同步 */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -77,6 +78,7 @@ function SyncButton({ syncing, overwrite, onClick }: {
     >
       {/* 同步中时图标旋转，提示用户操作正在进行 */}
       <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+      {/* 根据同步状态和覆盖模式动态显示按钮文案 */}
       {syncing
         ? '同步中...'
         : overwrite
@@ -100,6 +102,7 @@ function SyncResultDisplay({ results }: { results: SyncResults }) {
           ? <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
           : <XCircle className="w-5 h-5 text-destructive" />
         }
+        {/* 同步成功统计：成功数/总用户数 */}
         <span className="font-medium text-foreground">
           同步完成：{results.synced}/{results.total} 用户成功
         </span>
@@ -107,7 +110,9 @@ function SyncResultDisplay({ results }: { results: SyncResults }) {
       {/* 有失败用户时展示错误列表 */}
       {results.failed > 0 && (
         <div className="mt-2">
+          {/* 失败用户标题 */}
           <p className="text-sm text-destructive font-medium mb-1">失败的用户：</p>
+          {/* 错误列表：遍历每个失败用户，显示用户ID、用户名和错误信息 */}
           <ul className="text-sm text-muted-foreground list-disc list-inside">
             {results.errors.map((err, idx) => (
               <li key={idx}>
