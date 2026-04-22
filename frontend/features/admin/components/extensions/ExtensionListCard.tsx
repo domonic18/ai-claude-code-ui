@@ -6,18 +6,21 @@
 
 import React from 'react';
 
+/**
+ * ExtensionListCard 组件属性
+ */
 interface ExtensionListCardProps {
-  /** Card title */
+  /** 卡片标题 */
   title: string;
-  /** Available count label */
+  /** 可用数量标签文案 */
   availableLabel: string;
-  /** Empty state message */
+  /** 空态提示文案 */
   emptyMessage: string;
-  /** Items to render */
+  /** 待渲染的扩展条目列表 */
   items: Array<Record<string, string>>;
-  /** Unique key field name */
+  /** 用作列表 key 的字段名 */
   keyField: string;
-  /** Render function for each item */
+  /** 自定义渲染函数：接收单个条目，返回 React 节点 */
   renderItem: (item: Record<string, string>) => React.ReactNode;
 }
 
@@ -34,17 +37,23 @@ export function ExtensionListCard({
   renderItem,
 }: ExtensionListCardProps) {
   return (
+    // 外层卡片容器：带边框和圆角
     <div className="bg-card border border-border rounded-lg">
+      {/* 卡片头部：标题 + 可用数量 */}
       <div className="p-4 border-b border-border">
         <h2 className="text-lg font-bold text-foreground">{title}</h2>
         <p className="text-sm text-muted-foreground">{items.length} {availableLabel}</p>
       </div>
+      {/* 卡片内容：可滚动列表区域，最大高度 96 单位 */}
       <div className="p-4 max-h-96 overflow-y-auto">
         {items.length === 0 ? (
+          // 空态：居中显示提示文案
           <p className="text-sm text-muted-foreground text-center py-4">{emptyMessage}</p>
         ) : (
+          // 非空：遍历 items 渲染自定义内容
           <ul className="space-y-2">
             {items.map((item) => (
+              // 使用 keyField 指定的字段作为列表项 key
               <li key={item[keyField]} className="text-sm">
                 {renderItem(item)}
               </li>
