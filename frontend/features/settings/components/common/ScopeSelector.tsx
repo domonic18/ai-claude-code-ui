@@ -7,34 +7,39 @@
  * Note: UI uses "local" terminology but backend uses "project"
  */
 
+// 导入 React 核心库
 import React from 'react';
+// 导入图标组件
 import { Globe, FolderOpen } from 'lucide-react';
+// 导入类型定义
 import { McpScope } from '../../types/settings.types';
 
-// UI-facing type (user-facing terminology)
+// UI 面向的类型（用户术语）
 type UiScope = 'user' | 'local';
 
+// 项目接口定义
 export interface Project {
-  name: string;
-  path?: string;
-  fullPath?: string;
-  displayName?: string;
+  name: string;       // 项目名称
+  path?: string;      // 项目路径
+  fullPath?: string;  // 完整路径
+  displayName?: string; // 显示名称
 }
 
+// Scope 选择器组件属性接口
 interface ScopeSelectorProps {
-  scope: McpScope;
-  projectPath: string;
-  projects: Project[];
-  readonly?: boolean;
-  onChange: (scope: McpScope, projectPath: string) => void;
+  scope: McpScope;                                      // 当前 scope
+  projectPath: string;                                 // 项目路径
+  projects: Project[];                                 // 项目列表
+  readonly?: boolean;                                  // 是否只读模式
+  onChange: (scope: McpScope, projectPath: string) => void;  // 变更回调
 }
 
-// Helper to convert backend scope to UI scope
+// 将后端 scope 转换为 UI scope 的辅助函数
 const toUiScope = (scope: McpScope): UiScope => {
   return scope === 'project' ? 'local' : scope;
 };
 
-// Helper to convert UI scope to backend scope
+// 将 UI scope 转换为后端 scope 的辅助函数
 const fromUiScope = (scope: UiScope): McpScope => {
   return scope === 'local' ? 'project' : scope;
 };
@@ -49,20 +54,23 @@ export const ScopeSelector: React.FC<ScopeSelectorProps> = ({
   readonly = false,
   onChange
 }) => {
+  // 转换为 UI scope
   const uiScope = toUiScope(scope);
 
+  // 处理 scope 变更
   const handleChange = (newUiScope: UiScope, newProjectPath: string) => {
     onChange(fromUiScope(newUiScope), newProjectPath);
   };
 
   if (readonly) {
-    // Display-only mode for editing existing servers
+    // 只读模式：用于编辑现有服务器时显示 scope 信息
     return (
       <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
         <label className="block text-sm font-medium text-foreground mb-2">
           Scope
         </label>
         <div className="flex items-center gap-2">
+          {/* 根据 scope 类型显示对应图标 */}
           {scope === 'user' ? <Globe className="w-4 h-4" /> : <FolderOpen className="w-4 h-4" />}
           <span className="text-sm">
             {scope === 'user' ? 'User (Global)' : 'Project (Local)'}

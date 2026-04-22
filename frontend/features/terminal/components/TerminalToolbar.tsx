@@ -3,35 +3,38 @@
  *
  * Toolbar component for the terminal/shell interface.
  * Displays connection status, session info, and control buttons.
+ * 终端工具栏组件，显示连接状态、会话信息和控制按钮
  */
 
 import React from 'react';
 
 /**
  * Session type (inline definition from ShellProps)
+ * 会话类型定义（来自 ShellProps 的内联定义）
  */
 type Session = {
-  id: string;
-  __provider?: string;
-  name?: string;
-  summary?: string;
+  id: string;              // 会话唯一标识符
+  __provider?: string;     // 会话提供者（cursor、claude 等）
+  name?: string;           // Cursor 会话名称
+  summary?: string;        // Claude 会话摘要
 };
 
 /**
  * Props for TerminalToolbar component
+ * 终端工具栏组件的 Props
  */
 interface TerminalToolbarProps {
-  /** Whether the terminal is connected */
+  /** Whether the terminal is connected - 终端是否已连接 */
   isConnected: boolean;
-  /** Whether the terminal is being initialized */
+  /** Whether the terminal is being initialized - 终端是否正在初始化 */
   isInitialized: boolean;
-  /** Whether the terminal is restarting */
+  /** Whether the terminal is restarting - 终端是否正在重启 */
   isRestarting: boolean;
-  /** Currently selected session (optional) */
+  /** Currently selected session (optional) - 当前选中的会话 */
   selectedSession?: Session | null;
-  /** Handler for disconnect button */
+  /** Handler for disconnect button - 断开连接按钮的处理函数 */
   onDisconnect: () => void;
-  /** Handler for restart button */
+  /** Handler for restart button - 重启按钮的处理函数 */
   onRestart: () => void;
 }
 
@@ -64,13 +67,17 @@ export function TerminalToolbar({
   onRestart,
 }: TerminalToolbarProps): React.ReactElement {
   // Session display names
+  // 根据会话提供者类型计算会话显示名称
   const sessionDisplayName = React.useMemo(() => {
     if (!selectedSession) return null;
+    // Cursor 会话使用 name 字段
     return selectedSession.__provider === 'cursor'
       ? (selectedSession.name || 'Untitled Session')
+      // Claude 会话使用 summary 字段
       : (selectedSession.summary || 'New Session');
   }, [selectedSession]);
 
+  // 会话显示名称的短版本（限制为 30 个字符）
   const sessionDisplayNameShort = React.useMemo(() => {
     return sessionDisplayName?.slice(0, 30) ?? null;
   }, [sessionDisplayName]);

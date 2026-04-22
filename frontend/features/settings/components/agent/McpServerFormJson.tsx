@@ -5,43 +5,50 @@
  * Provides a textarea for JSON input with real-time validation.
  */
 
+// 导入 React 核心库
 import React from 'react';
 
+// MCP 服务器 JSON 表单组件属性接口
 export interface McpServerFormJsonProps {
-  jsonInput: string;
-  validationError: string;
-  onChange: (value: string) => void;
-  onValidationErrorChange: (error: string) => void;
+  jsonInput: string;                                  // JSON 输入字符串
+  validationError: string;                            // 验证错误信息
+  onChange: (value: string) => void;                  // 输入变更回调
+  onValidationErrorChange: (error: string) => void;   // 验证错误变更回调
 }
 
 /**
  * McpServerFormJson - JSON import mode with validation
  */
+// MCP 服务器 JSON 表单组件，带实时验证
 export const McpServerFormJson: React.FC<McpServerFormJsonProps> = ({
   jsonInput,
   validationError,
   onChange,
   onValidationErrorChange
 }) => {
+  // 处理文本框输入变化，实时验证 JSON 格式
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     onChange(value);
 
-    // Validate JSON as user types
+    // 用户输入时实时验证 JSON 格式
     try {
       if (value.trim()) {
         const parsed = JSON.parse(value);
         if (!parsed.type) {
           onValidationErrorChange('Missing required field: type');
         } else if (parsed.type === 'stdio' && !parsed.command) {
+          // stdio 类型必须有 command 字段
           onValidationErrorChange('stdio type requires a command field');
         } else if ((parsed.type === 'http' || parsed.type === 'sse') && !parsed.url) {
+          // http/sse 类型必须有 url 字段
           onValidationErrorChange(`${parsed.type} type requires a url field`);
         } else {
           onValidationErrorChange('');
         }
       }
     } catch (err) {
+      // JSON 解析失败
       if (value.trim()) {
         onValidationErrorChange('Invalid JSON format');
       } else {
@@ -52,6 +59,7 @@ export const McpServerFormJson: React.FC<McpServerFormJsonProps> = ({
 
   return (
     <div className="space-y-4">
+      {/* JSON 配置输入框 */}
       <div>
         <label className="block text-sm font-medium text-foreground mb-2">
           JSON Configuration *

@@ -23,6 +23,10 @@ export class TerminalWebSocket {
   // 重连间隔（毫秒）
   private reconnectInterval = 3000;
 
+  /**
+   * 构造函数：创建 WebSocket 连接管理器
+   * @param url - WebSocket 服务器 URL
+   */
   constructor(url: string) {
     this.url = url;
   }
@@ -34,15 +38,19 @@ export class TerminalWebSocket {
   connect(): Promise<WebSocket> {
     return new Promise((resolve, reject) => {
       try {
+        // 创建 WebSocket 实例
         this.ws = new WebSocket(this.url);
 
         // 连接成功后的处理
         this.ws.onopen = () => {
+          // 重置重连计数器
           this.reconnectAttempts = 0;
+          // 清除重连定时器
           if (this.reconnectTimer) {
             clearInterval(this.reconnectTimer);
             this.reconnectTimer = null;
           }
+          // 返回 WebSocket 实例
           resolve(this.ws!);
         };
 
@@ -71,7 +79,9 @@ export class TerminalWebSocket {
       return;
     }
 
+    // 增加重连尝试计数
     this.reconnectAttempts++;
+    // 设置延迟重连
     this.reconnectTimer = setTimeout(() => {
       this.connect().catch(() => {
         // Reconnect will be scheduled again by onclose
@@ -85,7 +95,9 @@ export class TerminalWebSocket {
    * 通过 WebSocket 发送消息
    */
   send(data: unknown): void {
+    // 检查连接状态，仅当连接打开时发送
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      // 将数据序列化为 JSON 字符串并发送
       this.ws.send(JSON.stringify(data));
     }
   }
@@ -95,16 +107,19 @@ export class TerminalWebSocket {
    * 关闭 WebSocket 连接并停止重连
    */
   disconnect(): void {
+    // 清除重连定时器
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
 
+    // 关闭 WebSocket 连接
     if (this.ws) {
       this.ws.close();
       this.ws = null;
     }
 
+    // 设置重连次数为最大值，阻止自动重连
     this.reconnectAttempts = this.maxReconnectAttempts;
   }
 

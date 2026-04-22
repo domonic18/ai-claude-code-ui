@@ -364,47 +364,55 @@ const LoginHeader: React.FC = () => {
  * 管理登录表单状态、SAML 状态检查和用户交互。
  */
 const LoginForm: React.FC = () => {
+  // 国际化翻译钩子
   const { t } = useTranslation();
+  // 路由导航钩子，用于登录成功后跳转
   const navigate = useNavigate();
-  // 表单状态：用户名
+  // 表单状态：用户名输入
   const [username, setUsername] = useState('');
-  // 表单状态：密码
+  // 表单状态：密码输入
   const [password, setPassword] = useState('');
-  // 表单状态：加载中标志
+  // 表单状态：加载中标志（用于登录按钮的 loading 状态）
   const [isLoading, setIsLoading] = useState(false);
-  // 表单状态：错误消息
+  // 表单状态：错误消息（显示登录失败原因）
   const [error, setError] = useState('');
-  // SAML 状态：是否启用和配置
+  // SAML 状态：SAML 功能是否启用和配置完成
   const [samlStatus, setSamlStatus] = useState<SamlStatus>({ enabled: false, configured: false });
-  // SAML 状态：是否正在加载
+  // SAML 状态：是否正在检查 SAML 配置状态
   const [isLoadingSaml, setIsLoadingSaml] = useState(true);
 
-  // 从认证上下文获取登录方法
+  // 从认证上下文获取登录方法（用于表单提交时调用）
   const { login } = useAuth();
 
   /**
    * 组件挂载时检查 SAML 配置状态
+   * 使用 useEffect 钩子在组件首次渲染时执行一次检查
    */
   useEffect(() => {
     const checkSamlStatus = async () => {
       try {
+        // 发送 HTTP GET 请求检查 SAML 配置状态
         // 请求后端获取 SAML 配置状态
         const response = await fetch(SAML_STATUS_ENDPOINT);
         if (response.ok) {
+          // 解析 JSON 响应数据并更新状态
           const data = await response.json();
           setSamlStatus(data);
         }
       } finally {
+        // 无论请求成功与否，都结束加载状态（确保 UI 正常显示）
         // 无论请求成功与否，都结束加载状态
         setIsLoadingSaml(false);
       }
     };
 
+    // 调用异步函数检查 SAML 状态
     checkSamlStatus();
-  }, []);
+  }, []); // 空依赖数组：只在组件挂载时执行一次
 
   /**
    * SAML 登录按钮点击处理器
+   * 调用 handleSamlLogin 函数处理 SAML 登录流程
    */
   const onSamlLogin = () => {
     handleSamlLogin(setError, t);
@@ -412,11 +420,16 @@ const LoginForm: React.FC = () => {
 
   /**
    * 表单提交处理器
+   * 封装 handleSubmit 函数的调用，传递所有必要的参数
    */
   const onSubmitForm = (e: React.FormEvent) => {
     handleSubmit(username, password, setIsLoading, setError, login, navigate, t, e);
   };
 
+  /**
+   * 导航到首次设置页面的处理函数
+   * 当用户点击"首次使用"链接时调用
+   */
   // 导航到首次设置页面的处理函数
   const handleFirstTimeSetup = () => {
     navigate('/register');

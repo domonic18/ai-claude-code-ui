@@ -30,6 +30,7 @@ export function useTerminalHistory() {
     }
   });
   // 当前历史记录导航索引
+  // -1 表示不在历史记录导航模式
   const [currentIndex, setCurrentIndex] = useState<number>(-1);
 
   /**
@@ -37,9 +38,11 @@ export function useTerminalHistory() {
    * 添加命令到历史记录
    */
   const addToHistory = useCallback((command: string) => {
+    // 忽略空命令
     if (!command.trim()) return;
 
     setHistory(prev => {
+      // 添加新命令到历史记录
       const newHistory = [...prev, command];
       // 限制历史记录大小，超过则移除最早的记录
       if (newHistory.length > MAX_HISTORY_SIZE) {
@@ -53,7 +56,7 @@ export function useTerminalHistory() {
       }
       return newHistory;
     });
-    // 重置导航索引
+    // 重置导航索引，退出历史记录导航模式
     setCurrentIndex(-1);
   }, []);
 
@@ -63,6 +66,7 @@ export function useTerminalHistory() {
    */
   const navigateHistory = useCallback((direction: 'prev' | 'next'): string | null => {
     setCurrentIndex(prev => {
+      // 历史记录为空时无法导航
       if (history.length === 0) return -1;
 
       let newIndex = prev;
@@ -77,6 +81,7 @@ export function useTerminalHistory() {
       return newIndex;
     });
 
+    // 返回当前索引对应的命令
     return history[currentIndex] || null;
   }, [history, currentIndex]);
 

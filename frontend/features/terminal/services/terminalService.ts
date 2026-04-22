@@ -2,6 +2,7 @@
  * Terminal Services
  *
  * API services for terminal operations.
+ * 终端操作的 API 服务层
  */
 
 // 导入终端相关的类型定义
@@ -19,6 +20,11 @@ export class TerminalService {
   // 项目名称，用于构建 API 路径
   private projectName: string;
 
+  /**
+   * 构造函数：创建终端服务实例
+   * @param projectName - 项目名称
+   * @param baseUrl - API 基础路径，默认为 '/api'
+   */
   constructor(projectName: string, baseUrl: string = '/api') {
     this.projectName = projectName;
     this.baseUrl = baseUrl;
@@ -29,16 +35,19 @@ export class TerminalService {
    * 启动一个新的 Shell 会话，返回会话 ID 和 WebSocket URL
    */
   async startShell(config: ShellConfig): Promise<{ sessionId: string; socketUrl: string }> {
+    // 发送 POST 请求到后端启动 Shell
     const response = await fetch(`${this.baseUrl}/projects/${this.projectName}/shell/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config),
     });
 
+    // 检查响应状态
     if (!response.ok) {
       throw new Error(`Failed to start shell: ${response.statusText}`);
     }
 
+    // 返回会话 ID 和 WebSocket URL
     return response.json();
   }
 

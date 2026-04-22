@@ -5,6 +5,7 @@ import { logger } from '@/shared/utils/logger';
 import type { EditorFile } from '../types/editor.types';
 
 // 二进制文件扩展名列表：这些文件无法在文本编辑器中显示
+// 与 editorUtils.ts 中的 BINARY_EXTENSIONS 不同，此处不包含代码文件
 const BINARY_EXTENSIONS = [
     '.docx', '.pdf', '.xlsx', '.pptx', '.zip',    // Office 文档和压缩包
     '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico',  // 图片文件
@@ -51,11 +52,13 @@ function isBinaryFile(filename: string): boolean {
  */
 async function loadFileContent(file: EditorFile): Promise<string> {
     // 如果有完整的 diff 信息（包含新旧内容），直接返回新内容用于对比
+    // 这使得编辑器可以显示变更后的内容，而不是服务器的最新内容
     if (file.diffInfo?.new_string !== undefined && file.diffInfo?.old_string !== undefined) {
         return file.diffInfo.new_string;
     }
 
     // 二进制文件返回提示信息，引导用户下载到本地查看
+    // 避免在编辑器中显示乱码或二进制数据
     if (isBinaryFile(file.name)) {
         return `这个二进制文件 (${file.name}) 现在还不能在文本编辑器中预览.\n\n请你点击下载按钮保存到本地查看。`;
     }
@@ -80,6 +83,7 @@ async function loadFileContent(file: EditorFile): Promise<string> {
 function downloadFile(file: EditorFile, content: string): void {
     if (isBinaryFile(file.name)) {
         // 二进制文件：使用服务端下载接口
+        // 服务端可以直接返回文件流，避免前端加载大文件到内存
         const url = `/api/projects/${file.projectName}/file/download?filePath=${encodeURIComponent(file.path)}`;
         const link = document.createElement('a');
         link.href = url;
@@ -89,6 +93,7 @@ function downloadFile(file: EditorFile, content: string): void {
         document.body.removeChild(link);
     } else {
         // 文本文件：创建 Blob URL 触发浏览器下载
+        // Blob URL 可以在浏览器端直接下载，无需经过服务器
         const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -97,7 +102,7 @@ function downloadFile(file: EditorFile, content: string): void {
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(url);  // 释放内存
+        URL.revokeObjectURL(url);  // 释放内存，防止内存泄漏
     }
 }
 
@@ -113,6 +118,7 @@ export function useEditorFileOps({ file, projectPath }: UseEditorFileOpsOptions)
     const [saveSuccess, setSaveSuccess] = useState<boolean>(false); // 保存成功状态
 
     // 加载文件内容
+    // 依赖项为 file 和 projectPath，当文件或项目路径变化时重新加载
     useEffect(() => {
         const loadFile = async () => {
             try {
@@ -121,6 +127,7 @@ export function useEditorFileOps({ file, projectPath }: UseEditorFileOpsOptions)
                 setContent(fileContent);
             } catch (error) {
                 // 加载失败时显示错误信息在编辑器中
+                // 用户可以看到错误详情，便于调试
                 logger.error('Error loading file:', error);
                 setContent(`// Error loading file: ${error.message}\n// File: ${file.name}\n// Path: ${file.path}`);
             } finally {
@@ -132,6 +139,7 @@ export function useEditorFileOps({ file, projectPath }: UseEditorFileOpsOptions)
     }, [file, projectPath]);
 
     // 保存文件到服务器
+    // 使用 useCallback 避免不必要的重新渲染
     const handleSave = useCallback(async () => {
         setSaving(true);
         setSaveSuccess(false);
@@ -142,6 +150,7 @@ export function useEditorFileOps({ file, projectPath }: UseEditorFileOpsOptions)
 
             if (!response.ok) {
                 // 尝试解析错误响应
+                // 服务器可能返回 JSON 格式的错误信息
                 const contentType = response.headers.get('content-type');
                 if (contentType?.includes('application/json')) {
                     const errorData = await response.json().catch(() => ({}));
@@ -157,13 +166,16 @@ export function useEditorFileOps({ file, projectPath }: UseEditorFileOpsOptions)
             setTimeout(() => setSaveSuccess(false), 2000);
         } catch (error) {
             // 保存失败时弹出错误提示
+            // TODO: 替换为更友好的提示组件（如 toast）
             alert(`Error saving file: ${error.message}`);
         } finally {
+            // 无论成功失败都重置保存状态
             setSaving(false);
         }
     }, [file.projectName, file.path, content]);
 
     // 下载文件到本地
+    // 使用 useCallback 避免不必要的重新渲染
     const handleDownload = useCallback(() => {
         downloadFile(file, content);
     }, [file, content]);

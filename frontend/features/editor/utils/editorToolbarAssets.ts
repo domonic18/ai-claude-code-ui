@@ -62,6 +62,7 @@ export interface ToolbarPanelOptions {
 
 /**
  * Build diff navigation section HTML
+ * 生成 diff 导航按钮的 HTML：当前变更计数、上一个/下一个按钮
  */
 export function buildDiffNavHTML(hasDiff: boolean, currentIndex: number, chunkCount: number): string {
     if (!hasDiff) return '<div style="display: flex; align-items: center; gap: 8px;"></div>';
@@ -74,16 +75,20 @@ export function buildDiffNavHTML(hasDiff: boolean, currentIndex: number, chunkCo
 
 /**
  * Build action buttons section HTML
+ * 生成操作按钮的 HTML：diff 切换、设置、展开按钮
  */
 export function buildActionsHTML(options: ToolbarPanelOptions): string {
     let html = '<div style="display: flex; align-items: center; gap: 4px;">';
 
+    // diff 切换按钮：仅在有 diff 信息时显示
     if (options.diffInfo) {
         html += `<button class="cm-toolbar-btn cm-toggle-diff-btn" title="${options.showDiff ? 'Hide diff highlighting' : 'Show diff highlighting'}">${getEyeSVG(options.showDiff)}</button>`;
     }
 
+    // 设置按钮：始终显示
     html += `<button class="cm-toolbar-btn cm-settings-btn" title="Editor Settings">${SETTINGS_SVG}</button>`;
 
+    // 展开按钮：仅在侧边栏模式且提供回调时显示
     if (options.isSidebar && options.onToggleExpand) {
         html += `<button class="cm-toolbar-btn cm-expand-btn" title="${options.isExpanded ? 'Collapse editor' : 'Expand editor to full width'}">${getExpandSVG(options.isExpanded)}</button>`;
     }
@@ -95,6 +100,7 @@ export function buildActionsHTML(options: ToolbarPanelOptions): string {
 // ─── Event Binding ──────────────────────────────────────
 /**
  * Bind toolbar button click events
+ * 绑定工具栏按钮的点击事件：diff 导航、diff 切换、设置、展开
  */
 export function bindToolbarEvents(
     dom: HTMLDivElement,
@@ -109,6 +115,7 @@ export function bindToolbarEvents(
 
     // 绑定 diff 导航按钮事件：上一个/下一个变更块
     if (hasDiff) {
+        // 上一个变更按钮：循环导航（到达开头时跳到末尾）
         dom.querySelector('.cm-diff-nav-prev')?.addEventListener('click', () => {
             if (chunks.length === 0) return;
             currentIndexRef.value = currentIndexRef.value > 0 ? currentIndexRef.value - 1 : chunks.length - 1;
@@ -117,6 +124,7 @@ export function bindToolbarEvents(
             updatePanel();
         });
 
+        // 下一个变更按钮：循环导航（到达末尾时跳到开头）
         dom.querySelector('.cm-diff-nav-next')?.addEventListener('click', () => {
             if (chunks.length === 0) return;
             currentIndexRef.value = currentIndexRef.value < chunks.length - 1 ? currentIndexRef.value + 1 : 0;
@@ -132,6 +140,7 @@ export function bindToolbarEvents(
     }
 
     // 绑定设置按钮事件：打开设置面板
+    // 使用 window.openSettings 全局函数，由外部提供
     dom.querySelector('.cm-settings-btn')?.addEventListener('click', () => {
         if (window.openSettings) window.openSettings('appearance');
     });

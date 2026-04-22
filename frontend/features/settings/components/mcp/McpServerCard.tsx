@@ -7,20 +7,26 @@
  * Extracted from McpServersContent for better modularity.
  */
 
+// 导入 React 核心库
 import React from 'react';
+// 导入 UI 组件
 import { Button } from '@/shared/components/ui/Button';
 import { Badge } from '@/shared/components/ui/Badge';
+// 导入图标组件
 import { Server, Terminal, Globe, Zap, Edit3, Trash2 } from 'lucide-react';
+// 导入类型定义
 import { McpServer, McpTransportType } from '../../types/settings.types';
 
+// MCP 服务器卡片组件属性接口
 interface McpServerCardProps {
-  server: McpServer;
-  testResult?: any;
-  serverTools?: any;
-  onEdit: (server: McpServer) => void;
-  onDelete: (serverId: string) => void;
+  server: McpServer;                           // MCP 服务器对象
+  testResult?: any;                            // 测试结果
+  serverTools?: any;                           // 服务器工具列表
+  onEdit: (server: McpServer) => void;         // 编辑回调
+  onDelete: (serverId: string) => void;        // 删除回调
 }
 
+// 根据传输类型获取对应图标
 const getTransportIcon = (type: McpTransportType) => {
   switch (type) {
     case 'stdio': return <Terminal className="w-4 h-4" />;
@@ -30,7 +36,7 @@ const getTransportIcon = (type: McpTransportType) => {
   }
 };
 
-// Helper to convert backend scope to UI display
+// 将后端 scope 转换为 UI 显示的辅助函数
 const toUiScope = (scope: 'user' | 'project'): 'user' | 'local' => {
   return scope === 'project' ? 'local' : scope;
 };

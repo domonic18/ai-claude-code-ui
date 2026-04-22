@@ -71,10 +71,12 @@ function useEditorSave(
   const saveSuccessTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   // 保存成功提示 2 秒后自动清除
+  // 使用防抖机制，避免状态频繁切换
   useEffect(() => {
     if (saveSuccess) {
       saveSuccessTimeoutRef.current = setTimeout(() => setSaveSuccess(false), 2000);
     }
+    // 清理函数：组件卸载或状态变更时取消定时器
     return () => {
       if (saveSuccessTimeoutRef.current) {
         clearTimeout(saveSuccessTimeoutRef.current);
@@ -83,6 +85,7 @@ function useEditorSave(
   }, [saveSuccess]);
 
   // 保存内容函数：调用 onSave 回调并更新状态
+  // 仅在有保存回调且有文件对象时才执行保存操作
   const saveContent = useCallback(async () => {
     if (!onSave || !file) return;
 
@@ -94,6 +97,7 @@ function useEditorSave(
       logger.error('Failed to save file:', error);
       throw error;
     } finally {
+      // 无论成功失败都重置保存中状态
       setIsSaving(false);
     }
   }, [content, onSave, file]);
@@ -107,6 +111,7 @@ function useEditorSave(
  */
 function useEditorConfig(readOnly: boolean) {
   // 编辑器配置状态：语言、主题、自动换行、minimap、行号、字号
+  // 默认值参考 DEFAULT_EDITOR_CONFIG 常量
   const [language, setLanguageState] = useState<EditorLanguage>('javascript');
   const [theme, setThemeState] = useState<EditorTheme>('dark');
   const [wordWrap, setWordWrapState] = useState<boolean>(true);
@@ -115,11 +120,13 @@ function useEditorConfig(readOnly: boolean) {
   const [fontSize, setFontSizeState] = useState<number>(14);
 
   // 组件挂载时从 localStorage 加载设置
+  // 只在首次渲染时执行，避免后续覆盖用户更改
   useEffect(() => {
     loadSettingsFromStorage(setThemeState, setWordWrapState, setMinimapState, setLineNumbersState, setFontSizeState);
   }, [setThemeState, setWordWrapState, setMinimapState, setLineNumbersState, setFontSizeState]);
 
   // 使用 ref 解决循环依赖问题：updateConfig 需要引用 setTheme
+  // 如果直接在 updateConfig 中使用 setThemeState，会导致依赖循环
   const setThemeRef = useRef<(theme: EditorTheme) => void>();
   const updateConfig = useCallback((updates: Partial<CodeEditorConfig>) => {
     const setThemeFn = setThemeRef.current;
@@ -128,11 +135,13 @@ function useEditorConfig(readOnly: boolean) {
   }, [setWordWrapState, setMinimapState, setLineNumbersState, setFontSizeState, setLanguageState]);
 
   // 将 setTheme 同步到 ref，供 updateConfig 使用
+  // 每次 setThemeState 变化时更新 ref，确保 ref 指向最新的函数
   useEffect(() => {
     setThemeRef.current = setThemeState;
   }, [setThemeState]);
 
   // 创建配置更新函数：每个函数都通过 updateConfig 统一处理
+  // 这种设计模式确保所有配置变更都经过相同的持久化逻辑
   const setTheme = useCallback((t: EditorTheme) => updateConfig({ theme: t }), [updateConfig]);
   const setLanguage = useCallback((l: EditorLanguage) => updateConfig({ language: l }), [updateConfig]);
   const setFontSize = useCallback((s: number) => updateConfig({ fontSize: s }), [updateConfig]);
@@ -146,7 +155,8 @@ function useEditorConfig(readOnly: boolean) {
     autoCloseBrackets: true, autoIndent: true, readOnly,
   };
 
-  // Reset to defaults
+  // 重置为默认配置：恢复所有设置到初始值并清除 localStorage
+  // 用户点击"重置"按钮时调用此函数
   const resetToDefaults = useCallback(() => {
     setThemeState('dark');
     setWordWrapState(true);

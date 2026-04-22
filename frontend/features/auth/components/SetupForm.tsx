@@ -161,41 +161,41 @@ function validateRegistrationForm(
  * 注册成功后自动跳转到聊天页面。
  */
 const SetupForm: React.FC = () => {
-  // 国际化翻译钩子
+  // 国际化翻译钩子，用于多语言支持
   const { t } = useTranslation();
-  // 路由导航钩子
+  // 路由导航钩子，用于注册成功后跳转
   const navigate = useNavigate();
 
-  // 表单状态：用户名
+  // 表单状态：用户名输入
   const [username, setUsername] = useState('');
-  // 表单状态：密码
+  // 表单状态：密码输入
   const [password, setPassword] = useState('');
-  // 表单状态：确认密码
+  // 表单状态：确认密码输入（用于验证两次密码一致）
   const [confirmPassword, setConfirmPassword] = useState('');
-  // 表单状态：加载中标志
+  // 表单状态：加载中标志（用于注册按钮的 loading 状态）
   const [isLoading, setIsLoading] = useState(false);
-  // 表单状态：错误消息
+  // 表单状态：错误消息（显示注册失败原因）
   const [error, setError] = useState('');
 
-  // 从认证上下文获取注册方法
+  // 从认证上下文获取注册方法（用于表单提交时调用）
   const { register } = useAuth();
 
-  // 用户名输入变更处理函数
+  // 用户名输入变更处理函数（当用户在用户名字段输入时调用）
   const handleUsernameChange = (value: string) => {
     setUsername(value);
   };
 
-  // 密码输入变更处理函数
+  // 密码输入变更处理函数（当用户在密码字段输入时调用）
   const handlePasswordChange = (value: string) => {
     setPassword(value);
   };
 
-  // 确认密码输入变更处理函数
+  // 确认密码输入变更处理函数（当用户在确认密码字段输入时调用）
   const handleConfirmPasswordChange = (value: string) => {
     setConfirmPassword(value);
   };
 
-  // 返回登录页面处理函数
+  // 返回登录页面处理函数（当用户点击"返回登录"链接时调用）
   const handleBackToLogin = () => {
     navigate('/login');
   };
@@ -205,30 +205,30 @@ const SetupForm: React.FC = () => {
    * 执行客户端验证，然后调用注册 API
    */
   const handleSubmit = async (e: React.FormEvent) => {
-    // 阻止表单默认提交行为
+    // 阻止表单默认提交行为（防止页面刷新）
     e.preventDefault();
-    // 清空之前的错误消息
+    // 清空之前的错误消息（避免显示旧的错误信息）
     setError('');
 
-    // 执行表单验证
+    // 执行客户端表单验证（检查密码一致性、用户名长度等）
     const validationError = validateRegistrationForm(username, password, confirmPassword, t);
     if (validationError) {
-      // 验证失败，显示错误消息
+      // 验证失败，显示错误消息并中止提交流程
       setError(validationError);
       return;
     }
 
-    // 进入加载状态
+    // 验证通过，进入加载状态（显示 loading 动画）
     setIsLoading(true);
 
-    // 调用注册 API
+    // 调用认证上下文的注册方法（发送请求到后端 API）
     const result = await register(username, password);
 
     if (result.success) {
-      // 注册成功：跳转到聊天页面
+      // 注册成功：跳转到聊天页面（自动登录）
       navigate('/chat');
     } else {
-      // 注册失败：显示错误消息并退出加载状态
+      // 注册失败：显示错误消息并退出加载状态（允许用户重试）
       setError(result.error || t('register.failed'));
       setIsLoading(false);
     }

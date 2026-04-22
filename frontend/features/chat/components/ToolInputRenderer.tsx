@@ -2,6 +2,21 @@
  * ToolInputRenderer Component
  *
  * Renders tool input for various AI tools (Bash, Read, Edit, Write, etc.).
+ *
+ * 组件职责：
+ * 1. 根据工具类型（Bash/Read/Edit/Write/其他）分发到对应的渲染函数
+ * 2. Bash 工具：显示命令行样式（终端样式）
+ * 3. Read 工具：显示文件路径和可点击的文件名
+ * 4. Edit 工具：显示文件编辑差异对比（DiffViewer）
+ * 5. Write 工具：显示新文件创建的差异对比
+ * 6. 其他工具：显示原始输入（CollapsiblePanel 可折叠面板）
+ *
+ * 工具类型映射：
+ * - Bash → BashInput（命令行）
+ * - Read → ReadInput（文件读取）
+ * - Edit → EditInput（文件编辑）
+ * - Write → WriteInput（文件写入）
+ * - 其他 → DefaultInput（默认显示）
  */
 
 import React from 'react';
@@ -19,11 +34,14 @@ export interface ToolInputRendererProps {
  * ToolInputRenderer Component
  *
  * Dispatches rendering to appropriate sub-component based on tool type.
+ *
+ * 主渲染函数：根据工具名称分发到对应的子组件
  */
 export function ToolInputRenderer({ toolName, toolInput, onFileOpen }: ToolInputRendererProps) {
   const input = parseToolInput(toolInput);
   if (!input) return null;
 
+  // 根据工具名称分发到对应的渲染函数
   switch (toolName) {
     case 'Bash':
       return <BashInput input={input} />;
@@ -38,8 +56,15 @@ export function ToolInputRenderer({ toolName, toolInput, onFileOpen }: ToolInput
   }
 }
 
+// ========== 工具特定渲染函数 ==========
+
 /**
  * Render Bash tool input as command line
+ *
+ * Bash 工具渲染：显示终端样式的命令行
+ * - 绿色的 $ 提示符
+ * - 黑色背景的命令区域
+ * - 可选的命令描述（灰色斜体）
  */
 function BashInput({ input }: { input: any }) {
   if (!input?.command) return null;
@@ -61,6 +86,11 @@ function BashInput({ input }: { input: any }) {
 
 /**
  * Render Read tool input
+ *
+ * Read 工具渲染：显示可点击的文件名
+ * - "Read " 前缀文本
+ * - 蓝色可点击的文件名按钮
+ * - 点击后触发 onFileOpen 回调
  */
 function ReadInput({ input, onFileOpen }: { input: any; onFileOpen?: (filePath: string) => void }) {
   if (!input?.file_path) return null;
@@ -82,6 +112,12 @@ function ReadInput({ input, onFileOpen }: { input: any; onFileOpen?: (filePath: 
 
 /**
  * Render Edit tool input with diff
+ *
+ * Edit 工具渲染：显示文件编辑的差异对比
+ * - 可折叠的面板（CollapsiblePanel）
+ * - 面板标题：编辑图标 + "Editing file" + 可点击的文件名
+ * - DiffViewer 组件显示 old_string 和 new_string 的对比
+ * - 支持点击文件名打开文件（带 diff 数据）
  */
 function EditInput({ input, onFileOpen }: { input: any; onFileOpen?: (filePath: string, diffData?: any) => void }) {
   if (!input?.file_path || input?.old_string === undefined || input?.new_string === undefined) {
@@ -125,6 +161,12 @@ function EditInput({ input, onFileOpen }: { input: any; onFileOpen?: (filePath: 
 
 /**
  * Render Write tool input with diff view
+ *
+ * Write 工具渲染：显示新文件创建的差异对比
+ * - 可折叠的面板（CollapsiblePanel）
+ * - 面板标题：文件图标 📄 + "Creating new file:" + 可点击的文件名
+ * - DiffViewer 组件显示空内容和新内容的对比
+ * - 支持点击文件名打开文件（带完整内容）
  */
 function WriteInput({ input, onFileOpen }: { input: any; onFileOpen?: (filePath: string, diffData?: any) => void }) {
   if (!input?.file_path || input?.content === undefined) {
@@ -168,6 +210,12 @@ function WriteInput({ input, onFileOpen }: { input: any; onFileOpen?: (filePath:
 
 /**
  * Render default tool input
+ *
+ * 默认工具渲染：显示原始输入内容
+ * - 可折叠的面板（CollapsiblePanel）
+ * - "Tool Input" 标题
+ * - 预格式化的代码块显示（<pre><code>）
+ * - 适用于不支持的或未知工具类型
  */
 function DefaultInput({ toolInput }: { toolInput: string }) {
   return (
