@@ -9,8 +9,8 @@ import { authenticatedFetch } from '@/shared/services';
 
 // 由组件调用，自定义 Hook：useMemoryEditor
 /**
- * Manages memory content loading and saving
- * @returns State and handlers for memory editor
+ * 记忆编辑器 Hook：管理长期记忆的加载、编辑和保存
+ * @returns {{memoryContent: string, setMemoryContent: function, loading: boolean, saving: boolean, saveMemory: function}}
  */
 export function useMemoryEditor() {
   const [memoryContent, setMemoryContent] = useState('');

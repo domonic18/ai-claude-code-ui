@@ -19,9 +19,7 @@ interface MemoryData {
 }
 
 /**
- * Memory Editor Component
- *
- * Renders the textarea editor with save button for editing memory content.
+ * 记忆编辑器属性
  */
 interface MemoryEditorProps {
   content: string;
@@ -31,6 +29,9 @@ interface MemoryEditorProps {
   onChange: (value: string) => void;
 }
 
+/**
+ * 记忆内容编辑器：渲染 textarea + 保存按钮，支持加载/保存中状态
+ */
 function MemoryEditor({ content, isLoading, isSaving, onSave, onChange }: MemoryEditorProps) {
   const { t } = useTranslation();
 
@@ -76,13 +77,16 @@ function MemoryEditor({ content, isLoading, isSaving, onSave, onChange }: Memory
 }
 
 /**
- * MemoryPage header component with back button, title, and success indicator
+ * 页面头部属性
  */
 interface MemoryPageHeaderProps {
   saveSuccess: boolean;
   t: (key: string) => string;
 }
 
+/**
+ * 记忆页面头部：返回按钮、标题、保存成功指示器
+ */
 function MemoryPageHeader({ saveSuccess, t }: MemoryPageHeaderProps) {
   return (
     <header className="border-b border-border bg-card">
@@ -117,12 +121,15 @@ function MemoryPageHeader({ saveSuccess, t }: MemoryPageHeaderProps) {
 }
 
 /**
- * Error message display component
+ * 错误提示属性
  */
 interface ErrorMessageProps {
   error: string | null;
 }
 
+/**
+ * 错误提示横幅：error 为空时不渲染
+ */
 function ErrorMessage({ error }: ErrorMessageProps) {
   if (!error) return null;
   return (
