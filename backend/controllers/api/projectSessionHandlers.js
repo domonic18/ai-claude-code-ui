@@ -8,6 +8,7 @@
 
 import { NotFoundError } from '../../middleware/error-handler.middleware.js';
 
+// 获取资源，供路由层调用
 /**
  * Gets messages for a specific session within a project
  * @param {string} userId - User ID
@@ -42,6 +43,7 @@ export async function getSessionMessages(userId, projectName, sessionId, limit, 
   return { messages: result.messages || [] };
 }
 
+// 处理业务逻辑，供路由层调用
 /**
  * Renames a session summary
  * @param {string} userId - User ID
@@ -70,6 +72,7 @@ export async function renameSessionSummary(userId, projectName, sessionId, summa
   return success;
 }
 
+// 删除资源，供路由层调用
 /**
  * Deletes a session
  * @param {string} userId - User ID
@@ -92,6 +95,7 @@ export async function deleteSession(userId, projectName, sessionId) {
   return success;
 }
 
+// 获取资源，供路由层调用
 /**
  * Gets sessions for a project
  * @param {Object} claudeDiscovery - ClaudeDiscovery instance
@@ -108,3 +112,4 @@ export async function getProjectSessions(claudeDiscovery, projectIdentifier, use
     offset
   });
 }
+

@@ -36,6 +36,7 @@ interface UseSidebarEffectsOptions {
   initializeHasMore: (projectName: string, hasMore: boolean) => void;
 }
 
+// UseSidebarEffectsReturn 的类型定义
 /**
  * Return type for useSidebarEffects hook
  */
@@ -52,6 +53,7 @@ export interface UseSidebarEffectsReturn {
   mergedProjects: Project[];
 }
 
+// 由组件调用，自定义 Hook：useSidebarEffects
 /**
  * Custom hook to manage sidebar effects and computed values
  *

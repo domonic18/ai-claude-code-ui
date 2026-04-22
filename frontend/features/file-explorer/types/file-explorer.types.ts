@@ -4,6 +4,7 @@
  * Type definitions for file tree and file explorer.
  */
 
+// 文件类型枚举
 /**
  * File type enum
  */
@@ -13,6 +14,7 @@ export type FileType =
   | 'symlink'
   | 'special';
 
+// 编辑器语言类型（从 editor types 导入）
 /**
  * Editor language type (imported from editor types)
  */
@@ -41,6 +43,7 @@ export type EditorLanguage =
   | 'powershell'
   | 'dockerfile';
 
+// 文件树节点接口
 /**
  * File node interface
  */
@@ -61,6 +64,7 @@ export interface FileNode {
   language?: EditorLanguage;
 }
 
+// 文件树数据结构
 /**
  * File tree data structure
  */
@@ -69,6 +73,7 @@ export interface TreeData {
   rootPath: string;
 }
 
+// 文件树组件 Props 接口
 /**
  * File tree props
  */
@@ -84,6 +89,7 @@ export interface FileTreeProps {
   className?: string;
 }
 
+// 文件树组件实际使用的 Props 接口
 /**
  * File tree component props (actual usage)
  */
@@ -95,11 +101,13 @@ export interface FileTreeComponentProps {
   className?: string;
 }
 
+// 文件视图模式类型
 /**
  * File view mode
  */
 export type FileViewMode = 'simple' | 'detailed' | 'compact';
 
+// 选中的文件状态
 /**
  * Selected file state
  */
@@ -114,6 +122,7 @@ export interface SelectedFile {
   projectName?: string;
 }
 
+// 选中的图片状态
 /**
  * Selected image state
  */
@@ -124,6 +133,7 @@ export interface SelectedImage {
   projectName: string;
 }
 
+// 文件图标映射配置
 /**
  * File icon mapping
  */
@@ -135,6 +145,7 @@ export interface FileIconConfig {
   };
 }
 
+// 文件浏览器状态
 /**
  * File explorer state
  */
@@ -146,6 +157,7 @@ export interface FileExplorerState {
   error: string | null;
 }
 
+// 文件操作 Action 类型
 /**
  * File action types
  */

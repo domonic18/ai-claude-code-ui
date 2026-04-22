@@ -1,3 +1,4 @@
+// React 错误边界组件：捕获子组件树中未处理的渲染异常，展示降级 UI 并支持重试
 import React, { Component, ReactNode } from 'react';
 import { logger } from '@/shared/utils/logger';
 
@@ -19,10 +20,12 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     this.state = { hasError: false, error: null, errorInfo: null };
   }
 
+  // 静态方法：渲染阶段捕获错误，触发降级 UI 显示
   static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
     return { hasError: true };
   }
 
+  // 提交阶段捕获错误信息和组件栈，用于日志记录
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
     logger.error('ErrorBoundary caught an error:', error, errorInfo);
     this.setState({
@@ -31,6 +34,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     });
   }
 
+  // 重置错误状态并调用外部重试回调，允许子组件树重新渲染
   handleRetry = (): void => {
     this.setState({ hasError: false, error: null, errorInfo: null });
     if (this.props.onRetry) {
@@ -56,6 +60,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
             <div className="text-sm text-red-700">
               <p className="mb-2">An error occurred while loading the chat interface.</p>
               {this.props.showDetails && this.state.error && (
+                // 开发环境下可通过 showDetails 展示完整错误栈，辅助调试
                 <details className="mt-4">
                   <summary className="cursor-pointer text-xs font-mono">Error Details</summary>
                   <pre className="mt-2 text-xs bg-red-100 p-2 rounded overflow-auto max-h-40">

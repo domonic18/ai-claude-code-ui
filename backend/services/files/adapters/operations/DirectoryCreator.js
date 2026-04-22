@@ -12,6 +12,7 @@ import containerManager from '../../../container/core/index.js';
 /** Operation timeout in milliseconds */
 const OPERATION_TIMEOUT_MS = 5000;
 
+// 文件适配器在用户在文件浏览器中创建文件夹时调用此函数
 /**
  * 目录创建器类
  */
@@ -24,6 +25,7 @@ export class DirectoryCreator {
     this.adapter = adapter;
   }
 
+  // 文件浏览器 UI 在用户点击"新建文件夹"按钮时调用此函数
   /**
    * 创建目录
    * @param {string} dirPath - 目录路径

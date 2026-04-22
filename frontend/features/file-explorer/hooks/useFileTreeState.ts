@@ -220,6 +220,7 @@ interface UseFileTreeStateReturn {
   handleSelectFile: (item: FileNode) => void;
 }
 
+// 由组件调用，自定义 Hook：useFileTreeState
 /**
  * Custom hook managing all state and effects for the FileTree component
  *

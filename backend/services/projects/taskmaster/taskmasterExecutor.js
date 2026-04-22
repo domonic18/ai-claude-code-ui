@@ -8,6 +8,7 @@
 
 import { spawn } from 'child_process';
 
+// taskmasterExecutor.js 功能函数
 /**
  * Execute CLI command and return result
  * @param {string} command - Command to execute
@@ -50,6 +51,7 @@ export function executeCommand(command, args, cwd, options = {}) {
   });
 }
 
+// taskmasterExecutor.js 功能函数
 /**
  * Handle TaskMaster command result
  * @param {Object} result - Command execution result
@@ -65,6 +67,7 @@ export function handleTaskMasterResult(result, operation) {
   return { output: result.stdout, success: true };
 }
 
+// taskmasterExecutor.js 功能函数
 /**
  * Parse JSON from stdout
  * @param {string} stdout - Command stdout

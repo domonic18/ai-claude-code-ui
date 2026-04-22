@@ -15,6 +15,7 @@ import { validateFileExtension } from './fileOperationHelpers.js';
 
 const logger = createLogger('controllers/api/fileUploadHandler');
 
+// 处理业务逻辑，供路由层调用
 /**
  * Handles file upload via Docker putArchive API
  * @param {Object} file - Uploaded file object with buffer and metadata
@@ -88,3 +89,4 @@ export async function handleFileUpload(file, userId, projectName) {
 
   return responseData;
 }
+

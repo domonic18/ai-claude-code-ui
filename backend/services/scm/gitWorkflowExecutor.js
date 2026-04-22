@@ -18,6 +18,7 @@ import { createAndPushBranch } from './gitBranchOperations.js';
 
 const logger = createLogger('services/scm/gitWorkflowExecutor');
 
+// gitWorkflowExecutor.js 功能函数
 /**
  * Check if target directory already contains the correct repository
  * @param {string} cloneDir - Target directory
@@ -51,6 +52,7 @@ async function checkExistingRepo(cloneDir, githubUrl) {
   }
 }
 
+// gitWorkflowExecutor.js 功能函数
 /**
  * Perform git clone operation (unified path with and without token)
  * @param {string} githubUrl - GitHub repository URL
@@ -76,6 +78,7 @@ async function performClone(githubUrl, cloneDir, githubToken) {
   }
 }
 
+// gitWorkflowExecutor.js 功能函数
 /**
  * Clone GitHub repository to specified directory
  * @param {string} githubUrl - GitHub repository URL
@@ -101,6 +104,7 @@ export async function cloneGitHubRepo(githubUrl, githubToken = null, projectPath
   return cloneDir;
 }
 
+// gitWorkflowExecutor.js 功能函数
 /**
  * Get git repository remote URL
  * @param {string} repoPath - Git repository path
@@ -111,6 +115,7 @@ export async function getGitRemoteUrl(repoPath) {
   return stdout.trim();
 }
 
+// gitWorkflowExecutor.js 功能函数
 /**
  * Get commit messages from repository
  * @param {string} projectPath - Git repository path
@@ -122,6 +127,7 @@ export async function getCommitMessages(projectPath, limit = 5) {
   return stdout.trim().split('\n').filter(msg => msg.length > 0);
 }
 
+// gitWorkflowExecutor.js 功能函数
 /**
  * Create GitHub Pull Request
  * @param {Object} octokit - Octokit instance
@@ -144,6 +150,7 @@ export async function createGitHubPR(octokit, owner, repo, branchName, title, bo
   return { number: pr.number, url: pr.html_url };
 }
 
+// gitWorkflowExecutor.js 功能函数
 /**
  * Execute complete GitHub branch + PR workflow
  * @param {Object} params - Workflow parameters

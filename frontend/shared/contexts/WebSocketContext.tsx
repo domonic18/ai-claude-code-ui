@@ -1,3 +1,4 @@
+// WebSocket 全局上下文：仅在用户已登录时建立连接，避免未认证请求浪费资源
 import React, { createContext, useContext } from 'react';
 import { useWebSocket } from '@/shared/services/websocket';
 import { useAuth } from './AuthContext';

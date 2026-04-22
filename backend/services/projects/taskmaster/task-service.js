@@ -16,6 +16,7 @@ import { parseTasksData, normalizeTask, countByStatus } from './taskParsing.js';
 
 const logger = createLogger('services/projects/taskmaster/task-service');
 
+// task-service.js 功能函数
 /**
  * 加载项目的任务列表
  * @param {string} projectPath - 项目路径
@@ -52,6 +53,7 @@ export async function loadTasks(projectPath) {
     };
 }
 
+// task-service.js 功能函数
 /**
  * 获取下一个待处理的任务
  * 从已有任务中查找状态为 pending 或 in-progress 的第一个任务

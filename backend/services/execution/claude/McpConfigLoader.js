@@ -13,6 +13,7 @@ import os from 'os';
 import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('services/execution/claude/McpConfigLoader');
 
+// 由 Claude 执行器调用，从用户主目录加载 MCP 服务器配置（模型上下文协议）
 /**
  * 从 ~/.claude.json 加载 MCP 服务器配置
  * @param {string} cwd - 用于项目特定配置的当前工作目录

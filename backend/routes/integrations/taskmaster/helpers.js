@@ -9,6 +9,7 @@
 import { promises as fsPromises, constants as fsConstants } from 'fs';
 import { broadcastTaskMasterProjectUpdate, broadcastTaskMasterTasksUpdate } from '../../../utils/taskmaster-websocket.js';
 
+// 处理 GET /projectpath 请求
 /**
  * 获取项目路径（容器模式）
  * @param {string} projectName - 项目名称
@@ -18,6 +19,7 @@ export function getProjectPath(projectName) {
     return `/workspace/${projectName}`;
 }
 
+// 定义 HTTP 路由处理器
 /**
  * 解析并校验项目路径可访问性
  * @param {string} projectName - 项目名称
@@ -38,6 +40,7 @@ export async function resolveProjectPath(projectName, res) {
     }
 }
 
+// 定义 HTTP 路由处理器
 /**
  * 确定 TaskMaster 的配置状态
  * @param {Object} taskMasterResult - .taskmaster 检测结果
@@ -57,6 +60,7 @@ export function determineConfigStatus(taskMasterResult, mcpResult) {
     return 'not-configured';
 }
 
+// 定义 HTTP 路由处理器
 /**
  * 通过 WebSocket 广播任务更新（如果 wss 可用）
  * @param {Object} req - Express request 对象
@@ -68,6 +72,7 @@ export function broadcastTasks(req, projectName) {
     }
 }
 
+// 定义 HTTP 路由处理器
 /**
  * 通过 WebSocket 广播项目更新（如果 wss 可用）
  * @param {Object} req - Express request 对象
@@ -79,3 +84,4 @@ export function broadcastProject(req, projectName, data) {
         broadcastTaskMasterProjectUpdate(req.app.locals.wss, projectName, data);
     }
 }
+

@@ -20,6 +20,7 @@ const __dirname = dirname(__filename);
 const packageJsonPath = path.join(__dirname, '../../package.json');
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
+// 获取数据库文件路径，用于状态显示
 /**
  * 获取数据库路径
  * @returns {string} 数据库文件路径
@@ -28,6 +29,7 @@ export function getDatabasePath() {
     return DATABASE.path;
 }
 
+// 获取应用安装目录路径，用于状态显示
 /**
  * 获取安装目录
  * @returns {string} 安装目录路径
@@ -36,6 +38,7 @@ export function getInstallDir() {
     return path.join(__dirname, '../..');
 }
 
+// 显示应用状态信息，包括版本、配置、数据库等，供 `status` 命令调用
 /**
  * 显示状态命令
  * 显示配置信息、数据库位置、版本信息等
@@ -94,6 +97,7 @@ export function showStatus() {
     logger.info(`      ${c.dim('>')} Access the UI at http://localhost:${SERVER.port}\n`);
 }
 
+// 显示命令行工具帮助信息，供 `help` 命令调用
 /**
  * 显示帮助信息
  * 显示命令行工具的使用说明、可用命令和选项
@@ -142,6 +146,7 @@ Report Issues:
 `);
 }
 
+// 显示当前应用版本号，供 `version` 命令调用
 /**
  * 显示版本信息
  * 输出当前软件版本号

@@ -12,6 +12,7 @@ import os from 'os';
 const ALLOWED_GIT_HOSTS = ['github.com', 'gitlab.com', 'bitbucket.org'];
 const VALID_PROVIDERS = ['claude', 'cursor', 'codex'];
 
+// 定义 HTTP 路由处理器
 /**
  * 将各种形式的布尔参数归一化为 true/false
  * @param {*} value - 原始参数值
@@ -23,6 +24,7 @@ export function normalizeBoolean(value, defaultVal = false) {
     return value === true || value === 'true';
 }
 
+// 定义 HTTP 路由处理器
 /**
  * 校验并归一化 agent 请求参数
  * @param {Object} body - 请求体
@@ -39,6 +41,7 @@ export function normalizeAgentParams(body) {
     };
 }
 
+// 定义 HTTP 路由处理器
 /**
  * 校验 agent 请求参数，返回错误信息或 null
  * @param {Object} params - 归一化后的参数
@@ -64,6 +67,7 @@ export function validateAgentParams(params) {
     return null;
 }
 
+// 定义 HTTP 路由处理器
 /**
  * 校验 projectPath 安全性
  * @param {string} projectPath - 项目路径
@@ -81,6 +85,7 @@ export function validateProjectPath(projectPath) {
     return null;
 }
 
+// 定义 HTTP 路由处理器
 /**
  * 校验 GitHub URL 合法性
  * @param {string} githubUrl - GitHub URL
@@ -100,3 +105,4 @@ function validateGithubUrl(githubUrl) {
     }
     return null;
 }
+

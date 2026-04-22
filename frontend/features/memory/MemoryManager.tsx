@@ -9,6 +9,9 @@
 import { Save } from 'lucide-react';
 import { useMemoryEditor } from './useMemoryEditor';
 
+/**
+ * 记忆管理器组件：提供 textarea 编辑长期记忆内容，调用 useMemoryEditor 进行 CRUD
+ */
 export function MemoryManager() {
   const { memoryContent, setMemoryContent, loading, saving, saveMemory } = useMemoryEditor();
 

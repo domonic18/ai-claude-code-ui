@@ -47,6 +47,7 @@ const MODE_CONFIG = {
   },
 } as const;
 
+// 由父组件调用，React 组件或常量：PermissionModeSelector
 /**
  * PermissionModeSelector Component
  *

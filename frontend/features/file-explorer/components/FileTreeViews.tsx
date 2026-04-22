@@ -11,6 +11,7 @@ import type { FileNode } from '../types/file-explorer.types';
 import type { TFunction } from 'i18next';
 import { FileTreeItem } from './FileTreeItem';
 
+// FileTreeViewsProps 的类型定义
 /**
  * Props for FileTreeViews component
  */
@@ -39,6 +40,7 @@ export interface FileTreeViewsProps {
   onDrop: (item: FileNode | null, e: React.DragEvent) => void;
 }
 
+// 由父组件调用，React 组件或常量：FileTreeViews
 /**
  * File tree views component - Supports simple, detailed, and compact view modes
  */

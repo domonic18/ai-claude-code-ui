@@ -20,6 +20,7 @@ export const TourContext = createContext<TourContextValue>({
   },
 });
 
+// 由组件调用，自定义 Hook：useTourContext
 /**
  * Hook to access tour control functions from any component.
  * Used by AppearanceTab to re-trigger the product tour.

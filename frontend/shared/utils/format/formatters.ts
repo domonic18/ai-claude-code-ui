@@ -23,6 +23,7 @@ export function formatRelativeTime(date: string | Date): string {
   return past.toLocaleDateString();
 }
 
+// 由日期显示组件调用，格式化日期为本地化字符串
 /**
  * Format date to locale string
  */

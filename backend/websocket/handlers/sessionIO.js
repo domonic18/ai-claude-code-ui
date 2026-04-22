@@ -10,6 +10,7 @@ import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('websocket/handlers/sessionIO');
 
+// WebSocket 消息或事件处理
 /**
  * 向会话发送输入
  *
@@ -45,6 +46,7 @@ export async function sendInputToSession(ptySessionsMap, sessionKey, data) {
     return false;
 }
 
+// WebSocket 消息或事件处理
 /**
  * 调整会话终端大小
  *
@@ -80,3 +82,4 @@ export async function resizeSessionTerminal(ptySessionsMap, sessionKey, cols, ro
 
     return false;
 }
+

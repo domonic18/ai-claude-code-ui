@@ -15,6 +15,7 @@ import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
 import type { VersionBannerProps } from '../types/sidebar.types';
 
+// Sidebar 组件使用此组件显示应用版本信息和更新提示
 /**
  * VersionBanner Component
  */

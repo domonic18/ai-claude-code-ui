@@ -12,6 +12,7 @@ import { createLogger } from '../../../utils/logger.js';
 
 const logger = createLogger('container/core/ContainerDestroyer');
 
+// 当转换到已销毁状态时由 ContainerLifecycle 调用
 /**
  * Destroy container and clean up resources
  * @param {Object} docker - Docker client
@@ -44,6 +45,7 @@ export async function destroyContainer(docker, containersMap, Container, userId,
   }
 }
 
+// 当转换到停止状态时由 ContainerLifecycle 调用
 /**
  * Stop container
  * @param {Object} docker - Docker client
@@ -62,6 +64,7 @@ export async function stopContainer(docker, containersMap, userId) {
   info.status = 'stopped';
 }
 
+// 当从停止转换到运行时由 ContainerLifecycle 调用
 /**
  * Start container
  * @param {Object} docker - Docker client

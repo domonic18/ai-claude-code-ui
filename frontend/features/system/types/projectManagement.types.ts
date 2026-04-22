@@ -6,6 +6,7 @@
 
 import type { Project } from '@/features/sidebar/types/sidebar.types';
 
+// ApiSession 的类型定义
 /**
  * Local session type from API
  */
@@ -20,11 +21,13 @@ export interface ApiSession {
   __projectName?: string;
 }
 
+// Session 的类型别名定义
 /**
  * Session type alias
  */
 export type Session = ApiSession;
 
+// ProjectManagementState 的类型定义
 /**
  * Project management state
  */
@@ -37,6 +40,7 @@ export interface ProjectManagementState {
   newSessionCounter: number;
 }
 
+// ProjectManagementActions 的类型定义
 /**
  * Project management actions
  */
@@ -52,6 +56,7 @@ export interface ProjectManagementActions {
   updateProjectsFromWebSocket: (updatedProjects: Project[]) => void;
 }
 
+// ProjectManagerConfig 的类型定义
 /**
  * Project manager hook configuration
  */

@@ -14,6 +14,7 @@ export interface ApiResponse<T = any> {
   message?: string;
 }
 
+// 分页响应的类型定义
 /**
  * Paginated response wrapper
  */
@@ -26,6 +27,7 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
   };
 }
 
+// API 错误的类型定义
 /**
  * API error response
  */
@@ -36,11 +38,13 @@ export interface ApiError {
   details?: any;
 }
 
+// HttpMethod 的类型别名定义
 /**
  * HTTP method types
  */
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 
+// RequestOptions 的类型定义
 /**
  * Request options
  */

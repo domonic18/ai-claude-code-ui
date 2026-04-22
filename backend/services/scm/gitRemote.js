@@ -13,6 +13,7 @@ import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('services/scm/gitRemote');
 
+// gitRemote.js 功能函数
 /**
  * 获取远程仓库的跟踪分支和远程名称
  * @private
@@ -37,6 +38,7 @@ async function resolveRemoteInfo(projectPath) {
     return { remoteName, remoteBranch };
 }
 
+// gitRemote.js 功能函数
 /**
  * 从远程获取
  * @param {string} projectPath - 项目路径
@@ -49,6 +51,7 @@ export async function fetchFromRemote(projectPath) {
     return { output: stdout || 'Fetch completed successfully', remoteName };
 }
 
+// gitRemote.js 功能函数
 /**
  * 从远程拉取
  * @param {string} projectPath - 项目路径
@@ -61,6 +64,7 @@ export async function pullFromRemote(projectPath) {
     return { output: stdout || 'Pull completed successfully', remoteName, remoteBranch };
 }
 
+// gitRemote.js 功能函数
 /**
  * 推送到远程
  * @param {string} projectPath - 项目路径
@@ -73,6 +77,7 @@ export async function pushToRemote(projectPath) {
     return { output: stdout || 'Push completed successfully', remoteName, remoteBranch };
 }
 
+// gitRemote.js 功能函数
 /**
  * 发布分支（设置上游并推送）
  * @param {string} projectPath - 项目路径

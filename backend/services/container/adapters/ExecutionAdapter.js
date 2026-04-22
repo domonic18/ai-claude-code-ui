@@ -10,6 +10,7 @@
 import containerManager from '../core/index.js';
 import { CONTAINER } from '../../../config/config.js';
 
+// ClaudeExecutor 和 CursorExecutor 使用此适配器在 Docker 容器中执行命令
 /**
  * 容器执行适配器
  * 将容器操作适配到 IExecutionEngine 接口
@@ -26,6 +27,7 @@ export class ExecutionAdapter {
     this.activeSessions = new Map();
   }
 
+  // 由 IExecutionEngine 实现调用以在用户容器中运行 shell 命令
   /**
    * 在容器中执行命令
    * @param {string} command - 命令
@@ -71,6 +73,7 @@ export class ExecutionAdapter {
     }
   }
 
+  // 当用户点击停止按钮时由 WebSocket 中止处理程序调用
   /**
    * 中止执行
    * @param {string} sessionId - 会话 ID（exec ID）
@@ -93,6 +96,7 @@ export class ExecutionAdapter {
     }
   }
 
+  // 由会话管理调用以检查 exec 会话是否仍在运行
   /**
    * 检查会话是否活动
    * @param {string} sessionId - 会话 ID
@@ -102,6 +106,7 @@ export class ExecutionAdapter {
     return this.activeSessions.has(sessionId);
   }
 
+  // 由管理 API 调用以列出所有活动的容器会话
   /**
    * 获取活动会话列表
    * @returns {Array<string>}
@@ -110,6 +115,7 @@ export class ExecutionAdapter {
     return Array.from(this.activeSessions.keys());
   }
 
+  // 由终端 API 调用以在容器中创建交互式 shell 会话
   /**
    * 在容器中创建 PTY 会话
    * @param {Object} options - 选项
@@ -143,6 +149,7 @@ export class ExecutionAdapter {
     }
   }
 
+  // 由 execute() 使用以准备 Docker exec 的环境变量
   /**
    * 构建环境变量数组
    * @private
@@ -168,6 +175,7 @@ export class ExecutionAdapter {
     return envArray;
   }
 
+  // 为 API 响应包装所有 Docker 错误并提供一致的错误元数据
   /**
    * 标准化错误
    * @private
@@ -189,6 +197,7 @@ export class ExecutionAdapter {
     return standardizedError;
   }
 
+  // 在服务器关闭或用户登出时调用
   /**
    * 清理资源
    */

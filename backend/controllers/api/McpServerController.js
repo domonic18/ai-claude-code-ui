@@ -15,6 +15,7 @@ import { ValidationError, NotFoundError } from '../../middleware/error-handler.m
  * MCP服务器控制器
  */
 export class McpServerController extends BaseController {
+// 处理业务逻辑，供路由层调用
   /**
    * 构造函数
    * @param {Object} dependencies - 依赖注入对象
@@ -23,6 +24,7 @@ export class McpServerController extends BaseController {
     super(dependencies);
   }
 
+// 获取资源，供路由层调用
   /**
    * 获取用户的MCP服务器列表
    * @param {Object} req - Express 请求对象
@@ -41,6 +43,7 @@ export class McpServerController extends BaseController {
     }
   }
 
+// 获取资源，供路由层调用
   /**
    * 获取启用的MCP服务器列表
    * @param {Object} req - Express 请求对象
@@ -59,6 +62,7 @@ export class McpServerController extends BaseController {
     }
   }
 
+// 获取资源，供路由层调用
   /**
    * 获取单个MCP服务器
    * @param {Object} req - Express 请求对象
@@ -78,6 +82,7 @@ export class McpServerController extends BaseController {
     }
   }
 
+// 创建新资源，供路由层调用
   /**
    * 创建MCP服务器
    * @param {Object} req - Express 请求对象
@@ -107,6 +112,7 @@ export class McpServerController extends BaseController {
     }
   }
 
+// 更新资源，供路由层调用
   /**
    * 更新MCP服务器
    * @param {Object} req - Express 请求对象
@@ -132,6 +138,7 @@ export class McpServerController extends BaseController {
     }
   }
 
+// 删除资源，供路由层调用
   /**
    * 删除MCP服务器
    * @param {Object} req - Express 请求对象
@@ -151,6 +158,7 @@ export class McpServerController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 测试MCP服务器连接
    * @param {Object} req - Express 请求对象
@@ -170,6 +178,7 @@ export class McpServerController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 发现MCP服务器的工具
    * @param {Object} req - Express 请求对象
@@ -189,6 +198,7 @@ export class McpServerController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 切换MCP服务器启用状态
    * @param {Object} req - Express 请求对象
@@ -208,6 +218,7 @@ export class McpServerController extends BaseController {
     }
   }
 
+// 获取资源，供路由层调用
   /**
    * 获取SDK配置
    * @param {Object} req - Express 请求对象
@@ -226,6 +237,7 @@ export class McpServerController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 验证MCP服务器配置
    * @param {Object} req - Express 请求对象
@@ -251,3 +263,4 @@ export class McpServerController extends BaseController {
 }
 
 export default McpServerController;
+

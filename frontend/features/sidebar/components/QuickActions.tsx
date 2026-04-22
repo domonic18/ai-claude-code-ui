@@ -16,6 +16,7 @@ import { Star, Edit3, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { QuickActionsProps } from '../types/sidebar.types';
 
+// Sidebar 组件使用此组件显示快捷操作按钮（新建项目、打开终端等）
 /**
  * QuickActions Component
  */

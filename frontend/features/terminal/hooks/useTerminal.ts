@@ -7,7 +7,9 @@
  * @module features/terminal/hooks/useTerminal
  */
 
+// 导入 React 核心 Hooks
 import { useState, useCallback, useRef, useMemo } from 'react';
+// 导入终端相关的类型定义
 import type {
   TerminalOutput,
   TerminalProcess,
@@ -16,14 +18,20 @@ import type {
   TerminalOptions,
   TerminalTheme
 } from '../types';
+// 导入日志工具
 import { logger } from '@/shared/utils/logger';
+// 导入连接回调和 WebSocket 处理器
 import { createConnectionCallbacks, createWebSocketHandlers } from './useTerminalCallbacks';
+// 导入终端历史管理 Hook
 import { useTerminalHistory } from './useTerminalHistory';
+// 导入终端操作函数集合
 import { createTerminalOperations } from './useTerminalOperations';
 
-// Stable empty array reference to prevent unnecessary re-renders
+// 稳定的空数组引用，防止不必要的重新渲染
+// 这是 React 优化模式，避免每次渲染都创建新数组
 const EMPTY_ARGS: string[] = [];
 
+// UseTerminalOptions 的类型定义
 /**
  * Hook for terminal functionality
  */
@@ -55,33 +63,44 @@ export interface UseTerminalReturn {
 }
 
 export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn {
+  // 解构并设置默认值
   const {
-    shell = '/bin/bash',
-    args: rawArgs,
-    cwd,
-    env,
-    autoConnect = false,
-    onOutput,
-    onProcessComplete,
-    onError,
+    shell = '/bin/bash',  // 默认使用 bash shell
+    args: rawArgs,         // 原始命令参数
+    cwd,                   // 当前工作目录
+    env,                   // 环境变量
+    autoConnect = false,   // 是否自动连接
+    onOutput,              // 输出回调函数
+    onProcessComplete,     // 进程完成回调函数
+    onError,               // 错误回调函数
   } = options;
 
-  // Use stable reference for args to prevent unnecessary callback recreations
+  // 使用稳定的引用来避免不必要的回调重新创建
+  // 如果 rawArgs 为 undefined，则使用空数组引用
   const args = useMemo(() => rawArgs ?? EMPTY_ARGS, [rawArgs]);
 
-  // State
+  // 状态管理：跟踪终端的各种状态
+  // process: 当前运行的进程对象
   const [process, setProcess] = useState<TerminalProcess | null>(null);
+  // outputs: 终端输出记录数组
   const [outputs, setOutputs] = useState<TerminalOutput[]>([]);
+  // isConnected: WebSocket 连接状态
   const [isConnected, setIsConnected] = useState<boolean>(false);
+  // isLoading: 命令执行中的加载状态
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  // isConnecting: WebSocket 连接中的状态
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
+  // error: 错误对象
   const [error, setError] = useState<Error | null>(null);
 
-  // Refs
+  // Refs：存储可变值，避免闭包陷阱
+  // wsRef: WebSocket 实例引用
   const wsRef = useRef<WebSocket | null>(null);
+  // isMountedRef: 组件挂载状态引用，用于避免内存泄漏
   const isMountedRef = useRef(true);
 
-  // Create terminal operations
+  // 创建终端操作函数集合
+  // 封装了所有与 WebSocket 通信的操作
   const operations = createTerminalOperations(
     wsRef,
     isConnected,
@@ -98,10 +117,12 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
     onOutput
   );
 
-  // Create connection callbacks
+  // 创建连接管理回调
+  // 提供 disconnect 和 reconnect 方法
   const connection = createConnectionCallbacks(wsRef, setIsConnected, setIsConnecting);
 
-  // Simple operations
+  // 清空输出的简单操作
+  // 重置输出数组为空
   const clearOutput = useCallback(() => {
     setOutputs([]);
   }, []);
@@ -123,6 +144,7 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
   };
 }
 
+// UseTerminalOptionsReturn 的类型定义
 /**
  * Hook for managing terminal options and theme
  */
@@ -145,24 +167,28 @@ const DEFAULT_TERMINAL_OPTIONS: TerminalOptions = {
 export function useTerminalOptions(
   initialOptions?: Partial<TerminalOptions>
 ): UseTerminalOptionsReturn {
+  // 初始化终端选项，合并默认值和用户提供的选项
   const [options, setOptions] = useState<TerminalOptions>({
     ...DEFAULT_TERMINAL_OPTIONS,
     ...initialOptions,
   });
 
+  // 从选项中提取主题类型
   const theme = options.theme as TerminalTheme;
 
   /**
    * Update terminal options
+   * 更新终端选项并持久化到 localStorage
    */
   const updateOptions = useCallback((updates: Partial<TerminalOptions>) => {
     setOptions(prev => {
+      // 合并更新到现有选项
       const newOptions = { ...prev, ...updates };
-      // Persist to localStorage
+      // 持久化到 localStorage
       try {
         localStorage.setItem('terminal-options', JSON.stringify(newOptions));
       } catch {
-        // Ignore localStorage errors
+        // 忽略 localStorage 错误（如隐私模式或存储已满）
       }
       return newOptions;
     });
@@ -170,6 +196,7 @@ export function useTerminalOptions(
 
   /**
    * Set terminal theme
+   * 设置终端主题
    */
   const setTheme = useCallback((newTheme: TerminalTheme) => {
     updateOptions({ theme: newTheme });
@@ -177,13 +204,14 @@ export function useTerminalOptions(
 
   /**
    * Reset to defaults
+   * 重置为默认选项并清除 localStorage
    */
   const resetToDefaults = useCallback(() => {
     setOptions(DEFAULT_TERMINAL_OPTIONS);
     try {
       localStorage.removeItem('terminal-options');
     } catch {
-      // Ignore localStorage errors
+      // 忽略 localStorage 错误
     }
   }, []);
 
@@ -196,6 +224,7 @@ export function useTerminalOptions(
   };
 }
 
+// UseTerminalScrollReturn 的类型定义
 /**
  * Re-export terminal history hook
  */
@@ -209,27 +238,35 @@ export interface UseTerminalScrollReturn {
 }
 
 export function useTerminalScroll(): UseTerminalScrollReturn {
+  // 终端滚动容器的 DOM 引用
   const scrollRef = useRef<HTMLDivElement>(null);
+  // 自动滚动开关状态
   const [shouldAutoScroll, setShouldAutoScroll] = useState<boolean>(true);
 
   /**
    * Scroll to bottom
+   * 滚动到终端底部
    */
   const scrollToBottom = useCallback(() => {
+    // 检查 ref 是否存在，避免空引用错误
     if (scrollRef.current) {
+      // 设置 scrollTop 为 scrollHeight，滚动到最底部
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, []);
 
   /**
    * Toggle auto-scroll
+   * 切换自动滚动模式并持久化到 localStorage
    */
   const toggleAutoScroll = useCallback(() => {
+    // 切换自动滚动状态
     setShouldAutoScroll(prev => !prev);
     try {
+      // 持久化新的自动滚动状态到 localStorage
       localStorage.setItem('terminal-auto-scroll', String(!shouldAutoScroll));
     } catch {
-      // Ignore localStorage errors
+      // 忽略 localStorage 错误
     }
   }, [shouldAutoScroll]);
 

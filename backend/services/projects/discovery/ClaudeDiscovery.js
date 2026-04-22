@@ -15,11 +15,13 @@ import { getProjectsInContainer } from '../managers/ContainerProjectManager.js';
 import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('services/projects/discovery/ClaudeDiscovery');
 
+// ClaudeDiscovery.js 功能函数
 /**
  * Claude 项目发现器
  * 完全基于容器化架构
  */
 export class ClaudeDiscovery extends BaseDiscovery {
+  // 初始化 Claude 项目发现器，配置容器会话管理器
   /**
    * 构造函数
    * @param {Object} config - 配置
@@ -36,6 +38,7 @@ export class ClaudeDiscovery extends BaseDiscovery {
     this.containerSessionManager = new ContainerSessionManager();
   }
 
+  // 由 GET /api/projects 调用，从 Docker 容器中获取用户的所有 Claude Code 项目
   /**
    * 获取项目列表
    * @param {Object} options - 选项
@@ -60,6 +63,7 @@ export class ClaudeDiscovery extends BaseDiscovery {
     }
   }
 
+  // 由 GET /api/projects/:id/sessions 调用，获取指定项目的所有聊天会话
   /**
    * 获取项目会话
    * @param {string} projectIdentifier - 项目标识
@@ -99,6 +103,7 @@ export class ClaudeDiscovery extends BaseDiscovery {
     }
   }
 
+  // 由 DELETE /api/projects/:id 调用，在删除项目前检查是否包含任何会话
   /**
    * 检查项目是否为空
    * @param {string} projectIdentifier - 项目标识

@@ -15,6 +15,7 @@ import { ValidationError } from '../../middleware/error-handler.middleware.js';
  * 命令控制器
  */
 export class CommandController extends BaseController {
+// 处理业务逻辑，供路由层调用
   /**
    * 验证命令
    * @param {Object} req - Express 请求对象
@@ -37,6 +38,7 @@ export class CommandController extends BaseController {
     }
   }
 
+// 获取资源，供路由层调用
   /**
    * 获取允许的命令列表
    * @param {Object} req - Express 请求对象
@@ -62,6 +64,7 @@ export class CommandController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 执行命令（通过容器或主机）
    * @param {Object} req - Express 请求对象
@@ -111,3 +114,4 @@ export class CommandController extends BaseController {
 }
 
 export default CommandController;
+

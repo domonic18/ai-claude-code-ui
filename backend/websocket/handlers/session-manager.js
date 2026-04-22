@@ -12,6 +12,7 @@ import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('websocket/handlers/session-manager');
 
+// WebSocket 消息或事件处理
 /**
  * 重连到现有会话
  *
@@ -57,6 +58,7 @@ export function reconnectToSession(ptySessionsMap, sessionKey, ws) {
     return true;
 }
 
+// WebSocket 消息或事件处理
 /**
  * 清理现有登录会话
  *
@@ -77,6 +79,7 @@ export function cleanupExistingSession(ptySessionsMap, sessionKey) {
     }
 }
 
+// WebSocket 消息或事件处理
 /**
  * 生成会话键
  *
@@ -101,6 +104,7 @@ export function generateSessionKey({ projectPath, sessionId, initialCommand, isP
     }
 }
 
+// WebSocket 消息或事件处理
 /**
  * 设置会话超时
  *
@@ -121,6 +125,7 @@ export function setupSessionTimeout(session, sessionKey, ptySessionsMap, timeout
     }, timeout);
 }
 
+// WebSocket 消息或事件处理
 /**
  * 处理 WebSocket 关闭事件
  *
@@ -142,3 +147,4 @@ export function handleWebSocketClose(ptySessionsMap, sessionKey, timeout = PTY_S
 
 // Re-export functions extracted to sessionIO.js for backward compatibility
 export { sendInputToSession, resizeSessionTerminal } from './sessionIO.js';
+

@@ -8,6 +8,7 @@
 
 import { PathUtils } from '../../core/utils/path-utils.js';
 
+// 在处理项目标识符前调用，验证格式并解码项目路径
 /**
  * Validates project identifier
  * @param {string} projectIdentifier - Project identifier

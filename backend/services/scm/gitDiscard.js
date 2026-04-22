@@ -14,6 +14,7 @@ import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('services/scm/gitDiscard');
 
+// 在丢弃更改时调用，执行 git checkout
 /**
  * 丢弃指定文件的更改
  * @param {string} projectPath - 项目路径
@@ -39,6 +40,7 @@ export async function discardChanges(projectPath, file) {
   }
 }
 
+// gitDiscard.js 功能函数
 /**
  * 删除未跟踪的文件
  * @param {string} projectPath - 项目路径

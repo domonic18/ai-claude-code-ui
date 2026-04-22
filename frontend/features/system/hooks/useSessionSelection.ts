@@ -13,6 +13,7 @@ import type { Session, ProjectManagerConfig } from '../types/projectManagement.t
 import { findSessionInProjects } from './useProjectUtils';
 import { logger } from '@/shared/utils/logger';
 
+// 由组件调用，自定义 Hook：useSessionSelection
 /**
  * Session selection hook
  *

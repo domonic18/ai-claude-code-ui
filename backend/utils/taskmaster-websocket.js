@@ -9,6 +9,7 @@ const logger = createLogger('utils/taskmaster-websocket');
  * 与现有 WebSocket 系统集成以提供实时更新。
  */
 
+// WebSocket 消息或事件处理
 /**
  * 向所有连接的客户端广播 TaskMaster 项目更新
  * @param {WebSocket.Server} wss - WebSocket 服务器实例
@@ -40,6 +41,7 @@ export function broadcastTaskMasterProjectUpdate(wss, projectName, taskMasterDat
     });
 }
 
+// WebSocket 消息或事件处理
 /**
  * 向所有连接的客户端广播特定项目的 TaskMaster 任务更新
  * @param {WebSocket.Server} wss - WebSocket 服务器实例
@@ -71,6 +73,7 @@ export function broadcastTaskMasterTasksUpdate(wss, projectName, tasksData) {
     });
 }
 
+// WebSocket 消息或事件处理
 /**
  * 广播 MCP 服务器状态变化
  * @param {WebSocket.Server} wss - WebSocket 服务器实例
@@ -100,6 +103,7 @@ export function broadcastMCPStatusChange(wss, mcpStatus) {
     });
 }
 
+// WebSocket 消息或事件处理
 /**
  * 广播常规 TaskMaster 更新通知
  * @param {WebSocket.Server} wss - WebSocket 服务器实例
@@ -130,3 +134,4 @@ export function broadcastTaskMasterUpdate(wss, updateType, data = {}) {
         }
     });
 }
+

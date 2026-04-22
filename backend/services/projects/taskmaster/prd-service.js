@@ -15,6 +15,7 @@ import { createLogger } from '../../../utils/logger.js';
 
 const logger = createLogger('services/projects/taskmaster/prd-service');
 
+// prd-service.js 功能函数
 /**
  * 内置 PRD 模板定义
  * 每个模板包含 id、name、description、category 和 content
@@ -275,6 +276,7 @@ Description of the business problem, data sources, and expected insights.
     }
 ];
 
+// prd-service.js 功能函数
 /**
  * 获取所有可用的 PRD 模板
  * @returns {Array<Object>} 模板列表
@@ -287,6 +289,7 @@ export function getAvailableTemplates() {
     }));
 }
 
+// prd-service.js 功能函数
 /**
  * 根据 ID 获取模板
  * @param {string} templateId - 模板 ID
@@ -296,6 +299,7 @@ export function getTemplateById(templateId) {
     return getAvailableTemplates().find(t => t.id === templateId);
 }
 
+// prd-service.js 功能函数
 /**
  * 将自定义值应用到模板占位符
  * @param {string} content - 模板内容
@@ -313,6 +317,7 @@ export function applyCustomizations(content, customizations) {
     return result;
 }
 
+// prd-service.js 功能函数
 /**
  * 获取 PRD 文件的完整路径
  * @param {string} projectPath - 项目路径
@@ -323,6 +328,7 @@ export function getPrdFilePath(projectPath, fileName) {
     return path.join(projectPath, '.taskmaster', 'docs', fileName);
 }
 
+// prd-service.js 功能函数
 /**
  * 确保 .taskmaster/docs 目录存在
  * @param {string} projectPath - 项目路径
@@ -334,6 +340,7 @@ export async function ensureDocsDir(projectPath) {
     return docsPath;
 }
 
+// prd-service.js 功能函数
 /**
  * 列出项目的所有 PRD 文件
  * @param {string} projectPath - 项目路径
@@ -374,6 +381,7 @@ export async function listPrdFiles(projectPath) {
     return prdFiles.sort((a, b) => new Date(b.modified) - new Date(a.modified));
 }
 
+// prd-service.js 功能函数
 /**
  * 读取 PRD 文件内容
  * @param {string} projectPath - 项目路径
@@ -402,6 +410,7 @@ export async function readPrdFile(projectPath, fileName) {
     };
 }
 
+// prd-service.js 功能函数
 /**
  * 写入 PRD 文件
  * @param {string} projectPath - 项目路径
@@ -425,6 +434,7 @@ export async function writePrdFile(projectPath, fileName, content) {
     };
 }
 
+// prd-service.js 功能函数
 /**
  * 删除 PRD 文件
  * @param {string} projectPath - 项目路径
@@ -444,6 +454,7 @@ export async function deletePrdFile(projectPath, fileName) {
     return true;
 }
 
+// prd-service.js 功能函数
 /**
  * 验证 PRD 文件名是否合法
  * @param {string} fileName - 文件名
@@ -453,6 +464,7 @@ export function isValidPrdFileName(fileName) {
     return /^[\w\-. ]+\.(txt|md)$/.test(fileName);
 }
 
+// prd-service.js 功能函数
 /**
  * 检查 PRD 文件是否存在
  * @param {string} projectPath - 项目路径

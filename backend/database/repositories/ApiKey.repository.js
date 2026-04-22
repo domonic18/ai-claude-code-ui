@@ -15,6 +15,7 @@ const db = getDatabase;
  * API密钥数据仓库
  */
 export const ApiKey = {
+// 数据库操作函数，供控制器调用
     /**
      * 生成新的API密钥
      * @returns {string}
@@ -23,6 +24,7 @@ export const ApiKey = {
         return 'ck_' + crypto.randomBytes(32).toString('hex');
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 创建新的API密钥
      * @param {number} userId
@@ -36,6 +38,7 @@ export const ApiKey = {
         return { id: result.lastInsertRowid, keyName, apiKey };
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 获取用户的所有API密钥
      * @param {number} userId
@@ -46,6 +49,7 @@ export const ApiKey = {
         return rows;
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 验证API密钥
      * @param {string} apiKey
@@ -66,6 +70,7 @@ export const ApiKey = {
         return row;
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 删除API密钥
      * @param {number} userId
@@ -78,6 +83,7 @@ export const ApiKey = {
         return result.changes > 0;
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 切换API密钥活动状态
      * @param {number} userId
@@ -91,3 +97,4 @@ export const ApiKey = {
         return result.changes > 0;
     }
 };
+

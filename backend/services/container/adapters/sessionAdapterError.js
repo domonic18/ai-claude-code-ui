@@ -6,6 +6,7 @@
  * @module container/adapters/sessionAdapterError
  */
 
+// SessionAdapter 在任何操作失败时调用此函数标准化错误对象
 /**
  * Standardizes error with metadata
  * @param {Error} error - Original error

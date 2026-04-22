@@ -21,6 +21,7 @@ const logger = createLogger('services/projects/taskmaster/detector');
 /** TaskMaster 有效安装所需的文件列表 */
 const KEY_FILES = ['tasks/tasks.json', 'config.json'];
 
+// detector.js 功能函数
 /**
  * 检查目录是否存在且确实为目录
  *
@@ -38,6 +39,7 @@ async function checkDirectoryExists(dirPath) {
   }
 }
 
+// detector.js 功能函数
 /**
  * 验证 TaskMaster 所需的关键文件是否存在
  *
@@ -64,6 +66,7 @@ async function checkKeyFiles(taskMasterPath) {
   return { fileStatus, hasEssentialFiles };
 }
 
+// detector.js 功能函数
 /**
  * 从 tasks.json 数据中提取扁平化的任务数组
  *
@@ -84,6 +87,7 @@ function extractAllTasks(tasksData) {
   return tasks;
 }
 
+// detector.js 功能函数
 /**
  * 从扁平任务数组计算聚合统计信息
  *
@@ -120,6 +124,7 @@ function calculateTaskStats(tasks) {
   };
 }
 
+// detector.js 功能函数
 /**
  * 读取并解析 tasks.json，返回聚合的任务统计信息
  *
@@ -141,6 +146,7 @@ async function parseTaskMetadata(taskMasterPath) {
   }
 }
 
+// detector.js 功能函数
 /**
  * 检测指定项目目录中的 TaskMaster 安装
  *

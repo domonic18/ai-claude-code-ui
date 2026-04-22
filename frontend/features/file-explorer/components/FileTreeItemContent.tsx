@@ -69,6 +69,7 @@ function FileTreeItemActionButtons({
   );
 }
 
+// FileTreeItemContentProps 的类型定义
 /**
  * Props for FileTreeItemContent component
  */
@@ -93,6 +94,7 @@ export interface FileTreeItemContentProps {
   onDrop: (e: React.DragEvent) => void;
 }
 
+// 由父组件调用，React 组件或常量：FileTreeItemContent
 /**
  * FileTreeItemContent Component
  *

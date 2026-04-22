@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, Shield } from 'lucide-react';
 import { ExtensionManagement } from '@/features/admin';
 
+// 由父组件调用，React 组件或常量：AdminPage
 /**
  * Admin Page Component
  */

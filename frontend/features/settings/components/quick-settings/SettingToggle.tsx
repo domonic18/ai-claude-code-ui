@@ -19,6 +19,9 @@ interface SettingToggleProps {
   children?: React.ReactNode;
 }
 
+/**
+ * 设置行组件：图标 + 标签 + checkbox，支持自定义子元素模式
+ */
 const SettingToggle = ({
   icon: Icon,
   label,

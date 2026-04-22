@@ -1,3 +1,4 @@
+// 滚动区域封装：启用 iOS 惯性滚动（-webkit-overflow-scrolling: touch）和平移手势
 import * as React from "react"
 import { cn } from "@/lib/utils"
 

@@ -26,6 +26,7 @@ const logger = createLogger('database/repositories/UserSettings.repository');
  * 用户设置数据仓库类
  */
 export class UserSettings {
+// 数据库操作函数，供控制器调用
   /**
    * 获取用户设置
    * @param {number} userId - 用户 ID
@@ -36,6 +37,7 @@ export class UserSettings {
     return executeGetByUserId(userId, provider);
   }
 
+// 数据库操作函数，供控制器调用
   /**
    * 获取或创建默认设置
    * @param {number} userId - 用户 ID
@@ -54,6 +56,7 @@ export class UserSettings {
     return settings;
   }
 
+// 数据库操作函数，供控制器调用
   /**
    * 创建用户设置
    * @param {number} userId - 用户 ID
@@ -90,6 +93,7 @@ export class UserSettings {
     }
   }
 
+// 数据库操作函数，供控制器调用
   /**
    * 更新用户设置
    * @param {number} userId - 用户 ID
@@ -119,6 +123,7 @@ export class UserSettings {
     }
   }
 
+// 数据库操作函数，供控制器调用
   /**
    * 删除用户设置
    * @param {number} userId - 用户 ID
@@ -129,6 +134,7 @@ export class UserSettings {
     return executeDelete(userId, provider);
   }
 
+// 数据库操作函数，供控制器调用
   /**
    * 获取用户的所有设置（所有 provider）
    * @param {number} userId - 用户 ID
@@ -138,6 +144,7 @@ export class UserSettings {
     return executeGetAllByUserId(userId);
   }
 
+// 数据库操作函数，供控制器调用
   /**
    * 获取默认设置
    * @param {string} provider - Provider 名称
@@ -167,3 +174,4 @@ export class UserSettings {
 }
 
 export default UserSettings;
+

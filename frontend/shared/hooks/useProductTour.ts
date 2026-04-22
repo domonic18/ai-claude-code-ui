@@ -41,6 +41,7 @@ export interface UseProductTourResult {
   totalSteps: number;
 }
 
+// 由组件调用，自定义 Hook：useProductTour
 /**
  * Hook for managing product tour state
  *

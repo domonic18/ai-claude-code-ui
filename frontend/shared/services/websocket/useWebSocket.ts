@@ -36,6 +36,7 @@ function createConnectionCallbacks(
   };
 }
 
+// 由组件调用，自定义 Hook：useWebSocket
 /**
  * React hook for WebSocket connection management
  * Handles connection, reconnection, and message state

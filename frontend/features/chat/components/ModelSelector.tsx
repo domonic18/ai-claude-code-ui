@@ -11,20 +11,32 @@
  * - Context window display
  */
 
+// 导入 React 核心依赖
 import React from 'react';
+// 导入 Token 预算类型定义
 import type { TokenBudget } from './TokenDisplay';
+// 导入模型选择器状态管理 Hook，处理下拉菜单逻辑
 import { useModelSelectorState } from './modelSelectorCallbacks';
+// 导入样式工具函数，用于动态生成 CSS 类名
 import { getTokenBadgeColorClasses, getButtonClasses, getModelItemClasses, getModelNameClasses } from './modelSelectorStyles';
 
 /**
- * TokenBadge component for displaying token budget percentage
+ * TokenBadge 组件 - 显示 Token 使用率百分比
+ *
+ * 根据使用率显示不同颜色：
+ * - 绿色：< 50%
+ * - 黄色：50% - 80%
+ * - 红色：> 80%
  */
 interface TokenBadgeProps {
+  // Token 使用率百分比（0-100）
   tokenPercentage: number;
+  // 鼠标悬停提示文本
   title: string;
 }
 
 function TokenBadge({ tokenPercentage, title }: TokenBadgeProps) {
+  // 根据使用率获取对应的颜色类名
   const colorClasses = getTokenBadgeColorClasses(tokenPercentage);
 
   return (
@@ -38,17 +50,26 @@ function TokenBadge({ tokenPercentage, title }: TokenBadgeProps) {
 }
 
 /**
- * ModelSelectorButton component for the main selector button
+ * ModelSelectorButton 组件 - 模型选择器主按钮
+ *
+ * 显示当前选中的模型名称和下拉箭头图标
+ * 点击后打开/关闭模型选择下拉菜单
  */
 interface ModelSelectorButtonProps {
+  // 模型列表是否已加载完成
   isModelsLoaded: boolean;
+  // 当前选中的模型对象
   currentModel: import('./ModelSelector').ModelOption | null;
+  // 下拉菜单是否打开
   isOpen: boolean;
+  // 按钮是否禁用（加载中或不可用）
   disabled: boolean;
+  // 按钮点击回调
   onClick: () => void;
 }
 
 function ModelSelectorButton({ isModelsLoaded, currentModel, isOpen, disabled, onClick }: ModelSelectorButtonProps) {
+  // 获取按钮的样式类名（包含禁用状态样式）
   const buttonClasses = getButtonClasses(disabled);
 
   return (
@@ -58,12 +79,15 @@ function ModelSelectorButton({ isModelsLoaded, currentModel, isOpen, disabled, o
       disabled={disabled}
       className={buttonClasses}
     >
+      {/* 显示电脑图标（表示模型/硬件） */}
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
       </svg>
+      {/* 显示当前模型名称或加载状态 */}
       <span className="text-sm font-medium">
         {isModelsLoaded ? (currentModel?.name || 'Loading...') : 'Loading models...'}
       </span>
+      {/* 下拉箭头图标（禁用状态不显示，打开时旋转 180 度） */}
       {!disabled && (
         <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -184,6 +208,7 @@ interface ModelSelectorProps {
   tokenBudget?: TokenBudget | null;
 }
 
+// 由父组件调用，React 组件或常量：ModelSelector
 /**
  * ModelSelector Component
  */

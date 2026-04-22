@@ -35,8 +35,10 @@ interface FileReferenceMenuProps {
 
 /**
  * Get file icon color based on extension
+ * 根据文件扩展名返回对应的 Tailwind CSS 颜色类名
  */
 function getFileIconColor(extension: string): string {
+  // 文件扩展名到颜色的映射表
   const colorMap: Record<string, string> = {
     'js': 'text-yellow-500',
     'jsx': 'text-yellow-500',
@@ -53,6 +55,7 @@ function getFileIconColor(extension: string): string {
     'txt': 'text-gray-400',
   };
 
+  // 返回对应扩展名的颜色，未匹配时使用灰色
   return colorMap[extension] || 'text-gray-400';
 }
 

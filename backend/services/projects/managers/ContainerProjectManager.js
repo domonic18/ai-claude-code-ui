@@ -15,6 +15,7 @@ import { loadProjectConfig } from '../config/index.js';
 import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('services/projects/managers/ContainerProjectManager');
 
+// ContainerProjectManager.js 功能函数
 /**
  * 从 Docker 多路复用流中收集 stdout 输出
  * Docker exec 返回的流包含 8 字节帧头（streamType + length），
@@ -36,6 +37,7 @@ function _collectStreamOutput(stream) {
   });
 }
 
+// ContainerProjectManager.js 功能函数
 /**
  * 创建项目条目对象
  * @param {string} projectName - 项目名称
@@ -56,6 +58,7 @@ function createProjectEntry(projectName, displayName) {
   };
 }
 
+// ContainerProjectManager.js 功能函数
 /**
  * 从 ls 输出解析项目列表
  * @param {string} output - 命令输出
@@ -77,6 +80,7 @@ function parseProjectList(output, projectConfig) {
   return projectList;
 }
 
+// ContainerProjectManager.js 功能函数
 /**
  * 在容器内创建默认工作区
  * @param {number} userId - 用户 ID
@@ -101,6 +105,7 @@ async function createDefaultWorkspace(userId, workspacePath) {
   }
 }
 
+// ContainerProjectManager.js 功能函数
 /**
  * 加载项目列表的会话信息
  * @param {number} userId - 用户 ID
@@ -119,6 +124,7 @@ async function loadProjectSessions(userId, projectList) {
   }
 }
 
+// 由 GET /api/projects 调用，在 Docker 容器中执行 find 命令发现项目
 /**
  * 从容器内获取项目列表
  * @param {number} userId - 用户 ID

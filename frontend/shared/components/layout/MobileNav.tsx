@@ -1,3 +1,4 @@
+// 移动端底部导航栏：在聊天和文件浏览器之间切换，输入框聚焦时自动隐藏避免遮挡
 import React from 'react';
 import { MessageSquare, Folder } from 'lucide-react';
 
@@ -16,6 +17,7 @@ interface NavItem {
 }
 
 function MobileNav({ activeTab, setActiveTab, isInputFocused }: MobileNavProps) {
+  // 底部 tab 配置，当前仅聊天和文件两个入口
   const navItems: NavItem[] = [
     {
       id: 'chat',
@@ -44,6 +46,7 @@ function MobileNav({ activeTab, setActiveTab, isInputFocused }: MobileNavProps) 
             <button
               key={item.id}
               onClick={item.onClick}
+              // onTouchStart 先于 onClick 触发，减少移动端 300ms 点击延迟
               onTouchStart={(e) => {
                 e.preventDefault();
                 item.onClick();
@@ -57,6 +60,7 @@ function MobileNav({ activeTab, setActiveTab, isInputFocused }: MobileNavProps) 
             >
               <Icon className="w-5 h-5" />
               {isActive && (
+                // 激活态底部蓝色指示条，替代传统文字标签的视觉反馈
                 <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-6 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full" />
               )}
             </button>

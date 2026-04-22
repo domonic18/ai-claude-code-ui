@@ -43,6 +43,7 @@ export const STORAGE_KEYS = {
   SELECTED_PROVIDER: 'selected-provider',
 } as const;
 
+// Provider 的类型别名定义
 /**
  * Providers
  */
@@ -53,6 +54,7 @@ export const PROVIDERS = {
   OPENCODE: 'opencode',
 } as const;
 
+// Provider 的类型别名定义
 /**
  * Provider type
  */

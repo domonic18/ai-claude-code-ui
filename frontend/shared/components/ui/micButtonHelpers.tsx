@@ -27,6 +27,7 @@ export {
 
 export type MicState = 'idle' | 'recording' | 'transcribing' | 'processing';
 
+// SupportCheckResult 的类型定义
 /**
  * 支持性检查结果接口
  */
@@ -60,6 +61,7 @@ export function checkMicrophoneSupport(): SupportCheckResult {
   };
 }
 
+// ButtonAppearance 的类型定义
 /**
  * 按钮外观配置接口
  */

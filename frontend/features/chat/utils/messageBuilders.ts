@@ -9,7 +9,7 @@ import type { ChatMessage } from '../types';
 import type { ToolResultData } from './messageDispatchers';
 import { unescapeWithMathProtection } from './stringProcessors';
 
-/** Generate unique message ID */
+/** 生成唯一的消息 ID，使用时间戳和随机数确保唯一性 */
 function makeMsgId(): string {
   return `msg-${Date.now()}-${Math.random()}`;
 }
@@ -21,10 +21,12 @@ function makeMsgId(): string {
  * @returns ChatMessage object
  */
 export function buildTextPart(part: any, msg: any): ChatMessage {
+  // 反转义文本内容（处理 \n、\t 等转义字符），同时保护数学公式不被破坏
   const text = typeof part.text === 'string'
     ? unescapeWithMathProtection(part.text)
     : part.text;
 
+  // 构建标准的文本消息对象
   return {
     id: msg.id || makeMsgId(),
     type: 'assistant',
@@ -45,8 +47,10 @@ export function buildToolUsePart(
   msg: any,
   toolResults: Map<string, ToolResultData>
 ): ChatMessage {
+  // 从工具结果映射表中获取该工具调用的执行结果
   const toolResult = toolResults.get(part.id);
 
+  // 构建工具调用消息对象，包含工具名称、输入参数和执行结果
   return {
     id: msg.id || makeMsgId(),
     type: 'assistant',
@@ -56,6 +60,7 @@ export function buildToolUsePart(
     toolName: part.name,
     toolInput: JSON.stringify(part.input),
     toolResult: toolResult ? {
+      // 将结果内容转换为字符串格式
       content: typeof toolResult.content === 'string' ? toolResult.content : JSON.stringify(toolResult.content),
       isError: toolResult.isError,
       toolUseResult: toolResult.toolUseResult

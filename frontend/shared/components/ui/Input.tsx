@@ -1,3 +1,4 @@
+// 输入框组件：shadcn/ui 风格的受控输入，统一 focus ring、placeholder、disabled 等样式
 import * as React from "react"
 import { cn } from "@/lib/utils"
 

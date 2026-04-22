@@ -9,6 +9,7 @@
 const MEMORY_START = '--- Memory Context ---';
 const MEMORY_END = '--- End Memory Context ---';
 
+// 工具函数，供多个模块调用
 /**
  * Remove memory context from text.
  * Memory context format: --- Memory Context ---\n...content...\n--- End Memory Context ---
@@ -35,3 +36,4 @@ export function filterMemoryContext(text) {
 
   return text;
 }
+

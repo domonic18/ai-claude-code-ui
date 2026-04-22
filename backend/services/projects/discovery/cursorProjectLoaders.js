@@ -13,6 +13,7 @@ import { loadSessionFromDatabase } from './cursorSessionLoaders.js';
 import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('services/projects/discovery/cursorProjectLoaders');
 
+// 在扫描 Cursor 项目时调用，从哈希目录加载项目元数据
 /**
  * 从哈希目录加载项目
  * @param {string} hashDir - 哈希目录名
@@ -64,6 +65,7 @@ export async function loadProjectFromHash(hashDir, cursorChatsRoot, normalizePro
   }
 }
 
+// 在获取项目会话时调用，从目录中加载所有会话文件
 /**
  * 从会话目录加载所有会话
  * @param {string} cursorChatsPath - Cursor chats 路径

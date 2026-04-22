@@ -1,3 +1,4 @@
+// 设置页通用校验：权限配置和工具模式匹配规则校验
 export type { ValidationResult } from './mcpServerValidators';
 export { validateMcpServer, validateMcpServerJson } from './mcpServerValidators';
 
@@ -30,6 +31,7 @@ export function validatePermissions(data: {
   return { valid: errors.length === 0, errors };
 }
 
+// 工具模式仅允许字母数字通配符和括号，防止注入非法字符
 export function validateToolPattern(pattern: string): ValidationResult {
   const errors: string[] = [];
   if (!pattern || typeof pattern !== 'string') {

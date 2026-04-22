@@ -26,6 +26,7 @@ const logger = createLogger('controllers/api/FileController');
  * File controller
  */
 export class FileController extends BaseController {
+// 处理业务逻辑，供路由层调用
   /**
    * Constructor
    * @param {Object} dependencies - Dependency injection object
@@ -35,6 +36,7 @@ export class FileController extends BaseController {
     this.fileOpsService = dependencies.fileOpsService || new FileOperationsService();
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * Reads file
    * @param {Object} req - Express request object
@@ -58,6 +60,7 @@ export class FileController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * Writes file
    * @param {Object} req - Express request object
@@ -85,6 +88,7 @@ export class FileController extends BaseController {
     }
   }
 
+// 获取资源，供路由层调用
   /**
    * Gets file tree
    * @param {Object} req - Express request object
@@ -105,6 +109,7 @@ export class FileController extends BaseController {
     }
   }
 
+// 获取资源，供路由层调用
   /**
    * Gets file stats
    * @param {Object} req - Express request object
@@ -127,6 +132,7 @@ export class FileController extends BaseController {
     }
   }
 
+// 删除资源，供路由层调用
   /**
    * Deletes file
    * @param {Object} req - Express request object
@@ -153,6 +159,7 @@ export class FileController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * Renames file or directory
    * @param {Object} req - Express request object
@@ -177,6 +184,7 @@ export class FileController extends BaseController {
     }
   }
 
+// 创建新资源，供路由层调用
   /**
    * Creates directory
    * @param {Object} req - Express request object
@@ -204,6 +212,7 @@ export class FileController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * Moves file or directory
    * @param {Object} req - Express request object
@@ -236,6 +245,7 @@ export class FileController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * Checks if file exists
    * @param {Object} req - Express request object
@@ -258,6 +268,7 @@ export class FileController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * Serves file content (for images and other binary files)
    * @param {Object} req - Express request object
@@ -285,6 +296,7 @@ export class FileController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * Uploads file attachment
    * Supported types: .docx, .pdf, .md, .txt
@@ -313,6 +325,7 @@ export class FileController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * Downloads file (for binary files like docx, pdf, etc.)
    * Reads file from container and returns as binary stream
@@ -343,3 +356,4 @@ export class FileController extends BaseController {
 }
 
 export default FileController;
+

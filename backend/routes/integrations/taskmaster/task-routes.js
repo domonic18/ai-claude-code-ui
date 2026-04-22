@@ -92,6 +92,7 @@ router.get('/detect/:projectName', async (req, res) => {
     }
 });
 
+// 定义 HTTP 路由处理器
 /**
  * GET /detect-all
  * 检测所有已知项目的 TaskMaster 配置（容器模式）
@@ -207,3 +208,4 @@ router.get('/tasks/:projectName', async (req, res) => {
 });
 
 export default router;
+

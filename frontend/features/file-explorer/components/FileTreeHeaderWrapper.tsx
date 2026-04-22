@@ -22,6 +22,7 @@ interface FileTreeHeaderWrapperProps {
   onCloseNewMenu: () => void;
 }
 
+// 由父组件调用，React 组件或常量：FileTreeHeaderWrapper
 /**
  * File tree header wrapper with event handling
  */

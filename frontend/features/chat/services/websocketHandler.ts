@@ -9,6 +9,13 @@
  * - cursorHandler.ts  - Cursor system/tool-use/error/result/output
  * - codexHandler.ts   - Codex response/complete
  * - sessionHandler.ts - Session lifecycle, token-budget, memory-context, TodoWrite
+ *
+ * 消息路由流程：
+ * 1. 接收 WebSocket 消息
+ * 2. 检查会话 ID 过滤（防止跨会话消息干扰）
+ * 3. 根据消息类型查找对应的处理器
+ * 4. 调用处理器并传递回调函数
+ * 5. 处理器通过回调更新前端状态
  */
 
 import { logger } from '@/shared/utils/logger';
@@ -30,6 +37,8 @@ import type { MessageHandlerCallbacks } from './types';
 /**
  * Message type → handler lookup table
  * Maps each WebSocket message type to its corresponding handler function
+ *
+ * 消息类型到处理器的映射表，每种消息类型都有专门的处理器
  */
 const MESSAGE_HANDLERS: Record<string, (message: WebSocketMessage, callbacks: MessageHandlerCallbacks, currentSessionId: string | null) => boolean> = {
   'session-start': (msg) => { logger.info(`Session started:`, msg.sessionId); return true; },
@@ -56,6 +65,11 @@ const MESSAGE_HANDLERS: Record<string, (message: WebSocketMessage, callbacks: Me
 
 /**
  * Check if message should be filtered by session ID
+ *
+ * 检查消息是否应该被会话 ID 过滤掉
+ * 全局消息（projects_updated, session-created, claude-complete, codex-complete）不过滤
+ * 其他消息必须匹配当前会话 ID 才能通过
+ *
  * @param message - WebSocket message to check
  * @param currentSessionId - Current active session ID
  * @returns true if message should be filtered (skipped)
@@ -71,6 +85,12 @@ function shouldFilterBySession(message: WebSocketMessage, currentSessionId: stri
 /**
  * Handle WebSocket message and return whether it was processed
  *
+ * 处理 WebSocket 消息的主入口函数：
+ * 1. 获取当前会话 ID
+ * 2. 检查消息是否应该被过滤（跨会话消息）
+ * 3. 查找对应的消息处理器
+ * 4. 调用处理器并返回处理结果
+ *
  * @param message - WebSocket message to process
  * @param callbacks - Callback functions for state updates
  * @returns true if message was processed, false if it should be ignored
@@ -79,19 +99,23 @@ export function handleWebSocketMessage(
   message: WebSocketMessage,
   callbacks: MessageHandlerCallbacks
 ): boolean {
+  // 获取当前活跃会话 ID
   const currentSessionId = callbacks.getCurrentSessionId();
 
   // Filter messages by session ID to prevent cross-session interference
+  // 根据会话 ID 过滤消息，防止跨会话消息干扰
   if (shouldFilterBySession(message, currentSessionId)) {
     logger.info(`\u23ed\ufe0f Skipping message for different session:`, message.sessionId, 'current:', currentSessionId);
     return false;
   }
 
+  // 查找对应的消息处理器
   const handler = MESSAGE_HANDLERS[message.type];
   if (!handler) {
     logger.info('Unknown message type:', message.type);
     return false;
   }
 
+  // 调用处理器并返回处理结果
   return handler(message, callbacks, currentSessionId);
 }

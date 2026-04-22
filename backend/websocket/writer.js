@@ -12,6 +12,7 @@
  * 由 AI 提供商用于发送流式响应
  */
 export class WebSocketWriter {
+// WebSocket 消息或事件处理
     /**
      * 创建新的 WebSocket 写入器
      * @param {WebSocket} ws - 要包装的 WebSocket 连接
@@ -22,6 +23,7 @@ export class WebSocketWriter {
         this.isWebSocketWriter = true;  // 传输检测标记
     }
 
+// WebSocket 消息或事件处理
     /**
      * 通过 WebSocket 发送数据
      * @param {Object} data - 要发送的数据对象（将被 JSON 序列化）
@@ -33,6 +35,7 @@ export class WebSocketWriter {
         }
     }
 
+// WebSocket 消息或事件处理
     /**
      * 设置此写入器的会话 ID
      * @param {string} sessionId - 会话标识符
@@ -41,6 +44,7 @@ export class WebSocketWriter {
         this.sessionId = sessionId;
     }
 
+// WebSocket 消息或事件处理
     /**
      * 获取当前会话 ID
      * @returns {string|null} 会话 ID，如果未设置则返回 null
@@ -49,3 +53,4 @@ export class WebSocketWriter {
         return this.sessionId;
     }
 }
+

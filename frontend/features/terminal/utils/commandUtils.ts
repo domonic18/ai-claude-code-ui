@@ -1,20 +1,27 @@
 /**
  * Command Utilities
  *
- * Functions for parsing, formatting, and validating shell commands.
+ * 命令行工具函数模块
+ *
+ * 提供命令解析、格式化和验证的工具函数集：
+ * 1. 格式化命令（带参数引用）
+ * 2. 解析命令字符串（支持引号和转义）
+ * 3. 转义 Shell 特殊字符
+ * 4. 验证危险命令模式
+ * 5. 截断长命令用于显示
+ * 6. 检测 Shell 内置命令
  */
 
 /**
- * Format command with arguments for display
- * @param command - Command name
- * @param args - Optional arguments array
- * @returns Formatted command string
+ * 格式化命令及其参数用于显示
+ * 自动为包含空格或特殊字符的参数添加引号
  */
 export function formatCommand(command: string, args?: string[]): string {
   if (!args || args.length === 0) {
     return command;
   }
 
+  // 为包含空格或特殊字符的参数添加引号
   const formattedArgs = args.map(arg => {
     if (/\s/.test(arg) || /^[^a-zA-Z0-9/_-]$/.test(arg)) {
       return `"${arg.replace(/"/g, '\\"')}"`;
@@ -26,16 +33,17 @@ export function formatCommand(command: string, args?: string[]): string {
 }
 
 /**
- * Parse command string into command and arguments
- * @param commandString - Raw command string
- * @returns Parsed command and args
+ * 解析命令字符串为命令名和参数数组
+ * 支持单引号、双引号和转义字符
  */
 export function parseCommand(commandString: string): { command: string; args: string[] } {
+  // 匹配非空白字符或引号包围的字符串
   const regex = /[^\s"']+|"([^"]*)"|'([^']*)'/g;
   const matches: string[] = [];
   let match;
 
   while ((match = regex.exec(commandString)) !== null) {
+    // 提取引号内容或直接使用匹配的文本
     matches.push(match[1] !== undefined ? match[1] : (match[2] !== undefined ? match[2] : match[0]));
   }
 
@@ -50,23 +58,21 @@ export function parseCommand(commandString: string): { command: string; args: st
 }
 
 /**
- * Escape special shell characters
- * @param text - Text to escape
- * @returns Escaped text safe for shell usage
+ * 转义 Shell 特殊字符
+ * 防止命令注入和意外的 Shell 行为
  */
 export function escapeShellChars(text: string): string {
   return text
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/\$/g, '\\$')
-    .replace(/`/g, '\\`')
-    .replace(/!/g, '\\!');
+    .replace(/\\/g, '\\\\')    // 反斜杠
+    .replace(/"/g, '\\"')      // 双引号
+    .replace(/\$/g, '\\$')     // 美元符（变量展开）
+    .replace(/`/g, '\\`')      // 反引号（命令替换）
+    .replace(/!/g, '\\!');     // 感叹号（历史扩展）
 }
 
 /**
- * Validate command for potentially dangerous patterns
- * @param command - Command to validate
- * @returns Validation result with optional error message
+ * 验证命令是否包含危险模式
+ * 检测可能导致系统损坏的命令模式
  */
 export function validateCommand(command: string): {
   valid: boolean;

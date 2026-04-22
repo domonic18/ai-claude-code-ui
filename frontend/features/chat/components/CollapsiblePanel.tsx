@@ -9,16 +9,19 @@ import React, { ReactNode } from 'react';
 export interface CollapsiblePanelProps {
   /** Panel title/summary */
   title: ReactNode;
+// 工具结果渲染、DiffViewer 等组件使用此面板展示可折叠内容
   /** Panel content */
   children: ReactNode;
   /** Whether the panel is open by default */
   defaultOpen?: boolean;
+// 工具结果渲染、DiffViewer 等组件使用此面板展示可折叠内容
   /** Additional CSS classes */
   className?: string;
   /** Panel ID */
   id?: string;
 }
 
+// 工具结果渲染、DiffViewer 等组件使用此面板展示可折叠内容
 /**
  * CollapsiblePanel Component
  *

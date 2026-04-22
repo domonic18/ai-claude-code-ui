@@ -44,6 +44,7 @@ import {
 const logger = createLogger('routes/api/git');
 const router = express.Router();
 
+// 定义 HTTP 路由处理器
 /**
  * 通用 Git 路由错误处理包装器
  *
@@ -68,6 +69,7 @@ function gitHandler(handler, errorFormatter) {
     };
 }
 
+// 定义 HTTP 路由处理器
 /**
  * 格式化 git status 错误响应
  * 区分 "不是 git 仓库" 和其他通用错误
@@ -84,6 +86,7 @@ function formatGitStatusError(error) {
     };
 }
 
+// 定义 HTTP 路由处理器
 /**
  * 格式化 initial commit 错误响应
  * 返回含 HTTP 状态码的结构化错误
@@ -101,6 +104,7 @@ function formatInitialCommitError(error) {
     return { status: 500, error: error.message };
 }
 
+// 定义 HTTP 路由处理器
 /**
  * 格式化 file-with-diff 错误响应
  * 目录类型差异查询返回 400，其他返回 500
@@ -115,6 +119,7 @@ function formatFileWithDiffError(error) {
     return { status: 500, error: error.message };
 }
 
+// 定义 HTTP 路由处理器
 /**
  * 带 HTTP 状态码的 Git 路由错误处理包装器
  *
@@ -171,3 +176,4 @@ router.post('/discard', gitHandler(handleDiscard));
 router.post('/delete-untracked', gitHandler(handleDeleteUntracked));
 
 export default router;
+

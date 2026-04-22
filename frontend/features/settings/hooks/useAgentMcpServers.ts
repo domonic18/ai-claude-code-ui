@@ -95,6 +95,7 @@ async function saveMcpServer(
   }
 }
 
+// 由组件调用，自定义 Hook：useAgentMcpServers
 /**
  * Custom hook to manage MCP servers
  * @returns {UseAgentMcpServersReturn} MCP server state and handlers

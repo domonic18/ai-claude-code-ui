@@ -12,6 +12,7 @@ import { PTY_TIMEOUTS } from '../../config/config.js';
 
 const logger = createLogger('services/container/ptySessionManagement');
 
+// 当用户关闭终端或会话超时时调用
 /**
  * Clean up a PTY session
  * @param {string} sessionId - Session ID
@@ -27,7 +28,7 @@ export async function cleanupPtySession(sessionId, ptyStreams, ptySessions) {
     const { stream, exec } = sessionData;
 
     try {
-      // Close stream
+      // 关闭流
       if (stream && !stream.destroyed) {
         stream.destroy();
       }
@@ -35,22 +36,23 @@ export async function cleanupPtySession(sessionId, ptyStreams, ptySessions) {
       logger.error(`Error closing stream for session ${sessionId}:`, error.message);
     }
 
-    // Remove from streams map
+    // 从流映射中删除
     ptyStreams.delete(sessionId);
   }
 
   if (session) {
-    // Mark session as ended
+    // 标记会话为已结束
     session.status = 'ended';
     session.endedAt = new Date();
 
-    // Remove from sessions map
+    // 从会话映射中删除
     ptySessions.delete(sessionId);
   }
 
   return true;
 }
 
+// 由 PTY 信息端点调用以返回会话详情
 /**
  * Get PTY session info (helper function)
  * @param {string} sessionId - Session ID
@@ -61,6 +63,7 @@ export function getPtySessionInfoHelper(sessionId, ptySessions) {
   return ptySessions.get(sessionId);
 }
 
+// 由管理 API 调用以列出所有活动的 PTY 会话
 /**
  * Get all active PTY sessions (helper function)
  * @param {Map} ptySessions - Map of PTY sessions
@@ -71,6 +74,7 @@ export function getActivePtySessionsHelper(ptySessions) {
     .filter(session => session.status === 'active');
 }
 
+// 由用户会话列表端点调用
 /**
  * Get PTY sessions by user ID (helper function)
  * @param {number} userId - User ID
@@ -82,6 +86,7 @@ export function getPtySessionsByUserIdHelper(userId, ptySessions) {
     .filter(session => session.userId === userId);
 }
 
+// 当用户登出或账户被删除时调用
 /**
  * End all PTY sessions for a user (helper function)
  * @param {number} userId - User ID

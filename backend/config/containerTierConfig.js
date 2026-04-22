@@ -31,6 +31,7 @@ export const RESOURCE_LIMITS = {
   }
 };
 
+// 获取指定用户层级的资源限制配置，用于容器创建时的资源分配
 /**
  * 获取指定层级的资源限制
  * @param {string} tier - 用户层级 (free, pro, enterprise)
@@ -40,6 +41,7 @@ export function getResourceLimits(tier = 'free') {
   return RESOURCE_LIMITS[tier] || RESOURCE_LIMITS.free;
 }
 
+// 验证资源限制配置对象的完整性和数据类型正确性
 /**
  * 验证资源限制配置
  * @param {Object} limits - 资源限制对象

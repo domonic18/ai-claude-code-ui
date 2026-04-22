@@ -1,23 +1,48 @@
+// React 核心库导入
 import React, { useState } from 'react';
+// React Router 导航钩子
 import { useNavigate } from 'react-router-dom';
+// 国际化翻译钩子
 import { useTranslation } from 'react-i18next';
+// 认证上下文钩子
 import { useAuth } from '@/shared/contexts/AuthContext';
+// 注册表单布局组件
 import { SetupFormLayout } from './SetupFormLayout';
 
+// 常量定义：表单验证规则
+const VALIDATION_RULES = {
+  MIN_USERNAME_LENGTH: 3,  // 用户名最小长度
+  MIN_PASSWORD_LENGTH: 6   // 密码最小长度
+};
+
 /**
- * Registration form fields component
+ * 注册表单字段组件的属性接口
  */
 export interface RegistrationFormFieldsProps {
+  /** 用户名输入值 */
   username: string;
+  /** 密码输入值 */
   password: string;
+  /** 确认密码输入值 */
   confirmPassword: string;
+  /** 是否处于加载状态 */
   isLoading: boolean;
+  /** 用户名变更回调 */
   onUsernameChange: (value: string) => void;
+  /** 密码变更回调 */
   onPasswordChange: (value: string) => void;
+  /** 确认密码变更回调 */
   onConfirmPasswordChange: (value: string) => void;
+  /** 国际化翻译函数 */
   t: (key: string) => string;
 }
 
+/**
+ * 注册表单字段组件
+ *
+ * 渲染用户名、密码和确认密码三个输入字段。
+ * 字段带有适当的标签、占位符和自动完成属性。
+ */
 export function RegistrationFormFields({
   username,
   password,
@@ -30,6 +55,7 @@ export function RegistrationFormFields({
 }: RegistrationFormFieldsProps) {
   return (
     <>
+      {/* 用户名输入字段 */}
       <div>
         <label htmlFor="username" className="block text-sm font-medium text-foreground mb-1">
           {t('login.username')}
@@ -47,6 +73,7 @@ export function RegistrationFormFields({
         />
       </div>
 
+      {/* 密码输入字段 */}
       <div>
         <label htmlFor="password" className="block text-sm font-medium text-foreground mb-1">
           {t('register.password')}
@@ -64,6 +91,7 @@ export function RegistrationFormFields({
         />
       </div>
 
+      {/* 确认密码输入字段 */}
       <div>
         <label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground mb-1">
           {t('register.confirmPassword')}
@@ -84,8 +112,22 @@ export function RegistrationFormFields({
   );
 }
 
+// 常量定义：错误消息键名
+const ERROR_KEYS = {
+  PASSWORD_MISMATCH: 'register.passwordMismatch',
+  USERNAME_TOO_SHORT: 'register.usernameTooShort',
+  PASSWORD_TOO_SHORT: 'register.passwordTooShort'
+};
+
 /**
- * Validate registration form
+ * 验证注册表单数据
+ *
+ * 检查密码是否匹配、用户名长度、密码长度等验证规则。
+ * @param {string} username - 用户名
+ * @param {string} password - 密码
+ * @param {string} confirmPassword - 确认密码
+ * @param {Function} t - 国际化翻译函数
+ * @returns {string | null} 验证错误消息，验证通过返回 null
  */
 function validateRegistrationForm(
   username: string,
@@ -93,50 +135,100 @@ function validateRegistrationForm(
   confirmPassword: string,
   t: (key: string) => string
 ): string | null {
+  // 检查两次输入的密码是否一致
   if (password !== confirmPassword) {
     return t('register.passwordMismatch');
   }
 
+  // 验证用户名长度至少为 3 个字符
   if (username.length < 3) {
     return t('register.usernameTooShort');
   }
 
+  // 验证密码长度至少为 6 个字符
   if (password.length < 6) {
     return t('register.passwordTooShort');
   }
 
+  // 所有验证通过
   return null;
 }
 
+/**
+ * SetupForm 主组件
+ *
+ * 处理初始用户注册的完整流程，包括表单状态管理、验证和提交。
+ * 注册成功后自动跳转到聊天页面。
+ */
 const SetupForm: React.FC = () => {
+  // 国际化翻译钩子，用于多语言支持
   const { t } = useTranslation();
+  // 路由导航钩子，用于注册成功后跳转
   const navigate = useNavigate();
+
+  // 表单状态：用户名输入
   const [username, setUsername] = useState('');
+  // 表单状态：密码输入
   const [password, setPassword] = useState('');
+  // 表单状态：确认密码输入（用于验证两次密码一致）
   const [confirmPassword, setConfirmPassword] = useState('');
+  // 表单状态：加载中标志（用于注册按钮的 loading 状态）
   const [isLoading, setIsLoading] = useState(false);
+  // 表单状态：错误消息（显示注册失败原因）
   const [error, setError] = useState('');
 
+  // 从认证上下文获取注册方法（用于表单提交时调用）
   const { register } = useAuth();
 
+  // 用户名输入变更处理函数（当用户在用户名字段输入时调用）
+  const handleUsernameChange = (value: string) => {
+    setUsername(value);
+  };
+
+  // 密码输入变更处理函数（当用户在密码字段输入时调用）
+  const handlePasswordChange = (value: string) => {
+    setPassword(value);
+  };
+
+  // 确认密码输入变更处理函数（当用户在确认密码字段输入时调用）
+  const handleConfirmPasswordChange = (value: string) => {
+    setConfirmPassword(value);
+  };
+
+  // 返回登录页面处理函数（当用户点击"返回登录"链接时调用）
+  const handleBackToLogin = () => {
+    navigate('/login');
+  };
+
+  /**
+   * 处理表单提交事件
+   * 执行客户端验证，然后调用注册 API
+   */
   const handleSubmit = async (e: React.FormEvent) => {
+    // 阻止表单默认提交行为（防止页面刷新）
     e.preventDefault();
+    // 清空之前的错误消息（避免显示旧的错误信息）
     setError('');
 
+    // 执行客户端表单验证（检查密码一致性、用户名长度等）
     const validationError = validateRegistrationForm(username, password, confirmPassword, t);
     if (validationError) {
+      // 验证失败，显示错误消息并中止提交流程
       setError(validationError);
       return;
     }
 
+    // 验证通过，进入加载状态（显示 loading 动画）
     setIsLoading(true);
 
+    // 调用认证上下文的注册方法（发送请求到后端 API）
     const result = await register(username, password);
 
     if (result.success) {
-      // Redirect to chat page on successful registration
+      // 注册成功：跳转到聊天页面（自动登录）
       navigate('/chat');
     } else {
+      // 注册失败：显示错误消息并退出加载状态（允许用户重试）
       setError(result.error || t('register.failed'));
       setIsLoading(false);
     }
@@ -149,11 +241,11 @@ const SetupForm: React.FC = () => {
       confirmPassword={confirmPassword}
       isLoading={isLoading}
       error={error}
-      onUsernameChange={setUsername}
-      onPasswordChange={setPassword}
-      onConfirmPasswordChange={setConfirmPassword}
+      onUsernameChange={handleUsernameChange}
+      onPasswordChange={handlePasswordChange}
+      onConfirmPasswordChange={handleConfirmPasswordChange}
       onSubmit={handleSubmit}
-      onBackToLogin={() => navigate('/login')}
+      onBackToLogin={handleBackToLogin}
       t={t}
     />
   );

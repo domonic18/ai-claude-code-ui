@@ -16,6 +16,7 @@ const BLOCKED_ENV_PREFIXES = [
   'LIB', 'APPIMAGE', 'ELECTRON_', 'CHROME_',
 ];
 
+// 定义 HTTP 路由处理器
 /**
  * Filter out dangerous environment variables from user input.
  * @param {Object} env - User-provided environment variables
@@ -43,6 +44,7 @@ export function sanitizeEnvVars(env) {
   return safe;
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Validate MCP server name format
  * @param {string} name - Server name to validate
@@ -55,6 +57,7 @@ export function isValidServerName(name) {
   return /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/.test(name);
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Validate MCP scope
  * @param {string} scope - Scope to validate
@@ -64,6 +67,7 @@ export function isValidScope(scope) {
   return ['user', 'local', 'global'].includes(scope);
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Validate MCP server configuration based on type
  * @param {Object} config - Parsed configuration
@@ -93,3 +97,4 @@ export function validateMcpConfig(config) {
 
   return null;
 }
+

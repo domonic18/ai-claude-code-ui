@@ -1,3 +1,4 @@
+// Markdown 实时预览面板：使用 ReactMarkdown + KaTeX 渲染，通过 DOMPurify 防止 XSS
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -10,6 +11,9 @@ interface CodeEditorPreviewProps {
     previewMode: 'edit' | 'preview' | 'split';
 }
 
+/**
+ * Markdown 实时预览面板：使用 ReactMarkdown + KaTeX 渲染，通过 DOMPurify 防止 XSS
+ */
 export function CodeEditorPreview({ content, previewMode }: CodeEditorPreviewProps) {
     if (previewMode === 'edit') {
         return null;
@@ -25,6 +29,7 @@ export function CodeEditorPreview({ content, previewMode }: CodeEditorPreviewPro
                         components={{
                             code: ({node, className, children, ...props}: any) => {
                                 const match = /language-(\w+)/.exec(className || '');
+                                // 无 language class 时判定为行内代码，使用内联样式而非代码块
                                 const isInline = !className && !match;
                                 return isInline ? (
                                     <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-sm" {...props}>

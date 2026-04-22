@@ -22,6 +22,7 @@ const logger = createLogger('services/scm/GitHubService');
 
 // ─── URL 解析工具 ──────────────────────────────────────
 
+// GitHubService.js 功能函数
 /**
  * 规范化 GitHub URL 以进行比较
  * @param {string} url - GitHub URL
@@ -34,6 +35,7 @@ export function normalizeGitHubUrl(url) {
     return normalized.toLowerCase();
 }
 
+// GitHubService.js 功能函数
 /**
  * 解析 GitHub URL 以提取 owner 和 repo
  * @param {string} url - GitHub URL（HTTPS 或 SSH）
@@ -53,6 +55,7 @@ export function parseGitHubUrl(url) {
 
 // ─── 分支名工具 ────────────────────────────────────────
 
+// GitHubService.js 功能函数
 /**
  * 从消息自动生成分支名称
  * @param {string} message - 代理消息
@@ -92,6 +95,7 @@ export function autogenerateBranchName(message) {
     return branchName;
 }
 
+// GitHubService.js 功能函数
 /**
  * 验证 Git 分支名称是否合法
  * @param {string} branchName - 要验证的分支名称
@@ -130,6 +134,7 @@ export function validateBranchName(branchName) {
 
 // ─── 清理 ──────────────────────────────────────────────
 
+// GitHubService.js 功能函数
 /**
  * 清理关联的 Claude 会话目录
  * @param {string|null} sessionId - 会话 ID
@@ -144,6 +149,7 @@ async function cleanupSessionDir(sessionId) {
     }
 }
 
+// GitHubService.js 功能函数
 /**
  * 清理临时项目目录及其 Claude 会话
  * @param {string} projectPath - 项目目录路径

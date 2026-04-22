@@ -17,6 +17,7 @@ import {
   getBranches
 } from '../../services/scm/index.js';
 
+// 定义 HTTP 路由处理器
 /**
  * Handle git status request
  */
@@ -27,6 +28,7 @@ export async function handleGetStatus(req, res) {
   res.json(await getStatus(projectPath));
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Handle git diff request
  */
@@ -37,6 +39,7 @@ export async function handleGetDiff(req, res) {
   res.json({ diff: await getFileDiff(projectPath, file) });
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Handle file with diff request
  */
@@ -47,6 +50,7 @@ export async function handleGetFileWithDiff(req, res) {
   res.json(await getFileWithDiff(projectPath, file));
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Handle branches request
  */
@@ -57,6 +61,7 @@ export async function handleGetBranches(req, res) {
   res.json({ branches: await getBranches(projectPath) });
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Handle commits request
  */
@@ -68,6 +73,7 @@ export async function handleGetCommits(req, res) {
   res.json({ commits: await getCommits(projectPath, safeLimit) });
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Handle commit diff request
  */
@@ -78,6 +84,7 @@ export async function handleGetCommitDiff(req, res) {
   res.json({ diff: await getCommitDiff(projectPath, commit) });
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Handle remote status request
  */
@@ -87,3 +94,4 @@ export async function handleGetRemoteStatus(req, res) {
   const projectPath = await resolveProjectPath(project);
   res.json(await getRemoteStatus(projectPath));
 }
+

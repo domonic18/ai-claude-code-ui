@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 
 export type CategoryType = 'permissions' | 'mcp';
 
+// Agent 设置页面的类别标签切换组件，用于在权限和 MCP 服务器之间切换
 interface CategoryTabsProps {
   selectedCategory: CategoryType;
   onSelectCategory: (category: CategoryType) => void;

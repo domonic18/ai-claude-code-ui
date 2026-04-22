@@ -38,6 +38,7 @@ const PUBLISH_DETAIL_OVERRIDES = {
     'does not appear to be a git repository': 'Remote repository not properly configured. Check your remote URL.',
 };
 
+// 定义 HTTP 路由处理器
 /**
  * 通用 Git 错误分类
  * @param {Error} error - 原始错误对象
@@ -116,3 +117,4 @@ export {
     classifyPublishError,
     classifyPublishDetails,
 };
+

@@ -16,6 +16,7 @@ import { createLogger } from '../utils/logger.js';
 
 const logger = createLogger('websocket/server');
 
+// WebSocket 消息或事件处理
 /**
  * 创建并配置 WebSocket 服务器
  * @param {http.Server} server - 要附加 WebSocket 的 HTTP 服务器
@@ -86,3 +87,4 @@ export function createWebSocketServer(server, connectedClients, ptySessionsMap) 
 
     return wss;
 }
+

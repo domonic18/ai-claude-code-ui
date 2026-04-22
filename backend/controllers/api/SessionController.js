@@ -15,6 +15,7 @@ import { NotFoundError, ValidationError } from '../../middleware/error-handler.m
  * 会话控制器
  */
 export class SessionController extends BaseController {
+// 处理业务逻辑，供路由层调用
   /**
    * 构造函数
    * @param {Object} dependencies - 依赖注入对象
@@ -24,6 +25,7 @@ export class SessionController extends BaseController {
     this.claudeDiscovery = dependencies.claudeDiscovery || new ClaudeDiscovery();
   }
 
+// 获取资源，供路由层调用
   /**
    * 获取会话列表
    * @param {Object} req - Express 请求对象
@@ -56,6 +58,7 @@ export class SessionController extends BaseController {
     }
   }
 
+// 获取资源，供路由层调用
   /**
    * 获取会话消息
    * @param {Object} req - Express 请求对象
@@ -101,6 +104,7 @@ export class SessionController extends BaseController {
     }
   }
 
+// 删除资源，供路由层调用
   /**
    * 删除会话
    * @param {Object} req - Express 请求对象
@@ -122,6 +126,7 @@ export class SessionController extends BaseController {
     }
   }
 
+// 获取资源，供路由层调用
   /**
    * 获取会话统计
    * @param {Object} req - Express 请求对象
@@ -151,6 +156,7 @@ export class SessionController extends BaseController {
     }
   }
 
+// 处理业务逻辑，供路由层调用
   /**
    * 搜索会话
    * @param {Object} req - Express 请求对象
@@ -187,3 +193,4 @@ export class SessionController extends BaseController {
 }
 
 export default SessionController;
+

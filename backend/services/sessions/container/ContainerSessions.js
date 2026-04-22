@@ -40,6 +40,8 @@ export { listSessionFiles, getProjectDir } from './sessionReader.js';
 
 // ─── 公共 JSONL 工具函数 ────────────────────────────────
 
+// 在返回会话列表前调用，根据 limit 和 offset 参数对数组进行分页
+// ContainerSessions.js 功能函数
 /**
  * 分页辅助函数
  * @param {Array} items - 要分页的数组
@@ -61,6 +63,7 @@ function _paginate(items, limit, offset) {
   };
 }
 
+// ContainerSessions.js 功能函数
 /**
  * 获取项目的会话列表（容器模式）
  * @param {number} userId - 用户 ID
@@ -99,6 +102,7 @@ async function getSessionsInContainer(userId, projectName, limit = 5, offset = 0
   }
 }
 
+// ContainerSessions.js 功能函数
 /**
  * 排序和过滤消息
  * @param {Array} messages - 原始消息数组
@@ -116,6 +120,7 @@ function _sortAndFilterMessages(messages) {
   return messages.map(filterMemoryContextFromEntry);
 }
 
+// ContainerSessions.js 功能函数
 /**
  * 从容器内获取特定会话的消息（支持分页）
  * @param {number} userId - 用户 ID
@@ -160,6 +165,7 @@ async function getSessionMessagesInContainer(userId, projectName, sessionId, lim
 
 // ─── 会话写操作 ──────────────────────────────────────────
 
+// ContainerSessions.js 功能函数
 /**
  * 更新会话摘要（容器模式）
  * @param {number} userId - 用户 ID
@@ -175,6 +181,7 @@ async function updateSessionSummaryInContainerWrapped(userId, projectName, sessi
   });
 }
 
+// 在容器中删除会话
 /**
  * 删除会话（容器模式）
  * @param {number} userId - 用户 ID

@@ -13,6 +13,7 @@ import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('services/scm/gitCommitContext');
 
+// gitCommitContext.js 功能函数
 /**
  * 收集已跟踪文件的 diff 上下文
  * @param {string} projectPath - 项目路径
@@ -30,6 +31,7 @@ export async function collectDiffContext(projectPath, files) {
   return diffContext;
 }
 
+// gitCommitContext.js 功能函数
 /**
  * 收集未跟踪文件的内容作为上下文
  * @param {string} projectPath - 项目路径
@@ -60,6 +62,7 @@ export async function collectUntrackedFileContent(projectPath, files) {
   return content;
 }
 
+// gitCommitContext.js 功能函数
 /**
  * 构建 AI 提交消息生成 prompt
  * @param {string[]} files - 文件列表

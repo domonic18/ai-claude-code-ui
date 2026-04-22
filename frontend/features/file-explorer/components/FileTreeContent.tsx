@@ -42,6 +42,7 @@ export interface FileTreeContentProps {
   onDrop: (item: FileNode | null, e: React.DragEvent) => void;
 }
 
+// 由父组件调用，React 组件或常量：FileTreeContent
 /**
  * File tree main content area
  */

@@ -10,6 +10,7 @@ const logger = createLogger('utils/project-watcher');
  * @module utils/project-watcher
  */
 
+// 工具函数，供多个模块调用
 /**
  * 使用 chokidar 为 Claude 项目文件夹设置文件系统监视器
  * 注意：由于项目现在完全容器化，此函数不执行任何操作。
@@ -23,3 +24,4 @@ export async function setupProjectsWatcher(connectedClients) {
   logger.info('[INFO] 项目在容器内管理，主机文件监视器已禁用');
   return null;
 }
+

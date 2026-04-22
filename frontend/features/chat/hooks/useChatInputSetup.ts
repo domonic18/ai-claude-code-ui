@@ -55,6 +55,7 @@ interface UseChatInputSetupResult {
   menuProps: Record<string, unknown>;
 }
 
+// 由组件调用，自定义 Hook：useChatInputSetup
 /**
  * Hook for setting up ChatInput keyboard and menu configuration
  */

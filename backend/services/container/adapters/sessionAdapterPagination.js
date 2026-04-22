@@ -6,6 +6,7 @@
  * @module container/adapters/sessionAdapterPagination
  */
 
+// SessionAdapter.getSessions 调用此函数按最后活动时间排序会话
 /**
  * Sorts sessions by last activity (most recent first)
  * @param {Array} sessions - Sessions array
@@ -17,6 +18,7 @@ export function sortSessionsByActivity(sessions) {
   );
 }
 
+// SessionAdapter.getSessionMessages 调用此函数按时间戳排序消息
 /**
  * Sorts messages by timestamp (oldest first)
  * @param {Array} messages - Messages array
@@ -30,6 +32,7 @@ export function sortMessagesByTimestamp(messages) {
   });
 }
 
+// SessionAdapter 调用此函数对会话或消息列表应用分页
 /**
  * Applies pagination to an array
  * @param {Array} items - Items to paginate
@@ -48,6 +51,7 @@ export function paginate(items, offset, limit) {
   };
 }
 
+// SessionAdapter.searchSessions 调用此函数按查询搜索会话
 /**
  * Searches sessions by query
  * @param {Array} sessions - Sessions array

@@ -12,6 +12,7 @@ import sqlite3 from 'sqlite3';
 import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('services/projects/discovery/cursorSessionLoaders');
 
+// cursorSessionLoaders.js 功能函数
 /**
  * 解析 Cursor SQLite meta 表的行数据为元数据对象
  * @param {Array<{key: string, value: string}>} metaRows - meta 表原始行
@@ -36,6 +37,7 @@ export function decodeMetaRows(metaRows) {
   return metadata;
 }
 
+// 在获取会话详情时调用，从 SQLite 数据库读取会话数据
 /**
  * 从 Cursor SQLite 数据库加载会话
  * @param {string} cursorChatsPath - Cursor chats 路径
@@ -81,6 +83,7 @@ export async function loadSessionFromDatabase(cursorChatsPath, sessionId) {
   }
 }
 
+// cursorSessionLoaders.js 功能函数
 /**
  * 构建会话对象
  * @param {string} sessionId - 会话 ID

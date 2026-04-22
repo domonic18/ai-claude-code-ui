@@ -14,20 +14,21 @@
  */
 export function getEditorStyles(isDarkMode: boolean): string {
     return `
-        /* Light background for full line changes */
+        /* 删除的整行：浅红色背景 */
         .cm-deletedChunk {
             background-color: ${isDarkMode ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 235, 235, 1)'} !important;
             border-left: 3px solid ${isDarkMode ? 'rgba(239, 68, 68, 0.6)' : 'rgb(239, 68, 68)'} !important;
             padding-left: 4px !important;
         }
 
+        /* 插入的整行：浅绿色背景 */
         .cm-insertedChunk {
             background-color: ${isDarkMode ? 'rgba(34, 197, 94, 0.15)' : 'rgba(230, 255, 237, 1)'} !important;
             border-left: 3px solid ${isDarkMode ? 'rgba(34, 197, 94, 0.6)' : 'rgb(34, 197, 94)'} !important;
             padding-left: 4px !important;
         }
 
-        /* Override linear-gradient underline and use solid darker background for partial changes */
+        /* 部分变更文本：绿色高亮背景 */
         .cm-editor.cm-merge-b .cm-changedText {
             background: ${isDarkMode ? 'rgba(34, 197, 94, 0.4)' : 'rgba(34, 197, 94, 0.3)'} !important;
             padding-top: 2px !important;
@@ -36,6 +37,7 @@ export function getEditorStyles(isDarkMode: boolean): string {
             margin-bottom: -2px !important;
         }
 
+        /* 删除行中的部分变更文本：红色高亮 */
         .cm-editor .cm-deletedChunk .cm-changedText {
             background: ${isDarkMode ? 'rgba(239, 68, 68, 0.4)' : 'rgba(239, 68, 68, 0.3)'} !important;
             padding-top: 2px !important;
@@ -44,12 +46,12 @@ export function getEditorStyles(isDarkMode: boolean): string {
             margin-bottom: -2px !important;
         }
 
-        /* Minimap gutter styling */
+        /* Minimap gutter 背景色 */
         .cm-gutter.cm-gutter-minimap {
             background-color: ${isDarkMode ? '#1e1e1e' : '#f5f5f5'};
         }
 
-        /* Editor toolbar panel styling */
+        /* 编辑器工具栏面板样式 */
         .cm-editor-toolbar-panel {
             padding: 8px 12px;
             background-color: ${isDarkMode ? '#1f2937' : '#ffffff'};
@@ -72,11 +74,13 @@ export function getEditorStyles(isDarkMode: boolean): string {
             transition: background-color 0.2s;
         }
 
+        /* 按钮悬停效果 */
         .cm-diff-nav-btn:hover,
         .cm-toolbar-btn:hover {
             background-color: ${isDarkMode ? '#374151' : '#f3f4f6'};
         }
 
+        /* 禁用按钮样式 */
         .cm-diff-nav-btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;

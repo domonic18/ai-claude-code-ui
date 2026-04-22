@@ -12,6 +12,7 @@ import { createLogger } from '../../../utils/logger.js';
 
 const logger = createLogger('mcp/cliService');
 
+// 定义 HTTP 路由处理器
 /**
  * Execute a Claude CLI command and return the result
  *
@@ -65,6 +66,7 @@ export function executeClaudeCli(args, options = {}) {
   });
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Build CLI arguments for adding an MCP server
  *
@@ -108,6 +110,7 @@ export function buildAddArgs(params) {
   return cliArgs;
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Build CLI arguments for removing an MCP server
  *
@@ -137,3 +140,4 @@ export function buildRemoveArgs(name, scope) {
 
   return { args: cliArgs, actualName };
 }
+

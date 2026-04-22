@@ -6,9 +6,11 @@
  * @module container/adapters/sessionAdapterIo
  */
 
+// SessionAdapter 调用此模块函数从容器读取会话文件
 import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('services/container/adapters/SessionAdapterIo');
 
+// SessionAdapter 调用此函数从 Docker exec 流读取命令输出
 /**
  * Reads command output from stream
  * @param {Object} stream - Command output stream
@@ -32,6 +34,7 @@ export function readCommandOutput(stream) {
   });
 }
 
+// SessionAdapter.getSessions 调用此函数在容器目录中查找所有 JSONL 会话文件
 /**
  * Finds all JSONL session files in a directory
  * @param {Object} containerManager - Container manager instance
@@ -49,6 +52,7 @@ export async function findJsonlSessionFiles(containerManager, userId, sessionsDi
   return output.trim().split('\n').filter(Boolean);
 }
 
+// SessionAdapter 调用此函数解析单个会话文件
 /**
  * Parses a single session file
  * @param {Object} containerManager - Container manager instance
@@ -63,6 +67,7 @@ export async function parseSessionFile(containerManager, userId, filePath, jsonl
   return jsonlParser.parseSessions(content);
 }
 
+// SessionAdapter.getSessionMessages 调用此函数解析特定会话的消息
 /**
  * Parses messages from a session file for a specific session
  * @param {Object} containerManager - Container manager instance
@@ -78,6 +83,7 @@ export async function parseSessionFileMessages(containerManager, userId, filePat
   return jsonlParser.parseMessages(content, sessionId);
 }
 
+// SessionAdapter.getSessions 调用此函数加载并解析所有会话文件
 /**
  * Loads and parses all session files
  * @param {Object} containerManager - Container manager instance
@@ -101,6 +107,7 @@ export async function loadAllSessionFiles(containerManager, userId, jsonlFiles, 
   return allSessions;
 }
 
+// SessionAdapter.getSessionMessages 调用此函数从多个会话文件加载消息
 /**
  * Loads messages from multiple session files
  * @param {Object} containerManager - Container manager instance

@@ -7,6 +7,7 @@
 import React from 'react';
 import { McpTransportType } from '../../types/settings.types';
 
+// MCP 服务器配置表单中的传输类型选择器，用于选择 stdio/SSE/HTTP
 interface TransportSelectorProps {
   type: McpTransportType;
   onChange: (type: McpTransportType) => void;

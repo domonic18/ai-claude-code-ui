@@ -4,11 +4,13 @@
  * Constants for file explorer component.
  */
 
+// 文件大小单位数组
 /**
  * File size units
  */
 export const FILE_SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const;
 
+// 文件类型类别枚举
 /**
  * File type categories
  */
@@ -23,6 +25,7 @@ export const FILE_TYPE_CATEGORIES = {
   OTHER: 'other',
 } as const;
 
+// 按类别分组的文件扩展名映射
 /**
  * File extensions by category
  */
@@ -59,6 +62,7 @@ export const FILE_EXTENSIONS = {
   video: ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'],
 } as const;
 
+// 按扩展名映射的文件图标配置
 /**
  * File icon mappings by extension
  */
@@ -109,6 +113,7 @@ export const FILE_ICONS = {
   '.mkv': { icon: 'Video', color: 'text-purple-600' },
 } as const;
 
+// 目录图标配置
 /**
  * Directory icons
  */
@@ -117,6 +122,7 @@ export const DIRECTORY_ICONS = {
   closed: { icon: 'Folder', color: 'text-blue-500' },
 } as const;
 
+// 文件列表视图模式
 /**
  * View modes
  */
@@ -126,6 +132,7 @@ export const VIEW_MODES = {
   COMPACT: 'compact',
 } as const;
 
+// 文件排序选项
 /**
  * Sort options
  */
@@ -136,6 +143,7 @@ export const SORT_OPTIONS = {
   TYPE: 'type',
 } as const;
 
+// 文件排序顺序
 /**
  * Sort orders
  */
@@ -144,16 +152,19 @@ export const SORT_ORDERS = {
   DESC: 'desc',
 } as const;
 
+// 最大文件名长度
 /**
  * Maximum file name length
  */
 export const MAX_FILE_NAME_LENGTH = 255;
 
+// 最大路径长度
 /**
  * Maximum path length
  */
 export const MAX_PATH_LENGTH = 4096;
 
+// 隐藏文件匹配模式
 /**
  * Hidden file patterns
  */
@@ -169,6 +180,7 @@ export const HIDDEN_FILE_PATTERNS = [
   /Thumbs\.db$/,   // Windows files
 ] as const;
 
+// 忽略的目录匹配模式
 /**
  * Ignored directory patterns
  */
@@ -190,6 +202,7 @@ export const IGNORED_DIR_PATTERNS = [
   /^out$/,
 ] as const;
 
+// 默认文件树选项
 /**
  * Default file tree options
  */
@@ -200,6 +213,7 @@ export const DEFAULT_TREE_OPTIONS = {
   caseSensitive: false,
 } as const;
 
+// 文件操作结果状态
 /**
  * File operation results
  */
@@ -209,6 +223,7 @@ export const FILE_OPERATION_RESULTS = {
   CANCELLED: 'cancelled',
 } as const;
 
+// 文件错误类型
 /**
  * File error types
  */
@@ -221,6 +236,7 @@ export const FILE_ERROR_TYPES = {
   UNKNOWN: 'UNKNOWN',
 } as const;
 
+// 系统保护文件夹列表（不可删除或重命名）
 /**
  * System folders that cannot be deleted or renamed
  */

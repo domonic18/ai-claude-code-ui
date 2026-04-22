@@ -4,6 +4,9 @@ import SettingsContent from './quick-settings/SettingsContent';
 import type { SettingsContentProps } from './quick-settings/SettingsContent';
 import SettingsPanelLayout from './quick-settings/SettingsPanelLayout';
 
+/**
+ * 快捷设置面板：右侧拉手导航 + 遮罩层，聚合各项聊天行为偏好开关
+ */
 interface QuickSettingsPanelProps extends SettingsContentProps {
   /** Whether the panel is open */
   isOpen: boolean;
@@ -12,6 +15,7 @@ interface QuickSettingsPanelProps extends SettingsContentProps {
   /** Whether in mobile view */
   isMobile: boolean;
 }
+
 
 const QuickSettingsPanel = ({
   isOpen,

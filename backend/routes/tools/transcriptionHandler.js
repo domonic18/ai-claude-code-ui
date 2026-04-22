@@ -17,6 +17,7 @@ import {
 
 const logger = createLogger('routes/tools/transcriptionHandler');
 
+// 定义 HTTP 路由处理器
 /**
  * Transcribe audio using Whisper API
  *
@@ -58,6 +59,7 @@ export async function transcribeAudio(req, apiKey, fileMimetype) {
   return data.text || '';
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Enhance transcribed text using GPT
  *
@@ -129,6 +131,7 @@ Agent instructions:`;
   return completion.choices[0].message.content || transcribedText;
 }
 
+// 定义 HTTP 路由处理器
 /**
  * Handle audio transcription with optional enhancement
  *
@@ -188,3 +191,4 @@ export async function handleTranscription(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
+

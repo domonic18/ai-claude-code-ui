@@ -14,6 +14,7 @@ const db = getDatabase;
  * 用户数据仓库
  */
 export const User = {
+// 数据库操作函数，供控制器调用
     /**
      * 检查是否存在任何用户
      * @returns {boolean}
@@ -23,6 +24,7 @@ export const User = {
         return row.count > 0;
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 创建新用户
      * @param {string} username - 用户名
@@ -36,6 +38,7 @@ export const User = {
         return { id: result.lastInsertRowid, username, role };
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 根据用户名获取用户
      * @param {string} username
@@ -46,6 +49,7 @@ export const User = {
         return row;
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 根据ID获取用户
      * @param {number} userId
@@ -56,6 +60,7 @@ export const User = {
         return row;
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 获取第一个（唯一）用户
      * @returns {Object|undefined}
@@ -65,6 +70,7 @@ export const User = {
         return row;
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 获取所有用户
      * @returns {Array}
@@ -74,6 +80,7 @@ export const User = {
         return rows;
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 更新最后登录时间
      * @param {number} userId
@@ -82,6 +89,7 @@ export const User = {
         db().prepare('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?').run(userId);
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 更新Git配置
      * @param {number} userId
@@ -93,6 +101,7 @@ export const User = {
         stmt.run(gitName, gitEmail, userId);
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 获取Git配置
      * @param {number} userId
@@ -103,6 +112,7 @@ export const User = {
         return row;
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 完成用户引导
      * @param {number} userId
@@ -112,6 +122,7 @@ export const User = {
         stmt.run(userId);
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 检查是否完成引导
      * @param {number} userId
@@ -122,6 +133,7 @@ export const User = {
         return row?.has_completed_onboarding === 1;
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 更新容器层级
      * @param {number} userId
@@ -132,6 +144,7 @@ export const User = {
         stmt.run(tier, userId);
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 获取容器层级
      * @param {number} userId
@@ -142,6 +155,7 @@ export const User = {
         return row?.container_tier || 'free';
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 更新容器配置
      * @param {number} userId
@@ -152,6 +166,7 @@ export const User = {
         stmt.run(JSON.stringify(config), userId);
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 获取容器配置
      * @param {number} userId
@@ -167,6 +182,7 @@ export const User = {
         }
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 根据 external_id 获取用户（SSO 用户）
      * @param {string} externalId - 外部身份提供者的用户 ID
@@ -238,6 +254,7 @@ export const User = {
         };
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 更新用户 SSO 状态
      * @param {number} userId
@@ -248,6 +265,7 @@ export const User = {
         stmt.run(ssoEnabled ? 1 : 0, userId);
     },
 
+// 数据库操作函数，供控制器调用
     /**
      * 根据身份提供者和外部 ID 获取用户
      * @param {string} identityProvider - 身份提供者
@@ -264,3 +282,4 @@ export const User = {
         return row;
     }
 };
+

@@ -12,6 +12,7 @@ import { Input } from '@/shared/components/ui/Input';
 import { Check, XCircle } from 'lucide-react';
 import { isValidFileName } from '../utils/fileTreeHelpers';
 
+// RenameInputProps 的类型定义
 /**
  * Props for RenameInput component
  */
@@ -24,6 +25,7 @@ export interface RenameInputProps {
   width?: string;
 }
 
+// 由父组件调用，React 组件或常量：RenameInput
 /**
  * 重命名输入组件
  */

@@ -14,6 +14,7 @@ export interface AssistantMessageProps {
   thinking?: string;
 }
 
+// ChatMessageList 组件使用此组件渲染 AI 助手的回复内容和推理过程
 /**
  * AssistantMessage Component
  *

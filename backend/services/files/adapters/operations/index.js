@@ -6,6 +6,7 @@
  * @module files/adapters/operations
  */
 
+// 文件适配器模块统一导出所有文件操作类
 export { FileReader } from './FileReader.js';
 export { FileWriter } from './FileWriter.js';
 export { FileTreeBuilder } from './FileTreeBuilder.js';

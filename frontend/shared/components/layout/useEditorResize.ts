@@ -10,6 +10,9 @@ interface UseEditorResizeReturn {
   handleMouseDown: (e: React.MouseEvent) => void;
 }
 
+/**
+ * 编辑器宽度拖拽调整 Hook：鼠标拖拽分隔条改变编辑器宽度，带最小/最大宽度限制
+ */
 export function useEditorResize(isMobile: boolean): UseEditorResizeReturn {
   const [editorWidth, setEditorWidth] = useState(600);
   const [isResizing, setIsResizing] = useState(false);

@@ -31,6 +31,7 @@ export function buildSessionGroups(allEntries, allSessions) {
   return sessionGroups;
 }
 
+// sessionGrouping.js 功能函数
 /**
  * 将会话添加到分组（新建或更新现有分组）
  * @param {Map} sessionGroups - 分组 Map
@@ -54,6 +55,7 @@ export function addToSessionGroup(sessionGroups, firstUserMsgId, session) {
   }
 }
 
+// sessionGrouping.js 功能函数
 /**
  * 合并分组会话和独立会话，返回排序后的完整列表
  * @param {Map} sessionGroups - firstUserMsgId → { latestSession, allSessions }

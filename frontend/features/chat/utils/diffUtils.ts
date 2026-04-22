@@ -10,6 +10,7 @@
  */
 export type DiffLineType = 'added' | 'removed' | 'context';
 
+// DiffViewer 组件使用的差异行类型定义
 /**
  * Single line in a diff
  */
@@ -19,6 +20,7 @@ export interface DiffLine {
   lineNum?: number;
 }
 
+// DiffViewer 组件调用此函数计算新旧内容的差异行
 /**
  * Calculate line-based diff between two strings
  *

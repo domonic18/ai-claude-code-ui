@@ -122,6 +122,7 @@ export const STORAGE_KEYS = {
   USER_SETTINGS: 'claude-code-ui.userSettings',
 } as const;
 
+// Provider 的类型别名定义
 /**
  * Supported providers
  */
@@ -132,6 +133,7 @@ export const PROVIDERS = {
   OPENCODE: 'opencode',
 } as const;
 
+// Provider 的类型别名定义
 /**
  * Provider type
  */

@@ -15,6 +15,7 @@ export type ProcessStatus =
   | 'failed'
   | 'terminated';
 
+// TerminalOutput 的类型定义
 /**
  * Terminal output entry
  */
@@ -25,6 +26,7 @@ export interface TerminalOutput {
   timestamp: Date;
 }
 
+// TerminalProcess 的类型定义
 /**
  * Terminal process info
  */
@@ -39,6 +41,7 @@ export interface TerminalProcess {
   env?: Record<string, string>;
 }
 
+// ShellConfig 的类型定义
 /**
  * Shell configuration
  */
@@ -49,6 +52,7 @@ export interface ShellConfig {
   cwd?: string;
 }
 
+// TerminalProps 的类型定义
 /**
  * Terminal props
  */
@@ -64,6 +68,7 @@ export interface TerminalProps {
   className?: string;
 }
 
+// ShellProps 的类型定义
 /**
  * Standalone shell props
  */
@@ -89,6 +94,7 @@ export interface ShellProps {
   className?: string;
 }
 
+// TerminalState 的类型定义
 /**
  * Terminal state
  */
@@ -100,6 +106,7 @@ export interface TerminalState {
   error: string | null;
 }
 
+// TerminalTheme 的类型别名定义
 /**
  * Terminal color theme
  */
@@ -110,6 +117,7 @@ export type TerminalTheme =
   | 'nord'
   | 'solarized';
 
+// TerminalOptions 的类型定义
 /**
  * Terminal options
  */

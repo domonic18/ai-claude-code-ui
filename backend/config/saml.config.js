@@ -34,6 +34,7 @@ export const samlConfig = {
   nameIDFormat: 'urn:oasis:names:tc:SAML:2.0:nameid-format:transient',
 };
 
+// 验证 SAML 配置是否完整，在应用启动时调用
 /**
  * 验证 SAML 配置是否完整
  * @returns {{ valid: boolean, errors: string[] }}

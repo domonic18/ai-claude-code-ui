@@ -36,6 +36,7 @@ const BASH_COMMAND_ALLOWLIST = [
  */
 const DANGEROUS_PATTERN = /[;&|`$()<>{}[\]\\]/;
 
+// 工具函数，供多个模块调用
 /**
  * 验证命令及其参数是否安全
  * @param {string} commandString - 要验证的命令字符串
@@ -102,3 +103,4 @@ export function validateCommand(commandString) {
 
   return { allowed: true, command: commandName, args };
 }
+

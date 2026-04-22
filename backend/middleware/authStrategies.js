@@ -26,6 +26,7 @@ export const AuthType = {
   NONE: 'none'
 };
 
+// 中间件函数，在请求处理链中执行
 /**
  * 尝试 JWT 认证
  * @param {Object} req - Express 请求对象
@@ -57,6 +58,7 @@ export async function _tryJwtAuth(req) {
   }
 }
 
+// 中间件函数，在请求处理链中执行
 /**
  * 尝试内部 API 密钥认证
  * @param {Object} req - Express 请求对象
@@ -84,6 +86,7 @@ export async function _tryInternalApiKeyAuth(req) {
   }
 }
 
+// 中间件函数，在请求处理链中执行
 /**
  * 尝试外部 API 密钥认证
  * @param {Object} req - Express 请求对象
@@ -111,6 +114,7 @@ export async function _tryExternalApiKeyAuth(req) {
   }
 }
 
+// 中间件函数，在请求处理链中执行
 /**
  * 检查用户角色
  */
@@ -121,6 +125,7 @@ export function _checkRoles(req, res, next, requiredRoles) {
   return next();
 }
 
+// 中间件函数，在请求处理链中执行
 /**
  * 平台模式认证处理
  * @returns {Object|null} 用户信息或 null
@@ -136,3 +141,4 @@ export function handlePlatformAuth(optional) {
     return null;
   }
 }
+

@@ -18,6 +18,7 @@ const logger = createLogger('services/scm/GitAuthHelper');
 const ASKPASS_DIR = path.join(os.tmpdir(), 'claude-ui-askpass');
 const ASKPASS_SCRIPT = '#!/bin/sh\nprintf \'%s\\n\' "$GIT_ASKPASS_SECRET"\n';
 
+// GitAuthHelper.js 功能函数
 /**
  * 创建临时 askpass 脚本用于安全传递 GitHub token
  *
@@ -40,6 +41,7 @@ export async function createAskpassScript(githubToken) {
   return { askpassPath, env };
 }
 
+// GitAuthHelper.js 功能函数
 /**
  * 清理 askpass 脚本文件
  * @param {string} askpassPath - 要删除的 askpass 脚本路径
@@ -48,6 +50,7 @@ export async function cleanupAskpass(askpassPath) {
   await fs.unlink(askpassPath).catch(() => {});
 }
 
+// GitAuthHelper.js 功能函数
 /**
  * 构建克隆操作的 git 环境变量
  * @param {string|null} githubToken - GitHub token（可选）
