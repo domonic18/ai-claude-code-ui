@@ -1,3 +1,4 @@
+// Git diff 简易查看器：按行解析 unified diff 格式，用颜色区分新增/删除/范围头
 import React from 'react';
 
 export interface DiffViewerProps {
@@ -19,7 +20,7 @@ function DiffViewer({ diff, isMobile, wrapText }: DiffViewerProps) {
   const renderDiffLine = (line: string, index: number) => {
     const isAddition = line.startsWith('+') && !line.startsWith('+++');
     const isDeletion = line.startsWith('-') && !line.startsWith('---');
-    const isHeader = line.startsWith('@@');
+    const isHeader = line.startsWith('@@'); // @@ 行标记 diff 范围（hunk header），用蓝色背景突出显示
 
     return (
       <div

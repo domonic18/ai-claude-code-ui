@@ -1,3 +1,4 @@
+// 编辑器内容区域：根据预览模式组合编辑面板和 Markdown 预览面板的布局
 import React from 'react';
 import type { CodeEditorFile } from '../types/editor.types';
 import { CodeEditorPanel } from './CodeEditorPanel';

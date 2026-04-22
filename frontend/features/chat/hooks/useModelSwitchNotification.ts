@@ -1,3 +1,4 @@
+// 模型切换通知 hook：监听 model-switch 自定义事件，在图片附件场景下自动降级模型时提示用户
 import { useState, useEffect, useRef } from 'react';
 
 interface ModelSwitchNotification {
@@ -12,6 +13,7 @@ export function useModelSwitchNotification() {
   useEffect(() => {
     const handleModelSwitch = (event: CustomEvent) => {
       const { newModel, reason } = event.detail;
+      // 仅在图片附件触发降级时通知，其他切换原因静默处理
       if (reason === 'image-attachment') {
         setNotification({ show: true, message: `当前模型不支持图片，已切换到 ${newModel}` });
         timeoutRef.current = window.setTimeout(() => {

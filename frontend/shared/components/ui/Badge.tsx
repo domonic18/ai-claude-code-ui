@@ -1,3 +1,4 @@
+// 标签组件：支持 default/secondary/destructive/outline 四种变体，用于状态标记和分类
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"

@@ -1,3 +1,5 @@
+// Tooltip 组件：悬停延迟显示提示气泡，支持四个方向定位和箭头指示器
+// 延迟显示避免快速划过时闪烁，卸载时清理定时器防止内存泄漏
 import React, { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -21,6 +23,7 @@ const Tooltip = ({
   const [isVisible, setIsVisible] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // 延迟触发显示，避免鼠标快速划过时产生不必要的弹出
   const handleMouseEnter = () => {
     const id = setTimeout(() => {
       setIsVisible(true);
@@ -29,6 +32,7 @@ const Tooltip = ({
   };
 
   const handleMouseLeave = () => {
+    // 离开时取消未触发的定时器并立即隐藏
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
@@ -36,6 +40,7 @@ const Tooltip = ({
     setIsVisible(false);
   };
 
+  // 组件卸载时清理定时器，防止在组件已销毁后执行 setState
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {
@@ -44,6 +49,7 @@ const Tooltip = ({
     };
   }, []);
 
+  // 根据方向属性计算气泡相对于触发元素的绝对定位偏移
   const getPositionClasses = (): string => {
     switch (position) {
       case 'top':
@@ -59,6 +65,7 @@ const Tooltip = ({
     }
   };
 
+  // 箭头三角形使用 border hack 实现，颜色与气泡背景保持一致
   const getArrowClasses = (): string => {
     switch (position) {
       case 'top':
@@ -74,6 +81,7 @@ const Tooltip = ({
     }
   };
 
+  // 无内容时直接渲染子元素，不包裹额外 DOM 层
   if (!content) {
     return <>{children}</>;
   }

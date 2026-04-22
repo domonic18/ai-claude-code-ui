@@ -1,3 +1,4 @@
+// 暗色模式切换开关：使用 ThemeContext 提供的 toggle，带有太阳/月亮图标动画
 import React from 'react';
 import { useTheme } from '@/shared/contexts/ThemeContext';
 

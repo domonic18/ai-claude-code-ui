@@ -1,3 +1,4 @@
+// Token 用量环形图：通过 SVG circle 的 strokeDasharray 绘制进度，颜色随用量比例变化（蓝→黄→红）
 import React from 'react';
 
 export interface TokenUsagePieProps {
@@ -17,7 +18,7 @@ function TokenUsagePie({ used, total }: TokenUsagePieProps) {
     if (percentage < 50) return '#3b82f6';
     if (percentage < 75) return '#f59e0b';
     return '#ef4444';
-  };
+  }; // <50% 蓝色正常，50-75% 黄色警告，>75% 红色告急
 
   return (
     <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">

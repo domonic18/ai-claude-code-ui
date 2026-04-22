@@ -1,3 +1,4 @@
+// 通用按钮组件：基于 class-variance-authority 管理 6 种视觉变体和 4 种尺寸的 Tailwind 样式组合
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
