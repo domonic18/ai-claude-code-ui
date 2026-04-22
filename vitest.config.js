@@ -57,7 +57,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, './frontend'),
       '@/features': path.resolve(__dirname, './frontend/features'),
       '@/shared-frontend': path.resolve(__dirname, './frontend/shared'),
-      '@/shared': path.resolve(__dirname, './shared'),
+      '@/shared': path.resolve(__dirname, './frontend/shared'),
       '@/config': path.resolve(__dirname, './frontend/config'),
       '@/lib': path.resolve(__dirname, './frontend/lib'),
     },

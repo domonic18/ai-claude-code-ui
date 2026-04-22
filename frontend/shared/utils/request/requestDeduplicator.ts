@@ -66,7 +66,7 @@ export class RequestDeduplicator {
    * @param fn - 实际执行请求的异步函数
    * @returns 请求结果的 Promise
    */
-  async dedupe<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  dedupe<T>(key: string, fn: () => Promise<T>): Promise<T> {
     // 如果已有相同 key 的请求在执行中，直接返回该 Promise
     if (this.pending.has(key)) {
       return this.pending.get(key)!;

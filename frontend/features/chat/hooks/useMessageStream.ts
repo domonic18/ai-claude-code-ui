@@ -85,6 +85,12 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
   const thinkingBufferRef = useRef('');
   // 节流定时器引用：控制缓冲区刷新频率
   const streamTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 使用 ref 跟踪最新值以避免 stale closure
+  // Note: refs are updated directly in flushBuffer() for immediate consistency.
+  // We do NOT sync from state here because state updates are asynchronous -
+  // a render triggered by flushBuffer() would overwrite the ref with stale state.
+  const streamingContentRef = useRef('');
+  const streamingThinkingRef = useRef('');
 
   const clearStreamTimer = useCallback(() => {
     if (streamTimerRef.current) {
@@ -96,10 +102,12 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
   const flushBuffer = useCallback(() => {
     if (streamBufferRef.current.length > 0) {
       setStreamingContent(prev => prev + streamBufferRef.current);
+      streamingContentRef.current += streamBufferRef.current;
       streamBufferRef.current = '';
     }
     if (thinkingBufferRef.current.length > 0) {
       setStreamingThinking(prev => prev + thinkingBufferRef.current);
+      streamingThinkingRef.current += thinkingBufferRef.current;
       thinkingBufferRef.current = '';
     }
   }, []);
@@ -114,9 +122,9 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
 
     streamTimerRef.current = setTimeout(() => {
       flushBuffer();
-      onStreamUpdate?.(streamingContent + streamBufferRef.current, streamingThinking);
+      onStreamUpdate?.(streamingContentRef.current + streamBufferRef.current, streamingThinkingRef.current + thinkingBufferRef.current);
     }, throttleInterval);
-  }, [flushBuffer, clearStreamTimer, throttleInterval, onStreamUpdate, onHasContent, streamingContent, streamingThinking]);
+  }, [flushBuffer, clearStreamTimer, throttleInterval, onStreamUpdate, onHasContent]);
 
   const updateStreamThinking = useCallback((thinking: string) => {
     if (!thinking) return;
@@ -126,20 +134,29 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
 
     streamTimerRef.current = setTimeout(() => {
       flushBuffer();
-      onStreamUpdate?.(streamingContent, streamingThinking + thinkingBufferRef.current);
+      onStreamUpdate?.(streamingContentRef.current + streamBufferRef.current, streamingThinkingRef.current + thinkingBufferRef.current);
     }, throttleInterval);
-  }, [flushBuffer, clearStreamTimer, throttleInterval, onStreamUpdate, streamingContent, streamingThinking]);
+  }, [flushBuffer, clearStreamTimer, throttleInterval, onStreamUpdate]);
 
   const getBufferContent = useCallback(() => {
     return {
-      content: streamingContent + streamBufferRef.current,
-      thinking: streamingThinking + thinkingBufferRef.current,
+      content: streamingContentRef.current + streamBufferRef.current,
+      thinking: streamingThinkingRef.current + thinkingBufferRef.current,
     };
-  }, [streamingContent, streamingThinking]);
+  }, []);
 
   const resetBuffers = useCallback(() => {
     streamBufferRef.current = '';
     thinkingBufferRef.current = '';
+  }, []);
+
+  const resetAll = useCallback(() => {
+    streamBufferRef.current = '';
+    thinkingBufferRef.current = '';
+    streamingContentRef.current = '';
+    streamingThinkingRef.current = '';
+    setStreamingContent('');
+    setStreamingThinking('');
   }, []);
 
   return {
@@ -151,6 +168,7 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
     updateStreamThinking,
     getBufferContent,
     resetBuffers,
+    resetAll,
   };
 }
 
@@ -185,7 +203,7 @@ export function useMessageStream(options: UseMessageStreamOptions = {}): UseMess
   const startStream = useCallback(() => {
     setIsStreaming(true);
     hasContentRef.current = false;
-    buffer.resetBuffers();
+    buffer.resetAll();
     buffer.clearStreamTimer();
   }, [buffer]);
 
@@ -203,10 +221,9 @@ export function useMessageStream(options: UseMessageStreamOptions = {}): UseMess
   }, [buffer, onStreamComplete]);
 
   const resetStream = useCallback(() => {
-    buffer.flushBuffer();
     buffer.clearStreamTimer();
     setIsStreaming(false);
-    buffer.resetBuffers();
+    buffer.resetAll();
     hasContentRef.current = false;
   }, [buffer]);
 
