@@ -14,6 +14,8 @@ import { CONTAINER } from '../../../config/config.js';
 
 const logger = createLogger('services/sessions/container/sessionReader');
 
+// 在解析会话文件时调用，将 JSONL 格式的内容解析为 JSON 对象数组
+// sessionReader.js 功能函数
 /**
  * Parse JSONL lines into entries
  * @param {string} content - JSONL content
@@ -38,6 +40,8 @@ export function parseJsonlLines(content) {
   return entries;
 }
 
+// 在批量读取会话时调用，遍历会话文件并对每个文件执行处理函数
+// sessionReader.js 功能函数
 /**
  * Iterate over session files and execute handler
  * @param {number} userId - User ID
@@ -61,6 +65,7 @@ export async function forEachSessionFile(userId, projectDir, sessionFiles, handl
   }
 }
 
+// sessionReader.js 功能函数
 /**
  * List session files in project directory
  * @param {number} userId - User ID
@@ -86,6 +91,7 @@ export async function listSessionFiles(userId, projectName) {
   }
 }
 
+// sessionReader.js 功能函数
 /**
  * Get project directory path
  * @param {string} projectName - Project name
@@ -96,6 +102,7 @@ export function getProjectDir(projectName) {
   return `${CONTAINER.paths.projects}/${encodedProjectName}`;
 }
 
+// sessionReader.js 功能函数
 /**
  * Collect all session data
  * @param {number} userId - User ID
@@ -125,6 +132,7 @@ export async function collectAllSessionData(userId, projectDir, sessionFiles) {
   return { allSessions, allEntries };
 }
 
+// sessionReader.js 功能函数
 /**
  * Collect messages for specific session
  * @param {number} userId - User ID
@@ -147,6 +155,7 @@ export async function collectMessagesForSession(userId, projectDir, sessionFiles
   return messages;
 }
 
+// sessionReader.js 功能函数
 /**
  * Get session files info (for debugging)
  * @param {number} userId - User ID

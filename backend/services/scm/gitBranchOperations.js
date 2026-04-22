@@ -12,6 +12,7 @@ import { gitSpawn } from './gitSpawn.js';
 
 const logger = createLogger('services/scm/gitBranchOperations');
 
+// gitBranchOperations.js 功能函数
 /**
  * Create and checkout local branch
  * @param {string} projectPath - Project path
@@ -40,6 +41,7 @@ export async function checkoutBranch(projectPath, branchName) {
   }
 }
 
+// gitBranchOperations.js 功能函数
 /**
  * Push branch to remote (tolerates already exists case)
  * @param {string} projectPath - Project path
@@ -63,6 +65,7 @@ export async function pushBranchToRemote(projectPath, branchName) {
   }
 }
 
+// gitBranchOperations.js 功能函数
 /**
  * Create and push new branch to remote (combined operation)
  * @param {string} projectPath - Project path
@@ -74,6 +77,7 @@ export async function createAndPushBranch(projectPath, branchName) {
   await pushBranchToRemote(projectPath, branchName);
 }
 
+// gitBranchOperations.js 功能函数
 /**
  * Create a branch on GitHub via Octokit API
  * @param {Object} octokit - Octokit 实例

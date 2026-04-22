@@ -18,6 +18,7 @@ const logger = createLogger('services/execution/engines/BaseExecutionEngine');
  * @abstract
  */
 export class BaseExecutionEngine extends IExecutionEngine {
+  // 由子类（ExecutionEngine）构造函数调用，初始化执行引擎基类
   /**
    * 构造函数
    * @param {Object} config - 引擎配置
@@ -31,6 +32,7 @@ export class BaseExecutionEngine extends IExecutionEngine {
     this.activeSessions = new Map();
   }
 
+  // 由容器管理器或路由层调用，在用户容器内执行 AI 命令（抽象方法，子类实现）
   /**
    * 执行 AI 命令
    * @abstract
@@ -44,6 +46,7 @@ export class BaseExecutionEngine extends IExecutionEngine {
     throw new Error(`execute() must be implemented by ${this.name}`);
   }
 
+  // 由用户中止或会话超时时调用，终止正在运行的 AI 执行会话（抽象方法，子类实现）
   /**
    * 中止活动会话
    * @abstract

@@ -23,11 +23,13 @@ import {
   normalizeSessionWithMetadata
 } from './codexProjectHelpers.js';
 
+// CodexDiscovery.js 功能函数
 /**
  * Codex 项目发现器
  * Codex 使用 JSONL 文件存储会话
  */
 export class CodexDiscovery extends BaseDiscovery {
+  // 初始化 Codex 项目发现器，配置会话存储路径
   /**
    * 构造函数
    * @param {Object} config - 配置
@@ -41,6 +43,7 @@ export class CodexDiscovery extends BaseDiscovery {
     });
   }
 
+  // 由 GET /api/projects 调用，扫描 ~/.codex/sessions/ 目录发现所有 Codex 项目
   /**
    * 获取项目列表
    * @param {Object} options - 选项
@@ -73,6 +76,7 @@ export class CodexDiscovery extends BaseDiscovery {
     }
   }
 
+  // 由 GET /api/projects/:id/sessions 调用，从 JSONL 文件中获取指定项目的所有会话
   /**
    * 获取项目会话
    * @param {string} projectIdentifier - 项目标识（项目路径）
@@ -129,6 +133,7 @@ export class CodexDiscovery extends BaseDiscovery {
     }
   }
 
+// CodexDiscovery.js 功能函数
   /**
    * 检查项目是否为空
    * @param {string} projectIdentifier - 项目标识
@@ -147,6 +152,7 @@ export class CodexDiscovery extends BaseDiscovery {
     }
   }
 
+// CodexDiscovery.js 功能函数
   /**
    * 获取项目根目录
    * @protected

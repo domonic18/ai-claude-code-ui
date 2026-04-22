@@ -13,6 +13,8 @@ import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('services/scm/gitSpawn');
 
+// 在执行任何 git 命令时调用，使用 spawn 安全执行，避免命令注入
+// gitSpawn.js 功能函数
 /**
  * 使用 spawn 安全执行 git 命令
  *

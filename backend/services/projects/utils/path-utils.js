@@ -21,6 +21,7 @@ import { hasInCache, setCache } from '../config/index.js';
 import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('services/projects/utils/path-utils');
 
+// path-utils.js 功能函数
 /**
  * 将项目名中的连字符还原为路径分隔符
  *
@@ -33,6 +34,7 @@ function decodeProjectName(projectName) {
   return projectName.replace(/-/g, '/');
 }
 
+// path-utils.js 功能函数
 /**
  * 从多个 cwd 候选中选择最佳工作目录
  *
@@ -61,6 +63,7 @@ function selectBestCwd(cwdCounts, latestCwd) {
   return latestCwd;
 }
 
+// path-utils.js 功能函数
 /**
  * 处理单条 JSONL entry，更新 cwd 统计
  *
@@ -81,6 +84,7 @@ function updateCwdFromEntry(entry, cwdCounts, state) {
   }
 }
 
+// path-utils.js 功能函数
 /**
  * 扫描项目目录下的所有 JSONL 文件，统计 cwd 使用情况
  *
@@ -112,6 +116,7 @@ async function scanJsonlForCwd(jsonlFiles, projectDir, projectName) {
   return selectBestCwd(cwdCounts, state.latestCwd) || decodeProjectName(projectName);
 }
 
+// 在项目发现后调用，从会话路径提取项目根目录
 /**
  * 从项目名解析出实际的文件系统目录路径
  *

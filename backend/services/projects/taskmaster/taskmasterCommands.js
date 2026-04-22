@@ -36,6 +36,7 @@ export function buildAddTaskArgs(params) {
   return args;
 }
 
+// taskmasterCommands.js 功能函数
 /**
  * Build update-task arguments
  * @param {string} taskId - Task ID
@@ -63,6 +64,7 @@ export function buildUpdateTaskArgs(taskId, updates) {
   ];
 }
 
+// taskmasterCommands.js 功能函数
 /**
  * Build parse-prd arguments
  * @param {string} prdPath - PRD file path
@@ -85,6 +87,7 @@ export function buildParsePRDArgs(prdPath, options = {}) {
   return args;
 }
 
+// taskmasterCommands.js 功能函数
 /**
  * Build set-status arguments
  * @param {string} taskId - Task ID

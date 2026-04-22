@@ -21,6 +21,7 @@ import {
 // Re-export for downstream consumers
 export { cleanCommitMessage } from './gitCommitAI.js';
 
+// gitCommitOperations.js 功能函数
 /**
  * 创建初始提交
  * @param {string} projectPath - 项目路径
@@ -41,6 +42,7 @@ export async function createInitialCommit(projectPath) {
   return { output: stdout };
 }
 
+// gitCommitOperations.js 功能函数
 /**
  * 提交指定文件
  * @param {string} projectPath - 项目路径
@@ -59,6 +61,7 @@ export async function commitFiles(projectPath, files, message) {
   return { output: stdout };
 }
 
+// gitCommitOperations.js 功能函数
 /**
  * 切换分支
  * @param {string} projectPath - 项目路径
@@ -70,6 +73,7 @@ export async function checkoutBranch(projectPath, branch) {
   return { output: stdout };
 }
 
+// gitCommitOperations.js 功能函数
 /**
  * 创建并切换到新分支
  * @param {string} projectPath - 项目路径
@@ -81,6 +85,7 @@ export async function createBranch(projectPath, branch) {
   return { output: stdout };
 }
 
+// gitCommitOperations.js 功能函数
 /**
  * 使用 AI 生成提交消息
  * @param {string} projectPath - 项目路径

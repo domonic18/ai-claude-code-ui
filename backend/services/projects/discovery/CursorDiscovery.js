@@ -18,11 +18,13 @@ import { loadProjectFromHash, loadSessionsFromDirectory } from './cursorProjectL
 
 const logger = createLogger('services/projects/discovery/CursorDiscovery');
 
+// CursorDiscovery.js 功能函数
 /**
  * Cursor 项目发现器
  * Cursor 使用 MD5 哈希作为项目目录名，使用 SQLite 存储会话
  */
 export class CursorDiscovery extends BaseDiscovery {
+  // 初始化 Cursor 项目发现器，配置 SQLite 数据库路径
   /**
    * 构造函数
    * @param {Object} config - 配置
@@ -36,6 +38,7 @@ export class CursorDiscovery extends BaseDiscovery {
     });
   }
 
+  // 由 GET /api/projects 调用，扫描 ~/.cursor/cursors/ 目录发现所有 Cursor 项目
   /**
    * 获取项目列表
    * @param {Object} options - 选项
@@ -83,6 +86,7 @@ export class CursorDiscovery extends BaseDiscovery {
     }
   }
 
+  // 由 GET /api/projects/:id/sessions 调用，从 SQLite 数据库中获取指定项目的所有会话
   /**
    * 获取项目会话
    * @param {string} projectIdentifier - 项目标识（MD5 哈希或实际路径）
@@ -133,6 +137,7 @@ export class CursorDiscovery extends BaseDiscovery {
     }
   }
 
+// CursorDiscovery.js 功能函数
   /**
    * 检查项目是否为空
    * @param {string} projectIdentifier - 项目标识
@@ -151,6 +156,7 @@ export class CursorDiscovery extends BaseDiscovery {
     }
   }
 
+// CursorDiscovery.js 功能函数
   /**
    * 获取项目根目录
    * @protected
@@ -161,6 +167,7 @@ export class CursorDiscovery extends BaseDiscovery {
     return path.join(os.homedir(), '.cursor', 'chats');
   }
 
+// CursorDiscovery.js 功能函数
   /**
    * 计算项目路径的 MD5 哈希
    * @private

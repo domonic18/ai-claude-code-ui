@@ -11,6 +11,7 @@ import { validateRepository } from './gitValidator.js';
 import { gitSpawn } from './gitSpawn.js';
 import { parseStatusOutput, stripDiffHeaders } from './gitStatusParser.js';
 
+// 在获取状态时调用，执行 git status
 /**
  * 获取仓库状态（分支、文件变更列表）
  * @param {string} projectPath - 项目路径
@@ -39,6 +40,7 @@ export async function getStatus(projectPath) {
 
 export { getFileDiff, getFileWithDiff } from './gitDiffOperations.js';
 
+// gitStatus.js 功能函数
 /**
  * 获取提交历史
  * @param {string} projectPath - 项目路径
@@ -73,6 +75,7 @@ export async function getCommits(projectPath, limit = 10) {
     });
 }
 
+// gitStatus.js 功能函数
 /**
  * 获取特定提交的完整 diff
  * @param {string} projectPath - 项目路径
@@ -88,6 +91,7 @@ export async function getCommitDiff(projectPath, commit) {
     return stdout;
 }
 
+// gitStatus.js 功能函数
 /**
  * 获取远程状态（ahead/behind 信息）
  * @param {string} projectPath - 项目路径
@@ -136,6 +140,7 @@ export async function getRemoteStatus(projectPath) {
     };
 }
 
+// gitStatus.js 功能函数
 /**
  * 获取分支列表
  * @param {string} projectPath - 项目路径

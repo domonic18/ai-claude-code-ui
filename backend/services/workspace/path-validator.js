@@ -13,6 +13,8 @@ import { checkForbiddenPath, resolveRealPath } from './pathValidatorHelpers.js';
 
 const WORKSPACES_ROOT = process.env.WORKSPACES_ROOT || os.homedir();
 
+// 在路径验证时调用，检查路径是否在允许的工作空间根目录范围内
+// path-validator.js 功能函数
 /**
  * 检查路径是否在工作空间根目录内
  * @param {string} realPath - 解析后的真实路径
@@ -26,6 +28,8 @@ function checkWithinWorkspace(realPath, workspaceRoot) {
   return null;
 }
 
+// 在验证符号链接时调用，确保链接目标不会逃逸工作空间根目录
+// path-validator.js 功能函数
 /**
  * 检查符号链接目标是否在工作空间内
  * @param {string} absolutePath - 绝对路径
@@ -49,6 +53,8 @@ async function checkSymlinkSafety(absolutePath, workspaceRoot) {
   return null;
 }
 
+// 在创建或访问工作区前调用，验证路径安全性并防止路径遍历攻击
+// path-validator.js 功能函数
 /**
  * 验证路径对工作空间操作是否安全
  * @param {string} requestedPath - 要验证的路径
@@ -77,6 +83,7 @@ export async function validateWorkspacePath(requestedPath) {
   }
 }
 
+// path-validator.js 功能函数
 /**
  * 验证现有工作空间路径
  * @param {string} workspacePath - 工作空间路径
@@ -97,6 +104,7 @@ export async function validateExistingWorkspace(workspacePath) {
   return { valid: true, resolvedPath: validation.resolvedPath };
 }
 
+// path-validator.js 功能函数
 /**
  * 验证新工作空间路径（路径不应已存在）
  * @param {string} workspacePath - 工作空间路径

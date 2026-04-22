@@ -11,6 +11,7 @@ import { createLogger } from '../../../utils/logger.js';
 
 const logger = createLogger('services/sessions/container/sessionWriter');
 
+// sessionWriter.js 功能函数
 /**
  * 查找并修改会话条目的通用模式
  * @param {number} userId - 用户 ID
@@ -43,6 +44,7 @@ export async function _findAndModifySession(userId, projectName, sessionId, list
   return found;
 }
 
+// sessionWriter.js 功能函数
 /**
  * 更新会话摘要（容器模式）
  * @param {number} userId - 用户 ID
@@ -101,6 +103,7 @@ export async function updateSessionSummaryInContainer(userId, projectName, sessi
   }
 }
 
+// sessionWriter.js 功能函数
 /**
  * 删除会话（容器模式）
  * @param {number} userId - 用户 ID

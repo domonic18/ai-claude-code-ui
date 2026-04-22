@@ -14,6 +14,7 @@ import { buildAddTaskArgs, buildUpdateTaskArgs, buildParsePRDArgs, buildSetStatu
 
 const logger = createLogger('services/projects/taskmaster/cli');
 
+// 在执行 TaskMaster 命令时调用，通过 CLI 与 TaskMaster 交互
 /**
  * 检查 TaskMaster CLI 是否已全局安装
  * @returns {Promise<Object>} 安装状态结果
@@ -58,6 +59,7 @@ export async function checkTaskMasterInstallation() {
     }
 }
 
+// 在执行 TaskMaster 命令时调用，通过 CLI 与 TaskMaster 交互
 /**
  * 获取下一个推荐任务
  * @param {string} projectPath - 项目路径
@@ -73,6 +75,7 @@ export async function getNextTask(projectPath) {
   return parseJSONOutput(result.stdout);
 }
 
+// 在执行 TaskMaster 命令时调用，通过 CLI 与 TaskMaster 交互
 /**
  * 在项目中初始化 TaskMaster
  * @param {string} projectPath - 项目路径
@@ -86,6 +89,7 @@ export async function initTaskMaster(projectPath) {
   return handleTaskMasterResult(result, 'TaskMaster init');
 }
 
+// cli.js 功能函数
 /**
  * 添加新任务
  * @param {string} projectPath - 项目路径
@@ -104,6 +108,7 @@ export async function addTask(projectPath, params) {
   return handleTaskMasterResult(result, 'Add task');
 }
 
+// 在执行 TaskMaster 命令时调用，通过 CLI 与 TaskMaster 交互
 /**
  * 更新任务状态
  * @param {string} projectPath - 项目路径
@@ -118,6 +123,7 @@ export async function setTaskStatus(projectPath, taskId, status) {
   return handleTaskMasterResult(result, 'Set task status');
 }
 
+// cli.js 功能函数
 /**
  * 更新任务详情
  * @param {string} projectPath - 项目路径
@@ -136,6 +142,7 @@ export async function updateTask(projectPath, taskId, updates) {
   return handleTaskMasterResult(result, 'Update task');
 }
 
+// cli.js 功能函数
 /**
  * 解析 PRD 文件生成任务
  * @param {string} projectPath - 项目路径

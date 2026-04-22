@@ -17,6 +17,7 @@ const logger = createLogger('services/sessions/container/containerFileReader');
 /** Docker exec 读取文件默认超时时间（毫秒） */
 const READ_FILE_TIMEOUT_MS = 30000;
 
+// containerFileReader.js 功能函数
 /**
  * 从容器内读取文件内容
  * @param {number} userId - 用户 ID
@@ -72,6 +73,7 @@ export async function readFileFromContainer(userId, filePath) {
   });
 }
 
+// containerFileReader.js 功能函数
 /**
  * 将 JSONL 内容写回容器文件
  * 根据内容大小自动选择写入策略：小文件使用 base64+shell，大文件使用 putArchive。
@@ -108,6 +110,7 @@ export async function writeJsonlContentToContainer(userId, filePath, entries) {
   }
 }
 
+// containerFileReader.js 功能函数
 /**
  * 在容器内执行命令并收集 stdout 输出
  * @param {number} userId - 用户 ID

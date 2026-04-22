@@ -12,6 +12,7 @@ import path from 'path';
 import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('services/execution/claude/ImageHandler');
 
+// 由 Claude 执行器调用，在发送查询前将 base64 图像保存为临时文件
 /**
  * 处理图像 - 将 base64 图像保存到临时文件并修改提示
  * @param {string} command - 原始用户提示
@@ -67,6 +68,7 @@ export async function handleImages(command, images, cwd) {
   }
 }
 
+// 由 Claude 会话完成或中止后调用，删除查询过程中创建的临时图像文件
 /**
  * 清理临时图像文件
  * @param {Array<string>} tempImagePaths - 要删除的临时文件路径数组

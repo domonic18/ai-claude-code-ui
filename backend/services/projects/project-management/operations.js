@@ -18,6 +18,7 @@ import { readStreamOutput } from '../../files/utils/file-utils.js';
 import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('services/projects/project-management/operations');
 
+// 由 PUT /api/projects/:id/rename 调用，更新项目显示名称
 /**
  * 重命名项目的显示名称
  * @param {string} projectName - 项目名称
@@ -41,6 +42,7 @@ async function renameProject(projectName, newDisplayName) {
   return true;
 }
 
+// 由 DELETE /api/projects/:id/sessions/:sessionId 调用，删除指定会话
 /**
  * 删除项目的某个会话（容器模式）
  * @param {number} userId - 用户 ID
@@ -57,6 +59,7 @@ async function deleteSession(userId, projectName, sessionId) {
   }
 }
 
+// 由 DELETE /api/projects/:id 调用，检查项目是否包含会话
 /**
  * 检查项目是否为空（没有会话）（容器模式）
  * @param {number} userId - 用户 ID
@@ -73,6 +76,7 @@ async function isProjectEmpty(userId, projectName) {
   }
 }
 
+// 由 DELETE /api/projects/:id 调用，删除项目及所有会话
 /**
  * 删除空项目（容器模式）
  * @param {number} userId - 用户 ID
@@ -122,6 +126,7 @@ async function deleteProject(userId, projectName) {
   }
 }
 
+// 由 POST /api/projects/manual 调用，手动添加自定义项目
 /**
  * 手动添加项目到配置（容器模式）
  * 在容器模式下，项目存储在 /workspace 下

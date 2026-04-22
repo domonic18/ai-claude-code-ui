@@ -18,6 +18,7 @@ const FORBIDDEN_PATHS = [
 /** /var 下的用户可访问子路径例外 */
 const VAR_EXCEPTIONS = ['/var/tmp', '/var/folders'];
 
+// pathValidatorHelpers.js 功能函数
 /**
  * 检查路径是否为禁止的系统目录
  * @param {string} normalizedPath - 标准化后的路径
@@ -39,6 +40,7 @@ export function checkForbiddenPath(normalizedPath) {
   return null;
 }
 
+// pathValidatorHelpers.js 功能函数
 /**
  * 解析路径的真实路径（处理不存在的路径和符号链接）
  * @param {string} absolutePath - 绝对路径

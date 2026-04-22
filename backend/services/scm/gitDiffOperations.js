@@ -12,6 +12,8 @@ import { validateRepository } from './gitValidator.js';
 import { gitSpawn } from './gitSpawn.js';
 import { stripDiffHeaders } from './gitStatusParser.js';
 
+// 由文件 diff API 调用，获取单个文件相对于暂存区或 HEAD 的差异
+// gitDiffOperations.js 功能函数
 /**
  * 获取特定文件的 diff
  * @param {string} projectPath - 项目路径
@@ -47,6 +49,7 @@ export async function getFileDiff(projectPath, file) {
     return stripDiffHeaders(stagedDiff) || '';
 }
 
+// gitDiffOperations.js 功能函数
 /**
  * 获取文件内容和 diff 信息（用于 CodeEditor）
  * @param {string} projectPath - 项目路径

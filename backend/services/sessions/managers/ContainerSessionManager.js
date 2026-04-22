@@ -18,11 +18,13 @@ import {
 } from '../container/ContainerSessions.js';
 import { PassThrough } from 'stream';
 
+// ContainerSessionManager.js 功能函数
 /**
  * 容器会话管理器
  * 管理容器中的 Claude CLI 会话文件
  */
 export class ContainerSessionManager extends BaseSessionManager {
+// ContainerSessionManager.js 功能函数
   /**
    * 构造函数
    * @param {Object} config - 管理器配置
@@ -36,6 +38,7 @@ export class ContainerSessionManager extends BaseSessionManager {
     this.managerType = 'container';
   }
 
+// ContainerSessionManager.js 功能函数
   /**
    * 获取会话文件路径
    * @private
@@ -48,6 +51,7 @@ export class ContainerSessionManager extends BaseSessionManager {
     return `${CONTAINER.paths.projects}/${encodedProjectName}/${sessionId}.jsonl`;
   }
 
+// 由会话 API 调用，从容器中获取项目的所有会话
   /**
    * 获取会话列表
    * @param {Object} options - 选项
@@ -77,6 +81,7 @@ export class ContainerSessionManager extends BaseSessionManager {
     }
   }
 
+// ContainerSessionManager.js 功能函数
   /**
    * 获取会话消息
    * @param {string} sessionId - 会话 ID
@@ -110,6 +115,7 @@ export class ContainerSessionManager extends BaseSessionManager {
     }
   }
 
+// 由删除 API 调用，从容器中删除指定会话
   /**
    * 删除会话
    * @param {string} sessionId - 会话 ID
@@ -136,6 +142,7 @@ export class ContainerSessionManager extends BaseSessionManager {
     }
   }
 
+// ContainerSessionManager.js 功能函数
   /**
    * 获取会话统计信息
    * @param {Object} options - 选项
@@ -177,6 +184,7 @@ export class ContainerSessionManager extends BaseSessionManager {
     }
   }
 
+// ContainerSessionManager.js 功能函数
   /**
    * 搜索会话
    * @param {string} query - 搜索查询
@@ -208,6 +216,7 @@ export class ContainerSessionManager extends BaseSessionManager {
     }
   }
 
+// ContainerSessionManager.js 功能函数
   /**
    * 读取命令输出
    * @private

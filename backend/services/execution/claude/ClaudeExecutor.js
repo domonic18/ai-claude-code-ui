@@ -33,6 +33,7 @@ const logger = createLogger('services/execution/claude/ClaudeExecutor');
  * 提供统一的 Claude 执行接口
  */
 export class ClaudeExecutor {
+// 内部功能调用
   /**
    * 构造函数
    * @param {Object} config - 配置选项

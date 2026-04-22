@@ -11,6 +11,7 @@ import { CLAUDE_MODELS } from '../../../../shared/modelConstants.js';
 import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('services/execution/claude/OptionsMapper');
 
+// 由 mapCliOptionsToSDK 调用，从环境变量读取自定义 Anthropic API 配置
 /**
  * 获取自定义 API 配置
  * @returns {Object} 自定义 API 配置
@@ -23,6 +24,7 @@ function getCustomApiConfig() {
   };
 }
 
+// 由 buildToolPermissions 调用，返回 Claude SDK 默认启用的工具列表
 /**
  * 构建默认工具列表
  * @returns {Array<string>} 默认工具列表
@@ -53,6 +55,7 @@ function getDefaultTools() {
   ];
 }
 
+// 由 mapCliOptionsToSDK 调用，根据权限模式构建工具允许/拒绝列表
 /**
  * 构建工具权限配置
  * @param {Object} settings - 工具设置
@@ -94,6 +97,7 @@ function buildToolPermissions(settings, permissionMode) {
   return result;
 }
 
+// 由 mapCliOptionsToSDK 调用，将环境变量中的自定义 API 配置应用到 SDK 选项
 /**
  * 应用自定义 API 配置
  * @param {Object} sdkOptions - SDK 选项对象
@@ -127,6 +131,7 @@ function applyCustomApiConfig(sdkOptions, options) {
   return sdkOptions;
 }
 
+// 由 Claude 执行器调用，将前端传入的选项转换为 Claude SDK 所需格式
 /**
  * 将 CLI 选项映射为 SDK 兼容的选项格式
  * @param {Object} options - CLI 选项
@@ -177,6 +182,7 @@ export function mapCliOptionsToSDK(options = {}) {
   return sdkOptions;
 }
 
+// 由 Claude 执行器调用，验证必需的 SDK 选项是否完整
 /**
  * 验证 SDK 选项
  * @param {Object} options - SDK 选项

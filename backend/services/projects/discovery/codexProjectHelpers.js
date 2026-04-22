@@ -8,6 +8,7 @@
 
 import path from 'path';
 
+// codexProjectHelpers.js 功能函数
 /**
  * Add session data to project map
  * @param {Map} projectMap - Project mapping
@@ -45,6 +46,7 @@ export function addSessionToProject(projectMap, sessionData, normalizeSession) {
   }
 }
 
+// 在返回项目列表前调用，按最后活动时间降序排序
 /**
  * Sort projects by last activity
  * @param {Array} projects - Projects array
@@ -58,6 +60,7 @@ export function sortProjectsByActivity(projects) {
   });
 }
 
+// 在返回会话列表前调用，按最后活动时间降序排序
 /**
  * Sort sessions by last activity
  * @param {Array} sessions - Sessions array
@@ -67,6 +70,7 @@ export function sortSessionsByActivity(sessions) {
   return sessions.sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
 }
 
+// 在解析完会话后调用，按项目路径分组构建项目映射
 /**
  * Build project map from session data
  * @param {Array} sessionDataList - Array of session data
@@ -85,6 +89,7 @@ export function buildProjectMap(sessionDataList, normalizeSession) {
   return projectMap;
 }
 
+// 在解析会话后调用，添加文件路径等元数据并规范化
 /**
  * Normalize session with metadata
  * @param {Object} sessionData - Raw session data

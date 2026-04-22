@@ -31,6 +31,7 @@ export function parseStatusOutput(statusOutput) {
     return { modified, added, deleted, untracked };
 }
 
+// gitStatusParser.js 功能函数
 /**
  * 去除 git diff 头部信息
  * @param {string} diff - 原始 diff 输出

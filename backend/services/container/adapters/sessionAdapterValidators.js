@@ -8,6 +8,7 @@
 
 import { PathUtils } from '../../core/utils/path-utils.js';
 
+// SessionAdapter 在所有操作前调用此函数验证项目标识符
 /**
  * Validates project identifier
  * @param {string} projectIdentifier - Project identifier

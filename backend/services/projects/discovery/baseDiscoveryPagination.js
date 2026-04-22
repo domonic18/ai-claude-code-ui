@@ -6,6 +6,7 @@
  * @module projects/discovery/baseDiscoveryPagination
  */
 
+// 在返回项目或会话列表前调用，根据前端请求参数进行排序和分页
 /**
  * Applies pagination and sorting to items
  * @param {Array} items - Items to paginate (projects/sessions)

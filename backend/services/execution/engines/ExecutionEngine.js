@@ -22,6 +22,7 @@ const logger = createLogger('services/execution/engines/ExecutionEngine');
  * 在用户专属的 Docker 容器中执行 Claude SDK 调用
  */
 export class ExecutionEngine extends BaseExecutionEngine {
+  // 由容器管理器初始化时调用，创建容器化执行引擎实例
   /**
    * 构造函数
    * @param {Object} config - 引擎配置
@@ -36,6 +37,7 @@ export class ExecutionEngine extends BaseExecutionEngine {
     this.requiresUserId = true;
   }
 
+  // 由 WebSocket 聊天处理器调用，在用户专属 Docker 容器内执行 Claude SDK 查询
   /**
    * 执行 Claude 命令（容器模式）
    * @param {string} command - 用户命令
@@ -146,6 +148,7 @@ export class ExecutionEngine extends BaseExecutionEngine {
     }
   }
 
+  // 由用户中止操作调用，终止容器内正在执行的 Claude 会话
   /**
    * 中止会话
    * @param {string} sessionId - 会话 ID
@@ -178,6 +181,7 @@ export class ExecutionEngine extends BaseExecutionEngine {
     }
   }
 
+  // 由 execute 方法调用，将主机路径映射到容器内的路径
   /**
    * 映射工作目录到容器路径
    * @private

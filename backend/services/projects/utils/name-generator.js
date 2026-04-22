@@ -8,6 +8,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 
+// 在项目列表展示时调用，为项目生成友好的显示名称（优先使用 package.json 的 name 字段）
 /**
  * 从项目路径生成更好的显示名称
  * @param {string} projectName - 项目名称（编码后的）
