@@ -19,6 +19,10 @@ const CONFIG_PATHS = [
     () => path.join(os.homedir(), '.claude', 'settings.json'),
 ];
 
+/**
+ * 依次尝试读取 Claude CLI 的两个配置文件（~/.claude.json → ~/.claude/settings.json）
+ * @returns {Promise<{data: Object, path: string}|null} 解析后的 JSON 配置及文件路径，均不存在则返回 null
+ */
 async function loadClaudeConfig() {
     for (const getPath of CONFIG_PATHS) {
         try {
@@ -30,7 +34,10 @@ async function loadClaudeConfig() {
     return null;
 }
 
-// 检测 task-master-ai MCP 服务器是否已配置，用于任务管理功能前置检查
+/**
+ * 检测 task-master-ai MCP 服务器是否已配置，用于任务管理功能前置检查
+ * @returns {Promise<{hasMCPServer: boolean, reason?: string, hasConfig: boolean, configPath?: string, availableServers?: string[], serverInfo?: Object}>}
+ */
 export async function detectTaskMasterMCPServer() {
     try {
         const config = await loadClaudeConfig();
@@ -56,7 +63,10 @@ export async function detectTaskMasterMCPServer() {
     }
 }
 
-// 返回用户级和项目级所有已配置的 MCP 服务器，供设置页面展示
+/**
+ * 返回用户级和项目级所有已配置的 MCP 服务器，供设置页面展示
+ * @returns {Promise<{hasConfig: boolean, configPath?: string, servers: Object, projectServers: Object, error?: string}>}
+ */
 export async function getAllMCPServers() {
     try {
         const config = await loadClaudeConfig();

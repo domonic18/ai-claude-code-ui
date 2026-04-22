@@ -6,7 +6,13 @@ const logger = createLogger('middleware/auth');
 
 const { User } = repositories;
 
-// 可选的 API 密钥中间件
+/**
+ * API 密钥验证中间件（可选）
+ * 仅在 AUTH.apiKey 已配置时生效，否则直接放行
+ * @param {import('express').Request} req - Express 请求对象
+ * @param {import('express').Response} res - Express 响应对象
+ * @param {import('express').NextFunction} next - Express next 函数
+ */
 const validateApiKey = (req, res, next) => {
   // 如果未配置，则跳过 API 密钥验证
   if (!AUTH.apiKey) {
@@ -20,7 +26,14 @@ const validateApiKey = (req, res, next) => {
   next();
 };
 
-// JWT 认证中间件
+/**
+ * JWT 认证中间件
+ * 平台模式直接取数据库首个用户；普通模式从 cookie 或 Authorization header 解析 JWT，
+ * 验证后将用户信息挂载到 req.user
+ * @param {import('express').Request} req - Express 请求对象
+ * @param {import('express').Response} res - Express 响应对象
+ * @param {import('express').NextFunction} next - Express next 函数
+ */
 const authenticateToken = async (req, res, next) => {
   // 平台模式：使用单个数据库用户
   if (SERVER.isPlatform) {
@@ -77,7 +90,11 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
-// 生成 JWT 令牌（永不过期）
+/**
+ * 生成永不过期的 JWT 令牌，payload 包含 userId 和 username
+ * @param {{id: number, username: string}} user - 数据库用户对象
+ * @returns {string} 签名后的 JWT 字符串
+ */
 const generateToken = (user) => {
   return jwt.sign(
     {
@@ -89,7 +106,12 @@ const generateToken = (user) => {
   );
 };
 
-// WebSocket 认证函数
+/**
+ * WebSocket 连接认证：验证 JWT 并查询数据库确认用户仍存在
+ * 平台模式直接返回首个用户，跳过令牌验证
+ * @param {string|undefined} token - 客户端传入的 JWT 令牌
+ * @returns {{userId: number, username: string}|null} 认证成功返回用户信息，失败返回 null
+ */
 const authenticateWebSocket = (token) => {
   // 平台模式：绕过令牌验证，返回第一个用户
   if (SERVER.isPlatform) {
