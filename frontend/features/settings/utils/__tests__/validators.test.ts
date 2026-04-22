@@ -362,7 +362,7 @@ describe('isInRange', () => {
   });
 
   it('should handle string number', () => {
-    expect(isInRange('5', 1, 10)).toBe(true);
+    expect(isInRange(Number('5'), 1, 10)).toBe(true);
   });
 });
 

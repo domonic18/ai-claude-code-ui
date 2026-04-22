@@ -54,7 +54,7 @@ function isMessageGrouped(messageType: string, prevMessage?: any): boolean {
  * @param messageType - 消息类型
  * @returns 头部显示类型
  */
-function getDisplayHeaderType(messageType: string): string {
+function getDisplayHeaderType(messageType: string): 'error' | 'assistant' | 'tool' {
   if (messageType === 'tool') return 'tool';
   if (messageType === 'error') return 'error';
   return 'assistant';

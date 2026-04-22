@@ -33,18 +33,17 @@ import SettingToggle from './SettingToggle';
  * @param {boolean} props.sendByCtrlEnter - 是否使用 Ctrl+Enter 发送消息
  * @param {Function} props.onSendByCtrlEnterChange - Ctrl+Enter 发送设置变更处理函数
  */
-// 设置内容组件的 TypeScript 类型接口定义
-interface SettingsContentProps {
-  autoExpandTools: boolean;                      // 是否自动展开工具
-  onAutoExpandChange: (checked: boolean) => void;  // 自动展开工具变更回调
-  showRawParameters: boolean;                    // 是否显示原始参数
-  onShowRawParametersChange: (checked: boolean) => void;  // 显示原始参数变更回调
-  showThinking: boolean;                         // 是否显示思考过程
-  onShowThinkingChange: (checked: boolean) => void;  // 显示思考过程变更回调
-  autoScrollToBottom: boolean;                   // 是否自动滚动到底部
-  onAutoScrollChange: (checked: boolean) => void;  // 自动滚动变更回调
-  sendByCtrlEnter: boolean;                      // 是否使用 Ctrl+Enter 发送
-  onSendByCtrlEnterChange: (checked: boolean) => void;  // Ctrl+Enter 发送变更回调
+export interface SettingsContentProps {
+  autoExpandTools: boolean;                                 // 是否自动展开工具
+  onAutoExpandChange: (checked: boolean) => void;           // 自动展开工具变更回调
+  showRawParameters: boolean;                               // 是否显示原始参数
+  onShowRawParametersChange: (checked: boolean) => void;    // 显示原始参数变更回调
+  showThinking: boolean;                                    // 是否显示思考过程
+  onShowThinkingChange: (checked: boolean) => void;         // 显示思考过程变更回调
+  autoScrollToBottom: boolean;                              // 是否自动滚动到底部
+  onAutoScrollChange: (checked: boolean) => void;           // 自动滚动变更回调
+  sendByCtrlEnter: boolean;                                 // 是否使用 Ctrl+Enter 发送
+  onSendByCtrlEnterChange: (checked: boolean) => void;      // Ctrl+Enter 发送变更回调
 }
 
 /**

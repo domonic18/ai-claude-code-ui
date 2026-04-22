@@ -1,7 +1,7 @@
 // 引入 React 框架和 Lucide 图标库
 import React from 'react';
 import { X, Save, Download, Maximize2, Minimize2, Eye, Edit } from 'lucide-react';
-import type { CodeEditorFile } from '../types/editor.types';
+import type { EditorFile } from '../types/editor.types';
 
 // 布局常量：工具栏按钮间距、图标尺寸等
 
@@ -11,17 +11,17 @@ import type { CodeEditorFile } from '../types/editor.types';
  * 定义文件信息、显示状态、操作回调等属性
  */
 interface CodeEditorHeaderProps {
-    file: CodeEditorFile;              // 当前打开的文件信息（包含路径、名称、diff 信息等）
-    isSidebar: boolean;                 // 是否在侧边栏中显示
-    isFullscreen: boolean;              // 是否全屏模式
-    isMarkdownFile: boolean;            // 是否为 Markdown 文件（决定是否显示预览切换按钮）
-    previewMode: 'edit' | 'preview' | 'split';  // Markdown 预览模式：编辑/预览/分屏
-    saveSuccess: boolean;               // 保存是否成功（用于显示成功状态）
-    saving: boolean;                    // 是否正在保存中
-    onDownload: () => void;             // 下载文件回调
-    onSave: () => void;                 // 保存文件回调
-    onClose: () => void;                // 关闭编辑器回调
-    onToggleFullscreen: () => void;     // 切换全屏模式回调
+    file: EditorFile;                                        // 当前打开的文件信息（包含路径、名称、diff 信息等）
+    isSidebar: boolean;                                      // 是否在侧边栏中显示
+    isFullscreen: boolean;                                   // 是否全屏模式
+    isMarkdownFile: boolean;                                 // 是否为 Markdown 文件（决定是否显示预览切换按钮）
+    previewMode: 'edit' | 'preview' | 'split';              // Markdown 预览模式：编辑/预览/分屏
+    saveSuccess: boolean;                                    // 保存是否成功（用于显示成功状态）
+    saving: boolean;                                         // 是否正在保存中
+    onDownload: () => void;                                  // 下载文件回调
+    onSave: () => void;                                      // 保存文件回调
+    onClose: () => void;                                     // 关闭编辑器回调
+    onToggleFullscreen: () => void;                          // 切换全屏模式回调
     onSetPreviewMode: (mode: 'edit' | 'preview' | 'split') => void;  // 设置预览模式回调
 }
 

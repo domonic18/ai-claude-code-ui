@@ -466,13 +466,13 @@ describe('terminalThemes', () => {
     });
 
     it('should fall back to default for unknown theme', () => {
-      const colors = getTerminalThemeColors('unknown-theme');
+      const colors = getTerminalThemeColors('unknown-theme' as any);
       const defaultColors = getTerminalThemeColors('default');
       expect(colors).toEqual(defaultColors);
     });
 
     it('should handle empty string theme', () => {
-      const colors = getTerminalThemeColors('');
+      const colors = getTerminalThemeColors('' as any);
       const defaultColors = getTerminalThemeColors('default');
       expect(colors).toEqual(defaultColors);
     });

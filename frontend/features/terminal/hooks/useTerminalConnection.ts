@@ -59,7 +59,7 @@ export { extractExitCode };
 /**
  * Establish WebSocket connection for terminal
  */
-interface WebSocketConnectionParams {
+export interface WebSocketConnectionParams {
   isConnected: boolean;
   isConnectingRef: React.MutableRefObject<boolean>;
   setIsConnected: (state: boolean) => void;

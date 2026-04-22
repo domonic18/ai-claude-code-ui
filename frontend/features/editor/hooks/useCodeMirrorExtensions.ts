@@ -1,6 +1,6 @@
 // CodeMirror 扩展组合 hook：将 minimap、diff 跳转、工具栏面板等扩展按依赖项缓存
 import { useMemo } from 'react';
-import type { CodeEditorFile } from '../types/editor.types';
+import type { EditorFile } from '../types/editor.types';
 import {
     createMinimapExtension,
     createScrollToFirstChunkExtension,
@@ -9,7 +9,7 @@ import {
 
 // 扩展选项接口：文件、diff、主题、侧边栏、展开状态、回调函数
 interface UseCodeMirrorExtensionsProps {
-    file: CodeEditorFile;
+    file: EditorFile;
     showDiff: boolean;
     isDarkMode: boolean;
     isSidebar: boolean;

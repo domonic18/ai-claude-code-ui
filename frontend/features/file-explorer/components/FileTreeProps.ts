@@ -53,7 +53,7 @@ interface Dnd {
   isDragOverRoot: boolean;
   handleDragStart: (item: any, e: React.DragEvent) => void;
   handleDragOver: (item: any | null, e: React.DragEvent) => void;
-  handleScrollAreaDragLeave: () => void;
+  handleScrollAreaDragLeave: (e: React.DragEvent) => void;
   handleDrop: (item: any | null, e: React.DragEvent) => void;
 }
 

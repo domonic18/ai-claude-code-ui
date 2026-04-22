@@ -1,34 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import SettingsContent from './quick-settings/SettingsContent';
+import type { SettingsContentProps } from './quick-settings/SettingsContent';
 import SettingsPanelLayout from './quick-settings/SettingsPanelLayout';
 
 /**
- * Quick settings panel component
- * @param {Object} props - Component props
- * @param {boolean} props.isOpen - Whether the panel is open
- * @param {Function} props.onToggle - Toggle handler
- * @param {boolean} props.autoExpandTools - Auto-expand tools setting
- * @param {Function} props.onAutoExpandChange - Auto-expand tools change handler
- * @param {boolean} props.showRawParameters - Show raw parameters setting
- * @param {Function} props.onShowRawParametersChange - Show raw parameters change handler
- * @param {boolean} props.showThinking - Show thinking setting
- * @param {Function} props.onShowThinkingChange - Show thinking change handler
- * @param {boolean} props.autoScrollToBottom - Auto-scroll to bottom setting
- * @param {Function} props.onAutoScrollChange - Auto-scroll change handler
- * @param {boolean} props.sendByCtrlEnter - Send by Ctrl+Enter setting
- * @param {Function} props.onSendByCtrlEnterChange - Send by Ctrl+Enter change handler
- * @param {boolean} props.isMobile - Whether in mobile view
- */
-/**
  * 快捷设置面板：右侧拉手导航 + 遮罩层，聚合各项聊天行为偏好开关
  */
+interface QuickSettingsPanelProps extends SettingsContentProps {
+  /** Whether the panel is open */
+  isOpen: boolean;
+  /** Toggle handler */
+  onToggle: (isOpen: boolean) => void;
+  /** Whether in mobile view */
+  isMobile: boolean;
+}
+
+
 const QuickSettingsPanel = ({
   isOpen,
   onToggle,
   isMobile,
   ...settingsProps
-}) => {
+}: QuickSettingsPanelProps) => {
   const [localIsOpen, setLocalIsOpen] = useState(isOpen);
 
   useEffect(() => {

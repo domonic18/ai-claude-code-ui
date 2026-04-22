@@ -8,6 +8,7 @@ import { FileAttachmentsPreview } from './FileAttachmentsPreview';
 import { ChatInputContainer } from './ChatInputContainer';
 import { ChatInputHint } from './ChatInputHint';
 import { ChatInputMenus } from './ChatInputMenus';
+import type { ChatInputMenusProps } from './ChatInputMenus';
 import type { FileAttachment } from '../types';
 
 interface ChatInputWrapperProps {
@@ -15,10 +16,10 @@ interface ChatInputWrapperProps {
   files: FileAttachment[];
   /** Handle remove file */
   handleRemoveFile: (fileId: string) => void;
-  /** Get root props */
-  getRootProps: () => Record<string, unknown>;
-  /** Get input props */
-  getInputProps: () => Record<string, unknown>;
+  /** Get root props (react-dropzone) */
+  getRootProps: (props?: any) => any;
+  /** Get input props (react-dropzone) */
+  getInputProps: (props?: any) => any;
   /** Is drag active */
   isDragActive: boolean;
   /** Is focused */
@@ -58,7 +59,7 @@ interface ChatInputWrapperProps {
   /** Has selected project */
   hasProject: boolean;
   /** Menu props */
-  menuProps: Record<string, unknown>;
+  menuProps: Partial<ChatInputMenusProps>;
 }
 
 export function ChatInputWrapper({
@@ -127,7 +128,7 @@ export function ChatInputWrapper({
       />
 
       {/* Menus */}
-      <ChatInputMenus {...menuProps} />
+      <ChatInputMenus {...(menuProps as ChatInputMenusProps)} />
     </div>
   );
 }

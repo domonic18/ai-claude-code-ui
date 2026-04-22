@@ -623,7 +623,7 @@ describe('requestDeduplicator', () => {
 
     describe('isPending', () => {
       it('should return true for pending requests', () => {
-        let resolveFn: () => void;
+        let resolveFn: (value?: unknown) => void;
         const mockFn = vi.fn().mockImplementation(() => new Promise(resolve => { resolveFn = resolve; }));
 
         deduplicator.dedupe('pending-key', mockFn);
@@ -642,8 +642,8 @@ describe('requestDeduplicator', () => {
 
     describe('pendingCount', () => {
       it('should track pending request count', async () => {
-        let resolveFn1: () => void;
-        let resolveFn2: () => void;
+        let resolveFn1: (value?: unknown) => void;
+        let resolveFn2: (value?: unknown) => void;
 
         const mockFn1 = vi.fn().mockImplementation(() => new Promise(resolve => { resolveFn1 = resolve; }));
         const mockFn2 = vi.fn().mockImplementation(() => new Promise(resolve => { resolveFn2 = resolve; }));

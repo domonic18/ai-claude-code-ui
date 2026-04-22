@@ -7,7 +7,7 @@
  * @module features/editor/utils/editorToolbarAssets
  */
 
-import type { EditorView } from '@codemirror/view';
+import { EditorView } from '@codemirror/view';
 
 // ─── SVG Icons ──────────────────────────────────────────
 
@@ -105,7 +105,7 @@ export function buildActionsHTML(options: ToolbarPanelOptions): string {
 export function bindToolbarEvents(
     dom: HTMLDivElement,
     view: EditorView,
-    chunks: Array<{ fromB: number }>,
+    chunks: ReadonlyArray<{ fromB: number }>,
     currentIndexRef: { value: number },
     updatePanel: () => void,
     options: ToolbarPanelOptions

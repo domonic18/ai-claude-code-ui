@@ -5,26 +5,26 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { githubLight } from '@uiw/codemirror-theme-github';
 import { unifiedMergeView } from '@codemirror/merge';
 import { EditorView } from '@codemirror/view';
-import type { CodeEditorFile } from '../types/editor.types';
+import type { EditorFile } from '../types/editor.types';
 import { getLanguageExtension } from '../utils/CodeMirrorSetup';
 
 /**
  * CodeMirror 编辑器面板属性接口
  */
 interface CodeEditorPanelProps {
-    file: CodeEditorFile;                                  // 文件信息
-    content: string;                                        // 编辑器内容
-    showDiff: boolean;                                      // 是否显示 diff
-    wordWrap: boolean;                                      // 是否自动换行
-    isDarkMode: boolean;                                    // 是否暗色模式
-    fontSize: string;                                       // 字体大小
-    showLineNumbers: boolean;                               // 是否显示行号
-    previewMode: 'edit' | 'preview' | 'split';             // 预览模式
-    editorRef: React.RefObject<any>;                        // CodeMirror 实例引用
-    editorToolbarPanel: any[];                              // 工具栏面板扩展
-    minimapExtension: any[];                                // Minimap 扩展
-    scrollToFirstChunkExtension: any[];                     // 滚动到第一个 diff chunk 扩展
-    setContent: (content: string) => void;                  // 设置内容回调
+    file: EditorFile;                                        // 文件信息
+    content: string;                                         // 编辑器内容
+    showDiff: boolean;                                       // 是否显示 diff
+    wordWrap: boolean;                                       // 是否自动换行
+    isDarkMode: boolean;                                     // 是否暗色模式
+    fontSize: string;                                        // 字体大小
+    showLineNumbers: boolean;                                // 是否显示行号
+    previewMode: 'edit' | 'preview' | 'split';              // 预览模式
+    editorRef: React.RefObject<any>;                         // CodeMirror 实例引用
+    editorToolbarPanel: any[];                               // 工具栏面板扩展
+    minimapExtension: any[];                                 // Minimap 扩展
+    scrollToFirstChunkExtension: any[];                      // 滚动到第一个 diff chunk 扩展
+    setContent: (content: string) => void;                   // 设置内容回调
 }
 
 /**

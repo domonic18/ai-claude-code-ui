@@ -30,6 +30,18 @@ export type McpScope = 'user' | 'project';
 
 // MCP 服务器配置接口
 /**
+ * MCP Server transport configuration (command/url, args, env, etc.)
+ */
+export interface McpConfig {
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  url?: string;
+  headers?: Record<string, string>;
+  timeout?: number;
+}
+
+/**
  * MCP Server configuration
  */
 export interface McpServer {
@@ -38,14 +50,7 @@ export interface McpServer {
   type: McpTransportType;
   scope: McpScope;
   projectPath?: string;
-  config: {
-    command?: string;
-    args?: string[];
-    env?: Record<string, string>;
-    url?: string;
-    headers?: Record<string, string>;
-    timeout?: number;
-  };
+  config: McpConfig;
   enabled?: boolean;
   raw?: any;
   jsonInput?: string;

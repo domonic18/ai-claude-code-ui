@@ -14,6 +14,7 @@
 
 import { logger } from '@/shared/utils/logger';
 import { buildInitMessage } from '../utils/webSocketFactory';
+import type { WebSocketConnectionParams } from './useTerminalConnection';
 
 /**
  * 从终端输出中提取进程退出码
