@@ -62,8 +62,10 @@ interface UseStreamBufferReturn {
   updateStreamThinking: (thinking: string) => void;
   /** Get buffer content */
   getBufferContent: () => { content: string; thinking: string };
-  /** Reset buffers */
+  /** Reset buffers only (keep state) */
   resetBuffers: () => void;
+  /** Reset all buffers, refs, and state */
+  resetAll: () => void;
 }
 
 /**
