@@ -1,3 +1,4 @@
+// CodeMirror 编辑器面板：封装编辑器实例，支持 diff 对比视图、minimap、自动换行等扩展
 import React from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { oneDark } from '@codemirror/theme-one-dark';
@@ -38,6 +39,7 @@ export function CodeEditorPanel({
     scrollToFirstChunkExtension,
     setContent
 }: CodeEditorPanelProps) {
+    // 纯预览模式下隐藏编辑面板，节省 DOM 渲染开销
     if (previewMode === 'preview') {
         return null;
     }
@@ -51,6 +53,7 @@ export function CodeEditorPanel({
                 extensions={[
                     ...getLanguageExtension(file.name),
                     ...editorToolbarPanel,
+                    // diff 视图使用 unifiedMergeView 扩展，对比 AI 修改前后的代码差异
                     ...(file.diffInfo && showDiff && file.diffInfo.old_string !== undefined
                         ? [
                             unifiedMergeView({

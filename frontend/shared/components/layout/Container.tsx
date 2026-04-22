@@ -1,3 +1,4 @@
+// 页面内容容器：提供响应式最大宽度约束和水平内边距，5 种断点尺寸适配不同布局
 import React from 'react';
 import { cn } from '@/lib/utils';
 

@@ -1,3 +1,4 @@
+// MCP 服务器检测工具：读取 ~/.claude.json 和 ~/.claude/settings.json，查找已配置的 MCP 服务器
 import { promises as fsPromises } from 'fs';
 import path from 'path';
 import os from 'os';
@@ -12,6 +13,7 @@ import {
 
 const logger = createLogger('utils/mcp-detector');
 
+// Claude CLI 的两个配置文件路径，按优先级依次尝试读取
 const CONFIG_PATHS = [
     () => path.join(os.homedir(), '.claude.json'),
     () => path.join(os.homedir(), '.claude', 'settings.json'),
@@ -28,6 +30,7 @@ async function loadClaudeConfig() {
     return null;
 }
 
+// 检测 task-master-ai MCP 服务器是否已配置，用于任务管理功能前置检查
 export async function detectTaskMasterMCPServer() {
     try {
         const config = await loadClaudeConfig();
@@ -53,6 +56,7 @@ export async function detectTaskMasterMCPServer() {
     }
 }
 
+// 返回用户级和项目级所有已配置的 MCP 服务器，供设置页面展示
 export async function getAllMCPServers() {
     try {
         const config = await loadClaudeConfig();

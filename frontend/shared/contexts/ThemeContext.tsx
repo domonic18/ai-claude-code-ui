@@ -1,3 +1,4 @@
+// 全局暗色模式状态管理：基于 localStorage 持久化 + 跟随系统偏好自动切换
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export interface ThemeContextValue {
@@ -20,6 +21,7 @@ export interface ThemeProviderProps {
 }
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
+  // 优先读取用户显式选择，其次跟随系统偏好，默认浅色
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme) {
@@ -33,6 +35,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     return false;
   });
 
+  // 同步 <html> class 和 <meta> 标签，影响 Tailwind dark: 变量和移动端状态栏颜色
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
@@ -63,6 +66,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     }
   }, [isDarkMode]);
 
+  // 监听系统暗色模式变化，仅在用户未手动选择时跟随系统
   useEffect(() => {
     if (!window.matchMedia) return;
 
@@ -78,6 +82,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
+  // 切换函数由 Context 暴露给所有子组件
   const toggleDarkMode = (): void => {
     setIsDarkMode(prev => !prev);
   };

@@ -1,3 +1,4 @@
+// 代码编辑器主入口组件：组装 Header/Content/Footer 子组件，协调编辑器状态和 CodeMirror 扩展
 import React, { useMemo } from 'react';
 import type { CodeEditorComponentProps } from '../types/editor.types';
 import { useCodeEditorState } from '../hooks/useCodeEditorState';
@@ -25,6 +26,7 @@ function CodeEditor({
         handleSave, handleDownload, handleToggleDiff
     } = useCodeEditorState({ file, projectPath, onClose });
 
+    // Markdown 文件支持预览模式切换，其他文件类型隐藏预览按钮
     const isMarkdownFile = useMemo(() => {
         const ext = file.name.split('.').pop()?.toLowerCase();
         return ext === 'md' || ext === 'markdown';

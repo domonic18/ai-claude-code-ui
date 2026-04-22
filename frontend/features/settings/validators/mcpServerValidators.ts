@@ -1,3 +1,4 @@
+// MCP 服务器配置校验：验证 stdio/sse/http 三种类型的服务器配置字段完整性
 import type { McpServer } from '../types/settings.types';
 
 export interface ValidationResult {
@@ -5,6 +6,7 @@ export interface ValidationResult {
   errors: string[];
 }
 
+// 条件追加错误消息的简写，集中错误收集逻辑
 function addError(errors: string[], condition: boolean, message: string): void {
   if (condition) errors.push(message);
 }
@@ -34,6 +36,7 @@ function validateServerScope(scope: string | undefined, projectPath: string | un
   addError(errors, scope === 'project' && !projectPath, 'Project path is required when scope is project');
 }
 
+// stdio 类型必须有 command，sse/http 类型必须有合法 URL，timeout 上限 5 分钟
 function validateServerConfig(server: Partial<McpServer>, errors: string[]): void {
   if (server.type === 'stdio') {
     addError(errors, !server.config?.command || server.config.command.trim().length === 0, 'Command is required for stdio type');

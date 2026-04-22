@@ -1,3 +1,4 @@
+// Claude AI 推理状态栏：展示实时推理进度，模拟 token 生成速率和已用时间
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +20,7 @@ function ClaudeStatus({ status, onAbort, isLoading, provider = 'claude' }: Claud
   const [animationPhase, setAnimationPhase] = useState(0);
   const [fakeTokens, setFakeTokens] = useState(0);
 
+  // 加载开始时启动计时器，每秒更新已用时间和估算 token 数
   useEffect(() => {
     if (!isLoading) {
       setElapsedTime(0);
@@ -27,7 +29,7 @@ function ClaudeStatus({ status, onAbort, isLoading, provider = 'claude' }: Claud
     }
 
     const startTime = Date.now();
-    const tokenRate = 30 + Math.random() * 20;
+    const tokenRate = 30 + Math.random() * 20; // 模拟 token 生成速率（30-50 tokens/s），SDK 未返回真实速率时用作估算
 
     const timer = setInterval(() => {
       const elapsed = Math.floor((Date.now() - startTime) / 1000);
@@ -38,6 +40,7 @@ function ClaudeStatus({ status, onAbort, isLoading, provider = 'claude' }: Claud
     return () => clearInterval(timer);
   }, [isLoading]);
 
+  // 旋转动画相位切换，每 500ms 循环 4 个符号
   useEffect(() => {
     if (!isLoading) return;
 
@@ -50,12 +53,13 @@ function ClaudeStatus({ status, onAbort, isLoading, provider = 'claude' }: Claud
 
   if (!isLoading) return null;
 
+  // 无具体状态文本时，每 3 秒轮换一个动作词给用户进度感
   const actionWords = ['Thinking', 'Processing', 'Analyzing', 'Working', 'Computing', 'Reasoning'];
   const actionIndex = Math.floor(elapsedTime / 3) % actionWords.length;
 
   const statusText = status?.text || actionWords[actionIndex];
   const tokens = status?.tokens || fakeTokens;
-  const canInterrupt = status?.can_interrupt !== false;
+  const canInterrupt = status?.can_interrupt !== false; // 默认允许中断，仅当服务端明确禁止时隐藏停止按钮
 
   const spinners = ['✻', '✹', '✸', '✶'];
   const currentSpinner = spinners[animationPhase];
