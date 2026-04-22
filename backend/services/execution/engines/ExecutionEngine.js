@@ -12,7 +12,7 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import containerManager from '../../container/core/index.js';
 import { executeInContainer } from '../../container/claude/DockerExecutor.js';
-import { createSession, updateSession } from '../../container/claude/SessionManager.js';
+import { createSession, updateSession, abortSession } from '../../container/claude/SessionManager.js';
 import { CONTAINER } from '../../../config/config.js';
 import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('services/execution/engines/ExecutionEngine');
@@ -169,10 +169,11 @@ export class ExecutionEngine extends BaseExecutionEngine {
       });
 
       this._updateSession(sessionId, { status: 'aborted' });
-      this._removeSession(sessionId);
 
-      // TODO: 通知容器中止执行
-      // 需要在容器中实现中止机制
+      // 通过 SessionManager 销毁 Docker exec stream 来终止容器内进程
+      await abortSession(sessionId);
+
+      this._removeSession(sessionId);
 
       return true;
     } catch (error) {

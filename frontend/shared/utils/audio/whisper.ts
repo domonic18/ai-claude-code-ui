@@ -31,11 +31,39 @@ export async function transcribeWithWhisper(audioBlob: Blob): Promise<string> {
   return result.text || '';
 }
 
+/** 缓存后端可用性检查结果，避免频繁请求 */
+let cachedAvailable: boolean | null = null;
+let lastCheckTime = 0;
+const CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 分钟内复用缓存结果
+
 /**
- * Check if transcription is available
+ * 检查后端语音转写服务是否可用
+ *
+ * 通过向 /api/transcribe 发送 HEAD/OPTIONS 预检请求判断服务端是否配置了
+ * OPENAI_API_KEY 并正常响应。结果会缓存 5 分钟以减少网络开销。
+ *
+ * @returns 是否可用
  */
-export function isTranscriptionAvailable(): boolean {
-  return true; // TODO: Check backend availability
+export async function isTranscriptionAvailable(): Promise<boolean> {
+  const now = Date.now();
+  if (cachedAvailable !== null && now - lastCheckTime < CHECK_INTERVAL_MS) {
+    return cachedAvailable;
+  }
+
+  try {
+    const response = await fetch('/api/transcribe', {
+      method: 'HEAD',
+      credentials: 'include',
+    });
+    // 405 = 端点存在但不支持 HEAD，说明路由已注册 → 可用
+    // 500 = 端点存在但缺少 API Key → 不可用
+    cachedAvailable = response.status === 405 || response.ok;
+  } catch {
+    cachedAvailable = false;
+  }
+
+  lastCheckTime = now;
+  return cachedAvailable;
 }
 
 /**
