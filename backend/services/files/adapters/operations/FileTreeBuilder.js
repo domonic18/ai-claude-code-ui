@@ -11,6 +11,7 @@ import { PassThrough } from 'stream';
 import containerManager from '../../../container/core/index.js';
 import { parseFileTreeOutput, buildTreeStructure } from './fileTreeParsers.js';
 
+// 文件适配器将文件树检索委托给此类以用于目录浏览
 /**
  * 文件树构建器类
  */
@@ -23,6 +24,7 @@ export class FileTreeBuilder {
     this.adapter = adapter;
   }
 
+  // 文件浏览器侧边栏调用此函数显示项目目录结构
   /**
    * 获取文件树结构
    * @param {string} dirPath - 目录路径

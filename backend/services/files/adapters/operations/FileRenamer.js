@@ -12,6 +12,7 @@ import containerManager from '../../../container/core/index.js';
 /** Operation timeout in milliseconds */
 const OPERATION_TIMEOUT_MS = 5000;
 
+// 文件适配器在用户在文件浏览器中编辑文件名时使用此函数重命名文件
 /**
  * 文件重命名器类
  */
@@ -24,6 +25,7 @@ export class FileRenamer {
     this.adapter = adapter;
   }
 
+  // 文件浏览器重命名处理程序在用户提交新文件名时调用此函数
   /**
    * 重命名文件或目录
    * @param {string} oldPath - 旧路径

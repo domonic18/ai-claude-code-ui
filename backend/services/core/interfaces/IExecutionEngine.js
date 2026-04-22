@@ -6,6 +6,7 @@
  * @module core/interfaces/IExecutionEngine
  */
 
+// 由 ClaudeExecutor、CursorExecutor 和 CodexExecutor 实现的基本接口
 /**
  * 执行引擎接口
  * 定义了 AI 命令执行的核心操作，支持容器和非容器模式
@@ -26,6 +27,7 @@ export class IExecutionEngine {
     throw new Error('IExecutionEngine.execute() must be implemented');
   }
 
+  // 当用户点击停止按钮时由 WebSocket 中止处理程序调用
   /**
    * 中止执行
    * @param {string} sessionId - 会话 ID
@@ -35,6 +37,7 @@ export class IExecutionEngine {
     throw new Error('IExecutionEngine.abort() must be implemented');
   }
 
+  // 由会话管理调用以检查会话是否仍在运行
   /**
    * 检查会话是否活动
    * @param {string} sessionId - 会话 ID
@@ -44,6 +47,7 @@ export class IExecutionEngine {
     throw new Error('IExecutionEngine.isSessionActive() must be implemented');
   }
 
+  // 由管理 API 调用以列出所有活动的会话
   /**
    * 获取活动会话列表
    * @returns {Array<string>} 活动会话 ID 列表
@@ -52,6 +56,7 @@ export class IExecutionEngine {
     throw new Error('IExecutionEngine.getActiveSessions() must be implemented');
   }
 
+  // 调用以确定执行是在容器模式还是本机模式
   /**
    * 获取执行引擎类型
    * @returns {string} 'native' | 'container'

@@ -10,6 +10,7 @@
 import { PassThrough } from 'stream';
 import containerManager from '../../../container/core/index.js';
 
+// 文件适配器将所有读取操作的内容检索委托给此类
 /**
  * 文件读取器类
  */
@@ -22,6 +23,7 @@ export class FileReader {
     this.adapter = adapter;
   }
 
+  // 文件浏览器和代码编辑器调用此函数打开并显示文件内容
   /**
    * 读取文件内容
    * @param {string} filePath - 文件路径
@@ -70,7 +72,7 @@ export class FileReader {
           return;
         }
 
-        // Trim trailing whitespace and strip UTF-8 BOM
+        // 移除尾部空格并去除 UTF-8 BOM
         let trimmedContent = content.replace(/\s+$/, '');
         const charCode = trimmedContent.charCodeAt(0);
         if (charCode === 0xFEFF || trimmedContent.startsWith('\uFEFF')) {

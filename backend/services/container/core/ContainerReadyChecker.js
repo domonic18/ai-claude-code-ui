@@ -10,6 +10,7 @@
 import { ContainerStateMachine, ContainerState } from './ContainerStateMachine.js';
 import { CONTAINER_TIMEOUTS } from '../../../config/config.js';
 
+// 由 ContainerManager.getOrCreateContainer() 调用以等待异步容器创建
 /**
  * Wait for container to reach ready state
  * @param {ContainerStateMachine} stateMachine - State machine instance
@@ -40,6 +41,7 @@ export async function waitForReady(stateMachine) {
   throw new Error(`Container not ready, current state: ${stateMachine.getState()}`);
 }
 
+// 在 getOrCreateContainer 期间容器状态未准备就绪时调用
 /**
  * Handle intermediate state when container is being created
  * @param {string} userId - User ID
@@ -61,7 +63,7 @@ export async function handleIntermediateState(userId, userConfig, options, state
     if (stateMachine.is(ContainerState.FAILED)) {
       stateMachine.transitionTo(ContainerState.NON_EXISTENT);
       await containerStateStore.save(stateMachine);
-      // Return indication to retry
+      // 返回重试指示
       return { ready: false, retry: true };
     }
     throw error;
