@@ -17,14 +17,15 @@ interface SyncActionsProps {
   onSync: (overwrite: boolean) => void;
 }
 
-// 由父组件调用，React 组件或常量：SyncActions
 /**
- * Renders sync action buttons and sync result summary
+ * 同步操作组件
+ * 提供"保留用户文件同步"和"强制覆盖同步"两个按钮，同步完成后展示结果摘要
  */
 export function SyncActions({ syncing, syncResults, onSync }: SyncActionsProps) {
   return (
     <div className="bg-card border border-border rounded-lg p-6">
       <h2 className="text-lg font-semibold text-foreground mb-4">同步操作</h2>
+      {/* 两个同步按钮：普通同步（保留用户文件）和强制覆盖同步 */}
       <div className="flex flex-col sm:flex-row gap-3">
         <SyncButton
           syncing={syncing}
@@ -38,17 +39,22 @@ export function SyncActions({ syncing, syncResults, onSync }: SyncActionsProps) 
         />
       </div>
 
+      {/* 同步完成后渲染结果面板：成功/失败统计 + 失败用户列表 */}
       {syncResults && <SyncResultDisplay results={syncResults} />}
     </div>
   );
 }
 
-/** Internal sync button with loading state */
+/**
+ * 内部同步按钮组件
+ * 根据 overwrite 参数切换按钮样式和文案，同步中禁用并展示旋转动画
+ */
 function SyncButton({ syncing, overwrite, onClick }: {
   syncing: boolean;
   overwrite: boolean;
   onClick: () => void;
 }) {
+  // 强制覆盖模式使用橙色警告样式，普通模式使用主题色
   const baseClass = overwrite
     ? 'bg-orange-600 hover:bg-orange-700'
     : 'bg-primary hover:bg-primary/90';
@@ -70,7 +76,10 @@ function SyncButton({ syncing, overwrite, onClick }: {
   );
 }
 
-/** Internal component for displaying sync results */
+/**
+ * 内部同步结果展示组件
+ * 显示同步成功/失败统计，失败时列出每个失败用户的 ID 和错误信息
+ */
 function SyncResultDisplay({ results }: { results: SyncResults }) {
   return (
     <div className="mt-4 p-4 bg-muted border border-border rounded-md">

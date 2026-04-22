@@ -17,6 +17,7 @@ interface ExtensionStatCardProps {
   color: 'blue' | 'green' | 'purple' | 'orange' | 'teal';
 }
 
+// 五种扩展类型对应的 Tailwind 渐变/边框/文字/徽章样式映射表
 const COLOR_CLASSES = {
   blue: {
     gradient: 'from-blue-500/10 to-blue-600/10 dark:from-blue-500/20 dark:to-blue-600/20',
@@ -55,11 +56,12 @@ const COLOR_CLASSES = {
   },
 } as const;
 
-// 由父组件调用，React 组件或常量：ExtensionStatCard
 /**
- * Displays a colored stat card with icon, label, and count
+ * 扩展统计卡片组件
+ * 根据颜色类型渲染渐变背景、图标和数量统计
  */
 export function ExtensionStatCard({ label, count, icon, color }: ExtensionStatCardProps) {
+  // 从预定义样式表中选取当前颜色对应的 Tailwind 类名
   const cls = COLOR_CLASSES[color];
 
   return (

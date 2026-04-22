@@ -12,13 +12,14 @@ interface ExtensionListViewProps {
   extensions: ExtensionsData;
 }
 
-// 由父组件调用，React 组件或常量：ExtensionListView
 /**
- * Renders a responsive grid of extension list cards for all types
+ * 扩展列表网格视图组件
+ * 将五类扩展（agents/commands/skills/hooks/knowledge）各自渲染为一张 ExtensionListCard
  */
 export function ExtensionListView({ extensions }: ExtensionListViewProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      {/* Agent 扩展列表：展示名称、描述和来源文件 */}
       <ExtensionListCard
         title="Agents"
         availableLabel="个可用"
@@ -34,6 +35,7 @@ export function ExtensionListView({ extensions }: ExtensionListViewProps) {
         )}
       />
 
+      {/* Command 扩展列表：展示斜杠命令名和来源文件 */}
       <ExtensionListCard
         title="Commands"
         availableLabel="个可用"
@@ -48,6 +50,7 @@ export function ExtensionListView({ extensions }: ExtensionListViewProps) {
         )}
       />
 
+      {/* Skill 扩展列表：展示技能名称和描述 */}
       <ExtensionListCard
         title="Skills"
         availableLabel="个可用"
@@ -62,6 +65,7 @@ export function ExtensionListView({ extensions }: ExtensionListViewProps) {
         )}
       />
 
+      {/* Hook 扩展列表：展示钩子名称、类型标签和描述 */}
       <ExtensionListCard
         title="Hooks"
         availableLabel="个可用"
@@ -82,6 +86,7 @@ export function ExtensionListView({ extensions }: ExtensionListViewProps) {
         )}
       />
 
+      {/* Knowledge 扩展列表：展示知识库名称、类型标签和描述 */}
       <ExtensionListCard
         title="Knowledge"
         availableLabel="个可用"

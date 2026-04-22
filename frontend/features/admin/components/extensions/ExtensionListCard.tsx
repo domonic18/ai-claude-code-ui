@@ -21,9 +21,9 @@ interface ExtensionListCardProps {
   renderItem: (item: Record<string, string>) => React.ReactNode;
 }
 
-// 由父组件调用，React 组件或常量：ExtensionListCard
 /**
- * Displays a card with header and scrollable item list
+ * 通用扩展列表卡片组件
+ * 包含标题头（显示类型名和可用数量）和可滚动的条目列表，条目为空时展示空态提示
  */
 export function ExtensionListCard({
   title,
