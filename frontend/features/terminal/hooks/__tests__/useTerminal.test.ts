@@ -271,11 +271,11 @@ describe('useTerminalOptions', () => {
     const { result } = renderHook(() => useTerminalOptions());
 
     act(() => {
-      result.current.setTheme('dark');
+      result.current.setTheme('dracula');
     });
 
-    expect(result.current.options.theme).toBe('dark');
-    expect(result.current.theme).toBe('dark');
+    expect(result.current.options.theme).toBe('dracula');
+    expect(result.current.theme).toBe('dracula');
   });
 
   it('should reset to defaults via resetToDefaults', () => {

@@ -132,6 +132,7 @@ describe('formatMcpConfigSummary', () => {
       name: 'Test Server',
       type: 'stdio',
       scope: 'project',
+      config: {},
       enabled: true
     };
     expect(formatMcpConfigSummary(server)).toBe('No configuration');
@@ -316,6 +317,7 @@ describe('formatServerStatus', () => {
       name: 'Test Server',
       type: 'stdio',
       scope: 'project',
+      config: {},
       enabled: false
     };
     expect(formatServerStatus(server)).toBe('Disabled');
@@ -327,6 +329,7 @@ describe('formatServerStatus', () => {
       name: 'Test Server',
       type: 'stdio',
       scope: 'project',
+      config: {},
       enabled: true
     };
     expect(formatServerStatus(server)).toBe('Project (Local)');
@@ -338,6 +341,7 @@ describe('formatServerStatus', () => {
       name: 'Test Server',
       type: 'stdio',
       scope: 'user',
+      config: {},
       enabled: true
     };
     expect(formatServerStatus(server)).toBe('User (Global)');
@@ -348,7 +352,8 @@ describe('formatServerStatus', () => {
       id: 'test-id',
       name: 'Test Server',
       type: 'stdio',
-      scope: 'project'
+      scope: 'project',
+      config: {}
     };
     expect(formatServerStatus(server)).toBe('Project (Local)');
   });

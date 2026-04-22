@@ -4,12 +4,11 @@ import {
   INVALID_NAME_CHARS,
   extractRelativePath,
   isValidFileName,
-  formatFileSize,
-  formatRelativeTime,
   isImageFile,
   findFileByPath,
   filterFileTree
 } from '../fileTreeHelpers';
+import { formatFileSize, formatRelativeTime } from '../fileFormatters';
 
 describe('DEFAULT_FILE_CONTENT', () => {
   it('should be a newline character', () => {
