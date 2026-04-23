@@ -5,7 +5,7 @@
  * Extracted from App.tsx to reduce complexity
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Project } from '@/features/sidebar/types/sidebar.types';
 
 interface WebSocketMessage {
@@ -80,7 +80,23 @@ export function useAppDataSync(
     shouldSkipUpdate, updateProjectsFromWebSocket, incrementExternalMessageUpdate, projects
   );
 
+  // Track previous session ID to detect genuine session switches
+  const prevSessionIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (selectedSession) layout.setActiveTab('chat');
-  }, [selectedSession?.id, layout]);
+    const currentId = selectedSession?.id ?? null;
+    const prevId = prevSessionIdRef.current;
+
+    // Switch to chat tab when session ID actually changes.
+    // Uses prevId comparison to avoid re-triggering on every render
+    // (the `layout` object reference changes on every render, which
+    // would cause the old version to fire on every re-render, resetting
+    // the tab the instant a user clicked File).
+    if (currentId !== prevId) {
+      layout.setActiveTab('chat');
+    }
+
+    prevSessionIdRef.current = currentId;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- layout.setActiveTab is stable
+  }, [selectedSession?.id]);
 }
