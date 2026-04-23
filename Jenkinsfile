@@ -18,7 +18,7 @@ pipeline {
     // 使用腾讯云仓库的 Docker 镜像构建（国内加速，避免 Docker Hub 网络问题）
     agent {
         docker {
-            image 'ccr.ccs.tencentyun.com/sasan/node:20.20.2-bookworm'
+            image 'ccr.ccs.tencentyun.com/sasan/node:20.20.2-bookworm-amd64'
             args '--entrypoint='
             registryUrl 'https://ccr.ccs.tencentyun.com'
             registryCredentialsId 'tencent-registry-credentials'
