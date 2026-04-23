@@ -19,6 +19,7 @@ pipeline {
     agent {
         docker {
             image 'ccr.ccs.tencentyun.com/sasan/node:20.20.2-bookworm'
+            args '--entrypoint='
             registryUrl 'https://ccr.ccs.tencentyun.com'
             registryCredentialsId 'tencent-registry-credentials'
         }
