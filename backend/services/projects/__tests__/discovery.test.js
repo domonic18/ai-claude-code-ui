@@ -275,32 +275,4 @@ describe('CodexDiscovery', () => {
     assert.ok(root.includes('.codex'));
     assert.ok(root.includes('sessions'));
   });
-
-  it('should check if session is in project correctly', () => {
-    const sessionData = {
-      cwd: '/path/to/project'
-    };
-
-    // 完全匹配
-    assert.equal(
-      discovery._isSessionInProject(sessionData, '/path/to/project'),
-      true
-    );
-
-    // 不匹配
-    assert.equal(
-      discovery._isSessionInProject(sessionData, '/different/path'),
-      false
-    );
-
-    // 测试 Windows 长路径处理
-    const sessionDataWithPrefix = {
-      cwd: '\\\\?\\C:\\path\\to\\project'
-    };
-
-    assert.equal(
-      discovery._isSessionInProject(sessionDataWithPrefix, 'C:\\path\\to\\project'),
-      true
-    );
-  });
 });

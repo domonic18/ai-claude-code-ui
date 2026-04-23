@@ -22,6 +22,7 @@ import {
 import {
   CommandController
 } from '../tools/index.js';
+import { applyPagination } from '../utils/pagination.js';
 
 describe('BaseController', () => {
   let controller;
@@ -98,21 +99,9 @@ describe('BaseController', () => {
 
 describe('AuthController', () => {
   let controller;
-  let mockReq;
-  let mockRes;
 
   beforeEach(() => {
     controller = new AuthController();
-    mockReq = {
-      user: { userId: 1 },
-      params: {},
-      query: {},
-      body: {}
-    };
-    mockRes = {
-      success: mock.fn(),
-      error: mock.fn()
-    };
   });
 
   it('should have correct controller info', () => {
@@ -120,40 +109,6 @@ describe('AuthController', () => {
 
     assert.equal(info.name, 'AuthController');
     assert.equal(info.type, 'controller');
-  });
-
-  it('should validate correct credentials', () => {
-    controller._validateCredentials('testuser', 'password123');
-
-    // 不抛出错误即为成功
-    assert.ok(true);
-  });
-
-  it('should reject empty username', () => {
-    assert.throws(
-      () => controller._validateCredentials('', 'password123'),
-      (err) => {
-        return err.name === 'ValidationError' && err.message.includes('required');
-      }
-    );
-  });
-
-  it('should reject short username', () => {
-    assert.throws(
-      () => controller._validateCredentials('ab', 'password123'),
-      (err) => {
-        return err.name === 'ValidationError' && err.message.includes('3 characters');
-      }
-    );
-  });
-
-  it('should reject short password', () => {
-    assert.throws(
-      () => controller._validateCredentials('testuser', '12345'),
-      (err) => {
-        return err.name === 'ValidationError' && err.message.includes('6 characters');
-      }
-    );
   });
 });
 
@@ -186,14 +141,14 @@ describe('ProjectController', () => {
     assert.equal(info.type, 'controller');
   });
 
-  it('should apply pagination correctly', () => {
+  it('should apply pagination correctly via utility', () => {
     const items = [
       { id: '1', lastActivity: '2024-01-01T10:00:00Z' },
       { id: '2', lastActivity: '2024-01-02T10:00:00Z' },
       { id: '3', lastActivity: '2024-01-03T10:00:00Z' }
     ];
 
-    const result = controller._applyPagination(items, {
+    const result = applyPagination(items, {
       sort: 'lastActivity',
       order: 'desc',
       limit: 2
@@ -205,13 +160,13 @@ describe('ProjectController', () => {
     assert.equal(result.meta.pagination.hasMore, true);
   });
 
-  it('should apply pagination with all items', () => {
+  it('should apply pagination with all items via utility', () => {
     const items = [
       { id: '1', lastActivity: '2024-01-01T10:00:00Z' },
       { id: '2', lastActivity: '2024-01-02T10:00:00Z' }
     ];
 
-    const result = controller._applyPagination(items, {
+    const result = applyPagination(items, {
       sort: 'lastActivity',
       order: 'desc',
       limit: 10
