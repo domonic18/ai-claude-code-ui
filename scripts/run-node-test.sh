@@ -23,8 +23,25 @@ if [ "$NODE_MAJOR" -ge 20 ]; then
   ARGS+=("--test-force-exit")
 fi
 
-# Forward all test file patterns
-ARGS+=("$@")
+# Expand glob patterns into actual file paths
+# npm scripts pass globs as literal strings (single-quoted);
+# Node --test does not expand globs on all platforms, so we expand them here.
+shopt -s globstar nullglob
+EXPANDED=()
+for pattern in "$@"; do
+    for f in $pattern; do
+        EXPANDED+=("$f")
+    done
+done
+shopt -u globstar nullglob
+
+# If no files matched, report error (glob patterns should always resolve in CI)
+if [ ${#EXPANDED[@]} -eq 0 ]; then
+    echo "ERROR: No test files matched patterns: $*" >&2
+    exit 1
+fi
+
+ARGS+=("${EXPANDED[@]}")
 
 # Execute with inherited stdio for proper CI output
 exec node "${ARGS[@]}"
