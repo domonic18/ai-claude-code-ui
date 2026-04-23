@@ -7,7 +7,7 @@
  */
 
 import { createLogger } from '../../../utils/logger.js';
-import { extractTokenBudget, extractMessagePreview, isResultError } from './messageParsingHelpers.js';
+import { extractTokenBudget, extractMessageContext, isResultError } from './messageParsingHelpers.js';
 import { aliasSessionId } from './SessionManager.js';
 
 const logger = createLogger('services/container/claude/sdkMessageHandlers');
@@ -47,14 +47,19 @@ export function sendSessionCreated(sdkMessage, writer, sessionId, state) {
  * @param {string} sessionId - Session ID
  */
 export function handleAssistantMessage(sdkMessage, writer, sessionId) {
-  const preview = extractMessagePreview(sdkMessage);
+  const ctx = extractMessageContext(sdkMessage);
 
-  logger.debug(
-    { sessionId, preview: preview?.substring(0, 100), totalLength: preview?.length || 0 },
-    '[MessageTransformer] Sending claude-response, type: assistant'
-  );
+  const logPayload = {
+    sessionId,
+    contentType: ctx.contentType,
+    stopReason: ctx.stopReason,
+    summary: ctx.summary?.substring(0, 100) || null,
+  };
+  if (ctx.tools.length > 0) {
+    logPayload.tools = ctx.tools.map(t => t.name || t.result);
+  }
 
-  logger.info({ sessionId }, '[MessageTransformer] Sending claude-response, type: assistant');
+  logger.info(logPayload, '[MessageTransformer] Sending claude-response, type: assistant');
 
   writer.send({ type: 'claude-response', data: sdkMessage });
 }
@@ -68,15 +73,24 @@ export function handleAssistantMessage(sdkMessage, writer, sessionId) {
 export function handleResultMessage(sdkMessage, writer, sessionId) {
   const tokenBudget = extractTokenBudget(sdkMessage);
   if (tokenBudget) {
+    logger.info(
+      { sessionId, tokenUsed: tokenBudget.used, tokenTotal: tokenBudget.total, usagePercent: Math.round(tokenBudget.used / tokenBudget.total * 100) },
+      '[MessageTransformer] Token budget update'
+    );
     writer.send({ type: 'token-budget', data: tokenBudget });
   }
 
   if (isResultError(sdkMessage)) {
     logger.error(
-      { sessionId, errorResult: sdkMessage.result },
+      { sessionId, errorResult: sdkMessage.result?.substring(0, 200) },
       '[MessageTransformer] Sending claude-error from result'
     );
     writer.send({ type: 'claude-error', error: sdkMessage.result });
+  } else {
+    logger.info(
+      { sessionId, resultPreview: sdkMessage.result?.substring(0, 120) },
+      '[MessageTransformer] Sending claude-response, type: result'
+    );
   }
 }
 
@@ -87,7 +101,21 @@ export function handleResultMessage(sdkMessage, writer, sessionId) {
  * @param {string} sessionId - Session ID
  */
 export function handleDefaultMessage(sdkMessage, writer, sessionId) {
-  logger.debug({ sessionId, sdkMessageType: sdkMessage.type }, '[MessageTransformer] Sending claude-response');
+  const ctx = extractMessageContext(sdkMessage);
+  // For system/user messages, include subtype for better identification
+  const logPayload = {
+    sessionId,
+    sdkMessageType: sdkMessage.type,
+    contentType: ctx.contentType,
+    summary: ctx.summary?.substring(0, 80),
+  };
+  if (sdkMessage.subtype) {
+    logPayload.subtype = sdkMessage.subtype;
+  }
+  logger.info(
+    logPayload,
+    '[MessageTransformer] Sending claude-response, type: default'
+  );
   writer.send({ type: 'claude-response', data: sdkMessage });
 }
 
