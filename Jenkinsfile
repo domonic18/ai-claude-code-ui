@@ -2,11 +2,12 @@
 //
 // 触发方式：GitHub webhook（push 到 develop 分支自动触发）
 //
-// 构建环境：Docker 镜像 node:20-bookworm（Debian，内置 gcc/make/python3，支持原生模块编译）
+// 构建环境：Docker 镜像（腾讯云仓库），Debian Bookworm，内置 gcc/make/python3，支持原生模块编译
 // 前置条件：
 //   1. Jenkins 服务器已安装 Docker
 //   2. Jenkins 插件：Pipeline、Git、GitHub plugin、Docker Pipeline
 //   3. GitHub 仓库已配置 webhook（地址在 Jenkins 系统配置中管理）
+//   4. Jenkins 凭据 tencent-registry-credentials（腾讯云容器镜像服务登录凭据）
 //
 // Jenkins Job SCM 配置：
 //   - Repository URL: git@github.com:domonic18/ai-claude-code-ui.git
@@ -14,10 +15,12 @@
 //   - Branch: */develop
 
 pipeline {
-    // 使用 Docker 镜像构建，Node.js 版本由镜像控制（与 .nvmrc 保持一致）
+    // 使用腾讯云仓库的 Docker 镜像构建（国内加速，避免 Docker Hub 网络问题）
     agent {
         docker {
-            image 'node:20-bookworm'
+            image 'ccr.ccs.tencentyun.com/sasan/node:20.20.2-bookworm'
+            registryUrl 'https://ccr.ccs.tencentyun.com'
+            registryCredentialsId 'tencent-registry-credentials'
         }
     }
 
