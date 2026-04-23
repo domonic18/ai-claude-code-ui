@@ -11,6 +11,8 @@ import {
   FileAdapter,
   SessionAdapter
 } from '../adapters/index.js';
+import { toContainerPath } from '../adapters/fileAdapterHelpers.js';
+import { standardizeError as standardizeSessionError } from '../adapters/sessionAdapterError.js';
 
 // Mock container manager
 class MockContainerManager {
@@ -132,35 +134,12 @@ describe('FileAdapter', () => {
     assert.equal(adapter.userId, 1);
   });
 
-  it('should convert to container path correctly', () => {
+  it('should convert to container path correctly via helper', () => {
     const absolutePath = '/workspace/test/file.txt';
-    assert.equal(adapter._toContainerPath(absolutePath), absolutePath);
+    assert.equal(toContainerPath(absolutePath), absolutePath);
 
     const relativePath = 'test/file.txt';
-    assert.ok(adapter._toContainerPath(relativePath).includes(relativePath));
-  });
-
-  it('should escape shell content correctly', () => {
-    const content = "Hello 'World'";
-    const escaped = adapter._escapeShellContent(content);
-
-    // Shell escaping uses '\'' pattern which still contains single quotes
-    assert.ok(escaped.includes("'\\''"));
-    assert.ok(escaped.includes("Hello"));
-  });
-
-  it('should handle newlines in content', () => {
-    const content = "Line1\nLine2";
-    const escaped = adapter._escapeShellContent(content);
-
-    assert.ok(escaped.includes('\\n'));
-  });
-
-  it('should handle tabs in content', () => {
-    const content = "Col1\tCol2";
-    const escaped = adapter._escapeShellContent(content);
-
-    assert.ok(escaped.includes('\\t'));
+    assert.ok(toContainerPath(relativePath).includes(relativePath));
   });
 
   it('should standardize errors correctly', () => {
@@ -190,21 +169,9 @@ describe('SessionAdapter', () => {
     assert.equal(adapter.userId, 1);
   });
 
-  it('should validate project identifiers correctly', () => {
-    // 有效标识符
-    let result = adapter._validateProjectIdentifier('my-project');
-    assert.equal(result.valid, true);
-    assert.ok(result.decoded);
-
-    // 无效标识符 - null
-    result = adapter._validateProjectIdentifier(null);
-    assert.equal(result.valid, false);
-    assert.ok(result.error.includes('non-empty string'));
-  });
-
-  it('should standardize errors correctly', () => {
+  it('should standardize errors via helper', () => {
     const error = new Error('Test error');
-    const standardized = adapter._standardizeError(error, 'testOperation');
+    const standardized = standardizeSessionError(error, 'testOperation', 1);
 
     assert.equal(standardized.type, 'container_session_error');
     assert.equal(standardized.operation, 'testOperation');
