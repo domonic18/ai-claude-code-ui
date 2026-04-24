@@ -9,7 +9,7 @@
 services:
   # 主应用服务
   app:
-    image: ccr.ccs.tencentyun.com/patent/claude-code-ui:6074b8d
+    image: ccr.ccs.tencentyun.com/patent/claude-code-ui:e3e6bf8
     container_name: claude-code-app
     ports:
       - "3001:3001"
@@ -25,6 +25,8 @@ services:
     environment:
       # 生产环境
       - NODE_ENV=production
+      # 时区（确保容器内日志时间与宿主机一致）
+      - TZ=Asia/Shanghai
       # 工作目录
       - WORKSPACE_DIR=/workspace
       # 数据目录（使用宿主机路径，兼容 Docker Desktop for Mac）

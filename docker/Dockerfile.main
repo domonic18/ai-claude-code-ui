@@ -43,6 +43,7 @@ RUN chmod +x /entrypoint.sh
 # Environment variables
 ENV NODE_ENV=production \
     PORT=3001 \
+    TZ=Asia/Shanghai \
     # Working data directory (consistent with mount point)
     WORKSPACE_DIR=/workspace \
     # Claude configuration directory
