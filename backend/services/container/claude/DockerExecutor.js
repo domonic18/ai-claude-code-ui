@@ -74,8 +74,18 @@ export async function executeInContainer(userId, command, options, writer, sessi
 
     // 步骤 2：预处理 - 修复 .claude/ 子目录权限（容器 root 创建，node 用户需可写）
     // SDK 初始化时会向 debug/、telemetry/ 等目录写入文件，node 用户需有写权限
+    // 注意：sh 不支持 brace expansion，必须逐个列出
+    //
+    // 清理 session-env/<sessionId>/：SDK 会将对话状态持久化到该目录。
+    // 由于 handleResumeParam 已改为永不 resume，此清理是安全的双重保障。
     try {
-      const fixCmd = "mkdir -p /workspace/.claude/{debug,telemetry,todos,session-env} && chmod 777 /workspace/.claude/debug /workspace/.claude/telemetry /workspace/.claude/todos /workspace/.claude/session-env";
+      const sessionStateDir = `/workspace/.claude/session-env/${sessionId}`;
+      const fixCmd = [
+        `rm -rf "${sessionStateDir}" 2>/dev/null;`,
+        'for d in debug telemetry todos session-env backups memory plans plugins shell-snapshots; do',
+        '  mkdir -p "/workspace/.claude/$d" && chmod 777 "/workspace/.claude/$d";',
+        'done'
+      ].join(' ');
       const { exec: fixExec, stream: fixStream } = await containerManager.execInContainer(
         userId, ['sh', '-c', fixCmd], { cwd: '/app' }
       );

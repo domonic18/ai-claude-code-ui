@@ -3,15 +3,26 @@
  *
  * Helper functions for determining SDK permission mode.
  *
- * 容器环境的关键约束：
- * 1. 用户容器以 root 运行，CLI 拒绝在 root 下使用 --dangerously-skip-permissions
- * 2. 容器没有终端，'default' 模式下无法处理交互式权限确认
- * 3. 'dontAsk' 模式下 Bash 等工具被 CLI 严格限制，即使匹配 allowedTools 也会被拒
+ * 容器环境的权限策略变更（2026-04-24）：
  *
- * 解决方案：不传 --permission-mode，依赖 SDK 的 --permission-prompt-tool stdio 机制。
- * SDK 检测到 canUseTool 回调后会自动添加 --permission-prompt-tool stdio，
- * CLI 通过 stdin/stdout 协议将权限请求发回给我们的 canUseTool 回调，
- * 回调对所有工具（除 AskUserQuestion 有特殊处理外）返回 allow。
+ * 旧方案：删除 permissionMode，依赖 canUseTool 回调处理所有权限请求。
+ *   SDK 检测到 canUseTool 后添加 --permission-prompt-tool stdio，
+ *   但 SDK 的 ZQ 类会在 permissionMode 未提供时默认填入 "default"，
+ *   导致 CLI 收到 --permission-mode default，对 Bash 等工具有内置限制，
+ *   即使 canUseTool 返回 allow，CLI 仍拒绝执行 Bash。
+ *
+ * 新方案：
+ *   容器内 SDK script 以 user: 'node'（非 root）运行，
+ *   CLI 接受 --dangerously-skip-permissions / bypassPermissions。
+ *   设置 permissionMode: 'bypassPermissions' + allowDangerouslySkipPermissions: true。
+ *   注意：SDK 不将该字段传递到 CLI，而是内部使用；
+ *   实际透传给 CLI 的参数由 addSDKSpecificOptions 等路径决定。
+ *   保留 canUseTool 回调用于 AskUserQuestion 交互。
+ *
+ * 约束前提：
+ *   1. 不再以 root 运行容器 exec，改用 node 用户
+ *   2. CLI 在非 root 下接受 --dangerously-skip-permissions
+ *   3. node 用户对 /workspace/my-workspace/ 有读写权限（容器 entrypoint 已设置）
  *
  * @module container/claude/helpers/permissionModeHelper
  */
@@ -32,8 +43,9 @@ const INTERACTIVE_PLANNING_TOOLS = [
 /**
  * 确定权限模式
  *
- * 容器模式下不传 permissionMode（删除该字段），让 SDK 使用
- * --permission-prompt-tool stdio 机制，通过 canUseTool 回调处理所有权限请求。
+ * 使用 bypassPermissions 绕过所有工具权限检查。
+ * non-root 用户（node）下 CLI 接受此设置。
+ * 保留 canUseTool 回调用于 AskUserQuestion 交互。
  *
  * @param {object} sdkOptions - SDK 选项（可变）
  * @param {object} settings - 合并后的 toolsSettings
@@ -45,18 +57,18 @@ export function determinePermissionMode(sdkOptions, settings) {
     ? sdkOptions.disallowedTools.filter(tool => !INTERACTIVE_PLANNING_TOOLS.includes(tool))
     : [];
 
-  // 容器环境：删除 permissionMode，不传 --permission-mode 给 CLI
-  // SDK 检测到 canUseTool 回调后会自动添加 --permission-prompt-tool stdio，
-  // CLI 通过 stdin/stdout 协议请求权限，我们的 canUseTool 回调返回 allow
-  delete sdkOptions.permissionMode;
+  // 使用 bypassPermissions 模式，绕过 CLI 对 Bash 等工具的内置限制
+  // SDK script 以 node 用户（非 root）运行，CLI 接受此设置
+  sdkOptions.permissionMode = 'bypassPermissions';
+  sdkOptions.allowDangerouslySkipPermissions = true;
 
   if (userDisallowedTools.length > 0) {
     logger.warn(
       { disallowedTools: userDisallowedTools },
-      'Container mode: canUseTool callback will handle permissions with user disallowedTools'
+      'Container mode: bypassPermissions with user disallowedTools'
     );
   }
-  logger.debug('Clearing permissionMode: using canUseTool callback via --permission-prompt-tool stdio');
+  logger.debug('Using bypassPermissions mode (non-root user, CLI accepts --dangerously-skip-permissions)');
 
   return userDisallowedTools;
 }

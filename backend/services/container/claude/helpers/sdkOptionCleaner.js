@@ -33,17 +33,36 @@ function removeInternalFields(sdkOptions) {
 }
 
 /**
+ * UUID v4 正则（用于验证 sessionId 格式）
+ * CLI 的 --session-id 必须为有效的 UUID，否则报错退出
+ */
+const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
  * 处理 resume 和 sessionId 参数
+ *
+ * 容器模式：永不 resume（每次从头开始）。
+ * SDK 对 resume 选项会传 --resume <sessionId> 给 CLI，
+ * CLI 尝试恢复已完成的会话状态并崩溃，exit code 1。
+ *
+ * sessionId 仅当为有效 UUID 时才传给 SDK（CLI --session-id 要求 UUID 格式），
+ * temp-xxx 等非 UUID 标识不传递，由 SDK 自动生成会话 ID。
+ *
  * @param {object} sdkOptions
  * @param {object} options
  */
 function handleResumeParam(sdkOptions, options) {
-  if (options.sessionId && options.resume === true) {
-    sdkOptions.resume = options.sessionId;
+  // 容器模式：永不 resume，避免 CLI 恢复已完成会话崩溃
+  delete sdkOptions.resume;
+
+  // sessionId 仅传有效 UUID（CLI 校验 UUID 格式，非 UUID 直接退出码 1）
+  // 前端首次发送 temp-xxx 等临时 ID，不传给 CLI
+  if (options.sessionId && UUID_V4_REGEX.test(options.sessionId)) {
+    sdkOptions.sessionId = options.sessionId;
   } else {
-    delete sdkOptions.resume;
+    // 非 UUID 格式必须删除（sdkOptions 从 options 浅拷贝而来，自带 sessionId）
+    delete sdkOptions.sessionId;
   }
-  delete sdkOptions.sessionId;
 }
 
 /**
