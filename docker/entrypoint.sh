@@ -15,17 +15,21 @@ DOCKER_SOCKET=/var/run/docker.sock
 WORKSPACE=${WORKSPACE:-/workspace}
 
 # ==================== Structured Logging ====================
-# 输出 pino 兼容的 JSON 日志，由 Node.js pino 统一采集
+# 输出 pino 兼容的 JSON 日志，time 使用本地 ISO 8601 格式（与 Node.js pino 配置一致）
+_iso_time() {
+    date '+%Y-%m-%dT%H:%M:%S.%3N%z' | sed 's/\([0-9]\{2\}\)$/:\1/'
+}
+
 log_info() {
     local msg="$1"; shift
-    printf '{"level":30,"time":%s,"module":"entrypoint","msg":"%s"' "$(date +%s%3N)" "$msg"
+    printf '{"level":30,"time":"%s","module":"entrypoint","msg":"%s"' "$(_iso_time)" "$msg"
     for kv in "$@"; do printf ',"%s"' "$kv"; done
     printf '}\n'
 }
 
 log_debug() {
     local msg="$1"; shift
-    printf '{"level":20,"time":%s,"module":"entrypoint","msg":"%s"' "$(date +%s%3N)" "$msg"
+    printf '{"level":20,"time":"%s","module":"entrypoint","msg":"%s"' "$(_iso_time)" "$msg"
     for kv in "$@"; do printf ',"%s"' "$kv"; done
     printf '}\n'
 }

@@ -254,7 +254,7 @@ export function getTraceContext() {
  * 输出 JSON 结构：
  * {
  *   "level": "INFO",
- *   "time": "2026-04-24T08:00:00.000Z",
+ *   "time": "2026-04-24T18:00:00.000+08:00",
  *   "pid": 12345,
  *   "module": "websocket/server",
  *   "traceId": "...",
@@ -272,10 +272,30 @@ const sharedFormatters = {
   },
 };
 
+/**
+ * 生成本地时间的 ISO 8601 字符串（带时区偏移量）
+ *
+ * 替代 pino.stdTimeFunctions.isoTime（UTC），使 time 字段与 Docker 外层时间戳一致，
+ * 避免在东八区部署时出现 UTC 与本地时间差 8 小时的混淆。
+ *
+ * @returns {string} pino timestamp 字符串，如 ',"time":"2026-04-24T10:50:41.104+08:00"'
+ */
+function localIsoTimestamp() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const ms = String(d.getMilliseconds()).padStart(3, '0');
+  const offset = -d.getTimezoneOffset();
+  const sign = offset >= 0 ? '+' : '-';
+  const absOffset = Math.abs(offset);
+  const tz = `${sign}${pad(Math.floor(absOffset / 60))}:${pad(absOffset % 60)}`;
+  const local = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${ms}${tz}`;
+  return `,"time":"${local}"`;
+}
+
 const rootLogger = pino({
   level: LOG_LEVEL,
   formatters: sharedFormatters,
-  timestamp: pino.stdTimeFunctions.isoTime,
+  timestamp: localIsoTimestamp,
   // 开发环境输出到 stdout（保持 JSON 格式一致性，可搭配 pino-pretty 管道使用）
   ...(IS_DEV ? {
     transport: {
