@@ -89,9 +89,10 @@ async function queryClaudeSDK(command, options = {}, ws) {
 - 安全地失败 - 错误不应该暴露系统内部
 
 ### 可观测系统与日志标准
-- 使用分级日志：INFO、WARN、ERROR
-- 为调试添加上下文信息（会话ID、项目路径等）
-- 使跨服务边界的调试成为可能
+- 基于 pino，模块：`backend/utils/logger.js`
+- 级别规则：DEBUG(高频细节) / INFO(关键生命周期) / WARN(可恢复异常) / ERROR(失败,必须 `{ err: error }`) / FATAL(致命)
+- 禁止：`console.log`、ANSI 颜色码、`logger.error('msg', error.message)`
+- 链路追踪：`createTracedLogger()` 注入 traceId/spanId；耗时测量：`startTimer()`
 
 ### 状态管理
 - 每个状态片段有一个真相来源

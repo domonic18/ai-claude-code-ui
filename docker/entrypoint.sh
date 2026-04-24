@@ -14,13 +14,27 @@ DATA_DIR=${DATA_DIR:-/var/lib/claude-code}
 DOCKER_SOCKET=/var/run/docker.sock
 WORKSPACE=${WORKSPACE:-/workspace}
 
+# ==================== Structured Logging ====================
+# 输出 pino 兼容的 JSON 日志，由 Node.js pino 统一采集
+log_info() {
+    local msg="$1"; shift
+    printf '{"level":30,"time":%s,"module":"entrypoint","msg":"%s"' "$(date +%s%3N)" "$msg"
+    for kv in "$@"; do printf ',"%s"' "$kv"; done
+    printf '}\n'
+}
+
+log_debug() {
+    local msg="$1"; shift
+    printf '{"level":20,"time":%s,"module":"entrypoint","msg":"%s"' "$(date +%s%3N)" "$msg"
+    for kv in "$@"; do printf ',"%s"' "$kv"; done
+    printf '}\n'
+}
+
 # ==================== Functions ====================
 
 # Fix /workspace ownership if running as root
 fix_workspace_permissions() {
     if [ "$(id -u)" = '0' ]; then
-        echo "[ENTRYPOINT] Running as root, fixing /workspace permissions..."
-
         # Get node user UID
         NODE_UID=$(id -u node 2>/dev/null || echo 1000)
 
@@ -28,23 +42,21 @@ fix_workspace_permissions() {
         CURRENT_UID=$(stat -c '%u' "$WORKSPACE" 2>/dev/null || stat -f '%u' "$WORKSPACE" 2>/dev/null)
 
         if [ "$CURRENT_UID" != "$NODE_UID" ]; then
-            echo "[ENTRYPOINT] Changing /workspace ownership to node:node (current: $CURRENT_UID, target: $NODE_UID)"
+            log_info "Fixing workspace ownership" "\"currentUid\":\"$CURRENT_UID\",\"targetUid\":\"$NODE_UID\""
             chown -R node:node "$WORKSPACE"
         else
-            echo "[ENTRYPOINT] /workspace already owned by node user"
+            log_debug "Workspace ownership already correct"
         fi
 
         # Ensure proper permissions
         chmod 755 "$WORKSPACE" 2>/dev/null || true
-    else
-        echo "[ENTRYPOINT] Not running as root, skipping permission fix"
     fi
 }
 
 # Create data directory if it doesn't exist
 setup_data_dir() {
     if [ ! -d "$DATA_DIR" ]; then
-        echo "[ENTRYPOINT] Creating data directory: $DATA_DIR"
+        log_info "Creating data directory" "\"dataDir\":\"$DATA_DIR\""
         mkdir -p "$DATA_DIR"
     fi
 }
@@ -52,24 +64,21 @@ setup_data_dir() {
 # Set permissions for data directory
 # Using 777 for maximum compatibility across different file systems and Docker Desktop for Mac
 set_data_dir_permissions() {
-    echo "[ENTRYPOINT] Setting permissions for $DATA_DIR"
     chmod -R 777 "$DATA_DIR" 2>/dev/null || true
-    ls -la "$DATA_DIR" || true
+    log_debug "Data directory permissions set" "\"dataDir\":\"$DATA_DIR\""
 }
 
 # Set Docker socket permissions to allow node user access
 set_docker_socket_permissions() {
     if [ -S "$DOCKER_SOCKET" ]; then
-        echo "[ENTRYPOINT] Setting Docker socket permissions"
         chmod 666 "$DOCKER_SOCKET" 2>/dev/null || true
+        log_debug "Docker socket permissions set"
     fi
 }
 
 # ==================== Main Execution ====================
 
-echo "[ENTRYPOINT] Starting Claude Code UI..."
-echo "[ENTRYPOINT] DATA_DIR=$DATA_DIR"
-echo "[ENTRYPOINT] WORKSPACE=$WORKSPACE"
+log_info "Starting Claude Code UI" "\"dataDir\":\"$DATA_DIR\",\"workspace\":\"$WORKSPACE\""
 
 # Order matters: fix permissions first, then setup other directories
 fix_workspace_permissions
@@ -77,5 +86,5 @@ setup_data_dir
 set_data_dir_permissions
 set_docker_socket_permissions
 
-echo "[ENTRYPOINT] Starting application as node user..."
+log_info "Switching to node user"
 exec gosu node node /app/backend/index.js

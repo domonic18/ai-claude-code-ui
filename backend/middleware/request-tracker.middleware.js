@@ -10,12 +10,30 @@
 import { generateTraceId, generateSpanId, startTimer, createTracedLogger } from '../utils/logger.js';
 
 /**
+ * 判断请求路径是否为低优先级（静态资源或健康探针）
+ * @param {string} url - 请求路径
+ * @returns {boolean}
+ */
+function isLowPriorityPath(url) {
+  if (!url) return false;
+  const path = url.split('?')[0]; // 去除 query string
+  // 健康探针
+  if (path === '/health' || path === '/healthz') return true;
+  // 静态资源
+  if (path.startsWith('/assets/') || path.startsWith('/icons/')) return true;
+  if (path === '/favicon.ico' || path === '/manifest.json') return true;
+  if (path.endsWith('.map') || path.endsWith('.js') || path.endsWith('.css')) return true;
+  return false;
+}
+
+/**
  * Express 中间件：为每个请求注入追踪上下文
  *
  * - 从请求头提取或自动生成 traceId
  * - 自动生成 spanId
  * - 在 req 上挂载 req.traceId / req.spanId / req.logger
- * - 请求完成时记录 method / url / statusCode / cost
+ * - 静态资源和 /health 探针跳过日志记录
+ * - 其余请求完成时记录 method / url / statusCode / cost
  *
  * @param {import('express').Request} req
  * @param {import('express').Response} res
@@ -35,6 +53,11 @@ function requestTracker(req, res, next) {
   const userId = req.user?.id || undefined;
 
   req.logger = createTracedLogger('http', { traceId, spanId, userId });
+
+  // 低优先级路径跳过追踪计时，减少开销
+  if (isLowPriorityPath(req.originalUrl || req.url)) {
+    return next();
+  }
 
   // 请求完成日志
   const timer = startTimer(`${req.method} ${req.path}`);
