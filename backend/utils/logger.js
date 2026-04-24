@@ -15,6 +15,7 @@
 
 import pino from 'pino';
 import crypto from 'crypto';
+import { AsyncLocalStorage } from 'async_hooks';
 
 // ---------------------------------------------------------------------------
 // 常量
@@ -194,6 +195,56 @@ export function startTimer(label) {
 }
 
 // ---------------------------------------------------------------------------
+// AsyncLocalStorage 链路传播
+// ---------------------------------------------------------------------------
+
+/**
+ * 请求级异步上下文存储，用于在 HTTP 请求生命周期内自动传播 traceId / spanId。
+ *
+ * 工作流程：
+ * 1. requestTracker 中间件调用 runWithTrace(traceContext, callback)
+ * 2. callback 内所有异步操作（Service / Container / DB / WS）共享同一个 trace 上下文
+ * 3. createLogger() 自动从 ALS 读取 traceId/spanId，无需手动传递
+ *
+ * @type {AsyncLocalStorage<{traceId: string, spanId: string, userId?: string, sessionId?: string}>}
+ */
+const traceStore = new AsyncLocalStorage();
+
+/**
+ * 在 trace 上下文中执行回调函数
+ *
+ * 由 requestTracker 中间件调用，将 traceId/spanId 注入当前请求的异步上下文。
+ * 回调内所有 createLogger() 创建的子 logger 都会自动携带这些字段。
+ *
+ * @param {Object} traceContext - 追踪上下文
+ * @param {string} traceContext.traceId - 链路 ID
+ * @param {string} traceContext.spanId - 分支 ID
+ * @param {string} [traceContext.userId] - 用户 ID
+ * @param {string} [traceContext.sessionId] - 会话 ID
+ * @param {Function} callback - 需要在 trace 上下文中执行的函数
+ * @returns {*} callback 的返回值
+ *
+ * @example
+ * // 在 requestTracker 中间件中
+ * runWithTrace({ traceId, spanId, userId }, () => {
+ *   // 这里所有 logger 自动携带 traceId/spanId
+ *   handleRequest(req, res);
+ * });
+ */
+export function runWithTrace(traceContext, callback) {
+  return traceStore.run(traceContext, callback);
+}
+
+/**
+ * 获取当前请求的 trace 上下文
+ *
+ * @returns {Object|undefined} 当前 ALS 中的 trace 上下文，如果不在请求上下文中则返回 undefined
+ */
+export function getTraceContext() {
+  return traceStore.getStore();
+}
+
+// ---------------------------------------------------------------------------
 // Pino 根 Logger 配置
 // ---------------------------------------------------------------------------
 
@@ -241,17 +292,30 @@ const rootLogger = pino({
 /**
  * 创建带模块标签的子 logger
  *
+ * 自动从 AsyncLocalStorage 读取当前请求的 traceId/spanId，无需手动传递。
+ * 在 HTTP 请求上下文内：自动携带 traceId、spanId、userId、sessionId。
+ * 在请求上下文外（启动/定时任务等）：仅携带 module 字段。
+ *
  * @param {string} moduleName - 模块名称，如 'websocket/server'、'controllers/auth'
- * @returns {pino.Logger} 带 module 字段的子 logger
+ * @returns {pino.Logger} 带 module 字段（及可选 trace 字段）的子 logger
  *
  * @example
  * import { createLogger } from '../utils/logger.js';
  * const logger = createLogger('websocket/server');
  * logger.info('Client connected');
- * logger.error({ err }, 'Connection failed');
+ * // 在 HTTP 请求中 => { module: "websocket/server", traceId: "abc", spanId: "def", msg: "Client connected" }
+ * // 在请求外       => { module: "websocket/server", msg: "Client connected" }
  */
 export function createLogger(moduleName) {
-  return rootLogger.child({ module: moduleName });
+  const fields = { module: moduleName };
+  const ctx = traceStore.getStore();
+  if (ctx) {
+    if (ctx.traceId) fields.traceId = ctx.traceId;
+    if (ctx.spanId) fields.spanId = ctx.spanId;
+    if (ctx.userId) fields.userId = ctx.userId;
+    if (ctx.sessionId) fields.sessionId = ctx.sessionId;
+  }
+  return rootLogger.child(fields);
 }
 
 /**
