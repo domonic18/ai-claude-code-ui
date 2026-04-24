@@ -40,7 +40,7 @@ export function initializeDatabase() {
         // 标记为已初始化
         markDatabaseInitialized();
     } catch (error) {
-        logger.error('初始化数据库错误:', error.message);
+        logger.error({ err: error }, 'Database initialization failed');
         throw error;
     }
 }

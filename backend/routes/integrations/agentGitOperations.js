@@ -32,7 +32,7 @@ export async function handleGitHubWorkflow(params, projectPath, user, writer) {
         const { executeGitHubBranchWorkflow } = await import('./agent/agentWorkflow.js');
         return await executeGitHubBranchWorkflow(params, projectPath, user, params.stream, writer);
     } catch (error) {
-        logger.error({ error: error.message }, 'GitHub branch/PR creation error');
+        logger.error({ err: error }, 'GitHub branch/PR creation error');
         if (params.stream) {
             writer.send({ type: 'github-error', error: error.message });
         }
@@ -79,7 +79,7 @@ export function sendResponse(params, res, writer, projectPath, ghResult) {
  * @param {string} finalProjectPath - Final project path
  */
 export function handleAgentError(error, params, res, writer, finalProjectPath) {
-    logger.error({ error: error.message, stack: error.stack }, 'External session error');
+    logger.error({ err: error }, 'External session error');
 
     if (finalProjectPath && params.cleanup && params.githubUrl) {
         const sessionIdForCleanup = writer ? writer.getSessionId() : null;

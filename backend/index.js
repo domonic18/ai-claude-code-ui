@@ -13,7 +13,7 @@ import http from 'http';
 import express from 'express';
 
 // 统一配置模块
-import { logConfigStatus, SERVER, c } from './config/config.js';
+import { logConfigStatus, SERVER } from './config/config.js';
 import { configureExpress } from './config/express-config.js';
 import { createWebSocketServer } from './websocket/server.js';
 
@@ -58,25 +58,17 @@ async function startServer() {
         logConfigStatus();
 
         // 记录运行模式
-        logger.info(`${c.info('[INFO]')} Using Claude Agents SDK for Claude integration`);
-        logger.info(`${c.info('[INFO]')} Running in ${c.bright(isProduction ? 'PRODUCTION' : 'DEVELOPMENT')} mode`);
+        logger.info('Using Claude Agents SDK for Claude integration');
+        logger.info({ env: isProduction ? 'PRODUCTION' : 'DEVELOPMENT' }, 'Running mode');
 
         if (!isProduction) {
-            logger.info(`${c.warn('[WARN]')} Note: Requests will be proxied to Vite dev server at ${c.dim('http://localhost:' + SERVER.vitePort)}`);
+            logger.info({ vitePort: SERVER.vitePort }, 'Requests will be proxied to Vite dev server');
         }
 
         server.listen(SERVER.port, '0.0.0.0', async () => {
             const appInstallPath = process.cwd();
 
-            logger.info('');
-            logger.info(c.dim('═'.repeat(63)));
-            logger.info(`  ${c.bright('Claude Code UI Server - Ready')}`);
-            logger.info(c.dim('═'.repeat(63)));
-            logger.info('');
-            logger.info(`${c.info('[INFO]')} Server URL:  ${c.bright('http://0.0.0.0:' + SERVER.port)}`);
-            logger.info(`${c.info('[INFO]')} Installed at: ${c.dim(appInstallPath)}`);
-            logger.info(`${c.tip('[TIP]')}  Run "cloudcli status" for full configuration details`);
-            logger.info('');
+            logger.info({ port: SERVER.port, installPath: appInstallPath }, 'Claude Code UI Server - Ready');
 
             // 开始监控项目文件夹的更改
             await setupProjectsWatcher(connectedClients);

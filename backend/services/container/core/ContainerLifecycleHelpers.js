@@ -113,7 +113,7 @@ export async function loadContainersFromDb(Container, docker, containers, stateM
     if (error.code === 'SQLITE_ERROR' && error.message.includes('no such table')) {
       logger.info('Database not yet initialized, skipping container load');
     } else {
-      logger.warn('Failed to load containers from database:', error.message);
+      logger.warn({ err: error }, 'Failed to load containers from database');
     }
   }
 }

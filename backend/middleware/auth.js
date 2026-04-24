@@ -145,7 +145,7 @@ const authenticateWebSocket = (token) => {
     logger.info(`[WS AUTH] Success: User ${decoded.userId} (${decoded.username}) verified from database`);
     return decoded;
   } catch (error) {
-    logger.error('[WS AUTH] Token verification error:', error.message);
+    logger.error({ err: error }, '[WS AUTH] Token verification error');
     return null;
   }
 };

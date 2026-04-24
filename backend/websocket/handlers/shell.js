@@ -121,7 +121,7 @@ export function handleShellConnection(ws, ptySessionsMap) {
             }
 
         } catch (error) {
-            logger.error('[ERROR] Shell WebSocket error:', error.message);
+            logger.error({ err: error }, 'Shell WebSocket error');
             if (ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({
                     type: 'output',

@@ -96,7 +96,7 @@ export class ContainerConfigBuilder {
       const content = fs.readFileSync(seccompPath, 'utf8');
       return JSON.parse(content);
     } catch (error) {
-      logger.warn(`[ContainerConfig] Failed to load seccomp profile: ${error.message}`);
+      logger.warn({ err: error }, 'Failed to load seccomp profile');
       // 返回 undefined 将使用 Docker 默认 seccomp profile
       return undefined;
     }

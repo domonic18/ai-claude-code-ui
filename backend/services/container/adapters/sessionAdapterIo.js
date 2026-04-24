@@ -100,7 +100,7 @@ export async function loadAllSessionFiles(containerManager, userId, jsonlFiles, 
       const sessions = await parseSessionFile(containerManager, userId, file, jsonlParser);
       allSessions.push(...sessions);
     } catch (error) {
-      logger.warn(`Failed to parse session file ${file}:`, error.message);
+      logger.warn({ err: error, file }, 'Failed to parse session file');
     }
   }
 
@@ -125,7 +125,7 @@ export async function loadMessagesFromFiles(containerManager, userId, jsonlFiles
       const fileMessages = await parseSessionFileMessages(containerManager, userId, file, sessionId, jsonlParser);
       messages.push(...fileMessages);
     } catch (error) {
-      logger.warn(`Failed to parse messages from ${file}:`, error.message);
+      logger.warn({ err: error, file }, 'Failed to parse messages from file');
     }
   }
 

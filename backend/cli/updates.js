@@ -8,7 +8,6 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { c } from '../config/config.js';
 import { createLogger } from '../utils/logger.js';
 
 const logger = createLogger('cli-updates');
@@ -49,16 +48,15 @@ export async function checkForUpdates(silent = false) {
         const currentVersion = packageJson.version;
 
         if (isNewerVersion(latestVersion, currentVersion)) {
-            logger.info(`\n${c.warn('[UPDATE]')} New version available: ${c.bright(latestVersion)} (current: ${currentVersion})`);
-            logger.info(`         Run ${c.bright('cloudcli update')} to update\n`);
+            logger.info({ latestVersion, currentVersion }, 'New version available — run `cloudcli update` to update');
             return { hasUpdate: true, latestVersion, currentVersion };
         } else if (!silent) {
-            logger.info(`${c.ok('[OK]')} You are on the latest version (${currentVersion})`);
+            logger.info({ version: currentVersion }, 'Already on the latest version');
         }
         return { hasUpdate: false, latestVersion, currentVersion };
     } catch (e) {
         if (!silent) {
-            logger.info(`${c.warn('[WARN]')} Could not check for updates`);
+            logger.warn({ err: e }, 'Could not check for updates');
         }
         return { hasUpdate: false, error: e.message };
     }
@@ -72,20 +70,19 @@ export async function checkForUpdates(silent = false) {
 export async function updatePackage() {
     try {
         const { execSync } = await import('child_process');
-        logger.info(`${c.info('[INFO]')} Checking for updates...`);
+        logger.info('Checking for updates');
 
         const { hasUpdate, latestVersion, currentVersion } = await checkForUpdates(true);
 
         if (!hasUpdate) {
-            logger.info(`${c.ok('[OK]')} Already on the latest version (${currentVersion})`);
+            logger.info({ version: currentVersion }, 'Already on the latest version');
             return;
         }
 
-        logger.info(`${c.info('[INFO]')} Updating from ${currentVersion} to ${latestVersion}...`);
+        logger.info({ currentVersion, latestVersion }, 'Updating package');
         execSync('npm update -g @domonic18/ai-claude-code-ui', { stdio: 'inherit' });
-        logger.info(`${c.ok('[OK]')} Update complete! Restart cloudcli to use the new version.`);
+        logger.info({ latestVersion }, 'Update complete — restart cloudcli to use the new version');
     } catch (e) {
-        logger.error(`${c.error('[ERROR]')} Update failed: ${e.message}`);
-        logger.info(`${c.tip('[TIP]')} Try running manually: npm update -g @domonic18/ai-claude-code-ui`);
+        logger.error({ err: e }, 'Update failed — try running: npm update -g @domonic18/ai-claude-code-ui');
     }
 }

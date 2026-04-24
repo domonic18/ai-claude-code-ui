@@ -145,7 +145,7 @@ async function cleanupSessionDir(sessionId) {
         const sessionPath = path.join(os.homedir(), '.claude', 'sessions', sessionId);
         await fs.rm(sessionPath, { recursive: true, force: true });
     } catch (error) {
-        logger.warn({ sessionId, error: error.message }, 'Failed to clean up session directory');
+        logger.warn({ sessionId, err: error }, 'Failed to clean up session directory');
     }
 }
 
@@ -169,7 +169,7 @@ export async function cleanupProject(projectPath, sessionId = null) {
         logger.info({ projectPath, duration: Date.now() - startTime }, 'cleanupProject cleaned');
         await cleanupSessionDir(sessionId);
     } catch (error) {
-        logger.error({ error: error.message, projectPath }, 'cleanupProject FAILED');
+        logger.error({ err: error, projectPath }, 'cleanupProject FAILED');
     }
 }
 

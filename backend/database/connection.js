@@ -9,7 +9,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
-import { c, DATABASE } from '../config/config.js';
+import { DATABASE } from '../config/config.js';
 import { createLogger } from '../utils/logger.js';
 const logger = createLogger('database/connection');
 
@@ -47,7 +47,7 @@ export function getDatabase() {
         }
 
         _db = new Database(dbPath);
-        logger.info(`${c.info('[INFO]')} 数据库路径: ${c.dim(dbPath)}`);
+        logger.info({ dbPath }, 'Database connected');
     }
     return _db;
 }

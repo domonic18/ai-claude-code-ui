@@ -140,7 +140,7 @@ export async function abortSession(sessionId) {
       session.stream.destroy();
       logger.info(`[SessionManager] Destroyed stream for session: ${sessionId}`);
     } catch (error) {
-      logger.error(`[SessionManager] Error destroying stream for session ${sessionId}:`, error.message);
+      logger.error({ err: error, sessionId }, 'Error destroying stream for session');
     }
   }
 

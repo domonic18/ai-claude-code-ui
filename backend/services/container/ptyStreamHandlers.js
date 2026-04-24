@@ -47,7 +47,7 @@ export function setupStreamHandlers(sessionId, stream, ws, ptySessions, cleanupC
 
   // Handle stream errors
   stream.on('error', (error) => {
-    logger.error(`PTY stream error for session ${sessionId}:`, error.message);
+    logger.error({ err: error, sessionId }, 'PTY stream error for session');
 
     if (ws.readyState === 1) {
       ws.send(JSON.stringify({

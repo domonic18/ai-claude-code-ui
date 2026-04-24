@@ -88,7 +88,7 @@ async function readSessionData(sessionPath, sessionId, projectPath) {
       projectPath,
     };
   } catch (error) {
-    logger.warn(`Could not read Cursor session ${sessionId}:`, error.message);
+    logger.warn({ err: error, sessionId }, 'Could not read Cursor session');
     return null;
   }
 }

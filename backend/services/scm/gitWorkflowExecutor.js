@@ -71,7 +71,7 @@ async function performClone(githubUrl, cloneDir, githubToken) {
     });
     logger.info({ cloneDir, githubUrl }, 'Repository cloned successfully');
   } catch (error) {
-    logger.error({ error: error.message, githubUrl, cloneDir }, 'Git clone failed');
+    logger.error({ err: error, githubUrl, cloneDir }, 'Git clone failed');
     throw new Error(`Git clone failed: ${error.message}`);
   } finally {
     await cleanup();

@@ -60,7 +60,7 @@ export async function loadProjectFromHash(hashDir, cursorChatsRoot, normalizePro
     });
 
   } catch (error) {
-    logger.warn(`Failed to load Cursor project from hash ${hashDir}:`, error.message);
+    logger.warn({ err: error, hashDir }, 'Failed to load Cursor project from hash');
     return null;
   }
 }
