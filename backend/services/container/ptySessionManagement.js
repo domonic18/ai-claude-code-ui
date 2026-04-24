@@ -33,7 +33,7 @@ export async function cleanupPtySession(sessionId, ptyStreams, ptySessions) {
         stream.destroy();
       }
     } catch (error) {
-      logger.error(`Error closing stream for session ${sessionId}:`, error.message);
+      logger.error({ err: error, sessionId }, 'Error closing stream for session');
     }
 
     // 从流映射中删除
@@ -103,7 +103,7 @@ export async function endAllPtySessionsForUserHelper(userId, ptySessions, ptyStr
       await cleanupPtySession(session.sessionId, ptyStreams, ptySessions);
       count++;
     } catch (error) {
-      logger.error(`Failed to end session ${session.sessionId}:`, error.message);
+      logger.error({ err: error, sessionId: session.sessionId }, 'Failed to end session');
     }
   }
 

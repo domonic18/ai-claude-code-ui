@@ -100,7 +100,7 @@ async function createDefaultWorkspace(userId, workspacePath) {
     logger.info('[ContainerProjectManager] Default workspace created: my-workspace');
     return createProjectEntry('my-workspace', 'my-workspace');
   } catch (error) {
-    logger.warn(`[ContainerProjectManager] Failed to create default workspace: ${error.message}`);
+    logger.warn({ err: error }, 'Failed to create default workspace');
     return null;
   }
 }

@@ -23,11 +23,13 @@ import mcpUtilsRoutes from '../routes/mcp-utils.js';
 import { validateApiKey, authenticateToken } from '../middleware/auth.js';
 import { responseFormatter, responseHeaders } from '../middleware/response-formatter.middleware.js';
 import { errorHandler, notFoundHandler } from '../middleware/error-handler.middleware.js';
+import { requestTracker } from '../middleware/request-tracker.middleware.js';
 import { createLogger } from '../utils/logger.js';
 const logger = createLogger('config/express-config');
 
 function setupMiddleware(app) {
   app.locals.wss = app.locals.wss;
+  app.use(requestTracker);
   app.use(cors({ origin: CORS.origins, credentials: true, methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization'] }));
   app.use(cookieParser());
   app.use(responseFormatter);

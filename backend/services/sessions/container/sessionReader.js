@@ -60,7 +60,7 @@ export async function forEachSessionFile(userId, projectDir, sessionFiles, handl
       const shouldStop = await handler({ filePath, entries });
       if (shouldStop) return;
     } catch (error) {
-      logger.warn(`[SessionReader] Failed to process session file ${fileName}:`, error.message);
+      logger.warn({ err: error, fileName }, 'Failed to process session file');
     }
   }
 }

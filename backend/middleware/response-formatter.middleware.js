@@ -116,7 +116,8 @@ function responseFormatter(req, res, next) {
 function responseTime(req, res, next) {
   const startTime = Date.now();
   res.on('finish', () => {
-    res.setHeader('X-Response-Time', `${Date.now() - startTime}ms`);
+    const cost = Date.now() - startTime;
+    res.setHeader('X-Response-Time', `${cost}ms`);
   });
   next();
 }

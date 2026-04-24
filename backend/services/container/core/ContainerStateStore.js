@@ -54,7 +54,7 @@ export class ContainerStateStore {
 
       // 保存操作静默进行（由 Lifecycle 状态转换日志覆盖）
     } catch (error) {
-      logger.error(`[StateStore] Failed to save state for user ${userId}:`, error.message);
+      logger.error({ err: error, userId }, 'Failed to save container state for user');
       throw error;
     }
   }
@@ -96,7 +96,7 @@ export class ContainerStateStore {
 
       return stateMachine;
     } catch (error) {
-      logger.error(`[StateStore] Failed to load state for user ${userId}:`, error.message);
+      logger.error({ err: error, userId }, 'Failed to load container state for user');
 
       // 如果数据库损坏，返回 null 让调用者创建新状态机
       if (error.message.includes('JSON')) {
@@ -124,7 +124,7 @@ export class ContainerStateStore {
 
       logger.info(`[StateStore] Deleted state for user ${userId}`);
     } catch (error) {
-      logger.error(`[StateStore] Failed to delete state for user ${userId}:`, error.message);
+      logger.error({ err: error, userId }, 'Failed to delete container state for user');
       throw error;
     }
   }
@@ -165,7 +165,7 @@ export class ContainerStateStore {
     try {
       return ContainerStateModel.getUsersByState(state);
     } catch (error) {
-      logger.error(`[StateStore] Failed to query users by state ${state}:`, error.message);
+      logger.error({ err: error, state }, 'Failed to query users by container state');
       return [];
     }
   }

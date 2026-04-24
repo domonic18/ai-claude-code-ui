@@ -38,7 +38,7 @@ function handlePlatformMode(req, res, next) {
         req.user = user;
         return next();
     } catch (error) {
-        logger.error({ error: error.message }, 'Platform mode error');
+        logger.error({ err: error }, 'Platform mode error');
         return res.status(500).json({ error: 'Platform mode: Failed to fetch user' });
     }
 }

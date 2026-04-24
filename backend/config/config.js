@@ -142,19 +142,14 @@ export function getConfigSummary() {
  * 记录配置状态到控制台
  */
 export function logConfigStatus() {
-  logger.info(`${c.info('[CONFIG]')} ===== 配置状态 =====`);
-  logger.info(`${c.info('[CONFIG]')} 模式: ${c.bright(SERVER.isPlatform ? 'PLATFORM (单用户)' : 'STANDARD (多用户)')}`);
-  logger.info(`${c.info('[CONFIG]')} 容器模式: ${c.ok('启用 (容器化架构)')}`);
-  logger.info(`${c.info('[CONFIG]')} 数据库: ${c.dim(DATABASE.path)}`);
-  logger.info(`${c.info('[CONFIG]')} 端口: ${c.bright(SERVER.port)}`);
+  logger.info('===== 配置状态 =====');
+  logger.info({ mode: SERVER.isPlatform ? 'PLATFORM' : 'STANDARD', containerized: true, database: DATABASE.path, port: SERVER.port }, 'Configuration loaded');
 
   if (SERVER.env === 'production') {
     if (AUTH.jwtSecret === 'claude-ui-dev-secret-change-in-production') {
-      logger.info(`${c.warn('[WARN]')} 使用默认 JWT 密钥，请在生产环境中设置 JWT_SECRET`);
+      logger.warn('Using default JWT secret — set JWT_SECRET in production');
     }
   }
-
-  logger.info(`${c.info('[CONFIG]')} ====================`);
 }
 
 // 默认导出所有配置

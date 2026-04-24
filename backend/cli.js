@@ -81,6 +81,6 @@ async function main() {
 
 // 运行 CLI
 main().catch(error => {
-    logger.error('\n❌ Error:', error.message);
+    logger.error({ err: error }, 'CLI error');
     process.exit(1);
 });

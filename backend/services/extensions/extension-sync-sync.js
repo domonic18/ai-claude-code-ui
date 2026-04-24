@@ -56,7 +56,7 @@ export async function syncConfigFiles(targetDir, results, overwrite) {
       results.synced++;
     } catch (error) {
       results.errors.push({ resource: filename, error: error.message });
-      logger.error(`[ExtensionSync] Failed to sync ${filename}:`, error.message);
+      logger.error({ err: error, filename }, 'Extension file sync failed');
     }
   }
 }
@@ -93,7 +93,7 @@ export async function syncResourceType(type, targetDir, results, overwrite) {
       }
     } catch (error) {
       results.errors.push({ resource: entry.name, error: error.message });
-      logger.error(`[ExtensionSync] Failed to sync ${entry.name}:`, error.message);
+      logger.error({ err: error, entryName: entry.name }, 'Extension directory sync failed');
     }
   }
 }

@@ -145,7 +145,7 @@ export class ContainerLifecycleManager {
       return true;
     } catch (error) {
       if (error.statusCode === 404) return false;
-      logger.warn(`Error verifying container ${containerName}: ${error.message}`);
+      logger.warn({ err: error, containerName }, 'Error verifying container');
       return true;
     }
   }

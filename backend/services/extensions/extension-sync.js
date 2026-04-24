@@ -111,7 +111,7 @@ export async function syncToAllUsers(options = {}) {
         } catch (error) {
             results.failed++;
             results.errors.push({ userId: user.id, username: user.username, error: error.message });
-            logger.error(`[ExtensionSync] Failed to sync for user ${user.id}:`, error.message);
+            logger.error({ err: error, userId: user.id }, 'Extension sync failed for user');
         }
     }
 

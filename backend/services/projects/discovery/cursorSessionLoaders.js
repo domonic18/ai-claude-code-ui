@@ -57,7 +57,9 @@ export async function loadSessionFromDatabase(cursorChatsPath, sessionId) {
     try {
       const stat = await fs.stat(storeDbPath);
       dbStatMtimeMs = stat.mtimeMs;
-    } catch (_) {}
+    } catch (_) {
+      logger.debug({ storeDbPath }, 'Could not stat store DB file, skipping mtime fallback');
+    }
 
     // 打开 SQLite 数据库
     const db = await open({
@@ -78,7 +80,7 @@ export async function loadSessionFromDatabase(cursorChatsPath, sessionId) {
     return buildSessionObject(sessionId, metadata, messageCountResult, dbStatMtimeMs);
 
   } catch (error) {
-    logger.warn(`Could not read Cursor session ${sessionId}:`, error.message);
+    logger.warn({ err: error, sessionId }, 'Could not read Cursor session');
     return null;
   }
 }

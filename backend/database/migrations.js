@@ -65,7 +65,7 @@ export function runMigrations() {
 
         logger.info('数据库迁移成功完成');
     } catch (error) {
-        logger.error('运行迁移错误:', error.message);
+        logger.error({ err: error }, 'Migration failed');
         throw error;
     }
 }

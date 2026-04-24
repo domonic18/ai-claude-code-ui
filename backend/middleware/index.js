@@ -34,6 +34,9 @@ export {
   sanitizeResponse
 } from './response-formatter.middleware.js';
 
+// 请求追踪中间件
+export { requestTracker } from './request-tracker.middleware.js';
+
 // 请求验证中间件
 export {
   validate,

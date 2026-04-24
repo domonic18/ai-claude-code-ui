@@ -65,7 +65,7 @@ async function loadMemoryContext(userId, options) {
     }
   } catch (error) {
     // 如果读取记忆失败，记录警告但继续执行
-    logger.warn('[ClaudeQuery] Failed to load memory context:', error.message);
+    logger.warn({ err: error }, 'Failed to load memory context');
   }
   return null;
 }

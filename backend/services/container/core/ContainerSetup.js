@@ -168,7 +168,7 @@ export async function createMemoryDirectoryAndFile(container) {
             }
         }
     } catch (error) {
-        logger.warn('Failed to create memory directory/file:', error.message);
+        logger.warn({ err: error }, 'Failed to create memory directory/file');
     }
 }
 

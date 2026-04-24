@@ -119,7 +119,7 @@ export async function loadAgentsForSDK() {
             agents[name] = agentDef;
             logger.info(`[ExtensionSDK] Loaded agent: ${name} with ${skillNames.length} skills`);
         } catch (error) {
-            logger.error(`[ExtensionSDK] Failed to load agent ${entry.name}:`, error.message);
+            logger.error({ err: error, agentName: entry.name }, 'Failed to load extension agent');
         }
     }
 

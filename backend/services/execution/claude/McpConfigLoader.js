@@ -38,7 +38,7 @@ export async function loadMcpConfig(cwd) {
       const configContent = await fs.readFile(claudeConfigPath, 'utf8');
       claudeConfig = JSON.parse(configContent);
     } catch (error) {
-      logger.error('Failed to parse ~/.claude.json:', error.message);
+      logger.error({ err: error }, 'Failed to parse ~/.claude.json');
       return null;
     }
 
@@ -69,7 +69,7 @@ export async function loadMcpConfig(cwd) {
     logger.info(`Total MCP servers loaded: ${Object.keys(mcpServers).length}`);
     return mcpServers;
   } catch (error) {
-    logger.error('Error loading MCP config:', error.message);
+    logger.error({ err: error }, 'Error loading MCP config');
     return null;
   }
 }

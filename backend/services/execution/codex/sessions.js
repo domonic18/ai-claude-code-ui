@@ -86,7 +86,7 @@ async function getCodexSessions(projectPath) {
           sessions.push(formatSession(sessionData, filePath));
         }
       } catch (error) {
-        logger.warn(`Could not parse Codex session file ${filePath}:`, error.message);
+        logger.warn({ err: error, filePath }, 'Could not parse Codex session file');
       }
     }
 

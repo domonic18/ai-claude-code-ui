@@ -48,7 +48,7 @@ export class ContainerCleanupManager {
           await this.destroyContainer(userId, false);
           cleanedCount++;
         } catch (error) {
-          logger.error(`[ContainerCleanup] Failed to cleanup container for user ${userId}:`, error.message);
+          logger.error({ err: error, userId }, 'Failed to cleanup container for user');
         }
       }
     }
@@ -94,7 +94,7 @@ export class ContainerCleanupManager {
 
       return cleanedCount;
     } catch (error) {
-      logger.error('[ContainerCleanup] Error during orphaned container cleanup:', error.message);
+      logger.error({ err: error }, 'Error during orphaned container cleanup');
       return cleanedCount;
     }
   }
@@ -141,7 +141,7 @@ export class ContainerCleanupManager {
           logger.info(`[ContainerCleanup] Cleaned up ${totalCount} containers (${idleCount} idle, ${orphanedCount} orphaned)`);
         }
       } catch (error) {
-        logger.error('[ContainerCleanup] Error during cleanup:', error.message);
+        logger.error({ err: error }, 'Error during container cleanup');
       }
     }, interval);
 

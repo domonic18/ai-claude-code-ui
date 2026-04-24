@@ -41,7 +41,7 @@ export async function mergeUserSettings(sdkOptions, settings, userId) {
     userSettings = await UserSettingsService.getSettings(userId, 'claude');
     logger.debug({ userId }, 'Loaded user settings for user');
   } catch (error) {
-    logger.warn({ error: error.message }, 'Failed to load user settings, using defaults');
+    logger.warn({ err: error }, 'Failed to load user settings, using defaults');
     return;
   }
 

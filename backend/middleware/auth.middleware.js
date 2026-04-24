@@ -178,7 +178,7 @@ function authenticateExternalApiKey(options = {}) {
       next();
     } catch (error) {
       // 区分"数据库不可用"和"key不存在"（后者已在上方处理）
-      logger.error('[AUTH] External API key verification error:', error.message);
+      logger.error({ err: error }, '[AUTH] External API key verification error');
       if (optional) {
         req.apiKey = null;
         return next();

@@ -9,7 +9,7 @@ import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { loadEnvironment, DATABASE, SERVER, CLAUDE, c } from '../config/config.js';
+import { loadEnvironment, DATABASE, SERVER, CLAUDE } from '../config/config.js';
 import { createLogger } from '../utils/logger.js';
 
 const logger = createLogger('cli-display');
@@ -44,57 +44,43 @@ export function getInstallDir() {
  * 显示配置信息、数据库位置、版本信息等
  */
 export function showStatus() {
-    logger.info(`\n${c.bright('Claude Code UI - Status')}\n`);
-    logger.info(c.dim('═'.repeat(60)));
+    logger.info('=== Claude Code UI Status ===');
 
     // 版本信息
-    logger.info(`\n${c.info('[INFO]')} Version: ${c.bright(packageJson.version)}`);
+    logger.info({ version: packageJson.version }, 'Version');
 
     // 安装位置
     const installDir = getInstallDir();
-    logger.info(`\n${c.info('[INFO]')} Installation Directory:`);
-    logger.info(`       ${c.dim(installDir)}`);
+    logger.info({ installDir }, 'Installation directory');
 
     // 数据库位置
     const dbPath = getDatabasePath();
     const dbExists = fs.existsSync(dbPath);
-    logger.info(`\n${c.info('[INFO]')} Database Location:`);
-    logger.info(`       ${c.dim(dbPath)}`);
-    logger.info(`       Status: ${dbExists ? c.ok('[OK] Exists') : c.warn('[WARN] Not created yet (will be created on first run)')}`);
+    logger.info({ dbPath, exists: dbExists }, 'Database');
 
     if (dbExists) {
         const stats = fs.statSync(dbPath);
-        logger.info(`       Size: ${c.dim((stats.size / 1024).toFixed(2) + ' KB')}`);
-        logger.info(`       Modified: ${c.dim(stats.mtime.toLocaleString())}`);
+        logger.info({ size: `${(stats.size / 1024).toFixed(2)} KB`, modified: stats.mtime.toISOString() }, 'Database stats');
     }
 
     // 环境变量
-    logger.info(`\n${c.info('[INFO]')} Configuration:`);
-    logger.info(`       PORT: ${c.bright(SERVER.port)} ${c.dim(process.env.PORT ? '' : '(default)')}`);
-    logger.info(`       DATABASE_PATH: ${c.dim(DATABASE.path)}`);
-    logger.info(`       CLAUDE_CLI_PATH: ${c.dim(CLAUDE.cliPath)}`);
-    logger.info(`       CONTEXT_WINDOW: ${c.dim(CLAUDE.contextWindow)}`);
+    logger.info({
+        port: SERVER.port,
+        portDefault: !process.env.PORT,
+        databasePath: DATABASE.path,
+        cliPath: CLAUDE.cliPath,
+        contextWindow: CLAUDE.contextWindow,
+    }, 'Configuration');
 
     // Claude 项目文件夹
     const claudeProjectsPath = path.join(os.homedir(), '.claude', 'projects');
     const projectsExists = fs.existsSync(claudeProjectsPath);
-    logger.info(`\n${c.info('[INFO]')} Claude Projects Folder:`);
-    logger.info(`       ${c.dim(claudeProjectsPath)}`);
-    logger.info(`       Status: ${projectsExists ? c.ok('[OK] Exists') : c.warn('[WARN] Not found')}`);
+    logger.info({ path: claudeProjectsPath, exists: projectsExists }, 'Claude projects folder');
 
     // 配置文件位置
     const envFilePath = path.join(__dirname, '../../.env');
     const envExists = fs.existsSync(envFilePath);
-    logger.info(`\n${c.info('[INFO]')} Configuration File:`);
-    logger.info(`       ${c.dim(envFilePath)}`);
-    logger.info(`       Status: ${envExists ? c.ok('[OK] Exists') : c.warn('[WARN] Not found (using defaults)')}`);
-
-    logger.info('\n' + c.dim('═'.repeat(60)));
-    logger.info(`\n${c.tip('[TIP]')} Hints:`);
-    logger.info(`      ${c.dim('>')} Use ${c.bright('cloudcli --port 8080')} to run on a custom port`);
-    logger.info(`      ${c.dim('>')} Use ${c.bright('cloudcli --database-path /path/to/db')} for custom database`);
-    logger.info(`      ${c.dim('>')} Run ${c.bright('cloudcli help')} for all options`);
-    logger.info(`      ${c.dim('>')} Access the UI at http://localhost:${SERVER.port}\n`);
+    logger.info({ path: envFilePath, exists: envExists }, 'Configuration file');
 }
 
 // 显示命令行工具帮助信息，供 `help` 命令调用
@@ -104,9 +90,7 @@ export function showStatus() {
  */
 export function showHelp() {
     logger.info(`
-╔═══════════════════════════════════════════════════════════════╗
-║              Claude Code UI - Command Line Tool               ║
-╚═══════════════════════════════════════════════════════════════╝
+Claude Code UI - Command Line Tool
 
 Usage:
   claude-code-ui [command] [options]
@@ -152,5 +136,5 @@ Report Issues:
  * 输出当前软件版本号
  */
 export function showVersion() {
-    logger.info(`${packageJson.version}`);
+    logger.info({ version: packageJson.version }, 'Version');
 }
