@@ -18,7 +18,7 @@ import { Container, ContainerState } from './repositories/Container.repository.j
 import { Credential } from './repositories/Credential.repository.js';
 import { UserSettings } from './repositories/UserSettings.repository.js';
 import { McpServer } from './repositories/McpServer.repository.js';
-import { createLogger } from '../utils/logger.js';
+import { createLogger, startTimer } from '../utils/logger.js';
 const logger = createLogger('database/db');
 
 // 初始化数据库并执行所有迁移，在应用启动时调用一次
@@ -30,6 +30,7 @@ export function initializeDatabase() {
         return;
     }
 
+    const dbTimer = startTimer('database/init');
     try {
         // 执行初始化SQL
         initializeSchema();
@@ -39,7 +40,9 @@ export function initializeDatabase() {
 
         // 标记为已初始化
         markDatabaseInitialized();
+        dbTimer.end(logger, 'Database initialized');
     } catch (error) {
+        dbTimer.endError(logger, 'Database initialization failed');
         logger.error({ err: error }, 'Database initialization failed');
         throw error;
     }

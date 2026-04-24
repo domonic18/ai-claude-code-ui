@@ -18,7 +18,7 @@ import fs from 'fs';
 import { CONTAINER_TIMEOUTS } from '../../../config/config.js';
 import { ContainerConfigBuilder } from './ContainerConfig.js';
 import { ContainerHealthMonitor } from './ContainerHealth.js';
-import { createLogger } from '../../../utils/logger.js';
+import { createLogger, startTimer } from '../../../utils/logger.js';
 
 const logger = createLogger('container/core/ContainerOperations');
 
@@ -144,23 +144,25 @@ export async function createAndStartContainer(docker, params) {
     await removeOrphanedContainer(docker, containerName);
 
     // 创建容器
-    logger.info(`Creating container ${containerName}...`);
+    const createTimer = startTimer('container/create');
+    logger.info({ containerName, userId }, 'Creating container');
     const container = await new Promise((resolve, reject) => {
         docker.createContainer(containerConfig, (err, container) => {
             if (err) {
-                logger.error(`Failed to create container:`, err);
+                createTimer.endError(logger, 'Container creation failed', { containerName });
                 reject(err);
             } else {
-                logger.info(`Container ${containerName} created with ID: ${container.id}`);
+                createTimer.end(logger, 'Container created', { containerName, containerId: container.id });
                 resolve(container);
             }
         });
     });
 
     // 启动容器
-    logger.info(`Starting container ${containerName}...`);
+    const startTimer_ = startTimer('container/start');
+    logger.info({ containerName }, 'Starting container');
     await container.start();
-    logger.info(`Container ${containerName} started`);
+    startTimer_.end(logger, 'Container started', { containerName });
 
     // 等待容器完全启动
     await new Promise(resolve => setTimeout(resolve, 2000));

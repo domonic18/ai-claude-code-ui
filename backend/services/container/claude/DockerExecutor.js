@@ -8,7 +8,7 @@ import containerManager from '../core/index.js';
 import { buildSDKScript } from './ScriptBuilder.js';
 import { setSessionStream, setSessionStdin } from './SessionManager.js';
 import { writeFileViaPutArchive } from '../utils/containerFileWriter.js';
-import { createLogger, sanitizePreview } from '../../../utils/logger.js';
+import { createLogger, sanitizePreview, startTimer } from '../../../utils/logger.js';
 import { copyImagesToContainer } from './dockerImageHandler.js';
 import { handleStreamProcessing } from './dockerStreamHandler.js';
 
@@ -64,6 +64,7 @@ async function prepareContainerAndScript(userId, command, options) {
  * @returns {Promise<object>} 执行结果 { output, sessionId }
  */
 export async function executeInContainer(userId, command, options, writer, sessionId) {
+  const execTimer = startTimer('docker/exec');
   logger.info({ sessionId, userId, cwd: options.cwd }, '[DockerExecutor] Starting execution');
   logger.debug({ preview: sanitizePreview(command), totalLength: command?.length || 0 }, '[DockerExecutor] User command');
 
@@ -109,9 +110,12 @@ export async function executeInContainer(userId, command, options, writer, sessi
     setSessionStdin(sessionId, stdinWriter);
 
     // 步骤 4：处理流输出并等待结果
-    return await handleStreamProcessing(stream, stdout, stderr, writer, sessionId);
+    const result = await handleStreamProcessing(stream, stdout, stderr, writer, sessionId);
+    execTimer.end(logger, 'Docker exec completed', { sessionId });
+    return result;
 
   } catch (error) {
+    execTimer.endError(logger, 'Docker exec failed', { sessionId });
     logger.error({ sessionId, err: error }, '[DockerExecutor] Exception during execution');
     throw new Error(`在容器中执行 SDK 失败：${error.message}`);
   }

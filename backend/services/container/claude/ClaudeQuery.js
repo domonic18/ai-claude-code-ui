@@ -12,7 +12,7 @@ import { executeInContainer } from './DockerExecutor.js';
 import { createSession, updateSession } from './SessionManager.js';
 import { CONTAINER } from '../../../config/config.js';
 import { memoryService } from '../../memory/index.js';
-import { createLogger, sanitizePreview } from '../../../utils/logger.js';
+import { createLogger, sanitizePreview, startTimer } from '../../../utils/logger.js';
 const logger = createLogger('services/container/claude/ClaudeQuery');
 
 // 用于在命令中包装记忆上下文的记忆标记
@@ -177,6 +177,7 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
     ...sdkOptions
   } = options;
 
+  const queryTimer = startTimer('claude/query');
   logger.info({ sessionId, userId }, '[ClaudeQuery] Query started');
   logger.debug({ sessionId, preview: sanitizePreview(command), totalLength: command?.length || 0 }, '[ClaudeQuery] User command');
   logger.debug({ sessionId, isContainerProject, projectPath }, '[ClaudeQuery] Project context');
@@ -219,6 +220,7 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
     logger.debug({ sessionId }, '[ClaudeQuery] Executing in container');
     await executeInContainer(userId, enhancedCommand, mappedOptions, writer, sessionId);
     logger.info({ sessionId }, '[ClaudeQuery] Execution completed');
+    queryTimer.end(logger, 'Claude query completed', { sessionId });
 
     // 7. 更新会话状态
     updateSession(sessionId, {
@@ -229,6 +231,7 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
     return sessionId;
 
   } catch (error) {
+    queryTimer.endError(logger, 'Claude query failed', { sessionId });
     handleQueryError(writer, sessionId, error);
     throw error;
   }
