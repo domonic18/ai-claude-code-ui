@@ -215,7 +215,7 @@ function resolveTreeArgs(dirPath, options) {
 export async function getFileTreeInContainer(userId, dirPath, options) {
   const { safeDirPath, opts } = resolveTreeArgs(dirPath, options);
 
-  logger.info('[FileTree] getFileTreeInContainer - userId:', userId, 'dirPath:', safeDirPath, 'projectPath:', opts.projectPath, 'isContainerProject:', opts.isContainerProject);
+  logger.debug('[FileTree] getFileTreeInContainer - userId:', userId, 'dirPath:', safeDirPath, 'projectPath:', opts.projectPath, 'isContainerProject:', opts.isContainerProject);
 
   const { safePath, error } = validatePath(safeDirPath);
   if (error) {

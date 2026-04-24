@@ -133,7 +133,7 @@ async function copyDirectoryIfExists(dirName, targetDir) {
     await copyDirectory(sourceDir, path.join(targetDir, dirName));
   } catch (error) {
     // Directory doesn't exist, skip
-    logger.info(`[ExtensionTar] Directory ${dirName} not found, skipping`);
+    logger.debug(`[ExtensionTar] Directory ${dirName} not found, skipping`);
   }
 }
 
@@ -153,7 +153,7 @@ async function copyConfigFiles(targetDir) {
       await fs.promises.copyFile(sourcePath, targetPath);
     } catch (error) {
       // File doesn't exist, skip
-      logger.info(`[ExtensionTar] Config file ${filename} not found, skipping`);
+      logger.debug(`[ExtensionTar] Config file ${filename} not found, skipping`);
     }
   }
 }

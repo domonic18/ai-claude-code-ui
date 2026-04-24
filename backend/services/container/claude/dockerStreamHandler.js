@@ -100,12 +100,12 @@ function setupStderrHandler(stderr, chunks, sessionId) {
 function setupExecutionTimeout(ctx, sessionId) {
   const timeoutMs = SDK.executionTimeout;
   if (timeoutMs <= 0) {
-    logger.info('[DockerExecutor] Execution timeout disabled (SDK_EXECUTION_TIMEOUT=0)');
+    logger.debug('[DockerExecutor] Execution timeout disabled (SDK_EXECUTION_TIMEOUT=0)');
     return;
   }
 
   const timeoutMinutes = Math.round(timeoutMs / 60000);
-  logger.info(`[DockerExecutor] Setting execution timeout: ${timeoutMinutes} minutes`);
+  logger.debug(`[DockerExecutor] Setting execution timeout: ${timeoutMinutes} minutes`);
 
   ctx.timeoutHandle = setTimeout(() => {
     logger.error(`[DockerExecutor] Execution timeout after ${timeoutMinutes} minutes`);

@@ -141,7 +141,7 @@ function validateRelativePath(relativePath) {
 
   const parts = relativePath.split('/').map(cleanFileName);
   if (parts.some(isInvalidPart)) {
-    logger.info('[fileAdapterHelpers] Skipping invalid path:', relativePath, '->', parts);
+    logger.debug('[fileAdapterHelpers] Skipping invalid path:', relativePath, '->', parts);
     return null;
   }
   return parts;

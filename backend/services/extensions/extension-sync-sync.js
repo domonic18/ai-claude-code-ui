@@ -44,11 +44,11 @@ export async function syncConfigFiles(targetDir, results, overwrite) {
 
     try {
       if (!(await fileExists(sourcePath))) {
-        logger.info(`[ExtensionSync] Config file not found: ${filename}, skipping`);
+        logger.debug(`[ExtensionSync] Config file not found: ${filename}, skipping`);
         continue;
       }
       if (!overwrite && await fileExists(targetPath)) {
-        logger.info(`[ExtensionSync] Skipping existing config file: ${filename}`);
+        logger.debug(`[ExtensionSync] Skipping existing config file: ${filename}`);
         continue;
       }
 
@@ -73,7 +73,7 @@ export async function syncResourceType(type, targetDir, results, overwrite) {
   const targetSubDir = path.join(targetDir, type);
 
   if (!(await directoryExists(sourceDir))) {
-    logger.info(`[ExtensionSync] Source directory not found: ${sourceDir}, skipping ${type}`);
+    logger.debug(`[ExtensionSync] Source directory not found: ${sourceDir}, skipping ${type}`);
     return;
   }
 

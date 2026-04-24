@@ -68,7 +68,7 @@ export function aliasSessionId(aliasId, originalId) {
   const session = containerSessions.get(originalId);
   if (session && aliasId !== originalId) {
     containerSessions.set(aliasId, session);
-    logger.info({ aliasId, originalId }, '[SessionManager] Created session alias');
+    logger.debug({ aliasId, originalId }, '[SessionManager] Created session alias');
   }
 }
 
@@ -138,7 +138,7 @@ export async function abortSession(sessionId) {
     try {
       // 调用 stream.destroy() 中断流，从而终止 exec 进程
       session.stream.destroy();
-      logger.info(`[SessionManager] Destroyed stream for session: ${sessionId}`);
+      logger.debug(`[SessionManager] Destroyed stream for session: ${sessionId}`);
     } catch (error) {
       logger.error({ err: error, sessionId }, 'Error destroying stream for session');
     }

@@ -110,13 +110,13 @@ export function hostPathToContainerPath(hostPath) {
 export function buildContainerPath(safePath, options = {}) {
   // 如果 safePath 已经是容器内的绝对路径，直接返回
   if (safePath.startsWith(CONTAINER.paths.projects) || safePath.startsWith(CONTAINER.paths.workspace)) {
-    logger.info('[PathUtils] Path is already absolute container path:', safePath);
+    logger.debug('[PathUtils] Path is already absolute container path:', safePath);
     return safePath;
   }
 
   const { projectPath = '', isContainerProject = false } = options;
 
-  logger.info('[PathUtils] buildContainerPath - safePath:', safePath, 'projectPath:', projectPath, 'isContainerProject:', isContainerProject);
+  logger.debug('[PathUtils] buildContainerPath - safePath:', safePath, 'projectPath:', projectPath, 'isContainerProject:', isContainerProject);
 
   // 验证 projectPath：如果是绝对路径（以 / 开头），这是错误的用法
   let normalizedProjectPath = projectPath;
@@ -124,7 +124,7 @@ export function buildContainerPath(safePath, options = {}) {
     logger.error('[PathUtils] ERROR: projectPath should not be an absolute path:', projectPath);
     // 移除前导斜杠，只保留相对部分
     normalizedProjectPath = projectPath.substring(1);
-    logger.info('[PathUtils] Normalized projectPath to:', normalizedProjectPath);
+    logger.debug('[PathUtils] Normalized projectPath to:', normalizedProjectPath);
   }
 
   // 处理当前目录 '.' 的情况，移除它以避免路径中出现 /./
@@ -146,7 +146,7 @@ export function buildContainerPath(safePath, options = {}) {
     ? `${basePath}/${processedSafePath}`.replace(/\/+/g, '/')
     : basePath.replace(/\/+/g, '/');
 
-  logger.info('[PathUtils] Final container path:', result);
+  logger.debug('[PathUtils] Final container path:', result);
 
   return result;
 }
