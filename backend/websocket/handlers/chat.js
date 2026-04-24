@@ -22,7 +22,7 @@ import { spawnCursor, abortCursorSession, isCursorSessionActive, getActiveCursor
 import { queryCodex, abortCodexSession, isCodexSessionActive, getActiveCodexSessions } from '../../services/execution/codex/index.js';
 import { WebSocketWriter } from '../writer.js';
 import { formatReadInstructions } from '../../services/files/FileDocumentReader.js';
-import { createLogger, sanitizePreview } from '../../utils/logger.js';
+import { createLogger, sanitizePreview, generateTraceId, generateSpanId, runWithTrace } from '../../utils/logger.js';
 
 const logger = createLogger('websocket/handlers/chat');
 
@@ -226,7 +226,22 @@ export function handleChatConnection(ws, connectedClients) {
       const data = JSON.parse(message);
       // 根据 message.type 路由到对应处理器
       const handler = COMMAND_HANDLERS[data.type];
-      if (handler) {
+      if (!handler) return;
+
+      // 为需要链路追踪的消息类型注入 traceId/spanId
+      const needsTrace = ['claude-command', 'cursor-command', 'codex-command', 'user-answer'].includes(data.type);
+      if (needsTrace) {
+        const traceId = generateTraceId();
+        const spanId = generateSpanId();
+        const userId = ws.user?.userId;
+        const sessionId = data.options?.sessionId || data.sessionId;
+
+        const traceContext = { traceId, spanId };
+        if (userId) traceContext.userId = userId;
+        if (sessionId) traceContext.sessionId = sessionId;
+
+        await runWithTrace(traceContext, () => handler(data, ws, writer));
+      } else {
         await handler(data, ws, writer);
       }
     } catch (error) {

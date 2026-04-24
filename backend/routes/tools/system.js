@@ -17,7 +17,7 @@ import { authenticateToken } from '../../middleware/auth.js';
 import containerManager from '../../services/container/core/index.js';
 import { FILE_TIMEOUTS } from '../../config/config.js';
 import { readStreamOutput } from '../../services/files/utils/file-utils.js';
-import { createLogger } from '../../utils/logger.js';
+import { createLogger, sanitizePreview } from '../../utils/logger.js';
 const logger = createLogger('routes/tools/system');
 
 const router = express.Router();
@@ -50,13 +50,13 @@ router.post('/update', authenticateToken, async (req, res) => {
         child.stdout.on('data', (data) => {
             const text = data.toString();
             output += text;
-            logger.info('Update output:', text);
+            logger.debug({ preview: sanitizePreview(text, 200) }, 'Update output');
         });
 
         child.stderr.on('data', (data) => {
             const text = data.toString();
             errorOutput += text;
-            logger.error('Update error:', text);
+            logger.error({ preview: sanitizePreview(text, 200) }, 'Update error');
         });
 
         child.on('close', (code) => {
