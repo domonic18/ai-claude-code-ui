@@ -72,7 +72,22 @@ export async function executeInContainer(userId, command, options, writer, sessi
     // 步骤 1：准备容器和脚本
     const { docker, sdkScriptInfo, authToken } = await prepareContainerAndScript(userId, command, options);
 
-    // 步骤 2：在容器中执行脚本（启用 stdin 以支持 Agent 交互提问）
+    // 步骤 2：预处理 - 修复 .claude/ 子目录权限（容器 root 创建，node 用户需可写）
+    // SDK 初始化时会向 debug/、telemetry/ 等目录写入文件，node 用户需有写权限
+    try {
+      const fixCmd = "mkdir -p /workspace/.claude/{debug,telemetry,todos,session-env} && chmod 777 /workspace/.claude/debug /workspace/.claude/telemetry /workspace/.claude/todos /workspace/.claude/session-env";
+      const { exec: fixExec, stream: fixStream } = await containerManager.execInContainer(
+        userId, ['sh', '-c', fixCmd], { cwd: '/app' }
+      );
+      await new Promise((resolve) => { fixStream.on('end', resolve); fixStream.resume(); });
+    } catch (permFixErr) {
+      logger.warn({ err: permFixErr }, '[DockerExecutor] Non-fatal: failed to fix .claude dir permissions');
+    }
+
+    // 步骤 3：在容器中执行脚本（启用 stdin 以支持 Agent 交互提问）
+    // user: 'node' — 以非 root 用户运行，避免 CLI 的 root 安全限制
+    // CLI 在 root 下拒绝 --dangerously-skip-permissions，且 --permission-prompt-tool stdio
+    // 对 Bash/Write 等工具不生效，导致文件操作被拒绝
     const { stream } = await containerManager.execInContainer(
       userId,
       ['node', sdkScriptInfo.tmpScriptFile],
@@ -80,6 +95,7 @@ export async function executeInContainer(userId, command, options, writer, sessi
         cwd: '/app',
         tty: false,
         stdin: true,
+        user: 'node',
         env: {
           NODE_PATH: '/app/node_modules',
           HOME: '/workspace',
@@ -90,7 +106,7 @@ export async function executeInContainer(userId, command, options, writer, sessi
       }
     );
 
-    // 步骤 3：保存 stream 并设置多路分离
+    // 步骤 4：保存 stream 并设置多路分离
     setSessionStream(sessionId, stream);
     const { PassThrough } = await import('stream');
     const stdout = new PassThrough();
@@ -109,7 +125,7 @@ export async function executeInContainer(userId, command, options, writer, sessi
     };
     setSessionStdin(sessionId, stdinWriter);
 
-    // 步骤 4：处理流输出并等待结果
+    // 步骤 5：处理流输出并等待结果
     const result = await handleStreamProcessing(stream, stdout, stderr, writer, sessionId);
     execTimer.end(logger, 'Docker exec completed', { sessionId });
     return result;

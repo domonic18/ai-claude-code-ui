@@ -1,7 +1,18 @@
 /**
  * Permission Mode Helper
  *
- * Helper functions for determining SDK permission mode
+ * Helper functions for determining SDK permission mode.
+ *
+ * 容器环境的关键约束：
+ * 1. 用户容器以 root 运行，CLI 拒绝在 root 下使用 --dangerously-skip-permissions
+ * 2. 容器没有终端，'default' 模式下无法处理交互式权限确认
+ * 3. 'dontAsk' 模式下 Bash 等工具被 CLI 严格限制，即使匹配 allowedTools 也会被拒
+ *
+ * 解决方案：不传 --permission-mode，依赖 SDK 的 --permission-prompt-tool stdio 机制。
+ * SDK 检测到 canUseTool 回调后会自动添加 --permission-prompt-tool stdio，
+ * CLI 通过 stdin/stdout 协议将权限请求发回给我们的 canUseTool 回调，
+ * 回调对所有工具（除 AskUserQuestion 有特殊处理外）返回 allow。
+ *
  * @module container/claude/helpers/permissionModeHelper
  */
 
@@ -20,7 +31,10 @@ const INTERACTIVE_PLANNING_TOOLS = [
 
 /**
  * 确定权限模式
- * 优先级：前端传入的 permissionMode > skipPermissions > 默认 bypass
+ *
+ * 容器模式下不传 permissionMode（删除该字段），让 SDK 使用
+ * --permission-prompt-tool stdio 机制，通过 canUseTool 回调处理所有权限请求。
+ *
  * @param {object} sdkOptions - SDK 选项（可变）
  * @param {object} settings - 合并后的 toolsSettings
  * @returns {string[]} 用户级禁止工具列表（不含系统级）
@@ -30,27 +44,19 @@ export function determinePermissionMode(sdkOptions, settings) {
   const userDisallowedTools = sdkOptions.disallowedTools
     ? sdkOptions.disallowedTools.filter(tool => !INTERACTIVE_PLANNING_TOOLS.includes(tool))
     : [];
-  const hasUserDisallowedTools = userDisallowedTools.length > 0;
-  const usingDefaultTools = !sdkOptions.allowedTools || sdkOptions.allowedTools.length === 0;
 
-  if (sdkOptions.permissionMode) {
-    // 前端明确传入了 permissionMode
-    if (sdkOptions.permissionMode === 'bypassPermissions' && hasUserDisallowedTools) {
-      logger.warn({ disallowedTools: userDisallowedTools }, 'WARNING: bypassPermissions mode will disable user-set disallowedTools');
-    }
-    logger.debug({ permissionMode: sdkOptions.permissionMode }, 'Using frontend permissionMode');
-  } else if (settings.skipPermissions && !hasUserDisallowedTools) {
-    // 用户设置 skipPermissions 且没有用户禁止工具
-    sdkOptions.permissionMode = 'bypassPermissions';
-    logger.debug('Setting permissionMode: bypassPermissions (reason: skipPermissions=true, no user disallowedTools)');
-  } else if (usingDefaultTools && !hasUserDisallowedTools) {
-    // 使用默认工具列表且没有用户禁止工具
-    sdkOptions.permissionMode = 'bypassPermissions';
-    logger.debug('Setting permissionMode: bypassPermissions (reason: using default tools, no user disallowedTools)');
-  } else {
-    sdkOptions.permissionMode = 'default';
-    logger.debug({ reason: hasUserDisallowedTools ? 'has user disallowedTools' : 'default fallback' }, 'Setting permissionMode: default');
+  // 容器环境：删除 permissionMode，不传 --permission-mode 给 CLI
+  // SDK 检测到 canUseTool 回调后会自动添加 --permission-prompt-tool stdio，
+  // CLI 通过 stdin/stdout 协议请求权限，我们的 canUseTool 回调返回 allow
+  delete sdkOptions.permissionMode;
+
+  if (userDisallowedTools.length > 0) {
+    logger.warn(
+      { disallowedTools: userDisallowedTools },
+      'Container mode: canUseTool callback will handle permissions with user disallowedTools'
+    );
   }
+  logger.debug('Clearing permissionMode: using canUseTool callback via --permission-prompt-tool stdio');
 
   return userDisallowedTools;
 }

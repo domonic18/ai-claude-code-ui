@@ -210,7 +210,7 @@ export class ContainerConfigBuilder {
       ? command
       : ['/bin/sh', '-c', command];
 
-    return {
+    const execConfig = {
       Cmd: cmd,
       AttachStdout: true,
       AttachStderr: true,
@@ -219,5 +219,12 @@ export class ContainerConfigBuilder {
       WorkingDir: options.cwd || CONTAINER.paths.workspace,
       Env: options.env ? Object.entries(options.env).map(([k, v]) => `${k}=${v}`) : []
     };
+
+    // 非 root 用户执行（容器默认是 root，传入 node 避免 CLI root 安全限制）
+    if (options.user) {
+      execConfig.User = options.user;
+    }
+
+    return execConfig;
   }
 }
