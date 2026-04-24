@@ -84,7 +84,9 @@ export async function createExtensionTar(options = {}) {
 
   const tempDir = path.join(PROJECT_ROOT, 'workspace', 'temp', `extensions-${Date.now()}`);
   const cleanup = () => {
-    fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {
+      logger.debug({ tempDir }, 'Failed to cleanup temp directory');
+    });
   };
 
   try {

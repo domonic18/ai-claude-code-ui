@@ -67,7 +67,9 @@ async function queryAIProvider(prompt, projectPath, provider) {
   let responseText = '';
   const writer = {
     send: (data) => {
-      try { responseText += extractResponseText(data); } catch { /* ignore */ }
+      try { responseText += extractResponseText(data); } catch {
+        logger.debug('Failed to extract response text from AI chunk');
+      }
     },
     setSessionId: () => {},
   };

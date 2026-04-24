@@ -56,7 +56,9 @@ async function processImageUpload(req, res) {
   } catch (error) {
     logger.error('Error processing images:', error);
     // 清理剩余的文件
-    await Promise.all(req.files.map(f => fs.unlink(f.path).catch(() => { })));
+    await Promise.all(req.files.map(f => fs.unlink(f.path).catch(() => {
+      logger.debug({ path: f.path }, 'Failed to cleanup uploaded file');
+    })));
     res.status(500).json({ error: 'Failed to process images' });
   }
 }

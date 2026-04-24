@@ -36,7 +36,9 @@ export function saveContainerToDb(Container, userId, containerInfo) {
 export function updateLastActive(Container, containerInfo) {
   try {
     Container.updateLastActive(containerInfo.id);
-  } catch {}
+  } catch {
+    logger.debug({ containerId: containerInfo.id }, 'Failed to update last active time');
+  }
 }
 
 // 在容器恢复期间调用以重置已停止容器的状态机
@@ -62,7 +64,9 @@ export async function handleMissingContainer(dockerErr, Container, userId, conta
     Container.delete(containerId);
     let sm = stateMachines.get(userId);
     if (!sm) {
-      try { sm = await containerStateStore.load(userId); } catch {}
+      try { sm = await containerStateStore.load(userId); } catch {
+      logger.debug({ userId }, 'Failed to load container state from store');
+    }
     }
     if (sm) {
       sm.forceReset();
