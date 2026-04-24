@@ -116,7 +116,7 @@ export class McpClient extends EventEmitter {
           const msg = JSON.parse(message);
           this.emit('message', msg);
         } catch {
-          console.debug(`[McpClient] Non-JSON message:`, message);
+          logger.debug({ message }, 'Non-JSON message received');
         }
       }
     } catch (error) {

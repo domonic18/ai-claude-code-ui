@@ -12,6 +12,8 @@
  */
 
 import { MemoryService } from './MemoryService.js';
+import { createLogger } from '../../utils/logger.js';
+const logger = createLogger('services/memory/MemoryLoader');
 
 /**
  * 记忆加载器类
@@ -120,7 +122,7 @@ export class MemoryLoader {
     if (estimatedTokens > this.maxTokens) {
       // 从低优先级开始截断
       finalContext = this._truncateByPriority(sortedParts, this.maxTokens);
-      console.log(`[MemoryLoader] Context truncated from ${estimatedTokens} to ~${this._estimateTokens(finalContext)} tokens`);
+      logger.debug({ from: estimatedTokens, to: this._estimateTokens(finalContext) }, 'Context truncated due to token limit');
     }
 
     return {
