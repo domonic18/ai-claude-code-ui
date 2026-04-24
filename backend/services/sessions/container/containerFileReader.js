@@ -139,7 +139,7 @@ export async function execAndCollectOutput(userId, cmd, options = {}) {
     stderr.on('data', (chunk) => {
       errorOutput += chunk.toString();
       if (options.logLabel && !options.silentStderr) {
-        logger.info(`[${options.logLabel}] STDERR:`, chunk.toString());
+        logger.debug(`[${options.logLabel}] STDERR:`, chunk.toString());
       }
     });
 

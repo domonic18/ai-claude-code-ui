@@ -319,6 +319,6 @@ export function cleanupIdlePtySessions(idleTime = PTY_TIMEOUTS.idleCleanup) {
 setInterval(() => {
   const count = cleanupIdlePtySessions();
   if (count > 0) {
-    logger.info(`Cleaned up ${count} idle PTY sessions`);
+    logger.debug(`Cleaned up ${count} idle PTY sessions`);
   }
 }, PTY_TIMEOUTS.cleanupInterval); // 使用配置的清理间隔

@@ -121,7 +121,7 @@ export async function writeFileViaPutArchive(container, containerFilePath, conte
       });
     });
 
-    logger.info(`[${logLabel}] File written to container: ${containerFilePath} (${content.length} bytes)`);
+    logger.debug(`[${logLabel}] File written to container: ${containerFilePath} (${content.length} bytes)`);
   } finally {
     try {
       await fs.rm(tmpDir, { recursive: true, force: true });
