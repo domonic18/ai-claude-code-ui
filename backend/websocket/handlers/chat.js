@@ -70,6 +70,16 @@ async function handleClaudeCommand(data, ws, writer) {
   const originalProjectName = data.options?.projectPath?.replace(/\//g, '-') || '';
   const { command, imageAttachments } = buildClaudeCommand(data);
 
+  logger.info({
+    userId: ws.user.userId,
+    preview: sanitizePreview(data.command),
+    totalLength: data.command?.length || 0,
+    model: data.options?.model,
+    projectPath: originalProjectName,
+    hasAttachments: !!(data.attachments?.length),
+    hasImages: imageAttachments.length > 0,
+  }, '[Chat] User message received');
+
   const containerOptions = {
     ...data.options,
     userId: ws.user.userId,
@@ -78,7 +88,6 @@ async function handleClaudeCommand(data, ws, writer) {
     images: imageAttachments.length > 0 ? imageAttachments : undefined,
   };
 
-  logger.debug({ preview: sanitizePreview(command), totalLength: command?.length || 0 }, '[WebSocket] Executing claude-command');
   await queryClaudeSDKInContainer(command, containerOptions, writer);
 }
 
@@ -135,13 +144,24 @@ function checkSessionStatus(data, writer) {
  */
 const COMMAND_HANDLERS = {
   'claude-command': async (data, ws, writer) => {
-    logger.debug({ model: data.options?.model, hasAttachments: !!(data.attachments?.length) }, '[WebSocket] Received claude-command');
     await handleClaudeCommand(data, ws, writer);
   },
   'cursor-command': async (data, ws, writer) => {
+    logger.info({
+      userId: ws.user.userId,
+      preview: sanitizePreview(data.command),
+      totalLength: data.command?.length || 0,
+      provider: 'cursor',
+    }, '[Chat] User message received');
     await spawnCursor(data.command, data.options, writer);
   },
   'codex-command': async (data, ws, writer) => {
+    logger.info({
+      userId: ws.user.userId,
+      preview: sanitizePreview(data.command),
+      totalLength: data.command?.length || 0,
+      provider: 'codex',
+    }, '[Chat] User message received');
     await queryCodex(data.command, data.options, writer);
   },
   'cursor-resume': async (data, ws, writer) => {

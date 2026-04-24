@@ -22,6 +22,18 @@ const logger = createLogger('controllers/core/AuthController');
 const { User } = repositories;
 
 /**
+ * 从请求中提取客户端 IP（支持反向代理）
+ * @param {import('express').Request} req
+ * @returns {string}
+ */
+function getClientIp(req) {
+  return req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+    || req.headers['x-real-ip']
+    || req.socket?.remoteAddress
+    || 'unknown';
+}
+
+/**
  * 认证控制器
  */
 export class AuthController extends BaseController {
@@ -98,6 +110,7 @@ export class AuthController extends BaseController {
       // 设置 httpOnly cookie（行业最佳实践）
       res.cookie('auth_token', token, getCookieOptions());
 
+      logger.info({ userId: user.id, username: user.username, role, ip: getClientIp(req) }, 'User registered');
       this._success(res, buildUserResponse(user), 'Registration successful', 201);
     } catch (error) {
       safeRollback(transactionActive);
@@ -125,6 +138,7 @@ export class AuthController extends BaseController {
       const user = User.getByUsername(username);
 
       if (!user) {
+        logger.warn({ username, ip: getClientIp(req) }, 'Login failed: user not found');
         throw new UnauthorizedError('Invalid username or password');
       }
 
@@ -132,6 +146,7 @@ export class AuthController extends BaseController {
       const isValidPassword = await bcrypt.compare(password, user.password_hash);
 
       if (!isValidPassword) {
+        logger.warn({ userId: user.id, username, ip: getClientIp(req) }, 'Login failed: wrong password');
         throw new UnauthorizedError('Invalid username or password');
       }
 
@@ -147,6 +162,7 @@ export class AuthController extends BaseController {
       // 设置 httpOnly cookie（行业最佳实践）
       res.cookie('auth_token', token, getCookieOptions());
 
+      logger.info({ userId: user.id, username, ip: getClientIp(req) }, 'User logged in');
       this._success(res, buildUserResponse(user), 'Login successful');
     } catch (error) {
       this._handleError(error, req, res, next);
@@ -250,10 +266,12 @@ export class AuthController extends BaseController {
    */
   async logout(req, res, next) {
     try {
+      const userId = req.user?.id;
       // 清除 httpOnly cookie（配置需与设置时完全一致）
       // clearCookie 会忽略 maxAge 等选项，只使用 path/domain/sameSite/secure 来匹配
       res.clearCookie('auth_token', getCookieOptions());
 
+      logger.info({ userId, ip: getClientIp(req) }, 'User logged out');
       this._success(res, null, 'Logged out successfully');
     } catch (error) {
       this._handleError(error, req, res, next);
