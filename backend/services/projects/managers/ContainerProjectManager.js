@@ -149,7 +149,9 @@ export async function getProjectsInContainer(userId) {
     const output = await _collectStreamOutput(stream);
 
     let projectConfig = {};
-    try { projectConfig = await loadProjectConfig(); } catch { /* silent */ }
+    try { projectConfig = await loadProjectConfig(); } catch {
+      logger.debug('Failed to load project config, using defaults');
+    }
 
     const projectList = parseProjectList(output, projectConfig);
 

@@ -64,7 +64,9 @@ async function readSessionData(sessionPath, sessionId, projectPath) {
     await fs.access(storeDbPath);
 
     let dbMtimeMs = null;
-    try { dbMtimeMs = (await fs.stat(storeDbPath)).mtimeMs; } catch {}
+    try { dbMtimeMs = (await fs.stat(storeDbPath)).mtimeMs; } catch {
+      logger.debug({ sessionId, storeDbPath }, 'Failed to stat store.db');
+    }
 
     const db = await open({
       filename: storeDbPath,

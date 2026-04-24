@@ -47,7 +47,9 @@ export async function createAskpassScript(githubToken) {
  * @param {string} askpassPath - 要删除的 askpass 脚本路径
  */
 export async function cleanupAskpass(askpassPath) {
-  await fs.unlink(askpassPath).catch(() => {});
+  await fs.unlink(askpassPath).catch((err) => {
+    logger.debug({ askpassPath }, 'Failed to cleanup askpass script');
+  });
 }
 
 // GitAuthHelper.js 功能函数

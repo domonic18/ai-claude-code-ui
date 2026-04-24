@@ -26,7 +26,9 @@ export async function collectDiffContext(projectPath, files) {
     try {
       const { stdout } = await gitSpawn(['diff', 'HEAD', '--', file], projectPath);
       if (stdout) diffContext += `\n--- ${file} ---\n${stdout}`;
-    } catch { /* ignore */ }
+    } catch {
+      logger.debug({ file }, 'Failed to get diff for file');
+    }
   }
   return diffContext;
 }
@@ -57,7 +59,9 @@ export async function collectUntrackedFileContent(projectPath, files) {
       } else {
         content += `\n--- ${file} (new directory) ---\n`;
       }
-    } catch { /* ignore */ }
+    } catch {
+      logger.debug({ file }, 'Failed to read untracked file');
+    }
   }
   return content;
 }

@@ -10,6 +10,8 @@
 import { validateRepository } from './gitValidator.js';
 import { gitSpawn } from './gitSpawn.js';
 import { parseStatusOutput, stripDiffHeaders } from './gitStatusParser.js';
+import { createLogger } from '../../utils/logger.js';
+const logger = createLogger('services/scm/gitStatus');
 
 // 在获取状态时调用，执行 git status
 /**
@@ -120,7 +122,9 @@ export async function getRemoteStatus(projectPath) {
                 hasRemote = true;
                 detectedRemote = remotes.includes('origin') ? 'origin' : remotes[0];
             }
-        } catch { /* no remote */ }
+        } catch {
+          logger.debug({ projectPath }, 'No git remote configured');
+        }
 
         return { hasRemote, hasUpstream: false, branch, remoteName: detectedRemote, message: 'No remote tracking branch configured' };
     }
