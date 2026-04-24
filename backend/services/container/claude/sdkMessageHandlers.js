@@ -56,7 +56,7 @@ export function handleAssistantMessage(sdkMessage, writer, sessionId) {
     summary: ctx.summary?.substring(0, 100) || null,
   };
   if (ctx.tools.length > 0) {
-    logPayload.tools = ctx.tools.map(t => t.name || t.result);
+    logPayload.tools = ctx.tools.map(t => t.name || (typeof t.result === 'string' ? t.result.substring(0, 80) : t.result));
   }
 
   logger.info(logPayload, '[MessageTransformer] Sending claude-response, type: assistant');

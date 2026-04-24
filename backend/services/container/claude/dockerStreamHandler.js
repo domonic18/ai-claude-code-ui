@@ -85,7 +85,7 @@ function setupStderrHandler(stderr, chunks, sessionId) {
     chunks.push(stderrText);
 
     if (hasRealError(stderrText)) {
-      logger.error({ sessionId, stderr: stderrText.substring(0, 2000) }, '[DockerExecutor] STDERR error detected');
+      logger.error({ sessionId, stderr: stderrText.substring(0, 500) }, '[DockerExecutor] STDERR error detected');
     } else if (stderrText.startsWith('[SDK]') || stderrText.includes('Error') || stderrText.includes('Exception')) {
       logger.debug({ sessionId, stderr: stderrText.substring(0, 500) }, '[DockerExecutor] STDERR debug output');
     }
