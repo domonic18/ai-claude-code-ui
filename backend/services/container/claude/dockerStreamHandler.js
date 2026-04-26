@@ -65,7 +65,7 @@ function setupStdoutHandler(stdout, chunks, writer, sessionId, state, onChunk) {
       try {
         processOutput(output, writer, sessionId, state);
       } catch (e) {
-        logger.error('[DockerExecutor] Error processing output:', e);
+        logger.error({ sessionId, err: e, outputPreview: output.substring(0, 200) }, '[DockerExecutor] Error processing output');
       }
     } else {
       logger.warn('[DockerExecutor] Writer not available');
@@ -175,7 +175,7 @@ function handleStreamProcessing(stream, stdout, stderr, writer, sessionId) {
   const stdoutChunks = [];
   const stderrChunks = [];
   let dataCount = 0;
-  const state = { sessionCreatedSent: false };
+  const state = { sessionCreatedSent: false, toolSeq: 0, toolTimers: new Map() };
 
   setupStdoutHandler(stdout, stdoutChunks, writer, sessionId, state, () => { dataCount++; });
   setupStderrHandler(stderr, stderrChunks, sessionId);

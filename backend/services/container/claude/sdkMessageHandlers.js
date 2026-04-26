@@ -1,13 +1,14 @@
 /**
  * SDK Message Handlers
  *
- * Functions for handling different types of SDK messages
+ * Functions for handling different types of SDK messages.
+ * Produces structured logs with tool inputs, results, sequence numbers, and timing.
  *
  * @module services/container/claude/sdkMessageHandlers
  */
 
 import { createLogger } from '../../../utils/logger.js';
-import { extractTokenBudget, extractMessageContext, isResultError } from './messageParsingHelpers.js';
+import { extractTokenBudget, extractMessageContext, isResultError, extractToolResults } from './messageParsingHelpers.js';
 import { aliasSessionId } from './SessionManager.js';
 
 const logger = createLogger('services/container/claude/sdkMessageHandlers');
@@ -30,7 +31,6 @@ export function sendSessionCreated(sdkMessage, writer, sessionId, state) {
   state.realSessionId = sdkMessage.session_id;
   logger.info({ sessionId, newSessionId: sdkMessage.session_id }, '[MessageTransformer] Sending session-created');
 
-  // 为真实 session ID 创建别名，使前端用真实 ID 查找 stdin writer 时能找到
   aliasSessionId(sdkMessage.session_id, sessionId);
 
   writer.send({ type: 'session-created', sessionId: sdkMessage.session_id });
@@ -40,26 +40,52 @@ export function sendSessionCreated(sdkMessage, writer, sessionId, state) {
   }
 }
 
+function buildToolLogMsg(tool, seq) {
+  const parts = [`[Tool #${seq}] ${tool.name}`];
+  if (tool.input) {
+    for (const [key, val] of Object.entries(tool.input)) {
+      if (val !== undefined && val !== null && val !== '') {
+        parts.push(`${key}=${JSON.stringify(val)}`);
+      }
+    }
+  }
+  return parts.join('  ');
+}
+
 /**
  * Handles assistant-type SDK messages
  * @param {Object} sdkMessage - SDK message object
  * @param {Object} writer - Message writer
  * @param {string} sessionId - Session ID
+ * @param {Object} state - State object with toolSeq counter and toolTimers map
  */
-export function handleAssistantMessage(sdkMessage, writer, sessionId) {
+export function handleAssistantMessage(sdkMessage, writer, sessionId, state) {
   const ctx = extractMessageContext(sdkMessage);
 
-  const logPayload = {
-    sessionId,
-    contentType: ctx.contentType,
-    stopReason: ctx.stopReason,
-    summary: ctx.summary?.substring(0, 100) || null,
-  };
-  if (ctx.tools.length > 0) {
-    logPayload.tools = ctx.tools.map(t => t.name || (typeof t.result === 'string' ? t.result.substring(0, 80) : t.result));
-  }
+  if (ctx.contentType === 'text' && ctx.summary) {
+    logger.info(
+      { sessionId, contentType: 'text', summary: ctx.summary },
+      `[Assistant] ${ctx.summary}`
+    );
+  } else if (ctx.tools.length > 0) {
+    for (const tool of ctx.tools) {
+      if (tool.result === 'tool_result') continue;
 
-  logger.info(logPayload, '[MessageTransformer] Sending claude-response, type: assistant');
+      if (!state) continue;
+      state.toolSeq = (state.toolSeq || 0) + 1;
+      if (!state.toolTimers) state.toolTimers = new Map();
+      state.toolTimers.set(tool.id, Date.now());
+
+      const logPayload = {
+        sessionId,
+        toolSeq: state.toolSeq,
+        toolName: tool.name,
+        ...(tool.input || {})
+      };
+      const logMsg = buildToolLogMsg(tool, state.toolSeq);
+      logger.info(logPayload, logMsg);
+    }
+  }
 
   writer.send({ type: 'claude-response', data: sdkMessage });
 }
@@ -70,7 +96,7 @@ export function handleAssistantMessage(sdkMessage, writer, sessionId) {
  * @param {Object} writer - Message writer
  * @param {string} sessionId - Session ID
  */
-export function handleResultMessage(sdkMessage, writer, sessionId) {
+export function handleResultMessage(sdkMessage, writer, sessionId, _state) {
   const tokenBudget = extractTokenBudget(sdkMessage);
   if (tokenBudget) {
     logger.info(
@@ -95,33 +121,47 @@ export function handleResultMessage(sdkMessage, writer, sessionId) {
 }
 
 /**
- * Handles default SDK messages
+ * Handles default SDK messages (user/system types including tool_result)
  * @param {Object} sdkMessage - SDK message object
  * @param {Object} writer - Message writer
  * @param {string} sessionId - Session ID
+ * @param {Object} state - State object with toolSeq counter and toolTimers map
  */
-export function handleDefaultMessage(sdkMessage, writer, sessionId) {
+export function handleDefaultMessage(sdkMessage, writer, sessionId, state) {
   const ctx = extractMessageContext(sdkMessage);
-  // For system/user messages, include subtype for better identification
-  const logPayload = {
-    sessionId,
-    sdkMessageType: sdkMessage.type,
-    contentType: ctx.contentType,
-    summary: ctx.summary?.substring(0, 80),
-  };
-  if (sdkMessage.subtype) {
-    logPayload.subtype = sdkMessage.subtype;
+
+  const toolResults = extractToolResults(sdkMessage);
+  if (toolResults.length > 0 && state) {
+    if (!state.toolTimers) state.toolTimers = new Map();
+    for (const tr of toolResults) {
+      const startTime = state.toolTimers.get(tr.toolUseId);
+      const durationMs = startTime ? Date.now() - startTime : null;
+      if (startTime) state.toolTimers.delete(tr.toolUseId);
+
+      const logPayload = {
+        sessionId,
+        toolUseId: tr.toolUseId,
+        isError: tr.isError,
+        durationMs
+      };
+      if (tr.resultPreview) {
+        logPayload.resultPreview = tr.resultPreview;
+      }
+
+      const durationStr = durationMs !== null ? `  ${durationMs >= 1000 ? (durationMs / 1000).toFixed(1) + 's' : durationMs + 'ms'}` : '';
+      const statusStr = tr.isError ? '  FAILED' : '  ok';
+      logger.info(logPayload, `[ToolResult]${statusStr}${durationStr}  ${(tr.resultPreview || '').substring(0, 100)}`);
+    }
+  } else {
+    logger.debug(
+      { sessionId, sdkMessageType: sdkMessage.type, contentType: ctx.contentType },
+      '[MessageTransformer] Sending claude-response, type: default'
+    );
   }
-  logger.info(
-    logPayload,
-    '[MessageTransformer] Sending claude-response, type: default'
-  );
+
   writer.send({ type: 'claude-response', data: sdkMessage });
 }
 
-/**
- * Message type handler lookup table
- */
 const MESSAGE_HANDLERS = {
   assistant: handleAssistantMessage,
   result: handleResultMessage
@@ -132,13 +172,14 @@ const MESSAGE_HANDLERS = {
  * @param {Object} sdkMessage - SDK message object
  * @param {Object} writer - Message writer
  * @param {string} sessionId - Session ID
+ * @param {Object} state - State object
  */
-export function handleSdkMessage(sdkMessage, writer, sessionId) {
+export function handleSdkMessage(sdkMessage, writer, sessionId, state) {
   const handler = MESSAGE_HANDLERS[sdkMessage.type];
 
   if (handler) {
-    handler(sdkMessage, writer, sessionId);
+    handler(sdkMessage, writer, sessionId, state);
   } else {
-    handleDefaultMessage(sdkMessage, writer, sessionId);
+    handleDefaultMessage(sdkMessage, writer, sessionId, state);
   }
 }

@@ -27,7 +27,7 @@ export function processOutputLine(line, writer, sessionId, state) {
   if (jsonData.type === 'content' && jsonData.chunk) {
     const sdkMessage = jsonData.chunk;
     sendSessionCreated(sdkMessage, writer, sessionId, state);
-    handleSdkMessage(sdkMessage, writer, sessionId);
+    handleSdkMessage(sdkMessage, writer, sessionId, state);
     return;
   }
 
