@@ -298,7 +298,7 @@ describe('Validation Middleware', () => {
         () => validation.validateProjectId(req, res, next),
         (err) => {
           assert.strictEqual(err.name, 'ValidationError');
-          assert.ok(err.message.includes('Invalid project ID'));
+          assert.ok(err.message.includes('Invalid projectId'));
           return true;
         }
       );
@@ -412,7 +412,7 @@ describe('Validation Middleware', () => {
         () => validation.validateSessionId(req, res, next),
         (err) => {
           assert.strictEqual(err.name, 'ValidationError');
-          assert.ok(err.message.includes('Invalid session ID'));
+          assert.ok(err.message.includes('Invalid sessionId'));
           return true;
         }
       );
@@ -469,7 +469,7 @@ describe('Validation Middleware', () => {
         () => validation.validateUserId(req, res, next),
         (err) => {
           assert.strictEqual(err.name, 'ValidationError');
-          assert.ok(err.message.includes('Invalid user ID'));
+          assert.ok(err.message.includes('Invalid userId'));
           return true;
         }
       );
