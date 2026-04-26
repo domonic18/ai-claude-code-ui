@@ -21,6 +21,7 @@ const { McpServer } = await import('../../database/repositories/McpServer.reposi
 const { UserSettingsService } = await import('../../services/settings/UserSettingsService.js');
 const { McpService } = await import('../../services/mcp/McpService.js');
 const { McpContainerManager } = await import('../../services/mcp/McpContainerManager.js');
+const { validateMcpConfig } = await import('../../services/mcp/validators/McpValidator.js');
 const { repositories } = await import('../../database/db.js');
 
 describe('Database Migrations', () => {
@@ -116,6 +117,10 @@ describe('UserSettings Repository', () => {
     });
 
     it('获取用户设置', async () => {
+        await UserSettings.create(testUserId, 'claude', {
+            allowedTools: ['Write', 'Read'],
+            skipPermissions: true
+        });
         const settings = await UserSettings.getByUserId(testUserId, 'claude');
         assert.ok(settings != null, '设置应该存在');
         assert.strictEqual(settings.provider, 'claude', '提供商应该是claude');
@@ -143,11 +148,14 @@ describe('UserSettings Repository', () => {
     });
 
     it('获取所有用户设置', async () => {
+        await UserSettings.create(testUserId, 'claude', { allowedTools: ['Write'] });
+        await UserSettings.create(testUserId, 'cursor', { allowedTools: ['Read'] });
         const all = await UserSettings.getAllByUserId(testUserId);
         assert.ok(all.length >= 2, '应该有至少2个提供商的设置');
     });
 
     it('删除用户设置', async () => {
+        await UserSettings.create(testUserId, 'claude', { allowedTools: ['Write'] });
         const deleted = await UserSettings.delete(testUserId, 'claude');
         assert.ok(deleted, '删除应该成功');
         const settings = await UserSettings.getByUserId(testUserId, 'claude');
@@ -248,21 +256,25 @@ describe('McpServer Repository', () => {
     });
 
     it('获取用户的所有MCP服务器', async () => {
+        await McpServer.create(testUserId, { name: 's1', type: 'stdio', config: { command: 'a' }, enabled: true });
+        await McpServer.create(testUserId, { name: 's2', type: 'http', config: { url: 'https://a.com' }, enabled: true });
+        await McpServer.create(testUserId, { name: 's3', type: 'sse', config: { url: 'https://b.com' }, enabled: false });
         const servers = await McpServer.getByUserId(testUserId);
         assert.ok(servers.length >= 3, '应该有至少3个服务器');
     });
 
     it('通过ID获取MCP服务器', async () => {
-        const servers = await McpServer.getByUserId(testUserId);
-        const server = await McpServer.getById(servers[0].id);
+        const created = await McpServer.create(testUserId, { name: 'getbyid-test', type: 'stdio', config: { command: 'node' } });
+        const server = await McpServer.getById(created.id);
         assert.ok(server != null, '服务器应该存在');
-        assert.strictEqual(server.id, servers[0].id, 'ID应该匹配');
+        assert.strictEqual(server.id, created.id, 'ID应该匹配');
     });
 
     it('通过名称获取MCP服务器', async () => {
-        const server = await McpServer.getByName(testUserId, 'stdio-server');
+        await McpServer.create(testUserId, { name: 'byname-test', type: 'stdio', config: { command: 'node' } });
+        const server = await McpServer.getByName(testUserId, 'byname-test');
         assert.ok(server != null, '服务器应该存在');
-        assert.strictEqual(server.name, 'stdio-server', '名称应该匹配');
+        assert.strictEqual(server.name, 'byname-test', '名称应该匹配');
     });
 
     it('获取不存在的服务器返回null', async () => {
@@ -271,48 +283,50 @@ describe('McpServer Repository', () => {
     });
 
     it('检查服务器归属 (属于当前用户)', async () => {
-        const servers = await McpServer.getByUserId(testUserId);
-        const belongs = await McpServer.belongsToUser(servers[0].id, testUserId);
+        const created = await McpServer.create(testUserId, { name: 'owner-test', type: 'stdio', config: { command: 'node' } });
+        const belongs = await McpServer.belongsToUser(created.id, testUserId);
         assert.ok(belongs, '服务器应该属于用户');
     });
 
     it('检查服务器归属 (不属于其他用户)', async () => {
-        const servers = await McpServer.getByUserId(testUserId);
-        const belongs = await McpServer.belongsToUser(servers[0].id, testUserId2);
+        const created = await McpServer.create(testUserId, { name: 'owner-test2', type: 'stdio', config: { command: 'node' } });
+        const belongs = await McpServer.belongsToUser(created.id, testUserId2);
         assert.ok(!belongs, '服务器不应该属于其他用户');
     });
 
     it('获取启用的服务器', async () => {
+        await McpServer.create(testUserId, { name: 'enabled-test', type: 'stdio', config: { command: 'node' }, enabled: true });
         const enabled = await McpServer.getEnabled(testUserId);
         assert.ok(enabled.length > 0, '应该有启用的服务器');
         enabled.forEach(s => assert.ok(s.enabled, '所有服务器都应该启用'));
     });
 
     it('切换服务器启用状态', async () => {
-        const server = await McpServer.getByName(testUserId, 'stdio-server');
-        const originalEnabled = server.enabled;
+        const created = await McpServer.create(testUserId, { name: 'toggle-test', type: 'stdio', config: { command: 'node' }, enabled: true });
+        const originalEnabled = created.enabled;
 
-        const toggled = await McpServer.toggleEnabled(server.id);
+        const toggled = await McpServer.toggleEnabled(created.id);
         assert.strictEqual(toggled.enabled, !originalEnabled, '状态应该切换');
 
-        const toggledBack = await McpServer.toggleEnabled(server.id);
+        const toggledBack = await McpServer.toggleEnabled(created.id);
         assert.strictEqual(toggledBack.enabled, originalEnabled, '状态应该切换回来');
     });
 
     it('更新MCP服务器', async () => {
-        const server = await McpServer.getByName(testUserId, 'http-server');
-        const updated = await McpServer.update(server.id, {
-            name: 'http-server-updated',
+        const created = await McpServer.create(testUserId, { name: 'update-test', type: 'http', config: { url: 'https://example.com' } });
+        const updated = await McpServer.update(created.id, {
+            name: 'update-test-updated',
             enabled: false
         });
-        assert.strictEqual(updated.name, 'http-server-updated', '名称应该更新');
+        assert.strictEqual(updated.name, 'update-test-updated', '名称应该更新');
         assert.ok(!updated.enabled, '启用状态应该更新');
     });
 
     it('创建重复名称的服务器应该失败', async () => {
+        await McpServer.create(testUserId, { name: 'dup-test', type: 'http', config: { url: 'https://example.com' } });
         await assert.rejects(
             async () => McpServer.create(testUserId, {
-                name: 'stdio-server',
+                name: 'dup-test',
                 type: 'http',
                 config: { url: 'https://example.com' }
             }),
@@ -322,11 +336,11 @@ describe('McpServer Repository', () => {
     });
 
     it('删除MCP服务器', async () => {
-        const server = await McpServer.getByName(testUserId, 'sse-server');
-        const deleted = await McpServer.delete(server.id);
+        const created = await McpServer.create(testUserId, { name: 'del-test', type: 'sse', config: { url: 'https://example.com/sse' } });
+        const deleted = await McpServer.delete(created.id);
         assert.ok(deleted, '删除应该成功');
 
-        const checkServer = await McpServer.getById(server.id);
+        const checkServer = await McpServer.getById(created.id);
         assert.strictEqual(checkServer, null, '服务器应该被删除');
     });
 });
@@ -464,11 +478,13 @@ describe('McpService', () => {
         assert.strictEqual(typeof McpService.testServer, 'function', 'testServer 应该是函数');
         assert.strictEqual(typeof McpService.discoverTools, 'function', 'discoverTools 应该是函数');
         assert.strictEqual(typeof McpService.toggleServer, 'function', 'toggleServer 应该是函数');
-        assert.strictEqual(typeof McpService.validateConfig, 'function', 'validateConfig 应该是函数');
+        assert.strictEqual(typeof validateMcpConfig, 'function', 'validateConfig 应该是函数');
         assert.strictEqual(typeof McpService.getSdkConfig, 'function', 'getSdkConfig 应该是函数');
     });
 
     it('获取用户的MCP服务器列表', async () => {
+        await McpService.createServer(testUserId, { name: 'list-test-1', type: 'stdio', config: { command: 'node' } });
+        await McpService.createServer(testUserId, { name: 'list-test-2', type: 'http', config: { url: 'https://example.com' } });
         const servers = await McpService.getServers(testUserId);
         assert.ok(Array.isArray(servers), '应该返回数组');
         assert.ok(servers.length >= 2, '应该有至少2个服务器');
@@ -501,26 +517,24 @@ describe('McpService', () => {
     });
 
     it('验证有效的stdio配置', async () => {
-        McpService.validateConfig({
+        validateMcpConfig({
             name: 'test-server',
             type: 'stdio',
             config: { command: 'node', args: ['server.js'] }
         });
-        // 如果没有抛出错误，测试通过
     });
 
     it('验证有效的http配置', async () => {
-        McpService.validateConfig({
+        validateMcpConfig({
             name: 'test-server',
             type: 'http',
             config: { url: 'https://example.com/mcp' }
         });
-        // 如果没有抛出错误，测试通过
     });
 
     it('验证无效的配置 (缺少name)', async () => {
         assert.throws(
-            () => McpService.validateConfig({
+            () => validateMcpConfig({
                 type: 'stdio',
                 config: { command: 'node' }
             }),
@@ -531,7 +545,7 @@ describe('McpService', () => {
 
     it('验证无效的配置 (无效type)', async () => {
         assert.throws(
-            () => McpService.validateConfig({
+            () => validateMcpConfig({
                 name: 'test',
                 type: 'invalid',
                 config: {}
@@ -543,7 +557,7 @@ describe('McpService', () => {
 
     it('验证无效的配置 (stdio缺少command)', async () => {
         assert.throws(
-            () => McpService.validateConfig({
+            () => validateMcpConfig({
                 name: 'test',
                 type: 'stdio',
                 config: {}
@@ -555,7 +569,7 @@ describe('McpService', () => {
 
     it('验证无效的配置 (http缺少url)', async () => {
         assert.throws(
-            () => McpService.validateConfig({
+            () => validateMcpConfig({
                 name: 'test',
                 type: 'http',
                 config: {}
@@ -580,9 +594,10 @@ describe('McpService', () => {
     });
 
     it('创建重复名称的服务器应该失败', async () => {
+        await McpService.createServer(testUserId2, { name: 'svc-dup-test', type: 'http', config: { url: 'https://example.com' } });
         await assert.rejects(
             async () => McpService.createServer(testUserId2, {
-                name: 'service-test-server',
+                name: 'svc-dup-test',
                 type: 'http',
                 config: { url: 'https://example.com' }
             }),
