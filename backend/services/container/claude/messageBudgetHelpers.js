@@ -35,5 +35,5 @@ export function extractTokenBudget(sdkMessage) {
  */
 export function isResultError(sdkMessage) {
   const result = sdkMessage.result;
-  return result && /^(Unknown skill|Error:|Failed:)/i.test(result);
+  return result && /^(Unknown skill|Error:|Failed:|API Error:)/i.test(result);
 }
