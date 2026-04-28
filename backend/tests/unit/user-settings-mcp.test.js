@@ -22,7 +22,10 @@ const { UserSettingsService } = await import('../../services/settings/UserSettin
 const { McpService } = await import('../../services/mcp/McpService.js');
 const { McpContainerManager } = await import('../../services/mcp/McpContainerManager.js');
 const { validateMcpConfig } = await import('../../services/mcp/validators/McpValidator.js');
-const { repositories } = await import('../../database/db.js');
+const { repositories, initializeDatabase } = await import('../../database/db.js');
+
+// 确保数据库表结构完整（CI 环境为空数据库，需要运行迁移创建 user_settings、user_mcp_servers 等表）
+initializeDatabase();
 
 describe('Database Migrations', () => {
     it('用户设置表已创建', async () => {
