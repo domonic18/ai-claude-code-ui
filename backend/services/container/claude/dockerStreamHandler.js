@@ -86,7 +86,10 @@ function setupStderrHandler(stderr, chunks, sessionId) {
 
     if (hasRealError(stderrText)) {
       logger.error({ sessionId, stderr: stderrText.substring(0, 500) }, '[DockerExecutor] STDERR error detected');
-    } else if (stderrText.startsWith('[SDK]') || stderrText.includes('Error') || stderrText.includes('Exception')) {
+    } else if (stderrText.startsWith('[SDK]')) {
+      // SDK 脚本输出包含关键执行信息（permissionMode、model、chunk 等），INFO 级别确保生产环境可见
+      logger.info({ sessionId, sdkLog: stderrText.substring(0, 500) }, '[DockerExecutor] SDK output');
+    } else if (stderrText.includes('Error') || stderrText.includes('Exception')) {
       logger.debug({ sessionId, stderr: stderrText.substring(0, 500) }, '[DockerExecutor] STDERR debug output');
     }
   });

@@ -109,6 +109,8 @@ async function execute() {
 ${generateImageHandling(imagePaths)}
 
     console.error("[SDK] Options model:", options.model);
+    console.error("[SDK] Options permissionMode:", options.permissionMode);
+    console.error("[SDK] Options allowDangerouslySkipPermissions:", options.allowDangerouslySkipPermissions);
     console.error("[SDK] Command:", command);
 
 ${generateDirectorySetup()}

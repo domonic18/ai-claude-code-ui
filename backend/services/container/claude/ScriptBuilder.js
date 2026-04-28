@@ -101,6 +101,16 @@ export async function buildSDKScript(command, options, userId) {
   logger.debug({ model: sdkOptions.model }, 'sdkOptions.model');
   logger.debug({ size: JSON.stringify(sdkOptions).length }, 'optionsJson size');
 
+  logger.info({
+    model: sdkOptions.model,
+    permissionMode: sdkOptions.permissionMode,
+    allowDangerouslySkipPermissions: sdkOptions.allowDangerouslySkipPermissions,
+    planMode,
+    optionsSize: JSON.stringify(sdkOptions).length,
+  }, '[ScriptBuilder] SDK options summary');
+
+
+
   const optionsBase64 = Buffer.from(JSON.stringify(sdkOptions)).toString('base64');
   const commandBase64 = Buffer.from(command, 'utf-8').toString('base64');
 
