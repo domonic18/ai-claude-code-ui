@@ -13,6 +13,23 @@ import { aliasSessionId } from './SessionManager.js';
 
 const logger = createLogger('services/container/claude/sdkMessageHandlers');
 
+// 匹配 API 代理返回的临时性错误（如 OneAPI 503/429/500）
+const API_ERROR_PATTERN = /^API Error:\s*(\d{3})\b/i;
+
+/**
+ * 检测 assistant 消息文本是否为 API 代理错误（如 OneAPI 返回的 503、429 等）
+ * @param {string} text - assistant 消息文本
+ * @returns {{ isApiError: boolean, statusCode: number|null }}
+ */
+function detectApiError(text) {
+  if (!text || typeof text !== 'string') return { isApiError: false, statusCode: null };
+  const match = text.match(API_ERROR_PATTERN);
+  if (match) {
+    return { isApiError: true, statusCode: parseInt(match[1], 10) };
+  }
+  return { isApiError: false, statusCode: null };
+}
+
 /**
  * Sends session-created message if conditions are met
  * @param {Object} sdkMessage - SDK message object
@@ -61,6 +78,24 @@ function buildToolLogMsg(tool, seq) {
  */
 export function handleAssistantMessage(sdkMessage, writer, sessionId, state) {
   const ctx = extractMessageContext(sdkMessage);
+
+  // 检测 API 代理错误（如 OneAPI 503 "无可用渠道"）
+  if (ctx.contentType === 'text' && ctx.summary) {
+    const { isApiError, statusCode } = detectApiError(ctx.summary);
+    if (isApiError) {
+      const isRetryable = statusCode >= 500 || statusCode === 429;
+      logger.error(
+        { sessionId, statusCode, isRetryable, summary: ctx.summary },
+        `[Assistant] API proxy error detected (${statusCode})`
+      );
+      writer.send({
+        type: 'claude-error',
+        error: ctx.summary,
+        meta: { source: 'api-proxy', statusCode, isRetryable }
+      });
+      return;
+    }
+  }
 
   if (ctx.contentType === 'text' && ctx.summary) {
     logger.info(
