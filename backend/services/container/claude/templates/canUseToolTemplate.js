@@ -5,20 +5,55 @@
  * in the container SDK script. Communicates with the main container
  * via stdout (questions) and stdin (answers).
  *
+ * In bypassPermissions mode, AskUserQuestion is auto-answered with "继续"
+ * to prevent the AI from pausing long-running tasks to ask the user.
+ *
  * @module container/claude/templates/canUseToolTemplate
  */
+
+/** bypassPermissions 模式下自动回答的内容 */
+const AUTO_ANSWER_TEXT = '继续';
 
 /**
  * Generate canUseTool callback code for intercepting AskUserQuestion
  *
  * When the SDK calls AskUserQuestion, this callback:
- * 1. Outputs the question via stdout as an agent-question message
- * 2. Waits for user answer via stdin (JSON line protocol)
- * 3. Resolves with the user's answer as updatedInput
+ * - In bypassPermissions mode: auto-answers "继续" immediately (no user interaction)
+ * - In other modes: outputs question via stdout, waits for user answer via stdin
  *
+ * @param {boolean} autoAnswer - Whether to auto-answer questions without user interaction
  * @returns {string} canUseTool callback code to embed in SDK script
  */
-export function generateCanUseToolCallback() {
+export function generateCanUseToolCallback(autoAnswer = false) {
+  if (autoAnswer) {
+    return `
+    // --- AskUserQuestion 自动回答回调（bypassPermissions 模式）---
+    // 在无限制模式下，AI 不应主动询问用户，自动回复"${AUTO_ANSWER_TEXT}"以保持任务连续性
+    async function canUseTool(toolName, input, canUseToolOptions) {
+      if (toolName === 'AskUserQuestion') {
+        const toolUseID = canUseToolOptions.toolUseID;
+        console.error("[SDK] canUseTool auto-answer: AskUserQuestion, toolUseID:", toolUseID, "(bypassPermissions mode, auto-answering)");
+
+        // 仍然通知前端 AI 尝试了提问（便于调试和审计），但不等待回答
+        console.log(JSON.stringify({
+          type: "agent-question-auto-answered",
+          toolUseID: toolUseID,
+          questions: input.questions || [],
+          prompt: input.prompt || '',
+          autoAnswer: "${AUTO_ANSWER_TEXT}"
+        }));
+
+        return {
+          behavior: 'allow',
+          updatedInput: { ...input, answer: "${AUTO_ANSWER_TEXT}" },
+          toolUseID: toolUseID
+        };
+      }
+      // 其他工具默认放行
+      return { behavior: 'allow' };
+    }`;
+  }
+
   return `
     // --- AskUserQuestion 交互回调 ---
     // 通过 stdout/stdin 与主容器通信，实现 Agent 向用户提问并等待回答

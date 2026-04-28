@@ -92,9 +92,12 @@ function generateCleanup(tmpOptionsFile, tmpScriptFile) {
  * @param {string} commandBase64 - Base64 encoded command
  * @param {string} sessionId - Session ID
  * @param {Array} imagePaths - Array of image paths
+ * @param {string} permissionMode - Permission mode ('default' | 'acceptEdits' | 'bypassPermissions' | 'plan')
  * @returns {string} Script content
  */
-export function generateSDKScript(tmpOptionsFile, tmpScriptFile, commandBase64, sessionId, imagePaths) {
+export function generateSDKScript(tmpOptionsFile, tmpScriptFile, commandBase64, sessionId, imagePaths, permissionMode = 'default') {
+  const autoAnswer = permissionMode === 'bypassPermissions';
+
   return `import { query } from "/app/node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs";
 import { readFileSync, unlinkSync } from "fs";
 
@@ -124,7 +127,7 @@ ${generateImageHandling(imagePaths)}
 
 ${generateDirectorySetup()}
 
-${generateCanUseToolCallback()}
+${generateCanUseToolCallback(autoAnswer)}
 
     // Claude SDK 接受一个对象参数：{ prompt, options }
     // 注入 canUseTool 回调以拦截 AskUserQuestion
