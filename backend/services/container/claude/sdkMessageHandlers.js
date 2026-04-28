@@ -75,6 +75,10 @@ export function handleAssistantMessage(sdkMessage, writer, sessionId, state) {
       state.toolSeq = (state.toolSeq || 0) + 1;
       if (!state.toolTimers) state.toolTimers = new Map();
       state.toolTimers.set(tool.id, Date.now());
+      if (tool.name && tool.id) {
+        if (!state.toolNames) state.toolNames = new Map();
+        state.toolNames.set(tool.id, tool.name);
+      }
 
       const logPayload = {
         sessionId,
@@ -138,8 +142,12 @@ export function handleDefaultMessage(sdkMessage, writer, sessionId, state) {
       const durationMs = startTime ? Date.now() - startTime : null;
       if (startTime) state.toolTimers.delete(tr.toolUseId);
 
+      const toolName = state.toolNames?.get(tr.toolUseId) || 'unknown';
+      if (state.toolNames?.has(tr.toolUseId)) state.toolNames.delete(tr.toolUseId);
+
       const logPayload = {
         sessionId,
+        toolName,
         toolUseId: tr.toolUseId,
         isError: tr.isError,
         durationMs
@@ -150,7 +158,7 @@ export function handleDefaultMessage(sdkMessage, writer, sessionId, state) {
 
       const durationStr = durationMs !== null ? `  ${durationMs >= 1000 ? (durationMs / 1000).toFixed(1) + 's' : durationMs + 'ms'}` : '';
       const statusStr = tr.isError ? '  FAILED' : '  ok';
-      logger.info(logPayload, `[ToolResult]${statusStr}${durationStr}  ${(tr.resultPreview || '').substring(0, 100)}`);
+      logger.info(logPayload, `[ToolResult]  ${toolName}${statusStr}${durationStr}  ${(tr.resultPreview || '').substring(0, 100)}`);
     }
   } else {
     logger.debug(
