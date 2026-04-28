@@ -62,6 +62,14 @@ export function processOutputLine(line, writer, sessionId, state) {
       }
     });
   }
+
+  // bypassPermissions 模式下 AI 尝试提问但已被自动回答（仅日志记录，不转发前端）
+  if (jsonData.type === 'agent-question-auto-answered') {
+    logger.info(
+      { sessionId, toolUseID: jsonData.toolUseID, autoAnswer: jsonData.autoAnswer },
+      '[MessageTransformer] Agent question auto-answered (bypassPermissions mode)'
+    );
+  }
 }
 
 /**

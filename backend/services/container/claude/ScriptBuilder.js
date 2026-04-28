@@ -121,7 +121,7 @@ export async function buildSDKScript(command, options, userId) {
   const tmpOptionsFile = `/tmp/sdk_opts_${tmpId}.b64`;
   const tmpScriptFile = `/tmp/sdk_exec_${tmpId}.mjs`;
 
-  const scriptContent = generateSDKScript(tmpOptionsFile, tmpScriptFile, commandBase64, sessionId, imagePaths);
+  const scriptContent = generateSDKScript(tmpOptionsFile, tmpScriptFile, commandBase64, sessionId, imagePaths, sdkOptions.permissionMode);
 
   return { scriptContent, optionsBase64, tmpOptionsFile, tmpScriptFile };
 }
