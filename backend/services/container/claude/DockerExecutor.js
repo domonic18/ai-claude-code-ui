@@ -85,7 +85,10 @@ export async function executeInContainer(userId, command, options, writer, sessi
           HOME: '/workspace',
           CLAUDE_CONFIG_DIR: '/workspace/.claude',
           ANTHROPIC_AUTH_TOKEN: authToken,
-          ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL
+          ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL,
+          // Claude CLI 拒绝在 root 用户下使用 bypassPermissions，
+          // 设置 IS_SANDBOX=1 告知 CLI 当前运行在沙箱容器中（参考 cli.js:11106430）
+          IS_SANDBOX: '1'
         }
       }
     );

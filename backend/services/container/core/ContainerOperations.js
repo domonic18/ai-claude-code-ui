@@ -248,7 +248,9 @@ export async function execInContainer(docker, containerId, command, options = {}
     const execConfig = configBuilder.buildExecConfig(command, options);
 
     const exec = await docker.getContainer(containerId).exec(execConfig);
-    const stream = await exec.start({ Detach: false, Tty: execConfig.Tty });
+    // stdin: true 告知 docker-modem 返回 HttpDuplex（可写流），而非只读的 IncomingMessage
+    // 这是容器内 SDK 通过 AskUserQuestion 向用户提问后接收 stdin 回答的前提
+    const stream = await exec.start({ Detach: false, Tty: execConfig.Tty, stdin: !!options.stdin });
 
     return { exec, stream };
 }

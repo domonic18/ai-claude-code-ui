@@ -105,7 +105,6 @@ export async function buildSDKScript(command, options, userId) {
     model: sdkOptions.model,
     permissionMode: sdkOptions.permissionMode,
     allowDangerouslySkipPermissions: sdkOptions.allowDangerouslySkipPermissions,
-    planMode,
     optionsSize: JSON.stringify(sdkOptions).length,
   }, '[ScriptBuilder] SDK options summary');
 

@@ -52,6 +52,12 @@ export function determinePermissionMode(sdkOptions, settings) {
     logger.debug({ reason: hasUserDisallowedTools ? 'has user disallowedTools' : 'default fallback' }, 'Setting permissionMode: default');
   }
 
+  // Claude Agent SDK 要求：使用 bypassPermissions 模式时必须同时设置 allowDangerouslySkipPermissions
+  // 参考：@anthropic-ai/claude-agent-sdk sdk.d.ts:789-792
+  if (sdkOptions.permissionMode === 'bypassPermissions') {
+    sdkOptions.allowDangerouslySkipPermissions = true;
+  }
+
   return userDisallowedTools;
 }
 
