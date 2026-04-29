@@ -65,6 +65,32 @@ async function configureExtensions(sdkOptions, options) {
 }
 
 /**
+ * bypassPermissions 模式下注入自主执行系统提示词
+ *
+ * 告诉 AI 不要提问、不要等待确认、自动继续执行所有任务。
+ * 使用 SDK 的 systemPrompt.append 机制，在默认 claude_code 提示词后追加指令。
+ *
+ * @param {object} sdkOptions - SDK 选项（可变）
+ */
+function injectAutonomousSystemPrompt(sdkOptions) {
+  sdkOptions.systemPrompt = {
+    type: 'preset',
+    preset: 'claude_code',
+    append: [
+      '## 自主执行模式（AUTONOMOUS MODE）',
+      '当前处于无限制自主执行模式，你必须严格遵守以下规则：',
+      '1. **禁止提问用户**：不要输出任何需要用户回复的问题，包括但不限于"是否继续？"、"需要我继续吗？"、"请确认"等表述。',
+      '2. **禁止等待确认**：不要在任何阶段暂停等待用户确认，直接执行下一步。',
+      '3. **完整执行所有任务**：遇到需要分步骤执行的长任务时，自动依次完成所有步骤，不要因为"进度汇报"而中断执行。绝对不要在中间阶段停下来汇报进度后就结束——必须继续执行剩余阶段。',
+      '4. **禁止使用 AskUserQuestion 工具**：不要调用 AskUserQuestion 向用户提问。',
+      '5. **遇到问题自行决策**：遇到歧义或选择时，基于上下文自行做出最合理的判断并继续执行，不要停下来询问用户。',
+      '6. **持续执行直到全部完成**：只有当所有任务都真正完成后才输出最终结果。如果任务分为多个阶段（如阶段1到阶段N），你必须完成所有阶段，不能在中间某个阶段结束后就停止。',
+      '7. **禁止输出"断点续传"或"可从中断处继续"的提示**：这意味着你还有未完成的工作，应该继续执行而不是停下来告诉用户可以恢复。',
+    ].join('\n'),
+  };
+}
+
+/**
  * 过滤 SDK 选项
  * @param {object} options
  * @param {number} userId
@@ -81,6 +107,12 @@ async function filterSDKOptions(options, userId) {
 
   const userDisallowedTools = determinePermissionMode(sdkOptions, settings);
   cleanupSdkOptions(sdkOptions, options, userDisallowedTools);
+
+  // bypassPermissions 模式下注入自主执行指令，防止 AI 中途停下来提问
+  if (sdkOptions.permissionMode === 'bypassPermissions') {
+    injectAutonomousSystemPrompt(sdkOptions);
+    logger.info('[ScriptBuilder] Injected autonomous system prompt (bypassPermissions mode)');
+  }
 
   return sdkOptions;
 }
