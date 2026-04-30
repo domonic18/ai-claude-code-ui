@@ -115,6 +115,24 @@ export async function executeInContainer(userId, command, options, writer, sessi
     // 步骤 4：处理流输出并等待结果
     const result = await handleStreamProcessing(stream, stdout, stderr, writer, sessionId);
     execTimer.end(logger, 'Docker exec completed', { sessionId });
+
+    // 检测异常终止（CLI 进程崩溃或 API 连接中断）
+    if (result.abnormalTermination) {
+      const errorMsg = result.error || 'unknown error';
+      logger.error({ sessionId, error: errorMsg }, '[DockerExecutor] SDK process terminated abnormally');
+      // 向前端发送错误消息
+      if (writer && typeof writer.send === 'function') {
+        try {
+          writer.send({
+            type: 'error',
+            sessionId,
+            message: `SDK 执行异常终止: ${errorMsg}`,
+            detail: 'Claude CLI 进程崩溃或 API 连接中断，任务未完成。可通过断点续传继续。'
+          });
+        } catch {}
+      }
+    }
+
     return result;
 
   } catch (error) {
