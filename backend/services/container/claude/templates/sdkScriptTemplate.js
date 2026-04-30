@@ -50,17 +50,27 @@ function generateDirectorySetup() {
  */
 function generateErrorHandling(tmpOptionsFile, tmpScriptFile) {
   return `  } catch (error) {
-    console.error("[SDK] Error occurred:", error.message);
-    console.error("[SDK] Stack:", error.stack);
-    console.error(JSON.stringify({
-      type: "error",
-      error: error.message,
-      stack: error.stack
-    }));
+    // 使用 writeSync 同步写入 stderr，确保 process.exit 前错误信息一定被输出
+    const errMsg = "[SDK] Error occurred: " + (error.message || error) + "\\n";
+    const stackMsg = "[SDK] Stack: " + (error.stack || "no stack") + "\\n";
+    try { process.stderr.write(errMsg); } catch {}
+    try { process.stderr.write(stackMsg); } catch {}
+
+    // 同时输出到 stdout 以便前端接收错误
+    try {
+      process.stdout.write(JSON.stringify({
+        type: "error",
+        error: error.message || String(error),
+        stack: error.stack || undefined
+      }) + "\\n");
+    } catch {}
+
     // 清理临时文件
     try { unlinkSync("${tmpOptionsFile}"); } catch {}
     try { unlinkSync("${tmpScriptFile}"); } catch {}
-    process.exit(1);
+
+    // 等待 200ms 让 stderr 刷新完毕再退出
+    setTimeout(() => process.exit(1), 200);
   }`;
 }
 
