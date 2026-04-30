@@ -65,6 +65,27 @@ async function configureExtensions(sdkOptions, options) {
 }
 
 /**
+ * 自主执行模式的系统提示词规则
+ *
+ * @type {string[]}
+ */
+const AUTONOMOUS_MODE_RULES = [
+  '## 自主执行模式（AUTONOMOUS MODE）',
+  '当前处于无限制自主执行模式，你必须严格遵守以下规则：',
+  '1. **禁止提问用户**：不要输出任何需要用户回复的问题，包括但不限于"是否继续？"、"需要我继续吗？"、"请确认"等表述。',
+  '2. **禁止等待确认**：不要在任何阶段暂停等待用户确认，直接执行下一步。',
+  '3. **完整执行所有任务**：遇到需要分步骤执行的长任务时，自动依次完成所有步骤，不要因为"进度汇报"而中断执行。绝对不要在中间阶段停下来汇报进度后就结束——必须继续执行剩余阶段。',
+  '4. **禁止使用 AskUserQuestion 工具**：不要调用 AskUserQuestion 向用户提问。',
+  '5. **遇到问题自行决策**：遇到歧义或选择时，基于上下文自行做出最合理的判断并继续执行，不要停下来询问用户。',
+  '6. **持续执行直到全部完成**：只有当所有任务都真正完成后才输出最终结果。如果任务分为多个阶段（如阶段1到阶段N），你必须完成所有阶段，不能在中间某个阶段结束后就停止。',
+  '7. **禁止输出"断点续传"或"可从中断处继续"的提示**：这意味着你还有未完成的工作，应该继续执行而不是停下来告诉用户可以恢复。',
+  '8. **禁止退化循环**：如果你发现自己正在重复输出相同或高度相似的文本（如反复输出"完成""最后""全部完成"等），立即停止该模式。检查 TodoWrite 列表确认当前进度，然后执行下一个未完成的步骤。如果所有步骤都已完成，直接输出最终结果即可，不要反复确认。',
+  '9. **编排层保持轻量**：当你通过 Task 工具调度子任务时，你的职责是"读 Task 返回的摘要 → 更新 TodoWrite → 调度下一个 Task"。不要重新输出或总结子任务的详细内容。Task 返回的摘要信息足以供你做决策。',
+  '10. **每步检查 TodoWrite**：每完成一个 Task 调用后，立即将对应的 Todo 项标记为 completed，然后查看下一个 pending 项。这确保你始终知道下一步该做什么，而不是重复已完成的步骤。',
+  '11. **安全边界**：禁止执行明确的破坏性操作，包括但不限于 `rm -rf /`、`DROP TABLE`、格式化磁盘等不可恢复的命令。如需清理文件，仅允许针对具体的目标路径操作，禁止使用通配符删除系统目录。',
+];
+
+/**
  * bypassPermissions 模式下注入自主执行系统提示词
  *
  * 告诉 AI 不要提问、不要等待确认、自动继续执行所有任务。
@@ -76,20 +97,7 @@ function injectAutonomousSystemPrompt(sdkOptions) {
   sdkOptions.systemPrompt = {
     type: 'preset',
     preset: 'claude_code',
-    append: [
-      '## 自主执行模式（AUTONOMOUS MODE）',
-      '当前处于无限制自主执行模式，你必须严格遵守以下规则：',
-      '1. **禁止提问用户**：不要输出任何需要用户回复的问题，包括但不限于"是否继续？"、"需要我继续吗？"、"请确认"等表述。',
-      '2. **禁止等待确认**：不要在任何阶段暂停等待用户确认，直接执行下一步。',
-      '3. **完整执行所有任务**：遇到需要分步骤执行的长任务时，自动依次完成所有步骤，不要因为"进度汇报"而中断执行。绝对不要在中间阶段停下来汇报进度后就结束——必须继续执行剩余阶段。',
-      '4. **禁止使用 AskUserQuestion 工具**：不要调用 AskUserQuestion 向用户提问。',
-      '5. **遇到问题自行决策**：遇到歧义或选择时，基于上下文自行做出最合理的判断并继续执行，不要停下来询问用户。',
-      '6. **持续执行直到全部完成**：只有当所有任务都真正完成后才输出最终结果。如果任务分为多个阶段（如阶段1到阶段N），你必须完成所有阶段，不能在中间某个阶段结束后就停止。',
-      '7. **禁止输出"断点续传"或"可从中断处继续"的提示**：这意味着你还有未完成的工作，应该继续执行而不是停下来告诉用户可以恢复。',
-      '8. **禁止退化循环**：如果你发现自己正在重复输出相同或高度相似的文本（如反复输出"完成""最后""全部完成"等），立即停止该模式。检查 TodoWrite 列表确认当前进度，然后执行下一个未完成的步骤。如果所有步骤都已完成，直接输出最终结果即可，不要反复确认。',
-      '9. **编排层保持轻量**：当你通过 Task 工具调度子任务时，你的职责是"读 Task 返回的摘要 → 更新 TodoWrite → 调度下一个 Task"。不要重新输出或总结子任务的详细内容。Task 返回的摘要信息足以供你做决策。',
-      '10. **每步检查 TodoWrite**：每完成一个 Task 调用后，立即将对应的 Todo 项标记为 completed，然后查看下一个 pending 项。这确保你始终知道下一步该做什么，而不是重复已完成的步骤。',
-    ].join('\n'),
+    append: AUTONOMOUS_MODE_RULES.join('\n'),
   };
 }
 
@@ -114,7 +122,11 @@ async function filterSDKOptions(options, userId) {
   // bypassPermissions 模式下注入自主执行指令，防止 AI 中途停下来提问
   if (sdkOptions.permissionMode === 'bypassPermissions') {
     injectAutonomousSystemPrompt(sdkOptions);
-    logger.info('[ScriptBuilder] Injected autonomous system prompt (bypassPermissions mode)');
+    logger.info({
+      userId,
+      sessionId: options.sessionId || '',
+      permissionMode: 'bypassPermissions',
+    }, '[ScriptBuilder] Autonomous mode activated (bypassPermissions)');
   }
 
   return sdkOptions;

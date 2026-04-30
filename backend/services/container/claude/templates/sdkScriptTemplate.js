@@ -85,6 +85,9 @@ function generateCleanup(tmpOptionsFile, tmpScriptFile) {
     try { unlinkSync("${tmpScriptFile}"); } catch {}`;
 }
 
+/** 允许的 permissionMode 枚举值 */
+const VALID_PERMISSION_MODES = ['default', 'acceptEdits', 'bypassPermissions', 'plan'];
+
 /**
  * Generate SDK script content
  * @param {string} tmpOptionsFile - Temporary options file path
@@ -96,6 +99,9 @@ function generateCleanup(tmpOptionsFile, tmpScriptFile) {
  * @returns {string} Script content
  */
 export function generateSDKScript(tmpOptionsFile, tmpScriptFile, commandBase64, sessionId, imagePaths, permissionMode = 'default') {
+  if (!VALID_PERMISSION_MODES.includes(permissionMode)) {
+    throw new TypeError(`Invalid permissionMode: "${permissionMode}". Must be one of: ${VALID_PERMISSION_MODES.join(', ')}`);
+  }
   const autoAnswer = permissionMode === 'bypassPermissions';
 
   return `import { query } from "/app/node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs";
