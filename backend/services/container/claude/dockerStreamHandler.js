@@ -11,6 +11,10 @@ import { createLogger } from '../../../utils/logger.js';
 
 const logger = createLogger('services/container/claude/dockerStreamHandler');
 
+/** 异常终止诊断日志的最大截取长度 */
+const DIAG_LOG_STDERR_MAX = 1000;
+const DIAG_LOG_STDOUT_MAX = 500;
+
 /**
  * Check if stderr contains real errors
  * @param {string} stderrOutput - stderr output
@@ -168,8 +172,8 @@ function setupStreamEndHandler(ctx, stdoutChunks, stderrChunks, sessionId, dataC
               break;
             }
           }
-        } catch {
-          // JSON 解析失败，回退到默认消息
+        } catch (parseErr) {
+          logger.warn({ sessionId, parseErr: parseErr.message }, '[DockerExecutor] Failed to parse error from stdout');
           errorSource = 'unknown error (parse failed)';
         }
       }
@@ -178,8 +182,8 @@ function setupStreamEndHandler(ctx, stdoutChunks, stderrChunks, sessionId, dataC
         sessionId,
         hasDoneMessage,
         hasStdoutError,
-        stderrTail: stderrOutput.substring(stderrOutput.length - 1000),
-        stdoutTail: stdoutOutput.substring(stdoutOutput.length - 500),
+        stderrTail: stderrOutput.substring(stderrOutput.length - DIAG_LOG_STDERR_MAX),
+        stdoutTail: stdoutOutput.substring(stdoutOutput.length - DIAG_LOG_STDOUT_MAX),
         totalChunks: dataCount,
       }, `[DockerExecutor] Abnormal termination: ${errorSource}`);
       ctx.settle(ctx.resolve, { output: stdoutOutput, sessionId, abnormalTermination: true, error: errorSource });

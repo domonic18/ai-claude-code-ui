@@ -68,22 +68,8 @@ function generateErrorHandling(tmpOptionsFile, tmpScriptFile) {
     try { unlinkSync("${tmpOptionsFile}"); } catch (e) { process.stderr.write("[SDK] Cleanup failed: " + e.message + "\\n"); }
     try { unlinkSync("${tmpScriptFile}"); } catch (e) { process.stderr.write("[SDK] Cleanup failed: " + e.message + "\\n"); }
 
-    // 等待 stderr drain 后退出，最多等待 500ms
-    const exitCode = 1;
-    const drainTimeout = setTimeout(() => {
-      process.stderr.write("[SDK] Drain timeout, forcing exit\\n");
-      process.exit(exitCode);
-    }, 500);
-    if (process.stderr.write("")) {
-      // stderr 已 drain，立即退出
-      clearTimeout(drainTimeout);
-      process.exit(exitCode);
-    } else {
-      process.stderr.once("drain", () => {
-        clearTimeout(drainTimeout);
-        process.exit(exitCode);
-      });
-    }
+    // 等待 500ms 让 stderr 刷新完毕再退出
+    setTimeout(() => process.exit(1), 500);
   }`;
 }
 
