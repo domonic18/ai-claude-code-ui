@@ -151,17 +151,33 @@ function setupStreamEndHandler(ctx, stdoutChunks, stderrChunks, sessionId, dataC
 
     // 检查 stdout 中是否包含正常的 "done" 消息
     const hasDoneMessage = stdoutOutput.includes('"type":"done"');
-    const hasErrorMessage = stdoutOutput.includes('"type":"error"');
+    const hasStdoutError = stdoutOutput.includes('"type":"error"');
 
     if (!hasDoneMessage) {
       // 没有正常结束消息 = 异常终止
-      const errorSource = hasErrorMessage
-        ? stdoutOutput.match(/"error"\s*:\s*"([^"]+)"/)?.[1] || 'unknown'
-        : 'process crashed or API connection lost';
+      // 尝试从 stdout 中解析错误信息（JSON.parse 比 regex 更可靠）
+      let errorSource = 'process crashed or API connection lost';
+      if (hasStdoutError) {
+        try {
+          // 从 stdout 末尾查找最后一个 error 类型的 JSON 行
+          const lines = stdoutOutput.split('\n').filter(l => l.trim());
+          for (let i = lines.length - 1; i >= 0; i--) {
+            const parsed = JSON.parse(lines[i]);
+            if (parsed.type === 'error' && parsed.error) {
+              errorSource = parsed.error;
+              break;
+            }
+          }
+        } catch {
+          // JSON 解析失败，回退到默认消息
+          errorSource = 'unknown error (parse failed)';
+        }
+      }
+
       logger.error({
         sessionId,
         hasDoneMessage,
-        hasErrorMessage,
+        hasStdoutError,
         stderrTail: stderrOutput.substring(stderrOutput.length - 1000),
         stdoutTail: stdoutOutput.substring(stdoutOutput.length - 500),
         totalChunks: dataCount,

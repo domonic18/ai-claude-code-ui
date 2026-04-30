@@ -50,27 +50,40 @@ function generateDirectorySetup() {
  */
 function generateErrorHandling(tmpOptionsFile, tmpScriptFile) {
   return `  } catch (error) {
-    // 使用 writeSync 同步写入 stderr，确保 process.exit 前错误信息一定被输出
+    // 使用同步写入 stderr，确保 process.exit 前错误信息一定被输出
     const errMsg = "[SDK] Error occurred: " + (error.message || error) + "\\n";
     const stackMsg = "[SDK] Stack: " + (error.stack || "no stack") + "\\n";
-    try { process.stderr.write(errMsg); } catch {}
-    try { process.stderr.write(stackMsg); } catch {}
+    try { process.stderr.write(errMsg); } catch (e) { /* stderr 不可用时无法写入 */ }
+    try { process.stderr.write(stackMsg); } catch (e) { /* stderr 不可用时无法写入 */ }
 
-    // 同时输出到 stdout 以便前端接收错误
+    // 同时输出到 stdout 以便 dockerStreamHandler 捕获错误
     try {
       process.stdout.write(JSON.stringify({
         type: "error",
-        error: error.message || String(error),
-        stack: error.stack || undefined
+        error: error.message || String(error)
       }) + "\\n");
-    } catch {}
+    } catch (e) { process.stderr.write("[SDK] Failed to write error to stdout: " + e.message + "\\n"); }
 
     // 清理临时文件
-    try { unlinkSync("${tmpOptionsFile}"); } catch {}
-    try { unlinkSync("${tmpScriptFile}"); } catch {}
+    try { unlinkSync("${tmpOptionsFile}"); } catch (e) { process.stderr.write("[SDK] Cleanup failed: " + e.message + "\\n"); }
+    try { unlinkSync("${tmpScriptFile}"); } catch (e) { process.stderr.write("[SDK] Cleanup failed: " + e.message + "\\n"); }
 
-    // 等待 200ms 让 stderr 刷新完毕再退出
-    setTimeout(() => process.exit(1), 200);
+    // 等待 stderr drain 后退出，最多等待 500ms
+    const exitCode = 1;
+    const drainTimeout = setTimeout(() => {
+      process.stderr.write("[SDK] Drain timeout, forcing exit\\n");
+      process.exit(exitCode);
+    }, 500);
+    if (process.stderr.write("")) {
+      // stderr 已 drain，立即退出
+      clearTimeout(drainTimeout);
+      process.exit(exitCode);
+    } else {
+      process.stderr.once("drain", () => {
+        clearTimeout(drainTimeout);
+        process.exit(exitCode);
+      });
+    }
   }`;
 }
 

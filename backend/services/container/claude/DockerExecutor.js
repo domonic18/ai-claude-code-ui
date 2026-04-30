@@ -120,16 +120,18 @@ export async function executeInContainer(userId, command, options, writer, sessi
     if (result.abnormalTermination) {
       const errorMsg = result.error || 'unknown error';
       logger.error({ sessionId, error: errorMsg }, '[DockerExecutor] SDK process terminated abnormally');
-      // 向前端发送错误消息
+      // 向前端发送错误消息（不暴露内部实现细节）
       if (writer && typeof writer.send === 'function') {
         try {
           writer.send({
             type: 'error',
             sessionId,
-            message: `SDK 执行异常终止: ${errorMsg}`,
-            detail: 'Claude CLI 进程崩溃或 API 连接中断，任务未完成。可通过断点续传继续。'
+            message: '任务执行异常中断，部分文档可能未完成。可通过断点续传继续。',
+            code: 'SDK_ABNORMAL_TERMINATION'
           });
-        } catch {}
+        } catch (sendErr) {
+          logger.warn({ sessionId, err: sendErr }, '[DockerExecutor] Failed to send error to frontend');
+        }
       }
     }
 
