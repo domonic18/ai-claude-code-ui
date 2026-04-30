@@ -142,9 +142,31 @@ function setupStreamEndHandler(ctx, stdoutChunks, stderrChunks, sessionId, dataC
     const stderrOutput = stderrChunks.join('');
     logger.info({ sessionId, totalChunks: dataCount, stdoutLength: stdoutOutput.length, stderrLength: stderrOutput.length }, '[DockerExecutor] Stream ended');
 
+    // 检查是否有 stderr 中的错误
     if (hasRealError(stderrOutput)) {
       logger.error({ sessionId, stderr: stderrOutput.substring(0, 2000) }, '[DockerExecutor] Execution failed');
       ctx.settle(ctx.reject, new Error(`SDK execution error: ${stderrOutput}`));
+      return;
+    }
+
+    // 检查 stdout 中是否包含正常的 "done" 消息
+    const hasDoneMessage = stdoutOutput.includes('"type":"done"');
+    const hasErrorMessage = stdoutOutput.includes('"type":"error"');
+
+    if (!hasDoneMessage) {
+      // 没有正常结束消息 = 异常终止
+      const errorSource = hasErrorMessage
+        ? stdoutOutput.match(/"error"\s*:\s*"([^"]+)"/)?.[1] || 'unknown'
+        : 'process crashed or API connection lost';
+      logger.error({
+        sessionId,
+        hasDoneMessage,
+        hasErrorMessage,
+        stderrTail: stderrOutput.substring(stderrOutput.length - 1000),
+        stdoutTail: stdoutOutput.substring(stdoutOutput.length - 500),
+        totalChunks: dataCount,
+      }, `[DockerExecutor] Abnormal termination: ${errorSource}`);
+      ctx.settle(ctx.resolve, { output: stdoutOutput, sessionId, abnormalTermination: true, error: errorSource });
     } else {
       logger.info({ sessionId }, '[DockerExecutor] Execution completed successfully');
       ctx.settle(ctx.resolve, { output: stdoutOutput, sessionId });
