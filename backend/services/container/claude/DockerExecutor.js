@@ -48,8 +48,10 @@ async function prepareContainerAndScript(userId, command, options) {
   }
 
   // 写入脚本和选项文件到容器
+  const uploadTimer = startTimer('sdk/script_upload');
   await writeFileViaPutArchive(container, sdkScriptInfo.tmpOptionsFile, sdkScriptInfo.optionsBase64, { logLabel: 'DockerExecutor' });
   await writeFileViaPutArchive(container, sdkScriptInfo.tmpScriptFile, sdkScriptInfo.scriptContent, { logLabel: 'DockerExecutor' });
+  uploadTimer.end(logger, 'Script files uploaded to container');
 
   return { container, docker, sdkScriptInfo, authToken };
 }
@@ -73,6 +75,7 @@ export async function executeInContainer(userId, command, options, writer, sessi
     const { docker, sdkScriptInfo, authToken } = await prepareContainerAndScript(userId, command, options);
 
     // 步骤 2：在容器中执行脚本（启用 stdin 以支持 Agent 交互提问）
+    const spawnTimer = startTimer('claude/docker_exec_spawn');
     const { stream } = await containerManager.execInContainer(
       userId,
       ['node', sdkScriptInfo.tmpScriptFile],
@@ -92,6 +95,7 @@ export async function executeInContainer(userId, command, options, writer, sessi
         }
       }
     );
+    spawnTimer.end(logger, 'Docker exec stream obtained', { sessionId });
 
     // 步骤 3：保存 stream 并设置多路分离
     setSessionStream(sessionId, stream);

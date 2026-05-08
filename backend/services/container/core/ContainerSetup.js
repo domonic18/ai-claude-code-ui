@@ -16,7 +16,7 @@
 import { syncExtensions } from '../../extensions/extension-sync.js';
 import { createExtensionTar } from '../../extensions/extension-tar.js';
 import { DEFAULT_MEMORY_TEMPLATE, MEMORY_SETUP_TIMEOUT } from '../../../shared/constants/memory.js';
-import { createLogger } from '../../../utils/logger.js';
+import { createLogger, startTimer } from '../../../utils/logger.js';
 
 const logger = createLogger('container/core/ContainerSetup');
 
@@ -76,6 +76,8 @@ export async function ensureDefaultWorkspace(container) {
  * @returns {Promise<void>}
  */
 export async function syncExtensionsToContainer(container) {
+    const syncTimer = startTimer('container/sync_extensions');
+
     // 创建扩展文件的 tar 流 - 同步到 /workspace
     const tarStream = await createExtensionTar({
         includeSkills: true,
@@ -115,6 +117,8 @@ export async function syncExtensionsToContainer(container) {
 
     // 创建记忆目录和文件
     await createMemoryDirectoryAndFile(container);
+
+    syncTimer.end(logger, 'Extensions synced to container');
 }
 
 // 由 syncExtensionsToContainer 调用以使 hook 脚本可执行

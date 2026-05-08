@@ -8,7 +8,7 @@
  */
 
 import { UserSettingsService } from '../../../settings/UserSettingsService.js';
-import { createLogger } from '../../../../utils/logger.js';
+import { createLogger, startTimer } from '../../../../utils/logger.js';
 
 const logger = createLogger('container/claude/userSettingsMerger');
 
@@ -36,11 +36,13 @@ function applySettingIfMissing(sdkOptions, settings, userSettings, settingsKey, 
  * @param {number} userId - 用户 ID
  */
 export async function mergeUserSettings(sdkOptions, settings, userId) {
+  const settingsTimer = startTimer('sdk/user_settings');
   let userSettings = null;
   try {
     userSettings = await UserSettingsService.getSettings(userId, 'claude');
-    logger.debug({ userId }, 'Loaded user settings for user');
+    settingsTimer.end(logger, 'User settings loaded', { userId });
   } catch (error) {
+    settingsTimer.endWarn(logger, 'User settings load failed');
     logger.warn({ err: error }, 'Failed to load user settings, using defaults');
     return;
   }

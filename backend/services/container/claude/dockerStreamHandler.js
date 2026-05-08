@@ -7,7 +7,7 @@
 import { getSession } from './SessionManager.js';
 import { SDK } from '../../../config/config.js';
 import { processOutput } from './MessageTransformer.js';
-import { createLogger, runWithTrace, getTraceContext } from '../../../utils/logger.js';
+import { createLogger, runWithTrace, getTraceContext, startTimer } from '../../../utils/logger.js';
 
 const logger = createLogger('services/container/claude/dockerStreamHandler');
 
@@ -242,11 +242,32 @@ function handleStreamProcessing(stream, stdout, stderr, writer, sessionId) {
   let dataCount = 0;
   const state = { sessionCreatedSent: false, toolSeq: 0, toolTimers: new Map() };
 
-  setupStdoutHandler(stdout, stdoutChunks, writer, sessionId, state, () => { dataCount++; });
+  // TTFT 计时：从流处理开始到首个有效 stdout chunk
+  const ttftTimer = startTimer('claude/first_token');
+  // 流式输出计时：从首个 chunk 到 stream end（lazy 创建，首个 chunk 时启动）
+  let streamDurationTimer = null;
+
+  setupStdoutHandler(stdout, stdoutChunks, writer, sessionId, state, () => {
+    dataCount++;
+    // 首个 chunk 时记录 TTFT，同时启动 stream_duration 计时
+    if (dataCount === 1) {
+      ttftTimer.end(logger, 'First token received (TTFT)', { sessionId });
+      streamDurationTimer = startTimer('claude/stream_duration');
+    }
+  });
   setupStderrHandler(stderr, stderrChunks, sessionId);
 
   return new Promise((resolve, reject) => {
     const context = createStreamContext(stream, stdout, stderr, resolve, reject);
+
+    // 扩展 settle 方法：在 stream end 时同时结束 stream_duration 计时
+    const originalSettle = context.settle.bind(context);
+    context.settle = (fn, value) => {
+      if (streamDurationTimer) {
+        streamDurationTimer.end(logger, 'Stream duration ended', { sessionId, totalChunks: dataCount });
+      }
+      originalSettle(fn, value);
+    };
 
     setupExecutionTimeout(context, sessionId);
     setupStreamEndHandler(context, stdoutChunks, stderrChunks, sessionId, dataCount);
