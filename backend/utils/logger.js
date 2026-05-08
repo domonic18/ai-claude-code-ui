@@ -310,32 +310,84 @@ const rootLogger = pino({
 // ---------------------------------------------------------------------------
 
 /**
- * 创建带模块标签的子 logger
+ * 从 AsyncLocalStorage 提取当前请求的 trace 字段
  *
- * 自动从 AsyncLocalStorage 读取当前请求的 traceId/spanId，无需手动传递。
- * 在 HTTP 请求上下文内：自动携带 traceId、spanId、userId、sessionId。
- * 在请求上下文外（启动/定时任务等）：仅携带 module 字段。
+ * 每次调用时动态读取，确保在流回调等异步场景下也能获取正确的上下文。
+ *
+ * @returns {Object} trace 相关字段（可能为空对象）
+ */
+function _getTraceFields() {
+  const ctx = traceStore.getStore();
+  if (!ctx) return {};
+  const fields = {};
+  if (ctx.traceId) fields.traceId = ctx.traceId;
+  if (ctx.spanId) fields.spanId = ctx.spanId;
+  if (ctx.userId) fields.userId = ctx.userId;
+  if (ctx.sessionId) fields.sessionId = ctx.sessionId;
+  return fields;
+}
+
+/**
+ * 支持动态 trace 绑定的日志级别方法名
+ */
+const LOG_LEVEL_METHODS = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'];
+
+/**
+ * 为 pino logger 创建动态 trace 注入的代理方法
+ *
+ * @param {object} target - pino logger 实例
+ * @returns {object} 代理对象，日志方法自动注入 trace 字段
+ */
+function _createTraceProxy(target) {
+  const proxy = {};
+  for (const method of LOG_LEVEL_METHODS) {
+    proxy[method] = (arg1, arg2) => {
+      const traceFields = _getTraceFields();
+      const hasTrace = Object.keys(traceFields).length > 0;
+
+      if (hasTrace) {
+        if (typeof arg1 === 'object' && arg1 !== null) {
+          target[method]({ ...traceFields, ...arg1 }, arg2);
+        } else if (typeof arg1 === 'string') {
+          target[method](traceFields, arg1);
+        } else {
+          target[method](arg1, arg2);
+        }
+      } else {
+        target[method](arg1, arg2);
+      }
+    };
+  }
+
+  proxy.child = (bindings) => _createTraceProxy(target.child(bindings));
+  proxy.level = target.level;
+
+  return proxy;
+}
+
+/**
+ * 创建带模块标签的子 logger（支持动态 trace 绑定）
+ *
+ * 返回一个代理 logger，每次日志调用时自动从 AsyncLocalStorage 读取
+ * traceId/spanId/userId/sessionId 并注入到日志字段中。
+ *
+ * 这解决了模块顶层 `const logger = createLogger(...)` 在模块加载时执行、
+ * trace 字段被冻结为空的问题。无论在请求上下文内还是流回调中，
+ * 只要 ALS 上下文存在，trace 字段就会被正确注入。
  *
  * @param {string} moduleName - 模块名称，如 'websocket/server'、'controllers/auth'
- * @returns {pino.Logger} 带 module 字段（及可选 trace 字段）的子 logger
+ * @returns {object} 带 module 字段及动态 trace 注入的代理 logger
  *
  * @example
  * import { createLogger } from '../utils/logger.js';
  * const logger = createLogger('websocket/server');
+ * // 模块加载时执行，但 trace 字段在每次 .info()/.error() 调用时动态读取
  * logger.info('Client connected');
- * // 在 HTTP 请求中 => { module: "websocket/server", traceId: "abc", spanId: "def", msg: "Client connected" }
- * // 在请求外       => { module: "websocket/server", msg: "Client connected" }
+ * // => { module: "websocket/server", traceId: "abc", spanId: "def", msg: "Client connected" }
  */
 export function createLogger(moduleName) {
-  const fields = { module: moduleName };
-  const ctx = traceStore.getStore();
-  if (ctx) {
-    if (ctx.traceId) fields.traceId = ctx.traceId;
-    if (ctx.spanId) fields.spanId = ctx.spanId;
-    if (ctx.userId) fields.userId = ctx.userId;
-    if (ctx.sessionId) fields.sessionId = ctx.sessionId;
-  }
-  return rootLogger.child(fields);
+  const baseLogger = rootLogger.child({ module: moduleName });
+  return _createTraceProxy(baseLogger);
 }
 
 /**
