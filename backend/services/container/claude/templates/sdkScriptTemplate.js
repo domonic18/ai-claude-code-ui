@@ -109,6 +109,7 @@ import { readFileSync, unlinkSync } from "fs";
 
 async function execute() {
   try {
+    console.error("[SDK_PERF] script_start:" + Date.now());
     console.error("[SDK] Starting execution...");
     console.error("[SDK] Environment check:");
     console.error("[SDK] - ANTHROPIC_AUTH_TOKEN:", process.env.ANTHROPIC_AUTH_TOKEN ? "SET (length=" + process.env.ANTHROPIC_AUTH_TOKEN.length + ")" : "NOT SET");
@@ -143,11 +144,13 @@ ${generateCanUseToolCallback(autoAnswer)}
       prompt: command,
       options: options
     });
+    console.error("[SDK_PERF] api_call_start:" + Date.now());
     console.error("[SDK] Query started, waiting for chunks...");
 
     let chunkCount = 0;
     for await (const chunk of result) {
       chunkCount++;
+      if (chunkCount === 1) console.error("[SDK_PERF] first_chunk:" + Date.now());
       console.error("[SDK] Received chunk #" + chunkCount + " type=" + (chunk && chunk.type) || "unknown");
 
       // 输出 chunk 到 stdout 供前端接收
