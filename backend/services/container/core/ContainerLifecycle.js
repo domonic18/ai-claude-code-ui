@@ -20,7 +20,7 @@ import {
 } from './ContainerLifecycleHelpers.js';
 import { handleIntermediateState, validateIntermediateState } from './ContainerStateHandler.js';
 import { createContainerWithStateMachine } from './ContainerStateMachineHandler.js';
-import { createLogger } from '../../../utils/logger.js';
+import { createLogger, startTimer } from '../../../utils/logger.js';
 
 const logger = createLogger('container/core/ContainerLifecycle');
 const { Container } = repositories;
@@ -43,30 +43,38 @@ export class ContainerLifecycleManager {
   // ─── 公共 API ──────────────────────────────────────
 
   async getOrCreateContainer(userId, userConfig = {}, options = {}) {
+    const getTimer = startTimer('container/get_or_create');
     const stateMachine = await this._getStateMachine(userId);
 
-    // 已就绪：检查运行状态
+    // 已就绪：检查运行状态（热路径）
     if (stateMachine.is(ContainerState.READY)) {
       const existing = await this._handleReadyState(userId, stateMachine);
-      if (existing) return existing;
+      if (existing) {
+        getTimer.end(logger, 'Container obtained (hot path)', { userId, path: 'hot' });
+        return existing;
+      }
       // 容器信息丢失但状态为 ready，先重置状态再重建
       stateMachine.transitionTo(ContainerState.NON_EXISTENT);
       await containerStateStore.save(stateMachine);
+      getTimer.end(logger, 'Container obtained (cold path - re-create)', { userId, path: 'cold-recreate' });
       return createContainerWithStateMachine(this.docker, userId, userConfig, stateMachine, this.containers, this.config);
     }
 
     // 创建中：等待或报错
     const { INTERMEDIATE_STATES } = await import('./ContainerStateHandler.js');
     if (INTERMEDIATE_STATES.includes(stateMachine.getState())) {
-      return handleIntermediateState(userId, userConfig, options, stateMachine, this.getOrCreateContainer.bind(this));
+      const result = await handleIntermediateState(userId, userConfig, options, stateMachine, this.getOrCreateContainer.bind(this));
+      getTimer.end(logger, 'Container obtained (intermediate state resolved)', { userId, path: 'intermediate' });
+      return result;
     }
 
-    // 失败或不存在：重置后创建
+    // 失败或不存在：重置后创建（冷路径）
     if (stateMachine.is(ContainerState.FAILED)) {
       stateMachine.transitionTo(ContainerState.NON_EXISTENT);
       await containerStateStore.save(stateMachine);
     }
 
+    getTimer.end(logger, 'Container obtained (cold path - new)', { userId, path: 'cold-new' });
     return createContainerWithStateMachine(this.docker, userId, userConfig, stateMachine, this.containers, this.config);
   }
 

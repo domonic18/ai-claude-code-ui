@@ -7,7 +7,7 @@
 
 import { loadAgentsForSDK } from '../../../services/extensions/extension-sync.js';
 import { randomUUID } from 'crypto';
-import { createLogger } from '../../../utils/logger.js';
+import { createLogger, startTimer } from '../../../utils/logger.js';
 import { generateSDKScript } from './templates/sdkScriptTemplate.js';
 import { determinePermissionMode } from './helpers/permissionModeHelper.js';
 import { mergeUserSettings } from './helpers/userSettingsMerger.js';
@@ -54,10 +54,13 @@ async function configureExtensions(sdkOptions, options) {
 
   if (options.enableExtensions === false) return;
 
+  const extTimer = startTimer('sdk/extension_load');
   try {
     sdkOptions.agents = await loadAgentsForSDK();
     sdkOptions.plugins = [{ type: 'local', path: '/workspace/.claude' }];
+    extTimer.end(logger, 'Extensions loaded', { agentCount: Object.keys(sdkOptions.agents || {}).length });
   } catch (error) {
+    extTimer.endWarn(logger, 'Extensions load failed');
     logger.error({ error }, 'Failed to load extensions');
     sdkOptions.agents = {};
     sdkOptions.plugins = [];

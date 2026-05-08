@@ -17,7 +17,7 @@ import * as ContainerOps from './ContainerOperations.js';
 import * as ContainerSetup from './ContainerSetup.js';
 import { waitForReady } from './ContainerReadyChecker.js';
 import { saveContainerToDb } from './ContainerLifecycleHelpers.js';
-import { createLogger } from '../../../utils/logger.js';
+import { createLogger, startTimer } from '../../../utils/logger.js';
 
 const logger = createLogger('container/core/ContainerStateMachineHandler');
 
@@ -33,6 +33,7 @@ const logger = createLogger('container/core/ContainerStateMachineHandler');
  * @returns {Promise<Object>} Container info
  */
 export async function createContainerWithStateMachine(docker, userId, userConfig, stateMachine, containers, config) {
+  const coldStartTimer = startTimer('container/cold_start_full');
   stateMachine.beginCreation();
   try {
     // Step 1: CREATING
@@ -55,9 +56,11 @@ export async function createContainerWithStateMachine(docker, userId, userConfig
 
     stateMachine.transitionTo(ContainerState.READY);
     await containerStateStore.save(stateMachine);
+    coldStartTimer.end(logger, 'Container cold start completed', { userId });
     logger.info(`Container claude-user-${userId} is ready`);
     return containerInfo;
   } catch (error) {
+    coldStartTimer.endError(logger, 'Container cold start failed', { userId });
     logger.error(`Container creation failed for user ${userId}:`, error);
     stateMachine.endCreation();
     stateMachine.setFailed(error);

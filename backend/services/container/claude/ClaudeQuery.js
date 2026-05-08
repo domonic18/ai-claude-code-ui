@@ -184,10 +184,11 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
 
   try {
     // 1. 加载记忆上下文
+    const memoryTimer = startTimer('claude/memory_load');
     const memoryContext = await loadMemoryContext(userId, {
       containerMode: options.containerMode
     });
-    logger.info({ sessionId, memoryLength: memoryContext?.length || 0 }, '[ClaudeQuery] Memory context loaded');
+    memoryTimer.end(logger, 'Memory context loaded', { sessionId, memoryLength: memoryContext?.length || 0 });
 
     // 2. 获取或创建用户容器
     logger.debug({ sessionId, userId }, '[ClaudeQuery] Getting container for user');
