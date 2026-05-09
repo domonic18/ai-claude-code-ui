@@ -213,7 +213,7 @@ function HtmlPreview({ file, onClose }: HtmlPreviewProps) {
           {!loading && blobUrl && (
             <iframe
               src={blobUrl}
-              sandbox="allow-scripts allow-same-origin allow-popups"
+              sandbox="allow-scripts allow-same-origin allow-popups allow-downloads"
               className="w-full h-full border-0"
               title={file.name}
             />
@@ -238,7 +238,7 @@ function HtmlPreview({ file, onClose }: HtmlPreviewProps) {
           {blobUrl && (
             <iframe
               src={blobUrl}
-              sandbox="allow-scripts allow-same-origin allow-popups"
+              sandbox="allow-scripts allow-same-origin allow-popups allow-downloads"
               className="w-full h-full border-0"
               title={file.name}
             />
