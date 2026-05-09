@@ -133,6 +133,17 @@ export interface SelectedImage {
   projectName: string;
 }
 
+// 选中的 HTML 文件状态
+/**
+ * Selected HTML file state (for inline preview)
+ */
+export interface SelectedHtml {
+  name: string;
+  path: string;
+  projectPath: string;
+  projectName: string;
+}
+
 // 文件图标映射配置
 /**
  * File icon mapping

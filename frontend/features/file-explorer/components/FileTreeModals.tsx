@@ -9,25 +9,30 @@
 import React from 'react';
 import { CodeEditor } from '@/features/editor';
 import ImageViewer from '@/shared/components/common/ImageViewer';
-import type { SelectedFile, SelectedImage } from '../types/file-explorer.types';
+import HtmlPreview from '@/shared/components/common/HtmlPreview';
+import type { SelectedFile, SelectedImage, SelectedHtml } from '../types/file-explorer.types';
 
 interface FileTreeModalsProps {
   selectedFile: SelectedFile | null;
   selectedImage: SelectedImage | null;
+  selectedHtml: SelectedHtml | null;
   onCloseFile: () => void;
   onCloseImage: () => void;
+  onCloseHtml: () => void;
 }
 
 // 由父组件调用，React 组件或常量：FileTreeModals
 /**
  * File tree modals
- * Renders code editor and image viewer modals
+ * Renders code editor, image viewer, and HTML preview modals
  */
 export function FileTreeModals({
   selectedFile,
   selectedImage,
+  selectedHtml,
   onCloseFile,
-  onCloseImage
+  onCloseImage,
+  onCloseHtml
 }: FileTreeModalsProps) {
   return (
     <>
@@ -45,6 +50,14 @@ export function FileTreeModals({
         <ImageViewer
           file={selectedImage}
           onClose={onCloseImage}
+        />
+      )}
+
+      {/* HTML Preview Modal */}
+      {selectedHtml && (
+        <HtmlPreview
+          file={selectedHtml}
+          onClose={onCloseHtml}
         />
       )}
     </>
