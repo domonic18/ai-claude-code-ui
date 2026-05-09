@@ -9,8 +9,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { filterFileTree, isImageFile } from '../utils/fileTreeHelpers';
+import { isHtmlFile } from '../utils/fileFormatters';
 import { useFileTreeFetch } from './useFileTreeFetch';
-import type { FileNode, FileViewMode, SelectedFile, SelectedImage } from '../types/file-explorer.types';
+import type { FileNode, FileViewMode, SelectedFile, SelectedImage, SelectedHtml } from '../types/file-explorer.types';
 
 /**
  * Initialize view mode from localStorage
@@ -75,7 +76,8 @@ function useFileTreeHandlers(
   setExpandedDirs: React.Dispatch<React.SetStateAction<Set<string>>>,
   setViewMode: React.Dispatch<React.SetStateAction<FileViewMode>>,
   setSelectedFile: React.Dispatch<React.SetStateAction<SelectedFile | null>>,
-  setSelectedImage: React.Dispatch<React.SetStateAction<SelectedImage | null>>
+  setSelectedImage: React.Dispatch<React.SetStateAction<SelectedImage | null>>,
+  setSelectedHtml: React.Dispatch<React.SetStateAction<SelectedHtml | null>>
 ) {
   // Toggle directory expansion
   const toggleDirectory = useCallback((path: string) => {
@@ -129,6 +131,13 @@ function useFileTreeHandlers(
         projectPath: selectedProject.path,
         projectName: selectedProject.name
       });
+    } else if (isHtmlFile(item.name)) {
+      setSelectedHtml({
+        name: item.name,
+        path: item.path,
+        projectPath: selectedProject.path,
+        projectName: selectedProject.name
+      });
     } else {
       setSelectedFile({
         name: item.name,
@@ -137,7 +146,7 @@ function useFileTreeHandlers(
         projectName: selectedProject.name
       });
     }
-  }, [selectedProject, setSelectedFile, setSelectedImage]);
+  }, [selectedProject, setSelectedFile, setSelectedImage, setSelectedHtml]);
 
   return {
     toggleDirectory,
@@ -157,6 +166,7 @@ function useFileTreeStateInit() {
   const [selectedFolder, setSelectedFolder] = useState<FileNode | null>(null);
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
+  const [selectedHtml, setSelectedHtml] = useState<SelectedHtml | null>(null);
   const [viewMode, setViewMode] = useState<FileViewMode>('detailed');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filteredFiles, setFilteredFiles] = useState<FileNode[]>([]);
@@ -175,6 +185,8 @@ function useFileTreeStateInit() {
     setSelectedFile,
     selectedImage,
     setSelectedImage,
+    selectedHtml,
+    setSelectedHtml,
     viewMode,
     setViewMode,
     searchQuery,
@@ -194,6 +206,7 @@ interface UseFileTreeStateReturn {
   selectedFolder: FileNode | null;
   selectedFile: SelectedFile | null;
   selectedImage: SelectedImage | null;
+  selectedHtml: SelectedHtml | null;
   viewMode: FileViewMode;
   searchQuery: string;
   filteredFiles: FileNode[];
@@ -207,6 +220,7 @@ interface UseFileTreeStateReturn {
   setSelectedFolder: React.Dispatch<React.SetStateAction<FileNode | null>>;
   setSelectedFile: React.Dispatch<React.SetStateAction<SelectedFile | null>>;
   setSelectedImage: React.Dispatch<React.SetStateAction<SelectedImage | null>>;
+  setSelectedHtml: React.Dispatch<React.SetStateAction<SelectedHtml | null>>;
   setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
   setFilteredFiles: React.Dispatch<React.SetStateAction<FileNode[]>>;
   setShowNewMenu: React.Dispatch<React.SetStateAction<boolean>>;
@@ -258,7 +272,8 @@ export function useFileTreeState({
     state.setExpandedDirs,
     state.setViewMode,
     state.setSelectedFile,
-    state.setSelectedImage
+    state.setSelectedImage,
+    state.setSelectedHtml
   );
 
   // Size units for display
@@ -277,6 +292,7 @@ export function useFileTreeState({
     selectedFolder: state.selectedFolder,
     selectedFile: state.selectedFile,
     selectedImage: state.selectedImage,
+    selectedHtml: state.selectedHtml,
     viewMode: state.viewMode,
     searchQuery: state.searchQuery,
     filteredFiles: state.filteredFiles,
@@ -290,6 +306,7 @@ export function useFileTreeState({
     setSelectedFolder: state.setSelectedFolder,
     setSelectedFile: state.setSelectedFile,
     setSelectedImage: state.setSelectedImage,
+    setSelectedHtml: state.setSelectedHtml,
     setSearchQuery: state.setSearchQuery,
     setFilteredFiles: state.setFilteredFiles,
     setShowNewMenu: state.setShowNewMenu,

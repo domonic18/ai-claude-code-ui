@@ -50,3 +50,13 @@ export function isImageFile(filename: string): boolean {
   const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp'];
   return ext ? imageExtensions.includes(ext) : false;
 }
+
+/**
+ * 检查是否为 HTML 文件
+ * @param filename - 文件名
+ * @returns 是否为 HTML 文件
+ */
+export function isHtmlFile(filename: string): boolean {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  return ext === 'html' || ext === 'htm';
+}

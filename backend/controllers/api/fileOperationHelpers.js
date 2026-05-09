@@ -32,6 +32,10 @@ const CONTENT_TYPES = {
   'mp3': 'audio/mpeg',
   'mp4': 'video/mp4',
 
+  // Web
+  'html': 'text/html; charset=utf-8',
+  'htm': 'text/html; charset=utf-8',
+
   // Default
   'default': 'application/octet-stream'
 };

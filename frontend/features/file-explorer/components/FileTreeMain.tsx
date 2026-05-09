@@ -46,8 +46,10 @@ interface FileTreeMainProps {
   modalsProps: {
     selectedFile: any;
     selectedImage: any;
+    selectedHtml: any;
     onCloseFile: () => void;
     onCloseImage: () => void;
+    onCloseHtml: () => void;
   };
 }
 

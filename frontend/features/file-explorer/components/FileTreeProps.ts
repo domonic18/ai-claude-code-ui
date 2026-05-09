@@ -19,11 +19,13 @@ interface State {
   sizeUnits: string[];
   selectedFile: any;
   selectedImage: any;
+  selectedHtml: any;
   changeViewMode: (mode: FileViewMode) => void;
   setSearchQuery: (query: string) => void;
   setShowNewMenu: (show: boolean) => void;
   setSelectedFile: (file: any) => void;
   setSelectedImage: (image: any) => void;
+  setSelectedHtml: (html: any) => void;
   toggleDirectory: (path: string) => void;
   handleSelectFile: (item: any) => void;
   handleFolderSelect: (item: any, e: React.MouseEvent) => void;
@@ -144,7 +146,9 @@ export function buildModalsProps(state: State) {
   return {
     selectedFile: state.selectedFile,
     selectedImage: state.selectedImage,
+    selectedHtml: state.selectedHtml,
     onCloseFile: () => state.setSelectedFile(null),
-    onCloseImage: () => state.setSelectedImage(null)
+    onCloseImage: () => state.setSelectedImage(null),
+    onCloseHtml: () => state.setSelectedHtml(null)
   };
 }
