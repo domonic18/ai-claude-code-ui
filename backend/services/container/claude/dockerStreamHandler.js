@@ -44,8 +44,14 @@ function createStreamContext(stream, stdout, stderr, resolve, reject) {
     stream, stdout, stderr, resolve, reject,
     settled: false,
     timeoutHandle: null,
+    /** @type {Function|null} Settle 前置钩子，用于清理资源（如结束计时器） */
+    beforeSettle: null,
     settle(fn, value) {
-      if (!this.settled) { this.settled = true; fn(value); }
+      if (!this.settled) {
+        this.settled = true;
+        if (this.beforeSettle) this.beforeSettle();
+        fn(value);
+      }
     },
   };
 }
@@ -139,9 +145,9 @@ function setupExecutionTimeout(ctx, sessionId) {
  * @param {Array} stdoutChunks - Stdout chunks
  * @param {Array} stderrChunks - Stderr chunks
  * @param {string} sessionId - Session ID
- * @param {number} dataCount - Data chunk count
+ * @param {Function} getDataCount - Getter function returning current data chunk count
  */
-function setupStreamEndHandler(ctx, stdoutChunks, stderrChunks, sessionId, dataCount) {
+function setupStreamEndHandler(ctx, stdoutChunks, stderrChunks, sessionId, getDataCount) {
   // 在注册时捕获当前 trace 上下文，以便在流回调中恢复
   const capturedTrace = getTraceContext();
 
@@ -150,7 +156,7 @@ function setupStreamEndHandler(ctx, stdoutChunks, stderrChunks, sessionId, dataC
       if (ctx.timeoutHandle) clearTimeout(ctx.timeoutHandle);
 
       const session = getSession(sessionId);
-      if (!session && dataCount > 0) {
+      if (!session && getDataCount() > 0) {
         logger.info(`[DockerExecutor] Stream ended for session ${sessionId}, session seems to have been aborted`);
         ctx.settle(ctx.resolve, { output: stdoutChunks.join(''), sessionId, aborted: true });
         return;
@@ -158,7 +164,7 @@ function setupStreamEndHandler(ctx, stdoutChunks, stderrChunks, sessionId, dataC
 
       const stdoutOutput = stdoutChunks.join('');
       const stderrOutput = stderrChunks.join('');
-      logger.info({ sessionId, totalChunks: dataCount, stdoutLength: stdoutOutput.length, stderrLength: stderrOutput.length }, '[DockerExecutor] Stream ended');
+      logger.info({ sessionId, totalChunks: getDataCount(), stdoutLength: stdoutOutput.length, stderrLength: stderrOutput.length }, '[DockerExecutor] Stream ended');
 
       // 检查是否有 stderr 中的错误
       if (hasRealError(stderrOutput)) {
@@ -198,7 +204,7 @@ function setupStreamEndHandler(ctx, stdoutChunks, stderrChunks, sessionId, dataC
           hasStdoutError,
           stderrTail: stderrOutput.substring(stderrOutput.length - DIAG_LOG_STDERR_MAX),
           stdoutTail: stdoutOutput.substring(stdoutOutput.length - DIAG_LOG_STDOUT_MAX),
-          totalChunks: dataCount,
+          totalChunks: getDataCount(),
         }, `[DockerExecutor] Abnormal termination: ${errorSource}`);
         ctx.settle(ctx.resolve, { output: stdoutOutput, sessionId, abnormalTermination: true, error: errorSource });
       } else {
@@ -242,14 +248,14 @@ function handleStreamProcessing(stream, stdout, stderr, writer, sessionId) {
   let dataCount = 0;
   const state = { sessionCreatedSent: false, toolSeq: 0, toolTimers: new Map() };
 
-  // TTFT 计时：从流处理开始到首个有效 stdout chunk
+  // TTFT (Time To First Token) 计时：从流处理开始到首个有效 stdout chunk
   const ttftTimer = startTimer('claude/first_token');
   // 流式输出计时：从首个 chunk 到 stream end（lazy 创建，首个 chunk 时启动）
   let streamDurationTimer = null;
 
   setupStdoutHandler(stdout, stdoutChunks, writer, sessionId, state, () => {
     dataCount++;
-    // 首个 chunk 时记录 TTFT，同时启动 stream_duration 计时
+    // 首个 chunk 时记录 TTFT (Time To First Token)，同时启动 stream_duration 计时
     if (dataCount === 1) {
       ttftTimer.end(logger, 'First token received (TTFT)', { sessionId });
       streamDurationTimer = startTimer('claude/stream_duration');
@@ -260,17 +266,15 @@ function handleStreamProcessing(stream, stdout, stderr, writer, sessionId) {
   return new Promise((resolve, reject) => {
     const context = createStreamContext(stream, stdout, stderr, resolve, reject);
 
-    // 扩展 settle 方法：在 stream end 时同时结束 stream_duration 计时
-    const originalSettle = context.settle.bind(context);
-    context.settle = (fn, value) => {
+    // 注册 settle 前置钩子：在流结束时结束 stream_duration 计时
+    context.beforeSettle = () => {
       if (streamDurationTimer) {
         streamDurationTimer.end(logger, 'Stream duration ended', { sessionId, totalChunks: dataCount });
       }
-      originalSettle(fn, value);
     };
 
     setupExecutionTimeout(context, sessionId);
-    setupStreamEndHandler(context, stdoutChunks, stderrChunks, sessionId, dataCount);
+    setupStreamEndHandler(context, stdoutChunks, stderrChunks, sessionId, () => dataCount);
     setupStreamErrorHandler(context, sessionId);
   });
 }
