@@ -11,6 +11,7 @@ import containerManager from '../core/index.js';
 import { executeInContainer } from './DockerExecutor.js';
 import { createSession, updateSession } from './SessionManager.js';
 import { CONTAINER } from '../../../config/config.js';
+import { getModelProviderConfig } from '../../../config/modelConfig.js';
 import { memoryService } from '../../memory/index.js';
 import { createLogger, sanitizePreview, startTimer } from '../../../utils/logger.js';
 const logger = createLogger('services/container/claude/ClaudeQuery');
@@ -210,20 +211,25 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
       cwd: workingDir
     };
 
-    // 4. 创建会话
+    // 4. 根据模型获取 provider 端点配置
+    const modelName = mappedOptions.model || '';
+    const providerConfig = getModelProviderConfig(modelName);
+    logger.info({ sessionId, modelName, providerBaseURL: providerConfig.baseURL }, '[ClaudeQuery] Provider config resolved');
+
+    // 5. 创建会话
     setupSession(sessionId, container, command, mappedOptions);
 
-    // 5. 发送会话启动和记忆上下文消息
+    // 6. 发送会话启动和记忆上下文消息
     sendSessionStart(writer, sessionId, container.id, memoryContext);
 
-    // 6. 构建增强命令并执行
+    // 7. 构建增强命令并执行
     const enhancedCommand = buildEnhancedCommand(command, memoryContext);
     logger.debug({ sessionId }, '[ClaudeQuery] Executing in container');
-    await executeInContainer(userId, enhancedCommand, mappedOptions, writer, sessionId);
+    await executeInContainer(userId, enhancedCommand, mappedOptions, writer, sessionId, providerConfig);
     logger.info({ sessionId }, '[ClaudeQuery] Execution completed');
     queryTimer.end(logger, 'Claude query completed', { sessionId });
 
-    // 7. 更新会话状态
+    // 8. 更新会话状态
     updateSession(sessionId, {
       status: 'completed',
       endTime: Date.now()
