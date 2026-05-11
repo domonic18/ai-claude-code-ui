@@ -15,7 +15,7 @@ import containerManager from '../../services/container/core/index.js';
 import { NotFoundError, UnauthorizedError, ValidationError } from '../../middleware/error-handler.middleware.js';
 import { createLogger } from '../../utils/logger.js';
 import { getCookieOptions, validateCredentials, validatePasswordChange, buildUserResponse } from './authHelpers.js';
-import { safeRollback, createUserContainerInBackground } from './transactionHelpers.js';
+import { createUserContainerInBackground } from './transactionHelpers.js';
 
 const logger = createLogger('controllers/core/AuthController');
 
@@ -65,9 +65,6 @@ export class AuthController extends BaseController {
    * @param {Function} next - 下一个中间件
    */
   async register(req, res, next) {
-    // Track transaction state to avoid double-rollback
-    let transactionActive = false;
-
     try {
       const { username, password } = req.body;
 
@@ -80,29 +77,29 @@ export class AuthController extends BaseController {
         throw new ValidationError('Username already exists. Please choose a different username.');
       }
 
-      // 使用事务防止竞态条件
-      db().prepare('BEGIN').run();
-      transactionActive = true;
-
-      // 哈希密码
+      // 哈希密码（耗时操作放在事务外，避免长时间持有锁）
       const saltRounds = 12;
       const passwordHash = await bcrypt.hash(password, saltRounds);
 
-      // 第一个注册的用户自动成为管理员
-      const hasUsers = User.hasUsers();
-      const role = hasUsers ? 'user' : 'admin';
+      // 使用 better-sqlite3 的事务 API，自动处理 COMMIT/ROLLBACK
+      const registerUser = db().transaction(() => {
+        // 第一个注册的用户自动成为管理员
+        const hasUsers = User.hasUsers();
+        const role = hasUsers ? 'user' : 'admin';
 
-      // 创建用户
-      const user = User.create(username, passwordHash, role);
+        // 创建用户
+        const user = User.create(username, passwordHash, role);
 
-      // 生成令牌
-      const token = generateToken(user);
+        // 生成令牌
+        const token = generateToken(user);
 
-      // 更新最后登录时间
-      User.updateLastLogin(user.id);
+        // 更新最后登录时间
+        User.updateLastLogin(user.id);
 
-      db().prepare('COMMIT').run();
-      transactionActive = false;
+        return { user, role, token };
+      });
+
+      const { user, role, token } = registerUser();
 
       // 在后台为用户创建容器
       createUserContainerInBackground(user.id, containerManager);
@@ -113,7 +110,6 @@ export class AuthController extends BaseController {
       logger.info({ userId: user.id, username: user.username, role, ip: getClientIp(req) }, 'User registered');
       this._success(res, buildUserResponse(user), 'Registration successful', 201);
     } catch (error) {
-      safeRollback(transactionActive);
       this._handleError(error, req, res, next);
     }
   }
