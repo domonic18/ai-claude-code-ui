@@ -23,6 +23,7 @@ import { queryCodex, abortCodexSession, isCodexSessionActive, getActiveCodexSess
 import { WebSocketWriter } from '../writer.js';
 import { formatReadInstructions } from '../../services/files/FileDocumentReader.js';
 import { createLogger, sanitizePreview, generateTraceId, generateSpanId, runWithTrace } from '../../utils/logger.js';
+import { recordActivity } from '../../utils/usage-session-tracker.js';
 
 const logger = createLogger('websocket/handlers/chat');
 
@@ -144,28 +145,52 @@ function checkSessionStatus(data, writer) {
  */
 const COMMAND_HANDLERS = {
   'claude-command': async (data, ws, writer) => {
-    await handleClaudeCommand(data, ws, writer);
+    const userId = ws.user?.userId;
+    recordActivity(userId);
+    try {
+      await handleClaudeCommand(data, ws, writer);
+    } finally {
+      recordActivity(userId);
+    }
   },
   'cursor-command': async (data, ws, writer) => {
+    const userId = ws.user?.userId;
+    recordActivity(userId);
     logger.info({
-      userId: ws.user.userId,
+      userId,
       preview: sanitizePreview(data.command),
       totalLength: data.command?.length || 0,
       provider: 'cursor',
     }, '[Chat] User message received');
-    await spawnCursor(data.command, data.options, writer);
+    try {
+      await spawnCursor(data.command, data.options, writer);
+    } finally {
+      recordActivity(userId);
+    }
   },
   'codex-command': async (data, ws, writer) => {
+    const userId = ws.user?.userId;
+    recordActivity(userId);
     logger.info({
-      userId: ws.user.userId,
+      userId,
       preview: sanitizePreview(data.command),
       totalLength: data.command?.length || 0,
       provider: 'codex',
     }, '[Chat] User message received');
-    await queryCodex(data.command, data.options, writer);
+    try {
+      await queryCodex(data.command, data.options, writer);
+    } finally {
+      recordActivity(userId);
+    }
   },
   'cursor-resume': async (data, ws, writer) => {
-    await spawnCursor('', { sessionId: data.sessionId, resume: true, cwd: data.options?.cwd }, writer);
+    const userId = ws.user?.userId;
+    recordActivity(userId);
+    try {
+      await spawnCursor('', { sessionId: data.sessionId, resume: true, cwd: data.options?.cwd }, writer);
+    } finally {
+      recordActivity(userId);
+    }
   },
   'abort-session': async (data, ws, writer) => {
     writer.send(await abortSession(data, writer));
@@ -186,6 +211,9 @@ const COMMAND_HANDLERS = {
   'user-answer': async (data, ws, writer) => {
     const { sessionId, toolUseID, answer } = data;
     logger.info({ sessionId, toolUseID }, '[WebSocket] Received user-answer');
+
+    // 用户回复也算活跃操作（续期使用会话）
+    recordActivity(ws.user?.userId);
 
     const stdinWriter = getSessionStdin(sessionId, ws.user?.userId);
     if (!stdinWriter) {
