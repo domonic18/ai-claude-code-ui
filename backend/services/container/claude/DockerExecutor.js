@@ -19,9 +19,10 @@ const logger = createLogger('services/container/claude/DockerExecutor');
  * @param {string} userId - 用户 ID
  * @param {string} command - 用户命令
  * @param {object} options - SDK 选项
- * @returns {Promise<{container: object, docker: object, sdkScriptInfo: object}>}
+ * @param {{baseURL: string, authToken: string, apiKey: string}} providerConfig - Provider 端点配置
+ * @returns {Promise<{container: object, docker: object, sdkScriptInfo: object, providerConfig: object}>}
  */
-async function prepareContainerAndScript(userId, command, options) {
+async function prepareContainerAndScript(userId, command, options, providerConfig) {
   // 获取容器信息
   const containerInfo = containerManager.getContainerByUserId(userId);
   if (!containerInfo) {
@@ -41,10 +42,9 @@ async function prepareContainerAndScript(userId, command, options) {
   // 构建 SDK 脚本
   const sdkScriptInfo = await buildSDKScript(command, { ...options, imagePaths }, userId);
 
-  // 验证必需的环境变量
-  const authToken = process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY;
-  if (!authToken) {
-    throw new Error('ANTHROPIC_AUTH_TOKEN or ANTHROPIC_API_KEY must be set in environment or .env file');
+  // 验证 provider 配置中包含认证信息
+  if (!providerConfig.authToken) {
+    throw new Error('No auth token found for model provider. Check PROVIDER_* env vars or ANTHROPIC_AUTH_TOKEN.');
   }
 
   // 写入脚本和选项文件到容器
@@ -53,7 +53,7 @@ async function prepareContainerAndScript(userId, command, options) {
   await writeFileViaPutArchive(container, sdkScriptInfo.tmpScriptFile, sdkScriptInfo.scriptContent, { logLabel: 'DockerExecutor' });
   uploadTimer.end(logger, 'Script files uploaded to container');
 
-  return { container, docker, sdkScriptInfo, authToken };
+  return { container, docker, sdkScriptInfo, providerConfig };
 }
 
 /**
@@ -63,16 +63,17 @@ async function prepareContainerAndScript(userId, command, options) {
  * @param {object} options - SDK 选项
  * @param {object} writer - WebSocket 写入器
  * @param {string} sessionId - 会话 ID
+ * @param {{baseURL: string, authToken: string, apiKey: string}} [providerConfig] - Provider 端点配置
  * @returns {Promise<object>} 执行结果 { output, sessionId }
  */
-export async function executeInContainer(userId, command, options, writer, sessionId) {
+export async function executeInContainer(userId, command, options, writer, sessionId, providerConfig) {
   const execTimer = startTimer('docker/exec');
   logger.info({ sessionId, userId, cwd: options.cwd }, '[DockerExecutor] Starting execution');
   logger.debug({ preview: sanitizePreview(command), totalLength: command?.length || 0 }, '[DockerExecutor] User command');
 
   try {
     // 步骤 1：准备容器和脚本
-    const { docker, sdkScriptInfo, authToken } = await prepareContainerAndScript(userId, command, options);
+    const { docker, sdkScriptInfo, providerConfig: resolvedConfig } = await prepareContainerAndScript(userId, command, options, providerConfig);
 
     // 步骤 2：在容器中执行脚本（启用 stdin 以支持 Agent 交互提问）
     const spawnTimer = startTimer('claude/docker_exec_spawn');
@@ -87,8 +88,9 @@ export async function executeInContainer(userId, command, options, writer, sessi
           NODE_PATH: '/app/node_modules',
           HOME: '/workspace',
           CLAUDE_CONFIG_DIR: '/workspace/.claude',
-          ANTHROPIC_AUTH_TOKEN: authToken,
-          ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL,
+          ANTHROPIC_AUTH_TOKEN: resolvedConfig.authToken,
+          ANTHROPIC_BASE_URL: resolvedConfig.baseURL,
+          ANTHROPIC_API_KEY: resolvedConfig.apiKey,
           // Claude CLI 拒绝在 root 用户下使用 bypassPermissions，
           // 设置 IS_SANDBOX=1 告知 CLI 当前运行在沙箱容器中（参考 cli.js:11106430）
           IS_SANDBOX: '1'
