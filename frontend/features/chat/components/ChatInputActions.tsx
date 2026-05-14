@@ -63,26 +63,31 @@ export function ChatInputActions({
           onChange={(e) => {
             const files = Array.from(e.target.files || []);
             files.forEach(file => {
-              if (file.size <= maxFileSize) {
-                const attachment: FileAttachment = {
-                  id: `${file.name}-${Date.now()}`, // Generate unique ID
-                  name: file.name,
-                  size: file.size,
-                  type: file.type,
-                };
+              const attachment: FileAttachment = {
+                id: `${file.name}-${Date.now()}`, // Generate unique ID
+                name: file.name,
+                size: file.size,
+                type: file.type,
+              };
 
-                if (file.type.startsWith('image/')) {
-                  // For images, store as base64
-                  const reader = new FileReader();
-                  reader.onload = (ev) => {
-                    attachment.data = ev.target?.result as string;
-                    onAddFile?.(attachment);
-                  };
-                  reader.readAsDataURL(file);
-                } else {
-                  // For documents, upload to server
-                  handleFileUpload(file, attachment);
-                }
+              if (file.size > maxFileSize) {
+                const maxSizeMB = (maxFileSize / (1024 * 1024)).toFixed(0);
+                attachment.error = `文件大小超过限制（最大 ${maxSizeMB}MB）`;
+                onAddFile?.(attachment);
+                return;
+              }
+
+              if (file.type.startsWith('image/')) {
+                // For images, store as base64
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                  attachment.data = ev.target?.result as string;
+                  onAddFile?.(attachment);
+                };
+                reader.readAsDataURL(file);
+              } else {
+                // For documents, upload to server
+                handleFileUpload(file, attachment);
               }
             });
             // Reset input so same file can be selected again

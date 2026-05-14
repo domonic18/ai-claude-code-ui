@@ -68,9 +68,15 @@ async function uploadFileToServer(
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      logger.error('[uploadFileToServer] Upload failed:', response.status, errorText);
-      throw new Error(`Upload failed: ${response.status} ${errorText}`);
+      let errorMessage: string;
+      try {
+        const errorData = JSON.parse(await response.text());
+        errorMessage = errorData?.error?.message || errorData?.message || `上传失败（${response.status}）`;
+      } catch {
+        errorMessage = `上传失败（HTTP ${response.status}）`;
+      }
+      logger.error('[uploadFileToServer] Upload failed:', response.status, errorMessage);
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
@@ -100,17 +106,19 @@ export function useFileUploadHandler({
    */
   const onDrop = useCallback((acceptedFiles: File[]) => {
     acceptedFiles.forEach(file => {
-      if (file.size > maxFileSize) {
-        logger.error(`File ${file.name} exceeds maximum size of ${maxFileSize} bytes`);
-        return;
-      }
-
       const attachment: FileAttachment = {
         id: `${file.name}-${Date.now()}`, // Generate unique ID
         name: file.name,
         size: file.size,
         type: file.type,
       };
+
+      if (file.size > maxFileSize) {
+        const maxSizeMB = (maxFileSize / (1024 * 1024)).toFixed(0);
+        attachment.error = `文件大小超过限制（最大 ${maxSizeMB}MB）`;
+        onAddFile?.(attachment);
+        return;
+      }
 
       if (file.type.startsWith('image/')) {
         // For images, store as base64 data URL

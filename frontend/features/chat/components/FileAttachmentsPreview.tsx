@@ -4,8 +4,11 @@
  * Displays file attachment previews with remove functionality.
  */
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import type { FileAttachment } from '../types';
+
+/** Error state files auto-dismiss after this duration (ms) */
+const ERROR_AUTO_DISMISS_MS = 3000;
 
 export interface FileAttachmentsPreviewProps {
   files: FileAttachment[];
@@ -90,6 +93,37 @@ function formatFileSize(bytes: number): string {
  * Shows grid of attached files with upload progress and error states.
  */
 export function FileAttachmentsPreview({ files, onRemoveFile }: FileAttachmentsPreviewProps) {
+  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  // Auto-dismiss files with errors after a delay
+  useEffect(() => {
+    const timers = timersRef.current;
+
+    for (const file of files) {
+      if (file.error && !timers.has(file.id)) {
+        timers.set(file.id, setTimeout(() => {
+          onRemoveFile(file.id);
+          timers.delete(file.id);
+        }, ERROR_AUTO_DISMISS_MS));
+      }
+    }
+
+    // Cleanup timers for files that were already removed
+    for (const [id] of timers) {
+      if (!files.some(f => f.id === id)) {
+        clearTimeout(timers.get(id));
+        timers.delete(id);
+      }
+    }
+
+    return () => {
+      for (const timer of timers.values()) {
+        clearTimeout(timer);
+      }
+      timers.clear();
+    };
+  }, [files, onRemoveFile]);
+
   if (files.length === 0) return null;
 
   return (
@@ -134,10 +168,11 @@ export function FileAttachmentsPreview({ files, onRemoveFile }: FileAttachmentsP
 
           {/* Error indicator */}
           {file.error && (
-            <div className="absolute inset-0 bg-red-500/80 flex items-center justify-center rounded-lg">
-              <svg className="w-6 h-6 text-white flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <div className="absolute inset-0 bg-red-500/80 flex items-center justify-center rounded-lg px-2">
+              <svg className="w-4 h-4 text-white flex-shrink-0 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
+              <span className="text-white text-xs leading-tight text-center line-clamp-2">{file.error}</span>
             </div>
           )}
 
