@@ -8,6 +8,77 @@
 import { generateCanUseToolCallback } from './canUseToolTemplate.js';
 
 /**
+ * Generate signature stripping code for cross-provider model switching.
+ *
+ * When resuming a session that was created with a different provider
+ * (e.g. MiniMax → Claude), the thinking block signatures from the previous
+ * provider are invalid for the new one, causing 400 errors:
+ *   "Invalid signature in thinking block"
+ *
+ * This code runs before the SDK query() call and strips all `signature`
+ * fields from thinking blocks in the session JSONL transcript.
+ *
+ * @returns {string} Signature stripping code
+ */
+function generateSignatureStrip() {
+  return `    // 跨 provider 恢复会话时，清理 thinking block 中的 signature 字段
+    // 不同 provider 生成的 signature 无法被另一个 provider 验证
+    if (options.resume) {
+      try {
+        const __fs = await import("fs");
+        const __path = await import("path");
+        const sigHome = process.env.HOME || process.env.CLAUDE_CONFIG_DIR || "/workspace";
+        const sigProjDir = __path.join(sigHome, ".claude", "projects");
+        if (__fs.existsSync(sigProjDir)) {
+          const sigDirs = __fs.readdirSync(sigProjDir, { withFileTypes: true });
+          let sigStripped = 0;
+          for (const sigDir of sigDirs) {
+            if (!sigDir.isDirectory()) continue;
+            const sigDirPath = __path.join(sigProjDir, sigDir.name);
+            let sigFiles;
+            try { sigFiles = __fs.readdirSync(sigDirPath); } catch { continue; }
+            for (const sigFile of sigFiles) {
+              if (!sigFile.endsWith(".jsonl")) continue;
+              const sigFilePath = __path.join(sigDirPath, sigFile);
+              let sigContent;
+              try { sigContent = __fs.readFileSync(sigFilePath, "utf-8"); } catch { continue; }
+              if (!sigContent.includes('"signature"')) continue;
+              const sigLines = sigContent.split("\\n");
+              let sigModified = false;
+              const sigNewLines = sigLines.map(sigLine => {
+                if (!sigLine.includes('"signature"')) return sigLine;
+                try {
+                  const sigObj = JSON.parse(sigLine);
+                  if (sigObj.message && Array.isArray(sigObj.message.content)) {
+                    const sigFiltered = sigObj.message.content.filter(sigBlock => sigBlock.type !== "thinking");
+                    if (sigFiltered.length !== sigObj.message.content.length) {
+                      sigModified = true;
+                      // 如果移除 thinking 后 content 为空，跳过此行（返回空字符串占位）
+                      if (sigFiltered.length === 0) return '';
+                      sigObj.message.content = sigFiltered;
+                      return JSON.stringify(sigObj);
+                    }
+                  }
+                } catch {}
+                return sigLine;
+              }).filter(sigLine => sigLine !== '');
+              if (sigModified) {
+                __fs.writeFileSync(sigFilePath, sigNewLines.join("\\n"), "utf-8");
+                sigStripped++;
+              }
+            }
+          }
+          if (sigStripped > 0) {
+            console.error("[SDK] Stripped thinking signatures from " + sigStripped + " transcript file(s)");
+          }
+        }
+      } catch (sigErr) {
+        console.error("[SDK] Warning: signature strip failed:", sigErr.message);
+      }
+    }`;
+}
+
+/**
  * Generate image handling code section
  * @param {Array} imagePaths - Array of image paths
  * @returns {string} Image handling code
@@ -139,6 +210,8 @@ ${generateCanUseToolCallback(autoAnswer)}
     // Claude SDK 接受一个对象参数：{ prompt, options }
     // 注入 canUseTool 回调以拦截 AskUserQuestion
     options.canUseTool = canUseTool;
+
+${generateSignatureStrip()}
 
     const result = query({
       prompt: command,
