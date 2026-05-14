@@ -433,7 +433,7 @@
   },
   "agent": {
     "claude": "Claude",
-    "claudeChinese": "AI Assistant",
+    "claudeChinese": "claude-sonnet-4-6-thinking",
     "opencode": "OpenCode",
     "comingSoon": "Coming Soon",
     "opencodeDescription": "OpenCode integration is coming soon. This feature is currently under development and will be available in a future update."
