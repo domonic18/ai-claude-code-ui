@@ -117,16 +117,21 @@ function ModelDropdown({
   groupedModels,
   selectedModel,
   onModelSelect,
-  t
-}: ModelDropdownProps) {
+  t,
+  dropUp = false,
+}: ModelDropdownProps & { dropUp?: boolean }) {
   if (!isOpen || disabled) return null;
 
   const handleSelect = (modelName: string) => {
     onModelSelect?.(modelName);
   };
 
+  const positionClasses = dropUp
+    ? 'bottom-full mb-2'
+    : 'top-full mt-2';
+
   return (
-    <div className="absolute z-50 mt-2 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-96 overflow-y-auto">
+    <div className={`absolute z-50 ${positionClasses} w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-96 overflow-y-auto`}>
       {isModelsLoaded ? (
         Object.entries(groupedModels).map(([provider, providerModels]) => (
           <div key={provider}>
@@ -232,6 +237,13 @@ export function ModelSelector({
     t
   } = useModelSelectorState(selectedModel, models, onModelSelect, tokenBudget);
 
+  // 检测是否需要向上弹出
+  const dropUp = React.useMemo(() => {
+    if (!isOpen || !dropdownRef.current) return false;
+    const rect = dropdownRef.current.getBoundingClientRect();
+    return rect.bottom + 384 > window.innerHeight;
+  }, [isOpen]);
+
   if (compact) {
     return (
       <div className="inline-flex items-center px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs font-medium">
@@ -265,6 +277,7 @@ export function ModelSelector({
         selectedModel={selectedModel}
         onModelSelect={handleSelect}
         t={t}
+        dropUp={dropUp}
       />
     </div>
   );
