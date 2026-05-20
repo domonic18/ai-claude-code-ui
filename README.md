@@ -38,8 +38,11 @@
 git clone https://github.com/domonic18/ai-claude-code-ui.git
 cd ai-claude-code-ui
 
-# 拉取 extensions 子模块（按需）
+# 还原到父仓库记录的版本
 git submodule update --init --recursive
+
+# 拉取 extensions 子模块（按需）
+git submodule update --remote --merge
 
 # 安装依赖
 npm install
