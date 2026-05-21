@@ -15,6 +15,8 @@ export const DEFAULT_CLAUDE_TOOLS = [
   'Bash(git log:*)',
   'Bash(git diff:*)',
   'Bash(git status:*)',
+  'Bash(cp:*)',
+  'Bash(mkdir:*)',
   'Write',
   'Read',
   'Edit',

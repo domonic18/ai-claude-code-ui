@@ -18,6 +18,7 @@ const logger = createLogger('container/claude/ScriptBuilder');
 /** 默认允许的工具列表 */
 const DEFAULT_ALLOWED_TOOLS = [
   'Bash(git log:*)', 'Bash(git diff:*)', 'Bash(git status:*)',
+  'Bash(cp:*)', 'Bash(mkdir:*)',
   'Bash(pdftotext:*)', 'Bash(pandoc:*)', 'Bash(file:*)',
   'Write', 'Read', 'Edit', 'Glob', 'Grep', 'MultiEdit',
   'Task', 'TodoWrite', 'TodoRead', 'WebFetch', 'WebSearch', 'Skill',
