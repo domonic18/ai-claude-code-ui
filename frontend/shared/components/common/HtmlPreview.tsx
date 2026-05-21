@@ -104,21 +104,13 @@ function HtmlPreview({ file, onClose }: HtmlPreviewProps) {
   const { blobUrl, error, loading } = useHtmlLoader(htmlPath);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  /** Open the HTML content in a new browser tab */
+  /** Open the HTML content in a new browser tab with no opener reference */
   const handleOpenInNewTab = useCallback(() => {
     if (!blobUrl) return;
-    const newWindow = window.open('', '_blank');
-    if (newWindow) {
-      newWindow.document.write(
-        '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' +
-        file.name +
-        '</title></head><body style="margin:0">' +
-        '<iframe src="' + blobUrl + '" style="width:100vw;height:100vh;border:none"></iframe>' +
-        '</body></html>'
-      );
-      newWindow.document.close();
-    }
-  }, [blobUrl, file.name]);
+    // Use noopener to prevent the new window from accessing window.opener,
+    // avoiding potential security issues with same-origin parent access.
+    window.open(blobUrl, '_blank', 'noopener');
+  }, [blobUrl]);
 
   /** Download the HTML file to local disk */
   const handleDownload = useCallback(() => {
@@ -213,7 +205,7 @@ function HtmlPreview({ file, onClose }: HtmlPreviewProps) {
           {!loading && blobUrl && (
             <iframe
               src={blobUrl}
-              sandbox="allow-scripts allow-same-origin allow-popups allow-downloads"
+              sandbox="allow-scripts allow-popups allow-downloads"
               className="w-full h-full border-0"
               title={file.name}
             />
@@ -238,7 +230,7 @@ function HtmlPreview({ file, onClose }: HtmlPreviewProps) {
           {blobUrl && (
             <iframe
               src={blobUrl}
-              sandbox="allow-scripts allow-same-origin allow-popups allow-downloads"
+              sandbox="allow-scripts allow-popups allow-downloads"
               className="w-full h-full border-0"
               title={file.name}
             />
