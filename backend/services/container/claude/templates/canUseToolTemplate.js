@@ -50,11 +50,11 @@ export function generateCanUseToolCallback(autoAnswer = false) {
             toolUseID: toolUseID
           };
         }
-        // 其他工具默认放行
-        return { behavior: 'allow' };
+        // 其他工具默认放行，必须返回 updatedInput 以满足 SDK Zod schema 验证
+        return { behavior: 'allow', updatedInput: input };
       } catch (err) {
         console.error("[SDK] canUseTool auto-answer error:", err.message);
-        return { behavior: 'allow' };
+        return { behavior: 'allow', updatedInput: input };
       }
     }`;
   }
@@ -113,11 +113,11 @@ export function generateCanUseToolCallback(autoAnswer = false) {
             });
           });
         }
-        // 其他工具默认放行
-        return { behavior: 'allow' };
+        // 其他工具默认放行，必须返回 updatedInput 以满足 SDK Zod schema 验证
+        return { behavior: 'allow', updatedInput: input };
       } catch (err) {
         console.error("[SDK] canUseTool interactive error:", err.message);
-        return { behavior: 'allow' };
+        return { behavior: 'allow', updatedInput: input };
       }
     }`;
 }
