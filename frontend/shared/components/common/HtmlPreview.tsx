@@ -10,6 +10,7 @@
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Button } from '@/shared/components/ui/Button';
+import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
 import { X, ExternalLink, Download, Maximize2, Minimize2 } from 'lucide-react';
 import { authenticatedFetch } from '@/shared/services';
 import { logger } from '@/shared/utils/logger';
@@ -103,13 +104,21 @@ function HtmlPreview({ file, onClose }: HtmlPreviewProps) {
   const htmlPath = `/api/projects/${file.projectName}/files/content?path=${encodeURIComponent(file.path)}`;
   const { blobUrl, error, loading } = useHtmlLoader(htmlPath);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showOpenConfirm, setShowOpenConfirm] = useState(false);
 
-  /** Open the HTML content in a new browser tab with no opener reference */
-  const handleOpenInNewTab = useCallback(() => {
+  /** Show confirmation dialog before opening in a new tab */
+  const handleRequestOpenInNewTab = useCallback(() => {
     if (!blobUrl) return;
-    // Use noopener to prevent the new window from accessing window.opener,
-    // avoiding potential security issues with same-origin parent access.
-    window.open(blobUrl, '_blank', 'noopener');
+    setShowOpenConfirm(true);
+  }, [blobUrl]);
+
+  /** Open the HTML content in a new browser tab after user confirmation */
+  const handleConfirmOpenInNewTab = useCallback(() => {
+    if (!blobUrl) return;
+    // Use noopener+noreferrer to prevent the new window from accessing
+    // window.opener or leaking Referer information.
+    window.open(blobUrl, '_blank', 'noopener,noreferrer');
+    setShowOpenConfirm(false);
   }, [blobUrl]);
 
   /** Download the HTML file to local disk */
@@ -150,7 +159,7 @@ function HtmlPreview({ file, onClose }: HtmlPreviewProps) {
           <Button
             variant="outline"
             size="sm"
-            onClick={handleOpenInNewTab}
+            onClick={handleRequestOpenInNewTab}
             disabled={!blobUrl}
             className="h-7 px-2 text-xs border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700 hover:border-gray-500"
           >
@@ -237,6 +246,18 @@ function HtmlPreview({ file, onClose }: HtmlPreviewProps) {
           )}
         </div>
       )}
+
+      {/* Confirmation dialog for opening HTML in a new tab */}
+      <ConfirmDialog
+        isOpen={showOpenConfirm}
+        title="Open HTML in New Tab"
+        message="Opening in a new tab removes the iframe sandbox protection. The HTML content will run with full browser permissions, which may include scripts from the file. Only proceed if you trust this file."
+        confirmLabel="Open"
+        cancelLabel="Cancel"
+        type="warning"
+        onConfirm={handleConfirmOpenInNewTab}
+        onCancel={() => setShowOpenConfirm(false)}
+      />
     </>
   );
 }
