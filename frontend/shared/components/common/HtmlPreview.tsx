@@ -66,8 +66,10 @@ function useHtmlLoader(filePath: string): HtmlLoaderResult {
           throw new Error(`Request failed with status ${response.status}`);
         }
 
-        const htmlText = await response.text();
-        const blob = new Blob([htmlText], { type: 'text/html; charset=utf-8' });
+        // Use response.blob() to preserve the original binary data and
+        // Content-Type from the API response, instead of response.text()
+        // which may cause encoding issues when re-creating a Blob.
+        const blob = await response.blob();
         blobUrlRef.current = URL.createObjectURL(blob);
         setBlobUrl(blobUrlRef.current);
       } catch (err: any) {
