@@ -39,7 +39,12 @@
     "test:frontend": "npx vitest run",
     "test:watch": "npx vitest",
     "lint": "eslint backend/ frontend/ shared/",
-    "lint:fix": "eslint --fix backend/ frontend/ shared/"
+    "lint:fix": "eslint --fix backend/ frontend/ shared/",
+    "test:gpt:openrouter": "node workspace/测试设计/接入openai类模型测试/测试脚本/test-openrouter-gpt.mjs",
+    "test:gpt:adapter": "node workspace/测试设计/接入openai类模型测试/测试脚本/test-claude-adapter.mjs",
+    "test:gpt:bridge": "node workspace/测试设计/接入openai类模型测试/测试脚本/test-claude-bridge.mjs",
+    "test:gpt:accuracy": "node workspace/测试设计/接入openai类模型测试/测试脚本/test-gpt-tool-accuracy.mjs",
+    "test:gpt:cc-switch": "node workspace/测试设计/接入openai类模型测试/测试脚本/test-cc-switch.mjs"
   },
   "keywords": [
     "claude code",

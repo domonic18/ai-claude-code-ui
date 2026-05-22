@@ -94,6 +94,16 @@ export async function executeInContainer(userId, command, options, writer, sessi
           // Claude CLI 拒绝在 root 用户下使用 bypassPermissions，
           // 设置 IS_SANDBOX=1 告知 CLI 当前运行在沙箱容器中（参考 cli.js:11106430）
           IS_SANDBOX: '1'
+,
+          // 代理配置：让容器内 SDK 通过宿主机 Clash 访问外网
+          // macOS 上 host.docker.internal 指向宿主机
+          // 需要在 Clash Verge 中开启"允许局域网连接"(Allow LAN)
+          HTTP_PROXY: 'http://host.docker.internal:7897',
+          HTTPS_PROXY: 'http://host.docker.internal:7897',
+          // 国内直连 API 域名不需要走 Clash 代理
+          NO_PROXY: 'localhost,127.0.0.1,.local,host.docker.internal,api.laozhang.ai,guanghua-api.bj33smarter.com'
+
+
         }
       }
     );
