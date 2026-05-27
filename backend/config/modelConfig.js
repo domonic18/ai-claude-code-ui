@@ -40,7 +40,7 @@ function providerToEnvKey(provider) {
  * 默认 provider 使用 ANTHROPIC_BASE_URL / ANTHROPIC_AUTH_TOKEN / ANTHROPIC_API_KEY
  *
  * @param {Array<{name: string, provider: string}>} models - 已解析的模型列表
- * @returns {Map<string, {baseURL: string, authToken: string, apiKey: string}>} provider 配置映射
+ * @returns {Map<string, {baseURL: string, authToken: string, apiKey: string, provider: string, needsProxy: boolean}>} provider 配置映射
  */
 function buildProviderRegistry(models) {
   const registry = new Map();
@@ -56,14 +56,19 @@ function buildProviderRegistry(models) {
     const providerApiKey = process.env[`PROVIDER_${envKey}_API_KEY`];
     const providerAuthToken = process.env[`PROVIDER_${envKey}_AUTH_TOKEN`] || providerApiKey;
 
+    // 检查该 provider 是否需要代理（通过 PROVIDER_<KEY>_NEEDS_PROXY 环境变量）
+    const needsProxy = process.env[`PROVIDER_${envKey}_NEEDS_PROXY`] === 'true';
+
     if (providerBaseURL && providerAuthToken) {
       // 有专属配置的 provider
       registry.set(provider, {
         baseURL: providerBaseURL,
         authToken: providerAuthToken,
         apiKey: providerApiKey || '',
+        provider,
+        needsProxy,
       });
-      logger.info(`[MODELS] Provider "${provider}" → custom endpoint: ${providerBaseURL}`);
+      logger.info(`[MODELS] Provider "${provider}" → custom endpoint: ${providerBaseURL}, needsProxy: ${needsProxy}`);
     } else {
       // 使用默认 ANTHROPIC 端点
       const defaultBaseURL = process.env.ANTHROPIC_BASE_URL;
@@ -75,8 +80,10 @@ function buildProviderRegistry(models) {
         baseURL: defaultBaseURL || '',
         authToken: defaultAuthToken || '',
         apiKey: process.env.ANTHROPIC_API_KEY || '',
+        provider,
+        needsProxy,
       });
-      logger.info(`[MODELS] Provider "${provider}" → default endpoint: ${defaultBaseURL || '( Anthropic default )'}`);
+      logger.info(`[MODELS] Provider "${provider}" → default endpoint: ${defaultBaseURL || '( Anthropic default )'}, needsProxy: ${needsProxy}`);
     }
   }
 
@@ -168,10 +175,10 @@ export const MODELS = {
 };
 
 /**
- * Provider 注册表 —— provider 名称 → {baseURL, authToken, apiKey} 映射
+ * Provider 注册表 —— provider 名称 → {baseURL, authToken, apiKey, provider, needsProxy} 映射
  *
  * 在模块加载时从环境变量构建，运行时只读
- * @type {Map<string, {baseURL: string, authToken: string, apiKey: string}>}
+ * @type {Map<string, {baseURL: string, authToken: string, apiKey: string, provider: string, needsProxy: boolean}>}
  */
 const providerRegistry = buildProviderRegistry(MODELS.available);
 
@@ -184,7 +191,7 @@ const providerRegistry = buildProviderRegistry(MODELS.available);
  * 3. 如果找不到，回退到默认 ANTHROPIC 端点
  *
  * @param {string} modelName - 模型名称（如 "glm-4.7" 或 "anthropic/claude-sonnet-4"）
- * @returns {{baseURL: string, authToken: string, apiKey: string}} provider 端点配置
+ * @returns {{baseURL: string, authToken: string, apiKey: string, provider: string, needsProxy: boolean}} provider 端点配置
  */
 export function getModelProviderConfig(modelName) {
   // 从模型列表中查找该模型的 provider
@@ -202,6 +209,8 @@ export function getModelProviderConfig(modelName) {
     baseURL: process.env.ANTHROPIC_BASE_URL || '',
     authToken: process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY || '',
     apiKey: process.env.ANTHROPIC_API_KEY || '',
+    provider: 'default',
+    needsProxy: false,
   };
   logger.warn({ modelName }, '[MODELS] No provider config found, using default ANTHROPIC endpoint');
   return fallback;

@@ -19,7 +19,7 @@ const logger = createLogger('services/container/claude/DockerExecutor');
  * @param {string} userId - 用户 ID
  * @param {string} command - 用户命令
  * @param {object} options - SDK 选项
- * @param {{baseURL: string, authToken: string, apiKey: string}} providerConfig - Provider 端点配置
+ * @param {{baseURL: string, authToken: string, apiKey: string, provider: string, needsProxy: boolean}} providerConfig - Provider 端点配置
  * @returns {Promise<{container: object, docker: object, sdkScriptInfo: object, providerConfig: object}>}
  */
 async function prepareContainerAndScript(userId, command, options, providerConfig) {
@@ -63,7 +63,7 @@ async function prepareContainerAndScript(userId, command, options, providerConfi
  * @param {object} options - SDK 选项
  * @param {object} writer - WebSocket 写入器
  * @param {string} sessionId - 会话 ID
- * @param {{baseURL: string, authToken: string, apiKey: string}} [providerConfig] - Provider 端点配置
+ * @param {{baseURL: string, authToken: string, apiKey: string, provider: string, needsProxy: boolean}} [providerConfig] - Provider 端点配置
  * @returns {Promise<object>} 执行结果 { output, sessionId }
  */
 export async function executeInContainer(userId, command, options, writer, sessionId, providerConfig) {
@@ -77,6 +77,47 @@ export async function executeInContainer(userId, command, options, writer, sessi
 
     // 步骤 2：在容器中执行脚本（启用 stdin 以支持 Agent 交互提问）
     const spawnTimer = startTimer('claude/docker_exec_spawn');
+
+    // 动态构建容器环境变量：
+    // - 从 provider baseURL 自动提取域名加入 NO_PROXY
+    // - 仅 needsProxy=true 的 provider 才设置 HTTP_PROXY（通过宿主机 Clash 访问外网）
+    const containerEnv = {
+      NODE_PATH: '/app/node_modules',
+      HOME: '/workspace',
+      CLAUDE_CONFIG_DIR: '/workspace/.claude',
+      ANTHROPIC_AUTH_TOKEN: resolvedConfig.authToken,
+      ANTHROPIC_BASE_URL: resolvedConfig.baseURL,
+      ANTHROPIC_API_KEY: resolvedConfig.apiKey,
+      // Claude CLI 拒绝在 root 用户下使用 bypassPermissions，
+      // 设置 IS_SANDBOX=1 告知 CLI 当前运行在沙箱容器中（参考 cli.js:11106430）
+      IS_SANDBOX: '1',
+    };
+
+    // 从 provider baseURL 提取 API 域名，自动加入 NO_PROXY 列表
+    const noProxyBase = 'localhost,127.0.0.1,.local,host.docker.internal';
+    try {
+      const apiHost = new URL(resolvedConfig.baseURL).hostname;
+      containerEnv.NO_PROXY = `${noProxyBase},${apiHost}`;
+    } catch {
+      // baseURL 格式异常时仅使用基础列表
+      containerEnv.NO_PROXY = noProxyBase;
+    }
+
+    // 仅标记 needsProxy 的 provider 设置代理（如 Claude Adapter 走宿主机 Clash）
+    // macOS 上 host.docker.internal 指向宿主机
+    // 需要在 Clash Verge 中开启"允许局域网连接"(Allow LAN)
+    if (resolvedConfig.needsProxy) {
+      containerEnv.HTTP_PROXY = 'http://host.docker.internal:7897';
+      containerEnv.HTTPS_PROXY = 'http://host.docker.internal:7897';
+    }
+
+    logger.info({
+      sessionId,
+      provider: resolvedConfig.provider,
+      needsProxy: resolvedConfig.needsProxy,
+      noProxy: containerEnv.NO_PROXY,
+    }, '[DockerExecutor] Container env proxy config');
+
     const { stream } = await containerManager.execInContainer(
       userId,
       ['node', sdkScriptInfo.tmpScriptFile],
@@ -84,27 +125,7 @@ export async function executeInContainer(userId, command, options, writer, sessi
         cwd: '/app',
         tty: false,
         stdin: true,
-        env: {
-          NODE_PATH: '/app/node_modules',
-          HOME: '/workspace',
-          CLAUDE_CONFIG_DIR: '/workspace/.claude',
-          ANTHROPIC_AUTH_TOKEN: resolvedConfig.authToken,
-          ANTHROPIC_BASE_URL: resolvedConfig.baseURL,
-          ANTHROPIC_API_KEY: resolvedConfig.apiKey,
-          // Claude CLI 拒绝在 root 用户下使用 bypassPermissions，
-          // 设置 IS_SANDBOX=1 告知 CLI 当前运行在沙箱容器中（参考 cli.js:11106430）
-          IS_SANDBOX: '1'
-,
-          // 代理配置：让容器内 SDK 通过宿主机 Clash 访问外网
-          // macOS 上 host.docker.internal 指向宿主机
-          // 需要在 Clash Verge 中开启"允许局域网连接"(Allow LAN)
-          HTTP_PROXY: 'http://host.docker.internal:7897',
-          HTTPS_PROXY: 'http://host.docker.internal:7897',
-          // 国内直连 API 域名不需要走 Clash 代理
-          NO_PROXY: 'localhost,127.0.0.1,.local,host.docker.internal,api.laozhang.ai,guanghua-api.bj33smarter.com'
-
-
-        }
+        env: containerEnv
       }
     );
     spawnTimer.end(logger, 'Docker exec stream obtained', { sessionId });
