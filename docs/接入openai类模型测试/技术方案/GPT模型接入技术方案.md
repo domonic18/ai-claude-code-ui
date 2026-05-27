@@ -86,7 +86,7 @@ Claude Agent SDK (Anthropic 格式)
 
 ## 三、方案验证详情
 
-### 3.1 方案 A：OpenRouter + VPN（评分 3.85/5）
+### 3.1 方案 A：OpenRouter + VPN（评分 4.0/5）
 
 #### 架构
 
@@ -178,7 +178,7 @@ Claude Bridge 在翻译多轮消息时，Anthropic 的 `tool_use.id`（`toolu_*`
 
 ---
 
-### 3.3 方案 C：Claude Adapter + 老张 API（评分 4.0/5）
+### 3.3 方案 C：Claude Adapter + 老张 API（评分 4.5/5）
 
 #### 项目信息
 
@@ -249,9 +249,8 @@ SDK (本机) → Claude Adapter (localhost:3080, 协议翻译) → 老张 API �
 #### 背景
 
 方案 C 在实际使用中暴露以下问题：
-1. 老张 API 为个人维护服务，稳定性和 SLA 无法保障
-2. 部分模型（如 gpt-5.5）在老张 API 上不可用
-3. Docker 容器内调用时出现 `max_output_tokens: 0` 错误
+1. 部分模型（如 gpt-5.5）在老张 API 上不可用
+2. Docker 容器内调用时出现 `max_output_tokens: 0` 错误
 
 经调研发现公司有新加坡节点的 One-API 服务（`api.hk33smarter.com`），提供 228 个模型（含 69 个 GPT/OpenAI 系列），且**国内直连无需 VPN**。
 

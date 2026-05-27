@@ -217,6 +217,7 @@ function HtmlPreview({ file, onClose }: HtmlPreviewProps) {
             <iframe
               src={blobUrl}
               sandbox="allow-scripts allow-popups allow-downloads"
+              allowFullScreen
               className="w-full h-full border-0"
               title={file.name}
             />
@@ -242,6 +243,7 @@ function HtmlPreview({ file, onClose }: HtmlPreviewProps) {
             <iframe
               src={blobUrl}
               sandbox="allow-scripts allow-popups allow-downloads"
+              allowFullScreen
               className="w-full h-full border-0"
               title={file.name}
             />
