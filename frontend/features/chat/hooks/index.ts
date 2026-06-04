@@ -29,3 +29,5 @@ export {
 export * from './useChatInputState';
 export * from './useChatInputMenus';
 export * from './useChatInputSetup';
+export * from './useSkillSelection';
+export * from './skillCategories';

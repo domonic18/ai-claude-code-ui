@@ -94,6 +94,10 @@ export function ChatInterfaceRenderer({
         permissionMode={hook.permissionMode}
         onPermissionModeChange={hook.setPermissionMode}
         chatInputProps={chatInputProps}
+        selectedSkill={hook.selectedSkill}
+        onSkillSelect={hook.setSelectedSkill}
+        groupedSkills={hook.groupedSkills}
+        skillsLoading={hook.skillsLoading}
       />
     </div>
   );

@@ -87,6 +87,7 @@ async function handleClaudeCommand(data, ws, writer) {
     isContainerProject: true,
     projectPath: originalProjectName,
     images: imageAttachments.length > 0 ? imageAttachments : undefined,
+    skill: data.options?.skill || undefined,
   };
 
   await queryClaudeSDKInContainer(command, containerOptions, writer);

@@ -147,6 +147,12 @@ export async function buildSDKScript(command, options, userId) {
   const sessionId = options.sessionId || '';
   const imagePaths = options.imagePaths || [];
 
+  // 如果用户手动选择了 skill，在 command 前追加 skill 调用指令
+  if (options.skill) {
+    command = `请使用 "${options.skill}" skill 完成此任务。\n\n${command}`;
+    logger.info({ skill: options.skill }, '[ScriptBuilder] Skill explicitly selected by user');
+  }
+
   const sdkOptions = await filterSDKOptions(options, userId);
 
   logger.debug({ model: sdkOptions.model }, 'sdkOptions.model');

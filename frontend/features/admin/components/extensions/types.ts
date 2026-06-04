@@ -24,10 +24,14 @@ export interface Command {
 
 /** Skill 扩展数据：对应 ~/.claude/skills/ 下的技能配置 */
 export interface Skill {
-  /** 技能名称 */
+  /** 技能标识符（英文，如 patent-claim1-drafting） */
   name: string;
+  /** 短中文名称（来自 SKILL.md frontmatter title 字段） */
+  title: string;
   /** 技能功能描述 */
   description: string;
+  /** 自动分类（如 Patent Document、Utility 等） */
+  category: string;
 }
 
 /** Hook 扩展数据：对应 ~/.claude/hooks/ 下的生命周期钩子 */

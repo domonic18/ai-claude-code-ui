@@ -9,7 +9,7 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import { fileExists, extractMarkdownTitle } from './extension-utils.js';
+import { fileExists, extractMarkdownTitle, parseFrontmatter } from './extension-utils.js';
 import { extractDescriptionByExtension } from './descriptionExtractors.js';
 
 /**
@@ -29,6 +29,30 @@ export async function parseSkillDescription(filePath) {
     return extractMarkdownTitle(content);
   } catch {
     return '[无法读取]';
+  }
+}
+
+/**
+ * Parses skill metadata (title and description) from SKILL.md YAML frontmatter
+ * @param {string} filePath - Path to skill directory
+ * @returns {Promise<{title: string, description: string}>} Extracted metadata
+ */
+export async function parseSkillMetadata(filePath) {
+  const skillMdPath = path.join(filePath, 'SKILL.md');
+
+  if (!(await fileExists(skillMdPath))) {
+    return { title: '', description: '' };
+  }
+
+  try {
+    const content = await fs.readFile(skillMdPath, 'utf-8');
+    const frontmatter = parseFrontmatter(content);
+    return {
+      title: frontmatter.title || '',
+      description: frontmatter.description || extractMarkdownTitle(content),
+    };
+  } catch {
+    return { title: '', description: '[无法读取]' };
   }
 }
 
