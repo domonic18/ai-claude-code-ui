@@ -24,9 +24,14 @@ interface SkillSelectorButtonProps {
   isOpen: boolean;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
+  onClear?: (e: React.MouseEvent) => void;
 }
 
-function SkillSelectorButton({ selectedTitle, isOpen, onMouseEnter, onMouseLeave }: SkillSelectorButtonProps) {
+function SkillSelectorButton({ selectedTitle, isOpen, onMouseEnter, onMouseLeave, onClear }: SkillSelectorButtonProps) {
+  const handleClear = onClear
+    ? (e: React.MouseEvent) => { e.stopPropagation(); onClear(e); }
+    : undefined;
+
   return (
     <button
       type="button"
@@ -45,9 +50,24 @@ function SkillSelectorButton({ selectedTitle, isOpen, onMouseEnter, onMouseLeave
       <span className="max-w-[120px] truncate">
         {selectedTitle || 'Skill'}
       </span>
-      <svg className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-      </svg>
+      {/* 选中状态显示清除按钮，未选中显示下拉箭头 */}
+      {selectedTitle ? (
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={handleClear}
+          onKeyDown={handleClear}
+          className="ml-0.5 p-0.5 rounded hover:bg-purple-200 dark:hover:bg-purple-700/50 transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </span>
+      ) : (
+        <svg className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      )}
     </button>
   );
 }
@@ -316,6 +336,7 @@ export function SkillSelector({
         isOpen={isOpen}
         onMouseEnter={handleButtonEnter}
         onMouseLeave={handleButtonLeave}
+        onClear={() => onSkillSelect(null)}
       />
 
       {isOpen && !isLoading && (
