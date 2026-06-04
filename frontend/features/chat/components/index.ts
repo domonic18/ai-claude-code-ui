@@ -17,6 +17,7 @@ export { FileAttachmentsPreview } from './FileAttachmentsPreview';
 export { ChatToolbar } from './ChatToolbar';
 export { PermissionModeSelector } from './PermissionModeSelector';
 export type { PermissionMode } from './PermissionModeSelector';
+export { SkillSelector, type SkillOption } from './SkillSelector';
 
 // Refactored modular components
 export { CollapsiblePanel } from './CollapsiblePanel';

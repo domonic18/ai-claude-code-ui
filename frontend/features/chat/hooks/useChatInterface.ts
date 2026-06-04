@@ -17,6 +17,7 @@ import {
   useMessageStream,
   useModelSelection,
   useMessageSender,
+  useSkillSelection,
 } from './index';
 import { useModelsLoader } from './useModelsLoader';
 import { useModelSwitchNotification } from './useModelSwitchNotification';
@@ -137,6 +138,11 @@ export interface UseChatInterfaceResult {
   authenticatedFetch: (url: string, options?: RequestInit) => Promise<Response>;
   consumePendingQuestion: (answer: string) => boolean;
   setPendingQuestion: (toolUseID: string, sessionId: string) => void;
+  // Skill selection
+  selectedSkill: { name: string; title: string } | null;
+  setSelectedSkill: (skill: { name: string; title: string } | null) => void;
+  groupedSkills: Record<string, Array<{ name: string; title: string; description: string }>>;
+  skillsLoading: boolean;
 }
 
 // 由组件调用，自定义 Hook：useChatInterface
@@ -255,6 +261,9 @@ export function useChatInterface({
     pendingQuestionRef.current = { toolUseID, sessionId };
   }, []);
 
+  // ========== Skill 选择 ==========
+  const skillSelection = useSkillSelection(authenticatedFetch);
+
   useChatWebSocketProcessor({
     wsMessages, currentSessionId, selectedProjectName: selectedProject?.name,
     addMessage, updateMessage, setMessages, setIsLoading, setCurrentSessionId,
@@ -270,6 +279,8 @@ export function useChatInterface({
     onAddMessage: addMessage, onStartStream: stream.startStream, onSetLoading: setIsLoading,
     onSetInput: setInput, onSetAttachedFiles: setAttachedFiles, onSessionActive, onSessionProcessing, permissionMode,
     consumePendingQuestion,
+    selectedSkill: skillSelection.selectedSkill,
+    onClearSkillSelection: skillSelection.clearSelectedSkill,
   });
 
   // 附件处理：添加或更新附件（如果已存在则更新，否则添加）
@@ -289,5 +300,9 @@ export function useChatInterface({
     createDiff: useCallback((o: string, n: string) => calculateDiff(o, n), []), authenticatedFetch,
     consumePendingQuestion,
     setPendingQuestion,
+    selectedSkill: skillSelection.selectedSkill,
+    setSelectedSkill: skillSelection.setSelectedSkill,
+    groupedSkills: skillSelection.groupedSkills,
+    skillsLoading: skillSelection.isLoading,
   };
 }

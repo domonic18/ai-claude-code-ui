@@ -6,8 +6,9 @@
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { ModelSelector, PermissionModeSelector } from './index';
+import { ModelSelector, PermissionModeSelector, SkillSelector } from './index';
 import type { PermissionMode } from './PermissionModeSelector';
+import type { SkillOption } from './SkillSelector';
 import TokenUsagePie from '@/shared/components/ui/TokenUsagePie';
 
 export interface ChatToolbarProps {
@@ -35,6 +36,14 @@ export interface ChatToolbarProps {
   permissionMode?: PermissionMode;
   /** Handle permission mode change */
   onPermissionModeChange?: (mode: PermissionMode) => void;
+  /** Selected skill */
+  selectedSkill?: SkillOption | null;
+  /** Skill selection callback */
+  onSkillSelect?: (skill: SkillOption | null) => void;
+  /** Grouped skills by category */
+  groupedSkills?: Record<string, Array<{ name: string; title: string; description: string }>>;
+  /** Skills loading state */
+  skillsLoading?: boolean;
 }
 
 /**
@@ -55,11 +64,14 @@ export function ChatToolbar({
   onResetStream,
   permissionMode = 'default',
   onPermissionModeChange,
+  selectedSkill,
+  onSkillSelect,
+  groupedSkills,
+  skillsLoading,
 }: ChatToolbarProps) {
   const { t } = useTranslation();
 
   const handleAbort = () => {
-    // Send abort-session message via WebSocket
     sendMessage?.({
       type: 'abort-session',
       sessionId: currentSessionId,
@@ -71,6 +83,16 @@ export function ChatToolbar({
 
   return (
     <div className="flex items-center justify-center gap-3 max-w-4xl mx-auto px-4 py-3">
+      {/* Skill Selector */}
+      {onSkillSelect && groupedSkills && (
+        <SkillSelector
+          selectedSkill={selectedSkill || null}
+          onSkillSelect={onSkillSelect}
+          groupedSkills={groupedSkills}
+          isLoading={skillsLoading}
+        />
+      )}
+
       {/* Permission Mode Selector */}
       {onPermissionModeChange && (
         <PermissionModeSelector

@@ -50,6 +50,10 @@ export interface UseMessageSenderOptions {
   permissionMode: PermissionMode;
   /** Check and consume pending agent question; returns true if message was handled as answer */
   consumePendingQuestion?: (answer: string) => boolean;
+  /** Selected skill to invoke */
+  selectedSkill?: { name: string; title: string } | null;
+  /** Clear skill selection after send */
+  onClearSkillSelection?: () => void;
 }
 
 export interface UseMessageSenderResult {
@@ -96,6 +100,7 @@ function buildUserMessage(content: string, files: FileAttachment[]): ChatMessage
  * @param selectedModel - Selected model
  * @param permissionMode - Permission mode
  * @param onSessionProcessing - Session processing callback
+ * @param skillName - Selected skill name (optional)
  */
 function sendWebSocketMessage(
   sendMessage: (message: any) => void,
@@ -105,7 +110,8 @@ function sendWebSocketMessage(
   selectedProject?: { name: string },
   selectedModel?: string,
   permissionMode?: PermissionMode,
-  onSessionProcessing?: (sessionId: string) => void
+  onSessionProcessing?: (sessionId: string) => void,
+  skillName?: string,
 ) {
   // Create temporary session ID if needed
   const sessionId = currentSessionId || `temp-${Date.now()}`;
@@ -121,6 +127,7 @@ function sendWebSocketMessage(
       model: selectedModel,
       resume: !!currentSessionId,
       permissionMode,
+      skill: skillName || undefined,
     },
   });
 
@@ -198,6 +205,8 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
     onSessionProcessing,
     permissionMode,
     consumePendingQuestion,
+    selectedSkill,
+    onClearSkillSelection,
   } = options;
 
   // 消息发送处理器：处理用户点击发送按钮或按 Ctrl+Enter 的逻辑
@@ -241,9 +250,13 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
         selectedProject,
         selectedModel,
         permissionMode,
-        onSessionProcessing
+        onSessionProcessing,
+        selectedSkill?.name,
       );
     }
+
+    // 发送后清除 skill 选择（一次性）
+    onClearSkillSelection?.();
   }, [
     input,
     isLoading,
@@ -262,6 +275,8 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
     onSessionProcessing,
     permissionMode,
     consumePendingQuestion,
+    selectedSkill,
+    onClearSkillSelection,
   ]);
 
   return { handleSend };

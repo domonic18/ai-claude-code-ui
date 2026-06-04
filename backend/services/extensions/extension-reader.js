@@ -17,12 +17,45 @@ import {
 } from './extension-utils.js';
 import {
   parseSkillDescription,
+  parseSkillMetadata,
   parseHookDescription,
   parseKnowledgeFile,
   createKnowledgeDirMetadata
 } from './extension-parsers.js';
 
 const logger = createLogger('services/extensions/extension-reader');
+
+/**
+ * Skill name prefix → category mapping
+ * Used to auto-categorize skills for the UI selector
+ */
+const SKILL_CATEGORIES = {
+  'patent-': 'Patent Document',
+  'oa-': 'Patent Document',
+  'reexamination-': 'Patent Document',
+  'disclosure-': 'Patent Document',
+  'tech-disclosure': 'Patent Document',
+  'business-': 'Business & Strategy',
+  'innovation-': 'Business & Strategy',
+  'ip-': 'Business & Strategy',
+  'product-': 'Business & Strategy',
+  'operation-': 'Business & Strategy',
+  'technical-': 'Technical Documents',
+  'paper-': 'Academic Papers',
+  'utils-': 'Utility',
+};
+
+/**
+ * Derives skill category from its name via prefix matching
+ * @param {string} name - Skill name
+ * @returns {string} Category name
+ */
+function getSkillCategory(name) {
+  for (const [prefix, category] of Object.entries(SKILL_CATEGORIES)) {
+    if (name.startsWith(prefix)) return category;
+  }
+  return 'Utility';
+}
 
 /**
  * Generic directory reader - eliminates repetitive structure in readAgents/readCommands/readSkills/readHooks/readKnowledge
@@ -98,14 +131,19 @@ async function readCommands() {
 
 /**
  * Reads skills from extensions directory
- * @returns {Promise<Array>} Array of skill metadata
+ * @returns {Promise<Array>} Array of skill metadata with title, description, and category
  */
 async function readSkills() {
   return readExtensionDir('skills', {
     filter: (entry) => entry.isDirectory() && !entry.name.startsWith('.'),
     parseEntry: async (entry, filePath) => {
-      const description = await parseSkillDescription(filePath);
-      return { name: entry.name, description };
+      const { title, description } = await parseSkillMetadata(filePath);
+      return {
+        name: entry.name,
+        title,
+        description,
+        category: getSkillCategory(entry.name),
+      };
     }
   });
 }
