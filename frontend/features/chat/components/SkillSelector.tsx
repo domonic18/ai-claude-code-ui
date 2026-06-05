@@ -249,21 +249,21 @@ function SkillCategoryMenu({ groupedSkills, categoryMeta, categoryOrder, selecte
               <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
+
+              {/* 二级 skill 弹出面板 — 跟当前分类项对齐 */}
+              {hoveredCategory === category && (
+                <SkillFlyoutPanel
+                  skills={skills}
+                  selectedSkillName={selectedSkillName}
+                  onSelect={handleSelect}
+                  onMouseEnter={handleFlyoutEnter}
+                  onMouseLeave={handleFlyoutLeave}
+                />
+              )}
             </div>
           );
         })}
       </div>
-
-      {/* 二级 skill 弹出面板 */}
-      {hoveredCategory && groupedSkills[hoveredCategory] && (
-        <SkillFlyoutPanel
-          skills={groupedSkills[hoveredCategory]}
-          selectedSkillName={selectedSkillName}
-          onSelect={handleSelect}
-          onMouseEnter={handleFlyoutEnter}
-          onMouseLeave={handleFlyoutLeave}
-        />
-      )}
     </div>
   );
 }
