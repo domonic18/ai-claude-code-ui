@@ -224,7 +224,7 @@ function SkillCategoryMenu({ groupedSkills, categoryMeta, categoryOrder, selecte
       onMouseLeave={onMouseLeave}
     >
       {/* 一级分类列表 */}
-      <div className="w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl overflow-hidden z-50">
+      <div className="w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl overflow-visible z-50">
         {categoryOrder.map(category => {
           const meta = categoryMeta[category];
           const skills = groupedSkills[category];
