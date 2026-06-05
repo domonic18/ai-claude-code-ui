@@ -1,0 +1,458 @@
+/**
+ * DocumentService.js
+ *
+ * 文档管理服务
+ * 基于文件方式管理项目文档（零数据库变更）
+ * - 用户上传文档：扫描 <project>/documents/uploads/ 目录
+ * - AI 生成文档：读写 <project>/documents/.ai-documents.json 清单文件
+ *
+ * @module services/documents/DocumentService
+ */
+
+import containerManager from '../container/core/index.js';
+import { createLogger } from '../../utils/logger.js';
+import { PassThrough } from 'stream';
+import path from 'path';
+
+const logger = createLogger('services/documents/DocumentService');
+
+/** 文档目录在容器内的相对路径 */
+const DOCUMENTS_DIR = 'documents';
+const UPLOADS_SUBDIR = 'uploads';
+const AI_MANIFEST_FILE = '.ai-documents.json';
+
+/**
+ * 文档管理服务
+ * 在用户 Docker 容器内管理项目文档的元数据和文件操作
+ */
+export class DocumentService {
+  /**
+   * 获取项目下所有文档（用户上传 + AI 生成）
+   * @param {number} userId - 用户 ID
+   * @param {string} projectName - 项目名称（目录名）
+   * @returns {Promise<{uploads: Array, aiGenerated: Array}>}
+   */
+  async getProjectDocuments(userId, projectName) {
+    const [uploads, aiGenerated] = await Promise.all([
+      this._scanUploads(userId, projectName),
+      this._readAIManifest(userId, projectName)
+    ]);
+
+    return { uploads, aiGenerated };
+  }
+
+  /**
+   * 上传文档到项目的 documents/uploads/ 目录
+   * @param {number} userId - 用户 ID
+   * @param {string} projectName - 项目名称
+   * @param {Object} file - multer 文件对象 { buffer, originalname, size, mimetype }
+   * @returns {Promise<Object>} 上传结果
+   */
+  async uploadDocument(userId, projectName, file) {
+    const uploadDir = `${DOCUMENTS_DIR}/${UPLOADS_SUBDIR}`;
+    const containerBasePath = `/workspace/${projectName}`;
+    const containerDir = `${containerBasePath}/${uploadDir}`;
+
+    logger.info({ userId, projectName, originalName: file.originalname, fileSize: file.size }, '[文档上传] Service 开始处理');
+
+    // 确保容器存在
+    await containerManager.getOrCreateContainer(userId);
+    logger.info({ userId }, '[文档上传] 容器已就绪');
+
+    // 确保目录存在
+    await this._execCommand(userId, ['mkdir', '-p', containerDir]);
+    logger.info({ userId, containerDir }, '[文档上传] 目录已创建');
+
+    // 修复 multer 传递的文件名编码（UTF-8 字节被错误按 Latin-1 解码）
+    const fixedName = this._fixFilename(file.originalname);
+    // 生成安全的文件名
+    const safeName = this._sanitizeFilename(fixedName);
+    const containerFilePath = `${containerDir}/${safeName}`;
+    logger.info({ userId, safeName, containerFilePath }, '[文档上传] 安全文件名已生成');
+
+    // 将文件写入容器
+    try {
+      await this._writeFileToContainer(userId, containerFilePath, file.buffer);
+      logger.info({ userId, containerFilePath }, '[文档上传] 文件已写入容器');
+    } catch (writeErr) {
+      logger.error({ err: writeErr, userId, containerFilePath }, '[文档上传] 写入容器失败');
+      throw writeErr;
+    }
+
+    logger.info({ userId, projectName, file: safeName }, '文档上传成功');
+
+    return {
+      file_name: safeName,
+      file_path: containerFilePath,
+      file_size: file.size,
+      mime_type: file.mimetype,
+      type: 'upload',
+      created_at: new Date().toISOString()
+    };
+  }
+
+  /**
+   * 删除文档
+   * @param {number} userId - 用户 ID
+   * @param {string} projectName - 项目名称
+   * @param {string} filePath - 文件路径
+   * @param {string} docType - 文档类型 'upload' | 'ai_generated'
+   * @returns {Promise<boolean>}
+   */
+  async deleteDocument(userId, projectName, filePath, docType) {
+    await containerManager.getOrCreateContainer(userId);
+
+    // 安全校验：确保路径在项目目录内
+    const safeBase = `/workspace/${projectName}`;
+    if (!filePath.startsWith(safeBase)) {
+      throw new Error('Invalid file path: path traversal detected');
+    }
+
+    // 删除文件
+    await this._execCommand(userId, ['rm', '-f', filePath]);
+
+    // 如果是 AI 生成文档，从 manifest 中移除
+    if (docType === 'ai_generated') {
+      await this._removeFromAIManifest(userId, projectName, filePath);
+    }
+
+    logger.info({ userId, projectName, filePath, docType }, '文档删除成功');
+    return true;
+  }
+
+  /**
+   * 获取文档内容（用于预览）
+   * @param {number} userId - 用户 ID
+   * @param {string} filePath - 文件在容器内的完整路径
+   * @returns {Promise<{content: string, mime_type: string}>}
+   */
+  async getDocumentContent(userId, filePath) {
+    // 安全校验
+    if (!filePath.startsWith('/workspace/')) {
+      throw new Error('Invalid file path');
+    }
+
+    await containerManager.getOrCreateContainer(userId);
+
+    // 读取文件内容（限制大小 5MB）
+    const content = await this._readFileFromContainer(userId, filePath);
+
+    return {
+      content,
+      mime_type: this._guessMimeType(filePath)
+    };
+  }
+
+  /**
+   * 记录 AI 生成的文档
+   * @param {number} userId - 用户 ID
+   * @param {string} projectName - 项目名称
+   * @param {Object} docInfo - 文档信息 { file_path, conversation_id, message_id }
+   * @returns {Promise<void>}
+   */
+  async recordAIDocument(userId, projectName, docInfo) {
+    const manifest = await this._readAIManifest(userId, projectName);
+
+    // 避免重复记录
+    const exists = manifest.some(d => d.file_path === docInfo.file_path);
+    if (exists) {
+      return;
+    }
+
+    const entry = {
+      file_path: docInfo.file_path,
+      file_name: this._extractFilename(docInfo.file_path),
+      conversation_id: docInfo.conversation_id || null,
+      message_id: docInfo.message_id || null,
+      created_at: new Date().toISOString()
+    };
+
+    manifest.push(entry);
+    await this._writeAIManifest(userId, projectName, manifest);
+
+    logger.info({ userId, projectName, file: entry.file_name }, 'AI 文档已记录');
+  }
+
+  // ──────────────────── 私有方法 ────────────────────
+
+  /**
+   * 扫描 uploads 目录获取用户上传的文档列表
+   * @private
+   */
+  async _scanUploads(userId, projectName) {
+    const uploadDir = `/workspace/${projectName}/${DOCUMENTS_DIR}/${UPLOADS_SUBDIR}`;
+
+    try {
+      await containerManager.getOrCreateContainer(userId);
+
+      // 使用 find 列出文件路径，再用 wc/stat 获取元数据（兼容 BusyBox/Alpine）
+      const fileListOutput = await this._execCommandOutput(userId, [
+        'sh', '-c',
+        `find "${uploadDir}" -type f 2>/dev/null | head -100`
+      ]);
+
+      if (!fileListOutput || !fileListOutput.trim()) {
+        return [];
+      }
+
+      const filePaths = fileListOutput.trim().split('\n').filter(line => line.trim());
+      const results = [];
+
+      for (const filePath of filePaths) {
+        try {
+          const sizeOutput = await this._execCommandOutput(userId, [
+            'sh', '-c',
+            `wc -c < "${filePath}" 2>/dev/null | tr -d ' '`
+          ]);
+          const mtimeOutput = await this._execCommandOutput(userId, [
+            'sh', '-c',
+            `stat -c '%Y' "${filePath}" 2>/dev/null || echo '0'`
+          ]);
+          const fileName = filePath.split('/').pop();
+          results.push({
+            file_name: fileName,
+            file_path: filePath,
+            file_size: parseInt(sizeOutput.trim(), 10) || 0,
+            type: 'upload',
+            created_at: new Date(parseInt(mtimeOutput.trim(), 10) * 1000).toISOString()
+          });
+        } catch {
+          // 跳过无法读取的文件
+        }
+      }
+
+      return results;
+    } catch (error) {
+      // 目录可能不存在，返回空数组
+      logger.debug({ userId, projectName, err: error }, 'uploads 目录扫描跳过');
+      return [];
+    }
+  }
+
+  /**
+   * 读取 AI 文档清单
+   * @private
+   * @returns {Promise<Array>}
+   */
+  async _readAIManifest(userId, projectName) {
+    const manifestPath = `/workspace/${projectName}/${DOCUMENTS_DIR}/${AI_MANIFEST_FILE}`;
+
+    try {
+      await containerManager.getOrCreateContainer(userId);
+      const content = await this._readFileFromContainer(userId, manifestPath);
+      return JSON.parse(content);
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * 写入 AI 文档清单
+   * @private
+   */
+  async _writeAIManifest(userId, projectName, manifest) {
+    const dirPath = `/workspace/${projectName}/${DOCUMENTS_DIR}`;
+    const manifestPath = `${dirPath}/${AI_MANIFEST_FILE}`;
+
+    await containerManager.getOrCreateContainer(userId);
+    await this._execCommand(userId, ['mkdir', '-p', dirPath]);
+    await this._writeFileToContainer(userId, manifestPath, Buffer.from(JSON.stringify(manifest, null, 2)));
+  }
+
+  /**
+   * 从 AI 文档清单中移除一条记录
+   * @private
+   */
+  async _removeFromAIManifest(userId, projectName, filePath) {
+    const manifest = await this._readAIManifest(userId, projectName);
+    const filtered = manifest.filter(d => d.file_path !== filePath);
+    await this._writeAIManifest(userId, projectName, filtered);
+  }
+
+  /**
+   * 在容器内执行命令并等待完成
+   * @private
+   */
+  async _execCommand(userId, cmd) {
+    const { stream } = await containerManager.execInContainer(userId, cmd);
+    // Docker exec 在 Tty:false 模式下返回多路复用流，必须 demux 才能正确触发 end 事件
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    containerManager.docker.modem.demuxStream(stream, stdout, stderr);
+    return new Promise((resolve, reject) => {
+      stream.on('error', (err) => reject(err));
+      stream.on('end', resolve);
+    });
+  }
+
+  /**
+   * 在容器内执行命令并获取输出
+   * @private
+   * @returns {Promise<string>}
+   */
+  async _execCommandOutput(userId, cmd) {
+    const { stream } = await containerManager.execInContainer(userId, cmd);
+    return this._readStreamOutput(stream);
+  }
+
+  /**
+   * 从容器内读取文件内容
+   * @private
+   */
+  async _readFileFromContainer(userId, filePath) {
+    const { stream } = await containerManager.execInContainer(userId, ['cat', filePath]);
+    return this._readStreamOutput(stream);
+  }
+
+  /**
+   * 向容器内写入文件
+   * @private
+   */
+  async _writeFileToContainer(userId, containerFilePath, buffer) {
+    const { execSync } = await import('child_process');
+    const container = await containerManager.getOrCreateContainer(userId);
+    const dockerContainer = containerManager.docker.getContainer(container.id);
+
+    logger.info({ userId, containerFilePath, bufferSize: buffer.length, containerId: container.id }, '[文档上传] _writeFileToContainer 开始');
+
+    // containerFilePath 格式: /workspace/<project>/documents/uploads/<filename>
+    // 使用正则 ^\/workspace\/ 精确去除前缀，避免误替换项目名中的 "workspace"
+    const relativePath = containerFilePath.replace(/^\/workspace\//, '');
+
+    // 本地临时目录结构: tmpDir/workspace/<relativePath>
+    const tmpDir = `/tmp/doc_upload_${Date.now()}`;
+    const fs = await import('fs/promises');
+
+    const localFilePath = path.join(tmpDir, 'workspace', relativePath);
+    await fs.mkdir(path.dirname(localFilePath), { recursive: true });
+    await fs.writeFile(localFilePath, buffer);
+    logger.info({ userId, localFilePath, relativePath }, '[文档上传] 本地临时文件已写入');
+
+    // 创建 tar：从 tmpDir/workspace 目录打包，路径为 relativePath
+    const tarPath = path.join(tmpDir, 'archive.tar');
+    const tarCommand = `tar --format=posix -cf "${tarPath}" -C "${tmpDir}/workspace" "${relativePath}"`;
+    logger.info({ userId, tarCommand }, '[文档上传] 执行 tar 命令');
+
+    try {
+      execSync(tarCommand, { cwd: tmpDir });
+    } catch (tarErr) {
+      logger.error({ err: tarErr, tarCommand }, '[文档上传] tar 命令失败');
+      throw new Error(`Failed to create tar archive: ${tarErr.message}`);
+    }
+
+    const tarBuffer = await fs.readFile(tarPath);
+    logger.info({ userId, tarSize: tarBuffer.length }, '[文档上传] tar 归档已创建');
+
+    await new Promise((resolve, reject) => {
+      dockerContainer.putArchive(tarBuffer, { path: '/workspace' }, (err) => {
+        if (err) {
+          logger.error({ err, userId }, '[文档上传] putArchive 失败');
+          reject(new Error(`putArchive failed: ${err.message}`));
+        } else {
+          logger.info({ userId }, '[文档上传] putArchive 成功');
+          resolve();
+        }
+      });
+    });
+
+    await fs.rm(tmpDir, { recursive: true, force: true });
+    logger.info({ userId, tmpDir }, '[文档上传] 临时文件已清理');
+  }
+
+  /**
+   * 读取 Docker exec stream 的输出
+   * @private
+   */
+  _readStreamOutput(stream) {
+    return new Promise((resolve, reject) => {
+      const stdout = new PassThrough();
+      const stderr = new PassThrough();
+      containerManager.docker.modem.demuxStream(stream, stdout, stderr);
+
+      let output = '';
+      stdout.on('data', (chunk) => { output += chunk.toString(); });
+      stream.on('error', (err) => reject(err));
+      stream.on('end', () => resolve(output));
+    });
+  }
+
+  /**
+   * 修复 multer 传递的文件名编码
+   * multer/busboy 将 UTF-8 文件名错误按 Latin-1 解码，导致中文乱码
+   * @private
+   */
+  _fixFilename(str) {
+    try {
+      // 检测是否包含 Latin-1 高位字节（0x80-0xFF），这是 mojibake 的标志
+      if (/[\x80-\xff]/.test(str)) {
+        return Buffer.from(str, 'latin1').toString('utf8');
+      }
+      return str;
+    } catch {
+      return str;
+    }
+  }
+
+  /**
+   * 清理文件名，防止路径注入
+   * 保留中文及常见 CJK 字符，截断超长文件名
+   * @private
+   */
+  _sanitizeFilename(originalName) {
+    // 允许：字母、数字、点、下划线、连字符、CJK 统一汉字、CJK 符号、全角字符
+    const name = originalName.replace(/[^\w.\-一-鿿㐀-䶿　-〿＀-￯]/g, '_');
+
+    const uniqueId = Date.now().toString(36);
+    const dotIndex = name.lastIndexOf('.');
+    const MAX_BASENAME = 60; // 基础文件名最大长度，避免 tar 路径超限
+
+    if (dotIndex > 0) {
+      const ext = name.slice(dotIndex); // 含点，如 .docx
+      let baseName = name.slice(0, dotIndex);
+      if (baseName.length > MAX_BASENAME) {
+        baseName = baseName.slice(0, MAX_BASENAME);
+      }
+      return `${baseName}_${uniqueId}${ext}`;
+    }
+    let baseName = name;
+    if (baseName.length > MAX_BASENAME) {
+      baseName = baseName.slice(0, MAX_BASENAME);
+    }
+    return `${baseName}_${uniqueId}`;
+  }
+
+  /**
+   * 从完整路径提取文件名
+   * @private
+   */
+  _extractFilename(filePath) {
+    return filePath.split('/').pop();
+  }
+
+  /**
+   * 根据扩展名猜测 MIME 类型
+   * @private
+   */
+  _guessMimeType(filePath) {
+    const ext = filePath.split('.').pop().toLowerCase();
+    const mimeMap = {
+      md: 'text/markdown',
+      txt: 'text/plain',
+      pdf: 'application/pdf',
+      doc: 'application/msword',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      json: 'application/json',
+      csv: 'text/csv',
+      html: 'text/html',
+      xml: 'text/xml',
+      png: 'image/png',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg'
+    };
+    return mimeMap[ext] || 'application/octet-stream';
+  }
+}
+
+/** 单例导出 */
+export const documentService = new DocumentService();
+export default documentService;
