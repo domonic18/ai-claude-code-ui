@@ -50,4 +50,7 @@ export interface MessageHandlerCallbacks {
   // Agent interaction
   onSendUserAnswer?: (sessionId: string, toolUseID: string, answer: string) => void;
   setPendingQuestion?: (toolUseID: string, sessionId: string) => void;
+
+  // Document panel
+  onDocumentCreated?: (doc: { file_path: string; file_name: string; conversation_id: string; message_id: string; type: string }) => void;
 }

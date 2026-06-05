@@ -141,12 +141,15 @@ export async function getProjectsInContainer(userId) {
     }
 
     const workspacePath = CONTAINER.paths.workspace;
+    logger.info(`[getProjectsInContainer] ① userId=${userId} workspacePath=${workspacePath} containerId=${container.id}`);
+
     const { stream } = await containerManager.execInContainer(
       userId,
       ['sh', '-c', 'ls -1 "$1" 2>/dev/null | grep -v "^\\.claude$" | grep -v "^memory$" || echo ""', 'listProjects', workspacePath]
     );
 
     const output = await _collectStreamOutput(stream);
+    logger.info(`[getProjectsInContainer] ② ls 输出 (raw): ${JSON.stringify(output)}`);
 
     let projectConfig = {};
     try { projectConfig = await loadProjectConfig(); } catch {
@@ -154,6 +157,7 @@ export async function getProjectsInContainer(userId) {
     }
 
     const projectList = parseProjectList(output, projectConfig);
+    logger.info(`[getProjectsInContainer] ③ 解析后项目数=${projectList.length}, 名称列表: ${projectList.map(p => p.name).join(', ')}`);
 
     if (projectList.length === 0) {
       const defaultEntry = await createDefaultWorkspace(userId, workspacePath);
@@ -161,6 +165,7 @@ export async function getProjectsInContainer(userId) {
     }
 
     await loadProjectSessions(userId, projectList);
+    logger.info(`[getProjectsInContainer] ④ 最终返回 ${projectList.length} 个项目`);
     return projectList;
   } catch (error) {
     throw new Error(`Failed to get projects in container: ${error.message}`);

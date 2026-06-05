@@ -9,7 +9,8 @@
 
 import { createLogger } from '../../../utils/logger.js';
 import { extractTokenBudget, extractMessageContext, isResultError, extractToolResults } from './messageParsingHelpers.js';
-import { aliasSessionId } from './SessionManager.js';
+import { aliasSessionId, getSession } from './SessionManager.js';
+import { documentService } from '../../documents/DocumentService.js';
 
 const logger = createLogger('services/container/claude/sdkMessageHandlers');
 
@@ -123,6 +124,11 @@ export function handleAssistantMessage(sdkMessage, writer, sessionId, state) {
       };
       const logMsg = buildToolLogMsg(tool, state.toolSeq);
       logger.info(logPayload, logMsg);
+
+      // 检测 Write 工具调用 → 记录 AI 生成文档
+      if (tool.name === 'Write') {
+        _trackAIDocument(tool, sessionId, writer);
+      }
     }
   }
 
@@ -209,6 +215,50 @@ const MESSAGE_HANDLERS = {
   assistant: handleAssistantMessage,
   result: handleResultMessage
 };
+
+/**
+ * 检测 Write 工具调用并记录 AI 生成文档
+ * 从会话信息中提取 userId 和 projectName，异步写入文档清单
+ * @param {Object} tool - 工具调用信息 { name, id, input: { file } }
+ * @param {string} sessionId - 会话 ID
+ * @param {Object} writer - WebSocket 写入器
+ */
+function _trackAIDocument(tool, sessionId, writer) {
+  const filePath = tool.input?.file;
+  if (!filePath) return;
+
+  // 从会话信息获取 userId 和项目路径
+  const session = getSession(sessionId);
+  if (!session) return;
+
+  const userId = session.userId;
+  const cwd = session.options?.cwd || '';
+
+  // 从 cwd 提取项目名（如 /workspace/my-project → my-project）
+  const projectName = cwd.replace(/\/workspace\/?/, '').split('/')[0];
+  if (!userId || !projectName) return;
+
+  // 异步记录，不阻塞主消息流
+  documentService.recordAIDocument(userId, projectName, {
+    file_path: filePath,
+    conversation_id: sessionId,
+    message_id: tool.id
+  }).then(() => {
+    // 通知前端有新文档
+    writer.send({
+      type: 'document-created',
+      data: {
+        file_path: filePath,
+        file_name: filePath.split('/').pop(),
+        conversation_id: sessionId,
+        message_id: tool.id,
+        type: 'ai_generated'
+      }
+    });
+  }).catch(err => {
+    logger.warn({ err, sessionId, filePath }, '[DocumentTracker] Failed to record AI document');
+  });
+}
 
 /**
  * Routes SDK message to appropriate handler based on type

@@ -76,6 +76,8 @@ export interface UseChatInterfaceOptions {
   ws?: WebSocket | null;
   /** Send message via WebSocket */
   sendMessage?: (message: any) => void;
+  /** Callback when AI creates a document via Write tool */
+  onDocumentCreated?: (doc: { file_path: string; file_name: string; conversation_id: string; message_id: string; type: string }) => void;
 }
 
 export interface UseChatInterfaceResult {
@@ -180,6 +182,7 @@ export function useChatInterface({
   messages: externalMessages,
   ws,
   sendMessage,
+  onDocumentCreated,
 }: UseChatInterfaceOptions): UseChatInterfaceResult {
   // 使用 useMemo 缓存 WebSocket 消息数组，避免不必要的重新渲染
   const wsMessages = useMemo(() => rawWsMessages ?? EMPTY_WS_MESSAGES, [rawWsMessages]);
@@ -273,6 +276,7 @@ export function useChatInterface({
     onReplaceTemporarySession, onSessionActive, onSessionInactive, onSessionProcessing, onSessionNotProcessing,
     onSetTokenBudget: (b) => { setTokenBudget(b); onSetTokenBudget?.(b); }, setTasks,
     setPendingQuestion,
+    onDocumentCreated,
     ...stream,
   });
 

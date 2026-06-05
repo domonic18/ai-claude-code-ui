@@ -116,6 +116,8 @@ interface ChatInterfaceProps {
   onShowAllTasks?: () => void;
   /** Set token budget */
   onSetTokenBudget?: (budget: any) => void;
+  /** Callback when AI creates a document via Write tool */
+  onDocumentCreated?: (doc: { file_path: string; file_name: string; conversation_id: string; message_id: string; type: string }) => void;
 }
 
 /**
@@ -150,6 +152,7 @@ export function ChatInterface({
   onTaskClick,
   onShowAllTasks,
   onSetTokenBudget,
+  onDocumentCreated,
 }: ChatInterfaceProps) {
   const { t } = useTranslation();
 
@@ -158,6 +161,7 @@ export function ChatInterface({
     selectedProject, selectedSession, newSessionCounter, onFileOpen, onShowSettings, onInputFocusChange,
     onSessionActive, onSessionInactive, onSessionProcessing, onSessionNotProcessing, onReplaceTemporarySession,
     onShowAllTasks, onSetTokenBudget, externalMessageUpdate, onTaskClick, wsMessages, messages: externalMessages, ws, sendMessage,
+    onDocumentCreated,
   });
 
   // Prepare ChatInput props

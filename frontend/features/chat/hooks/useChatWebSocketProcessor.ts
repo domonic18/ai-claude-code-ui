@@ -57,6 +57,8 @@ interface UseChatWebSocketProcessorOptions {
   updateStreamThinking: (thinking: string) => void;
   /** Set pending question from Agent */
   setPendingQuestion?: (toolUseID: string, sessionId: string) => void;
+  /** Document created by AI Write tool */
+  onDocumentCreated?: (doc: { file_path: string; file_name: string; conversation_id: string; message_id: string; type: string }) => void;
 }
 
 // 由组件调用，自定义 Hook：useChatWebSocketProcessor
@@ -111,6 +113,7 @@ export function useChatWebSocketProcessor(options: UseChatWebSocketProcessorOpti
         getCurrentSessionId: () => options.currentSessionId,
         getSelectedProjectName: () => options.selectedProjectName,
         setPendingQuestion: options.setPendingQuestion,
+        onDocumentCreated: options.onDocumentCreated,
       });
     }
 

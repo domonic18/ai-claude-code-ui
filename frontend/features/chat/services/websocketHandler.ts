@@ -61,6 +61,12 @@ const MESSAGE_HANDLERS: Record<string, (message: WebSocketMessage, callbacks: Me
   'codex-response': (msg, cbs) => handleCodexResponse(msg, cbs),
   'codex-complete': (msg, cbs, sid) => handleCodexComplete(msg, cbs, sid),
   'session-aborted': (msg, cbs, sid) => handleSessionAborted(msg, cbs, sid),
+  'document-created': (msg, cbs) => {
+    if (cbs.onDocumentCreated && msg.data) {
+      cbs.onDocumentCreated(msg.data);
+    }
+    return true;
+  },
 };
 
 /**
