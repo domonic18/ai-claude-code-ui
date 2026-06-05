@@ -129,8 +129,9 @@ export class SidebarService {
         errorPrefix: 'Failed to fetch projects',
         endpoint: '/api/projects',
         responseParser: async (response) => {
-          const data = await response.json();
-          return data.projects || data || [];
+          const result = await response.json();
+          // API returns { success: true, data: [...projects], meta: { pagination: {...} } }
+          return result.data || result.projects || [];
         }
       }
     );
@@ -235,7 +236,8 @@ export class SidebarService {
         parseErrorResponse: true,
         responseParser: async (response) => {
           const result = await response.json();
-          return result.project || result;
+          // API returns { success: true, data: { project } }
+          return result.data?.project || result.data || result;
         }
       }
     );

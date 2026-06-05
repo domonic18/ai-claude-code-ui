@@ -52,13 +52,14 @@ export const Sidebar = memo(function Sidebar({
   return (
     <>
       <SidebarModals showNewProject={state.showNewProject} setShowNewProject={state.setShowNewProject}
-        createProject={state.createProject} onProjectSelect={onProjectSelect}
+        createProject={state.createProject} onProjectSelect={onProjectSelect} onRefresh={onRefresh}
         deleteConfirmState={deleteConfirmState} isDeleting={isDeleting}
         handleConfirmSessionDelete={handleConfirmSessionDelete} handleCancelSessionDelete={handleCancelSessionDelete} />
       <div className="h-full flex flex-col bg-card md:select-none" data-tour="sidebar"
         style={isPWA && isMobile ? { paddingTop: '44px' } : {}}>
         <SidebarHeader isRefreshing={state.isRefreshing} onRefresh={state.handleRefresh}
-          onNewSession={state.handleNewSession} isPWA={isPWA} isMobile={isMobile} onToggleSidebar={onToggleSidebar} />
+          onNewSession={state.handleNewSession} isPWA={isPWA} isMobile={isMobile} onToggleSidebar={onToggleSidebar}
+          onNewProject={() => state.setShowNewProject(true)} />
         <ProjectList {...{
           projects: state.mergedProjects, selectedProject, selectedSession,
           expandedProjects: state.expandedProjects, starredProjects, editingProject: state.editingProject,

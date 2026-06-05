@@ -23,6 +23,8 @@ interface SidebarModalsProps {
   createProject: (path: string) => Promise<Project>;
   /** On project select callback */
   onProjectSelect?: (project: Project) => void;
+  /** On refresh callback */
+  onRefresh?: (options?: { force?: boolean }) => void | Promise<void>;
   /** Delete confirmation state */
   deleteConfirmState: { isOpen: boolean; sessionId?: string };
   /** Is deleting session */
@@ -38,6 +40,7 @@ export function SidebarModals({
   setShowNewProject,
   createProject,
   onProjectSelect,
+  onRefresh,
   deleteConfirmState,
   isDeleting,
   handleConfirmSessionDelete,
@@ -54,17 +57,23 @@ export function SidebarModals({
             isOpen={showNewProject}
             onClose={() => setShowNewProject(false)}
             onProjectCreated={async (newProject) => {
-              try {
-                const created = await createProject(
-                  newProject.fullPath || (newProject as any).path
-                );
-                if (onProjectSelect && created) {
-                  onProjectSelect(created);
-                }
-                setShowNewProject(false);
-              } catch (error) {
-                logger.error('Error creating project:', error);
+              // ProjectCreationWizard 内部已经通过 createProjectApi 创建了项目
+              // 这里只需要通知父组件选择新项目并刷新列表
+              console.log('[SidebarModals] A onProjectCreated 触发, project:', JSON.stringify(newProject)?.slice(0, 200));
+              if (onProjectSelect && newProject) {
+                console.log('[SidebarModals] B 调用 onProjectSelect');
+                onProjectSelect(newProject);
               }
+              // 刷新项目列表以显示新项目
+              if (onRefresh) {
+                console.log('[SidebarModals] C 调用 onRefresh (force=true, 跳过去重)');
+                await onRefresh({ force: true });
+                console.log('[SidebarModals] D onRefresh 完成');
+              } else {
+                console.warn('[SidebarModals] C onRefresh 未传入!');
+              }
+              console.log('[SidebarModals] E 关闭弹窗 setShowNewProject(false)');
+              setShowNewProject(false);
             }}
           />,
           document.body

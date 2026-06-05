@@ -7,7 +7,7 @@
 
 import React, { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MessageSquare, RefreshCw, Plus } from 'lucide-react';
+import { MessageSquare, RefreshCw, Plus, FolderPlus } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import { IS_PLATFORM, PLATFORM_DASHBOARD_URL } from '../constants/sidebar.constants';
 import { APP_NAME } from '@/shared/constants/app.constants';
@@ -16,6 +16,7 @@ interface DesktopHeaderProps {
   isRefreshing: boolean;
   onRefresh: () => void | Promise<void>;
   onToggleSidebar?: () => void;
+  onNewProject?: () => void;
 }
 
 interface MobileHeaderProps {
@@ -34,6 +35,7 @@ export const DesktopHeader = memo(function DesktopHeader({
   isRefreshing,
   onRefresh,
   onToggleSidebar,
+  onNewProject,
 }: DesktopHeaderProps) {
   const { t } = useTranslation();
 
@@ -69,6 +71,15 @@ export const DesktopHeader = memo(function DesktopHeader({
         </div>
       )}
       <div className="flex items-center gap-2">
+        {onNewProject && (
+          <button
+            className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:text-accent-foreground rounded-md text-xs h-8 w-8 px-0 hover:bg-accent transition-colors duration-200"
+            onClick={onNewProject}
+            title="新建项目"
+          >
+            <FolderPlus className="w-4 h-4" />
+          </button>
+        )}
         <button
           className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:text-accent-foreground rounded-md text-xs h-8 w-8 px-0 hover:bg-accent transition-colors duration-200"
           onClick={handleRefresh}

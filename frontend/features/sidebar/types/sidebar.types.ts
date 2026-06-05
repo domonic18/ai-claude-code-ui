@@ -329,6 +329,8 @@ export interface SidebarHeaderProps {
   isMobile?: boolean;
   /** Toggle sidebar callback */
   onToggleSidebar?: () => void;
+  /** New project callback */
+  onNewProject?: () => void;
 }
 
 /**

@@ -97,21 +97,34 @@ export function useProjectCreationWizard(
     setError(null);
 
     try {
+      console.log('[ProjectCreationWizard] ① 开始调用 createProjectApi, projectName:', projectName);
       const project = await createProjectApi(projectName);
+      console.log('[ProjectCreationWizard] ② createProjectApi 返回:', JSON.stringify(project));
 
-      // Success! Notify parent
+      // Success! Notify parent — MUST await to ensure refresh completes
+      // before the modal closes, otherwise the sidebar won't show the new project.
       if (onProjectCreated && project) {
-        onProjectCreated(project);
+        console.log('[ProjectCreationWizard] ③ 调用 onProjectCreated ...');
+        try {
+          await onProjectCreated(project);
+          console.log('[ProjectCreationWizard] ④ onProjectCreated 完成');
+        } catch (callbackErr) {
+          console.error('[ProjectCreationWizard] ④ onProjectCreated 异常:', callbackErr);
+        }
+      } else {
+        console.warn('[ProjectCreationWizard] ③ 跳过 onProjectCreated — onProjectCreated:', !!onProjectCreated, 'project:', !!project, 'project value:', project);
       }
 
       if (onClose) {
+        console.log('[ProjectCreationWizard] ⑤ 调用 onClose');
         onClose();
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create project';
-      logger.error('[ProjectCreationWizard] Error:', err);
+      console.error('[ProjectCreationWizard] ✖ createProjectApi 异常:', err);
       setError(errorMessage);
     } finally {
+      console.log('[ProjectCreationWizard] ⑥ finally — setIsCreating(false)');
       setIsCreating(false);
     }
   };
