@@ -283,7 +283,7 @@ interface SkillSelectorProps {
   /** 按 category 分组的 skills */
   groupedSkills: Record<string, Array<{ name: string; title: string; description: string }>>;
   /** 分类元数据（由 API 下发） */
-  categoryMeta?: Record<string, { label: string; icon: string; color: string }>;
+  categoryMeta?: Record<string, { label: string; icon: string; color: string; order: number }>;
   /** 是否加载中 */
   isLoading?: boolean;
   /** 加载错误信息 */
@@ -313,7 +313,7 @@ export function SkillSelector({
   /** 从 categoryMeta 派生排序后的分类列表 */
   const categoryOrder = categoryMeta
     ? Object.entries(categoryMeta)
-        .sort(([, a], [, b]) => (a as { order: number }).order - (b as { order: number }).order)
+        .sort(([, a], [, b]) => a.order - b.order)
         .map(([key]) => key)
     : Object.keys(groupedSkills);
 
