@@ -31,6 +31,12 @@ interface ChatInterfaceInputAreaProps {
   groupedSkills?: Record<string, Array<{ name: string; title: string; description: string }>>;
   /** Skills loading state */
   skillsLoading?: boolean;
+  /** Category metadata from API */
+  categoryMeta?: Record<string, { label: string; icon: string; color: string }>;
+  /** Skills loading error */
+  skillsError?: string | null;
+  /** Retry loading skills */
+  onSkillsRetry?: () => void;
 }
 
 export function ChatInterfaceInputArea({
@@ -51,6 +57,9 @@ export function ChatInterfaceInputArea({
   onSkillSelect,
   groupedSkills,
   skillsLoading,
+  categoryMeta,
+  skillsError,
+  onSkillsRetry,
 }: ChatInterfaceInputAreaProps) {
   return (
     <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700">
@@ -71,6 +80,9 @@ export function ChatInterfaceInputArea({
         onSkillSelect={onSkillSelect}
         groupedSkills={groupedSkills}
         skillsLoading={skillsLoading}
+        categoryMeta={categoryMeta}
+        skillsError={skillsError}
+        onSkillsRetry={onSkillsRetry}
       />
 
       {/* 消息输入区域 */}

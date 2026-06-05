@@ -46,6 +46,55 @@ const SKILL_CATEGORIES = {
 };
 
 /**
+ * 分类显示元数据（单一定义源，前端通过 API 获取）
+ *
+ * 前端 skillCategories.ts 不再硬编码此数据，而是从 API 响应中读取。
+ * 修改分类配置只需改此处即可。
+ */
+export const SKILL_CATEGORY_META = {
+  'Patent Document': {
+    label: '专利文档',
+    icon: 'FileText',
+    color: 'text-blue-500',
+    bgColor: 'bg-blue-50 dark:bg-blue-900/20',
+    order: 1,
+  },
+  'Business & Strategy': {
+    label: '商业战略',
+    icon: 'Briefcase',
+    color: 'text-green-500',
+    bgColor: 'bg-green-50 dark:bg-green-900/20',
+    order: 2,
+  },
+  'Technical Documents': {
+    label: '技术文档',
+    icon: 'Code',
+    color: 'text-purple-500',
+    bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+    order: 3,
+  },
+  'Academic Papers': {
+    label: '学术论文',
+    icon: 'GraduationCap',
+    color: 'text-amber-500',
+    bgColor: 'bg-amber-50 dark:bg-amber-900/20',
+    order: 4,
+  },
+  'Utility': {
+    label: '工具',
+    icon: 'Wrench',
+    color: 'text-gray-500',
+    bgColor: 'bg-gray-50 dark:bg-gray-800',
+    order: 5,
+  },
+};
+
+/** 分类排序后的键列表 */
+export const CATEGORY_ORDER = Object.entries(SKILL_CATEGORY_META)
+  .sort(([, a], [, b]) => a.order - b.order)
+  .map(([key]) => key);
+
+/**
  * Derives skill category from its name via prefix matching
  * @param {string} name - Skill name
  * @returns {string} Category name
@@ -221,7 +270,7 @@ export async function getAllExtensions(options = {}) {
     readKnowledge()
   ]);
 
-  extensionsCache = { agents, commands, skills, hooks, knowledge };
+  extensionsCache = { agents, commands, skills, hooks, knowledge, categories: SKILL_CATEGORY_META, categoryOrder: CATEGORY_ORDER };
   extensionsCacheTime = now;
 
   return extensionsCache;

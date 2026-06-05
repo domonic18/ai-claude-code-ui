@@ -98,6 +98,9 @@ export function ChatInterfaceRenderer({
         onSkillSelect={hook.setSelectedSkill}
         groupedSkills={hook.groupedSkills}
         skillsLoading={hook.skillsLoading}
+        categoryMeta={hook.categoryMeta}
+        skillsError={hook.skillsError}
+        onSkillsRetry={hook.skillsRetry}
       />
     </div>
   );

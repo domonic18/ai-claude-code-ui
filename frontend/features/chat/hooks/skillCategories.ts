@@ -1,21 +1,14 @@
 /**
- * Skill 分类元数据常量
+ * Skill 分类元数据
  *
- * 定义 skill 分类的显示名称、图标和排序权重。
- * 与后端 extension-reader.js 的 SKILL_CATEGORIES 映射保持一致。
+ * 优先从 API 获取后端下发的分类配置（单一定义源），
+ * 本地 DEFAULT 作为 API 不可用时的兜底。
  *
  * @module features/chat/hooks/skillCategories
  */
 
-/**
- * Skill 分类显示元数据
- * @typedef {Object} CategoryMeta
- * @property {string} label - 分类中文显示名
- * @property {string} icon - lucide-react 图标名
- * @property {string} color - Tailwind 颜色类（用于图标和文字）
- * @property {number} order - 排序权重（越小越靠前）
- */
-export const SKILL_CATEGORY_META = {
+/** 本地兜底分类配置（仅在 API 未返回时使用） */
+const FALLBACK_CATEGORY_META = {
   'Patent Document': {
     label: '专利文档',
     icon: 'FileText',
@@ -53,7 +46,16 @@ export const SKILL_CATEGORY_META = {
   },
 };
 
-/** 分类排序后的键列表 */
-export const CATEGORY_ORDER = Object.entries(SKILL_CATEGORY_META)
-  .sort(([, a], [, b]) => a.order - b.order)
-  .map(([key]) => key);
+/**
+ * 根据后端下发的分类元数据构建排序后的配置
+ *
+ * @param {Object} apiCategories - API 返回的分类元数据（可为 null）
+ * @returns {{ meta: Object, order: string[] }}
+ */
+export function resolveCategoryConfig(apiCategories) {
+  const meta = apiCategories || FALLBACK_CATEGORY_META;
+  const order = Object.entries(meta)
+    .sort(([, a], [, b]) => a.order - b.order)
+    .map(([key]) => key);
+  return { meta, order };
+}

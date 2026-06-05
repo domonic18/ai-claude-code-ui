@@ -253,10 +253,10 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
         onSessionProcessing,
         selectedSkill?.name,
       );
-    }
 
-    // 发送后清除 skill 选择（一次性）
-    onClearSkillSelection?.();
+      // 发送成功后清除 skill 选择（一次性）；发送失败（ws 不存在）时保留以便重试
+      onClearSkillSelection?.();
+    }
   }, [
     input,
     isLoading,

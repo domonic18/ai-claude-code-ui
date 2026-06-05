@@ -9,7 +9,6 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SKILL_CATEGORY_META, CATEGORY_ORDER } from '../hooks/skillCategories';
 
 // ─── 延迟关闭配置 ──────────────────────────────────────
 const CLOSE_DELAY_MS = 200;
@@ -24,12 +23,23 @@ interface SkillSelectorButtonProps {
   isOpen: boolean;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
-  onClear?: (e: React.MouseEvent) => void;
+  onClear?: (e: React.MouseEvent | React.KeyboardEvent) => void;
 }
 
 function SkillSelectorButton({ selectedTitle, isOpen, onMouseEnter, onMouseLeave, onClear }: SkillSelectorButtonProps) {
-  const handleClear = onClear
+  const handleClearClick = onClear
     ? (e: React.MouseEvent) => { e.stopPropagation(); onClear(e); }
+    : undefined;
+
+  /** Fix #5: 只响应 Enter 和 Space 键，避免 Tab 导航误触发 */
+  const handleClearKeyDown = onClear
+    ? (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          e.stopPropagation();
+          onClear(e);
+        }
+      }
     : undefined;
 
   return (
@@ -55,8 +65,8 @@ function SkillSelectorButton({ selectedTitle, isOpen, onMouseEnter, onMouseLeave
         <span
           role="button"
           tabIndex={0}
-          onClick={handleClear}
-          onKeyDown={handleClear}
+          onClick={handleClearClick}
+          onKeyDown={handleClearKeyDown}
           className="ml-0.5 p-0.5 rounded hover:bg-purple-200 dark:hover:bg-purple-700/50 transition-colors"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -156,10 +166,13 @@ const CATEGORY_ICONS = {
 /**
  * SkillCategoryMenu — 一级分类列表
  *
- * 显示 5 个分类项，悬停某项时右侧弹出 SkillFlyoutPanel。
+ * 显示分类项，悬停某项时右侧弹出 SkillFlyoutPanel。
+ * 分类元数据从 props 传入（由 API 下发），不再硬编码。
  */
 interface SkillCategoryMenuProps {
   groupedSkills: Record<string, Array<{ name: string; title: string; description: string }>>;
+  categoryMeta: Record<string, { label: string; icon: string; color: string }>;
+  categoryOrder: string[];
   selectedSkillName: string | null;
   onSelect: (skill: { name: string; title: string }) => void;
   onClose: () => void;
@@ -167,7 +180,7 @@ interface SkillCategoryMenuProps {
   onMouseLeave: () => void;
 }
 
-function SkillCategoryMenu({ groupedSkills, selectedSkillName, onSelect, onClose, onMouseEnter, onMouseLeave }: SkillCategoryMenuProps) {
+function SkillCategoryMenu({ groupedSkills, categoryMeta, categoryOrder, selectedSkillName, onSelect, onClose, onMouseEnter, onMouseLeave }: SkillCategoryMenuProps) {
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
   const flyoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -212,10 +225,10 @@ function SkillCategoryMenu({ groupedSkills, selectedSkillName, onSelect, onClose
     >
       {/* 一级分类列表 */}
       <div className="w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl overflow-hidden z-50">
-        {CATEGORY_ORDER.map(category => {
-          const meta = SKILL_CATEGORY_META[category];
+        {categoryOrder.map(category => {
+          const meta = categoryMeta[category];
           const skills = groupedSkills[category];
-          if (!skills || skills.length === 0) return null;
+          if (!skills || skills.length === 0 || !meta) return null;
 
           return (
             <div
@@ -269,8 +282,14 @@ interface SkillSelectorProps {
   onSkillSelect: (skill: SkillOption | null) => void;
   /** 按 category 分组的 skills */
   groupedSkills: Record<string, Array<{ name: string; title: string; description: string }>>;
+  /** 分类元数据（由 API 下发） */
+  categoryMeta?: Record<string, { label: string; icon: string; color: string }>;
   /** 是否加载中 */
   isLoading?: boolean;
+  /** 加载错误信息 */
+  error?: string | null;
+  /** 重试加载回调 */
+  onRetry?: () => void;
 }
 
 /**
@@ -283,10 +302,20 @@ export function SkillSelector({
   selectedSkill,
   onSkillSelect,
   groupedSkills,
+  categoryMeta,
   isLoading = false,
+  error,
+  onRetry,
 }: SkillSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** 从 categoryMeta 派生排序后的分类列表 */
+  const categoryOrder = categoryMeta
+    ? Object.entries(categoryMeta)
+        .sort(([, a], [, b]) => (a as { order: number }).order - (b as { order: number }).order)
+        .map(([key]) => key)
+    : Object.keys(groupedSkills);
 
   const handleButtonEnter = useCallback(() => {
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
@@ -341,14 +370,32 @@ export function SkillSelector({
 
       {isOpen && !isLoading && (
         <div className="absolute bottom-full mb-2 left-0">
-          <SkillCategoryMenu
-            groupedSkills={groupedSkills}
-            selectedSkillName={selectedSkill?.name || null}
-            onSelect={handleSelect}
-            onClose={handleClose}
-            onMouseEnter={handleMenuEnter}
-            onMouseLeave={handleMenuLeave}
-          />
+          {/* Fix #3: 加载失败时显示错误提示和重试按钮 */}
+          {error ? (
+            <div className="w-56 bg-white dark:bg-gray-800 border border-red-200 dark:border-red-800 rounded-lg shadow-xl p-3 z-50">
+              <p className="text-sm text-red-600 dark:text-red-400 mb-2">{error}</p>
+              {onRetry && (
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 underline"
+                >
+                  重试
+                </button>
+              )}
+            </div>
+          ) : (
+            <SkillCategoryMenu
+              groupedSkills={groupedSkills}
+              categoryMeta={categoryMeta || {}}
+              categoryOrder={categoryOrder}
+              selectedSkillName={selectedSkill?.name || null}
+              onSelect={handleSelect}
+              onClose={handleClose}
+              onMouseEnter={handleMenuEnter}
+              onMouseLeave={handleMenuLeave}
+            />
+          )}
         </div>
       )}
     </div>

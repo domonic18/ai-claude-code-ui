@@ -143,6 +143,9 @@ export interface UseChatInterfaceResult {
   setSelectedSkill: (skill: { name: string; title: string } | null) => void;
   groupedSkills: Record<string, Array<{ name: string; title: string; description: string }>>;
   skillsLoading: boolean;
+  categoryMeta: Record<string, { label: string; icon: string; color: string }> | null;
+  skillsError: string | null;
+  skillsRetry: () => void;
 }
 
 // 由组件调用，自定义 Hook：useChatInterface
@@ -304,5 +307,8 @@ export function useChatInterface({
     setSelectedSkill: skillSelection.setSelectedSkill,
     groupedSkills: skillSelection.groupedSkills,
     skillsLoading: skillSelection.isLoading,
+    categoryMeta: skillSelection.categoryMeta,
+    skillsError: skillSelection.error,
+    skillsRetry: skillSelection.retryLoad,
   };
 }
