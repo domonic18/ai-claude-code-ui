@@ -149,6 +149,10 @@ export async function buildSDKScript(command, options, userId) {
 
   // 如果用户手动选择了 skill，在 command 前追加 skill 调用指令
   if (options.skill) {
+    // 校验 skill 名称：只允许字母、数字、连字符、下划线，防止注入
+    if (!/^[a-zA-Z0-9_-]+$/.test(options.skill)) {
+      throw new Error(`Invalid skill name: ${options.skill}`);
+    }
     command = `请使用 "${options.skill}" skill 完成此任务。\n\n${command}`;
     logger.info({ skill: options.skill }, '[ScriptBuilder] Skill explicitly selected by user');
   }

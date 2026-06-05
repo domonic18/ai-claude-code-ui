@@ -44,6 +44,12 @@ export interface ChatToolbarProps {
   groupedSkills?: Record<string, Array<{ name: string; title: string; description: string }>>;
   /** Skills loading state */
   skillsLoading?: boolean;
+  /** Category metadata from API */
+  categoryMeta?: Record<string, { label: string; icon: string; color: string }>;
+  /** Skills loading error */
+  skillsError?: string | null;
+  /** Retry loading skills */
+  onSkillsRetry?: () => void;
 }
 
 /**
@@ -68,6 +74,9 @@ export function ChatToolbar({
   onSkillSelect,
   groupedSkills,
   skillsLoading,
+  categoryMeta,
+  skillsError,
+  onSkillsRetry,
 }: ChatToolbarProps) {
   const { t } = useTranslation();
 
@@ -90,6 +99,9 @@ export function ChatToolbar({
           onSkillSelect={onSkillSelect}
           groupedSkills={groupedSkills}
           isLoading={skillsLoading}
+          categoryMeta={categoryMeta}
+          error={skillsError}
+          onRetry={onSkillsRetry}
         />
       )}
 

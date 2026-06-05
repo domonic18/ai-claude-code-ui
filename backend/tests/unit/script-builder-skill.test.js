@@ -61,4 +61,15 @@ describe('ScriptBuilder — skill 注入', () => {
     const command = decodeCommand(result);
     assert.strictEqual(command, '普通聊天消息');
   });
+
+  it('options.skill 含非法字符时应抛出错误', async () => {
+    await assert.rejects(
+      () => buildSDKScript('test', {
+        ...baseOptions,
+        skill: 'bad;skill${injection}',
+      }, 1),
+      { message: /Invalid skill name/ },
+      '非法 skill 名称应被拒绝'
+    );
+  });
 });
