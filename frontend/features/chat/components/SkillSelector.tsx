@@ -242,7 +242,7 @@ function SkillCategoryMenu({ groupedSkills, categoryMeta, categoryOrder, selecte
                 }`}
             >
               <span className={meta.color}>
-                {CATEGORY_ICONS[meta.icon as keyof typeof CATEGORY_ICONS]}
+                {CATEGORY_ICONS[meta.icon as keyof typeof CATEGORY_ICONS] || CATEGORY_ICONS.Wrench}
               </span>
               <span className="flex-1">{meta.label}</span>
               {/* 右箭头 */}
