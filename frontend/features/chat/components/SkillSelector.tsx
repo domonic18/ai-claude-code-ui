@@ -224,7 +224,7 @@ function SkillCategoryMenu({ groupedSkills, categoryMeta, categoryOrder, selecte
       onMouseLeave={onMouseLeave}
     >
       {/* 一级分类列表 */}
-      <div className="w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl overflow-hidden z-50">
+      <div className="w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl overflow-visible z-50">
         {categoryOrder.map(category => {
           const meta = categoryMeta[category];
           const skills = groupedSkills[category];
@@ -249,21 +249,21 @@ function SkillCategoryMenu({ groupedSkills, categoryMeta, categoryOrder, selecte
               <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
+
+              {/* 二级 skill 弹出面板 — 跟当前分类项对齐 */}
+              {hoveredCategory === category && (
+                <SkillFlyoutPanel
+                  skills={skills}
+                  selectedSkillName={selectedSkillName}
+                  onSelect={handleSelect}
+                  onMouseEnter={handleFlyoutEnter}
+                  onMouseLeave={handleFlyoutLeave}
+                />
+              )}
             </div>
           );
         })}
       </div>
-
-      {/* 二级 skill 弹出面板 */}
-      {hoveredCategory && groupedSkills[hoveredCategory] && (
-        <SkillFlyoutPanel
-          skills={groupedSkills[hoveredCategory]}
-          selectedSkillName={selectedSkillName}
-          onSelect={handleSelect}
-          onMouseEnter={handleFlyoutEnter}
-          onMouseLeave={handleFlyoutLeave}
-        />
-      )}
     </div>
   );
 }
