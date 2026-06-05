@@ -88,6 +88,10 @@ export function useSkillSelection(authenticatedFetch) {
     setError(null);
     try {
       const response = await (authenticatedFetch || fetch)('/api/extensions');
+      if (!response.ok) {
+        setError(`加载技能列表失败（HTTP ${response.status}）`);
+        return;
+      }
       const data = await response.json();
 
       if (data.success && Array.isArray(data.data?.skills)) {
