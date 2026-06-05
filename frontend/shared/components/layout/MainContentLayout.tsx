@@ -6,6 +6,7 @@ import React from 'react';
 import { MainContentHeader } from './MainContentHeader';
 import { MainContentArea } from './MainContentArea';
 import { CodeEditorSidebar } from './CodeEditorSidebar';
+import { DocumentPanel } from '@/features/documents';
 
 interface Project {
   name?: string;
@@ -63,7 +64,7 @@ interface MainContentLayoutProps {
   onMouseDown?: (e: React.MouseEvent) => void;
   onClose?: () => void;
   onToggleExpand?: () => void;
-  /** Aliases from useMainContentState (handleFileOpen, handleCloseEditor, etc.) */
+  /** Aliases from useMainContentState */
   handleFileOpen?: (filePath: string, diffInfo?: any, projectName?: string) => void;
   handleCloseEditor?: () => void;
   handleToggleEditorExpand?: () => void;
@@ -87,11 +88,22 @@ function getSidebarProps(p: MainContentLayoutProps) {
   };
 }
 
+/**
+ * 主内容区布局：Header + ContentArea + DocumentPanel + CodeEditorSidebar
+ *
+ * 新布局结构：
+ * ┌──────────────────────────────────────────────────────┐
+ * │ MainContentHeader (Chat | Shell tabs)                 │
+ * ├──────────────┬────────────┬──────────┬───────────────┤
+ * │ MainContent  │ Document   │ Code     │               │
+ * │ Area         │ Panel      │ Editor   │               │
+ * │ (chat/shell) │ (always)   │ (cond.)  │               │
+ * └──────────────┴────────────┴──────────┴───────────────┘
+ */
 export function MainContentLayout(props: MainContentLayoutProps) {
   const {
     isMobile, activeTab, selectedSession, selectedProject,
-    onMenuClick, setActiveTab, /* header */
-    editingFile, editorExpanded, /* shared */
+    onMenuClick, setActiveTab,
     newSessionCounter, ws, sendMessage, messages,
     onFileOpen: onFileOpenProp,
     handleFileOpen: handleFileOpenProp,
@@ -100,9 +112,14 @@ export function MainContentLayout(props: MainContentLayoutProps) {
     onReplaceTemporarySession, onShowSettings, autoExpandTools,
     showRawParameters, showThinking, autoScrollToBottom,
     sendByCtrlEnter, externalMessageUpdate, authenticatedFetch,
+    editingFile, editorExpanded,
   } = props;
 
   const onFileOpen = onFileOpenProp ?? handleFileOpenProp ?? (() => {});
+  const projectName = selectedProject?.name || null;
+
+  // 文档面板只在 Chat tab 且非移动端时显示
+  const showDocPanel = activeTab === 'chat' && !isMobile;
 
   return (
     <div className="h-full flex flex-col">
@@ -130,6 +147,12 @@ export function MainContentLayout(props: MainContentLayoutProps) {
           authenticatedFetch={authenticatedFetch}
           editingFile={editingFile} editorExpanded={editorExpanded}
         />
+        {/* 文档面板：固定右侧，始终可见 */}
+        {showDocPanel && (
+          <DocumentPanel
+            projectName={projectName}
+          />
+        )}
         <CodeEditorSidebar {...getSidebarProps(props)} />
       </div>
     </div>

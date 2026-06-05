@@ -3,10 +3,9 @@
  */
 
 import React from 'react';
-import { useTranslation } from 'react-i18next';
 import { ChatInterface } from '@/features/chat/components';
-import { FileTree } from '@/features/file-explorer';
 import { StandaloneShell } from '@/features/terminal';
+import { emitDocumentCreated } from '@/features/documents';
 import ErrorBoundary from '@/shared/components/common/ErrorBoundary';
 import type { Project as SidebarProject } from '@/features/sidebar/types/sidebar.types';
 
@@ -86,20 +85,9 @@ function renderChatTab(props: MainContentAreaProps, chatProject: any, chatSessio
           sendByCtrlEnter={props.sendByCtrlEnter}
           externalMessageUpdate={props.externalMessageUpdate}
           authenticatedFetch={props.authenticatedFetch}
+          onDocumentCreated={emitDocumentCreated}
         />
       </ErrorBoundary>
-    </div>
-  );
-}
-
-/**
- * Renders the files tab with FileTree
- */
-function renderFilesTab(props: MainContentAreaProps) {
-  if (props.activeTab !== 'files') return null;
-  return (
-    <div className="h-full overflow-hidden">
-      <FileTree selectedProject={props.selectedProject as any} />
     </div>
   );
 }
@@ -143,7 +131,6 @@ export function MainContentArea(props: MainContentAreaProps) {
   return (
     <div className={`flex-1 flex flex-col min-h-0 overflow-hidden ${props.editingFile ? 'mr-0' : ''} ${props.editorExpanded ? 'hidden' : ''}`}>
       {renderChatTab(props, chatProject, chatSession)}
-      {renderFilesTab(props)}
       {renderShellTab(props)}
     </div>
   );
