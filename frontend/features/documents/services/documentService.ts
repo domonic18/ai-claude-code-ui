@@ -96,3 +96,21 @@ export async function fetchDocumentContent(
   const json = await res.json();
   return json.data;
 }
+
+/**
+ * 保存文档内容（编辑后保存）
+ */
+export async function saveDocumentContent(
+  projectName: string,
+  filePath: string,
+  content: string
+): Promise<void> {
+  const res = await authenticatedFetch(
+    `${API_BASE}/${encodeURIComponent(projectName)}/documents/content`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ file_path: filePath, content })
+    }
+  );
+  if (!res.ok) throw new Error(`Failed to save document: ${res.statusText}`);
+}

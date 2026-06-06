@@ -39,8 +39,15 @@ export const DocumentPanel: React.FC<DocumentPanelProps> = ({
     previewContent,
     previewMimeType,
     previewLoading,
+    previewMode,
+    editContent,
+    saving,
     openPreview,
-    closePreview
+    closePreview,
+    setPreviewMode,
+    setEditContent,
+    handleSave,
+    handleDownload,
   } = useDocumentPreview();
 
   const navigateToConversation = useNavigateToConversation();
@@ -81,12 +88,19 @@ export const DocumentPanel: React.FC<DocumentPanelProps> = ({
             mimeType={previewMimeType}
             loading={previewLoading}
             width={panelWidth}
+            mode={previewMode}
+            editContent={editContent}
+            saving={saving}
             onClose={closePreview}
-        onNavigateToConversation={
-          previewDoc.conversation_id
-            ? (convId, msgId) => navigateToConversation(convId, msgId)
-            : undefined
-        }
+            onModeChange={setPreviewMode}
+            onEditContentChange={setEditContent}
+            onSave={handleSave}
+            onDownload={handleDownload}
+            onNavigateToConversation={
+              previewDoc.conversation_id
+                ? (convId, msgId) => navigateToConversation(convId, msgId)
+                : undefined
+            }
           />
         </div>
       </div>

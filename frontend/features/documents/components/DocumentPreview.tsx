@@ -1,47 +1,54 @@
 /**
  * DocumentPreview
  *
- * 文档预览组件：在文档面板内展示文档内容
- * 当前支持 Markdown，其他类型后续迭代
+ * 文档预览/编辑组件：在文档面板内展示文档内容
+ * 支持预览模式（MarkdownRenderer）和编辑模式（textarea）
+ * 工具栏：编辑、下载、新窗口打开
  */
 
 import React, { useMemo } from 'react';
+import { MarkdownRenderer } from '../../chat/components/MarkdownRenderer';
 import type { DocumentItem } from '../types/document.types';
 
+type PreviewMode = 'preview' | 'edit';
+
 interface DocumentPreviewProps {
-  /** 当前预览的文档 */
   doc: DocumentItem;
-  /** 文档内容 */
   content: string | null;
-  /** MIME 类型 */
   mimeType: string | null;
-  /** 是否加载中 */
   loading: boolean;
-  /** 面板宽度 */
   width?: number;
-  /** 关闭预览 */
+  mode: PreviewMode;
+  editContent: string;
+  saving: boolean;
   onClose: () => void;
-  /** 跳转到对话回调 */
+  onModeChange: (mode: PreviewMode) => void;
+  onEditContentChange: (content: string) => void;
+  onSave: () => Promise<void>;
+  onDownload: () => void;
   onNavigateToConversation?: (conversationId: string, messageId?: string) => void;
 }
 
-/** 判断是否为 Markdown */
 function isMarkdown(mimeType: string | null, fileName: string): boolean {
   if (mimeType === 'text/markdown') return true;
   return fileName.endsWith('.md');
 }
 
-/**
- * 文档预览：在面板内全屏展示文档内容
- */
 export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   doc,
   content,
   mimeType,
   loading,
   width = 288,
+  mode,
+  editContent,
+  saving,
   onClose,
-  onNavigateToConversation
+  onModeChange,
+  onEditContentChange,
+  onSave,
+  onDownload,
+  onNavigateToConversation,
 }) => {
   const isMd = useMemo(
     () => isMarkdown(mimeType, doc.file_name),
@@ -50,8 +57,8 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
   return (
     <div className="h-full flex flex-col bg-background overflow-hidden" style={{ width: `${width}px` }}>
-      {/* 预览头部 */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-muted/30">
+      {/* Toolbar */}
+      <div className="flex items-center gap-1 px-2 py-1.5 border-b border-border bg-muted/30">
         {/* 返回按钮 */}
         <button
           onClick={onClose}
@@ -64,38 +71,95 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
         </button>
 
         {/* 文件名 */}
-        <span className="text-xs font-medium text-foreground truncate flex-1">
+        <span className="text-xs font-medium text-foreground truncate flex-1 min-w-0">
           {doc.file_name}
         </span>
 
-        {/* 跳转到对话 */}
-        {doc.conversation_id && onNavigateToConversation && (
-          <button
-            onClick={() => onNavigateToConversation(doc.conversation_id!, doc.message_id ?? undefined)}
-            className="p-1 rounded hover:bg-accent/20 text-muted-foreground hover:text-foreground transition-colors"
-            title="跳转到对话"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-            </svg>
-          </button>
+        {/* 功能按钮组 */}
+        {mode === 'preview' ? (
+          <div className="flex items-center gap-0.5 flex-shrink-0">
+            {/* 编辑 */}
+            {isMd && (
+              <button
+                onClick={() => onModeChange('edit')}
+                className="p-1 rounded hover:bg-accent/20 text-muted-foreground hover:text-foreground transition-colors"
+                title="编辑"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                </svg>
+              </button>
+            )}
+            {/* 下载 */}
+            <button
+              onClick={onDownload}
+              className="p-1 rounded hover:bg-accent/20 text-muted-foreground hover:text-foreground transition-colors"
+              title="下载"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+            </button>
+            {/* 跳转对话 */}
+            {doc.conversation_id && onNavigateToConversation && (
+              <button
+                onClick={() => onNavigateToConversation(doc.conversation_id!, doc.message_id ?? undefined)}
+                className="p-1 rounded hover:bg-accent/20 text-muted-foreground hover:text-foreground transition-colors"
+                title="跳转到对话"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+                </svg>
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-0.5 flex-shrink-0">
+            {/* 保存 */}
+            <button
+              onClick={onSave}
+              disabled={saving}
+              className="p-1 rounded hover:bg-green-500/20 text-muted-foreground hover:text-green-600 transition-colors disabled:opacity-50"
+              title={saving ? '保存中...' : '保存'}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
+            {/* 取消 */}
+            <button
+              onClick={() => onModeChange('preview')}
+              className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+              title="取消编辑"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         )}
       </div>
 
-      {/* 预览内容 */}
-      <div className="flex-1 overflow-y-auto px-3 py-3">
+      {/* 内容区 */}
+      <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
             加载中...
           </div>
         ) : content ? (
-          isMd ? (
-            <div
-              className="prose prose-sm dark:prose-invert max-w-none text-xs"
-              dangerouslySetInnerHTML={{ __html: renderSimpleMarkdown(content) }}
+          mode === 'edit' ? (
+            <textarea
+              value={editContent}
+              onChange={(e) => onEditContentChange(e.target.value)}
+              className="w-full h-full resize-none p-3 text-xs font-mono bg-background text-foreground border-none outline-none"
+              spellCheck={false}
             />
+          ) : isMd ? (
+            <div className="px-3 py-3">
+              <MarkdownRenderer content={content} className="prose prose-sm dark:prose-invert max-w-none text-xs" />
+            </div>
           ) : (
-            <pre className="text-xs text-foreground whitespace-pre-wrap break-words font-mono">
+            <pre className="p-3 text-xs text-foreground whitespace-pre-wrap break-words font-mono">
               {content}
             </pre>
           )
@@ -108,37 +172,3 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
     </div>
   );
 };
-
-/**
- * 简易 Markdown 渲染（不引入额外依赖）
- * 支持：标题、加粗、斜体、代码块、列表、链接、段落
- */
-function renderSimpleMarkdown(md: string): string {
-  let html = md
-    // 代码块
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre class="bg-muted rounded p-2 overflow-x-auto"><code>$2</code></pre>')
-    // 行内代码
-    .replace(/`([^`]+)`/g, '<code class="bg-muted px-1 rounded text-[11px]">$1</code>')
-    // 标题
-    .replace(/^### (.+)$/gm, '<h4 class="text-sm font-semibold mt-3 mb-1">$1</h4>')
-    .replace(/^## (.+)$/gm, '<h3 class="text-sm font-bold mt-3 mb-1">$1</h3>')
-    .replace(/^# (.+)$/gm, '<h2 class="text-base font-bold mt-2 mb-1">$1</h2>')
-    // 加粗
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    // 斜体
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    // 链接
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-primary underline" target="_blank">$1</a>')
-    // 无序列表
-    .replace(/^- (.+)$/gm, '<li class="ml-3">$1</li>')
-    // 段落（双换行）
-    .replace(/\n\n/g, '</p><p class="mb-2">')
-    // 单换行
-    .replace(/\n/g, '<br/>');
-
-  // 包裹列表
-  html = html.replace(/(<li[^>]*>[\s\S]*?<\/li>)(?:<br\/>)?/g, '$1');
-  html = html.replace(/((?:<li[^>]*>[\s\S]*?<\/li>\s*)+)/g, '<ul class="list-disc mb-2">$1</ul>');
-
-  return `<p class="mb-2">${html}</p>`;
-}
