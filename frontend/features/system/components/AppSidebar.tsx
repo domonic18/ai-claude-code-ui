@@ -1,15 +1,22 @@
 /**
- * DesktopSidebar - Fixed sidebar for desktop view with toggle
+ * DesktopSidebar - Resizable sidebar for desktop view with toggle
  *
  * @module features/system/components/DesktopSidebar
  */
 
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { Sidebar } from '@/features/sidebar/components';
 import type { Project, Session as SidebarSession } from '@/features/sidebar/types/sidebar.types';
 
+const MIN_SIDEBAR_WIDTH = 240;
+const MAX_SIDEBAR_WIDTH = 500;
+const COLLAPSED_WIDTH = 56;
+
 interface DesktopSidebarProps {
   sidebarVisible: boolean;
+  sidebarWidth: number;
+  onSidebarWidthChange: (width: number) => void;
   projects: Project[];
   selectedProject: Project | null;
   selectedSession: SidebarSession | null;
@@ -25,12 +32,10 @@ interface DesktopSidebarProps {
   onToggleSidebar: (visible: boolean) => void;
 }
 
-// 由父组件调用，React 组件或常量：DesktopSidebar
-/**
- * Renders the fixed desktop sidebar with optional collapsed state
- */
 export function DesktopSidebar({
   sidebarVisible,
+  sidebarWidth,
+  onSidebarWidthChange,
   projects,
   selectedProject,
   selectedSession,
@@ -45,13 +50,51 @@ export function DesktopSidebar({
   onShowSettings,
   onToggleSidebar,
 }: DesktopSidebarProps) {
+  const [isResizing, setIsResizing] = useState(false);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(0);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    startXRef.current = e.clientX;
+    startWidthRef.current = sidebarWidth;
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const delta = e.clientX - startXRef.current;
+      const newWidth = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, startWidthRef.current + delta));
+      onSidebarWidthChange(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing, onSidebarWidthChange]);
+
+  const currentWidth = sidebarVisible ? sidebarWidth : COLLAPSED_WIDTH;
+
   return (
     <div
-      className={`h-full flex-shrink-0 border-r border-border bg-card transition-all duration-300 ${
-        sidebarVisible ? 'w-80' : 'w-14'
-      }`}
+      className="h-full flex-shrink-0 flex"
+      style={{ width: `${currentWidth}px` }}
     >
-      <div className="h-full overflow-hidden">
+      <div className="flex-1 min-w-0 border-r border-border bg-card overflow-hidden">
         {sidebarVisible ? (
           <Sidebar
             projects={projects}
@@ -76,11 +119,22 @@ export function DesktopSidebar({
           />
         )}
       </div>
+      {sidebarVisible && (
+        <div
+          onMouseDown={handleMouseDown}
+          className={`flex-shrink-0 cursor-col-resize transition-colors relative group ${
+            isResizing
+              ? 'w-1.5 bg-primary'
+              : 'w-[3px] hover:w-1.5 bg-border hover:bg-primary'
+          }`}
+        >
+          <div className="absolute inset-y-0 -left-1.5 -right-1.5" />
+        </div>
+      )}
     </div>
   );
 }
 
-/** Collapsed sidebar with expand and settings buttons */
 function CollapsedSidebarIcons({
   onExpand,
   onShowSettings,

@@ -54,7 +54,7 @@ function MobileNav({ activeTab, setActiveTab, isInputFocused }: MobileNavProps) 
               className={`flex items-center justify-center p-2 rounded-lg min-h-[40px] min-w-[40px] relative touch-manipulation ${
                 isActive
                   ? 'text-blue-600 dark:text-blue-400'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
               aria-label={item.id}
             >

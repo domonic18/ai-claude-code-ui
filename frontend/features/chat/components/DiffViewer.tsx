@@ -46,9 +46,9 @@ export function DiffViewer({
   const filename = filePath ? filePath.split('/').pop() : '';
 
   return (
-    <div className={`bg-white dark:bg-gray-900/50 border border-gray-200/60 dark:border-gray-700/60 rounded-lg overflow-hidden shadow-sm ${className}`}>
+    <div className={`bg-background/50 border border-border rounded-lg overflow-hidden shadow-sm ${className}`}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-800/80 dark:to-gray-800/40 border-b border-gray-200/60 dark:border-gray-700/60 backdrop-blur-sm">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-muted/50 to-muted/40 border-b border-border backdrop-blur-sm">
         {(title || filePath) && (
           <button
             onClick={() => onFileOpen?.(filePath || '', { old_string: oldContent, new_string: newContent })}
@@ -61,7 +61,7 @@ export function DiffViewer({
           <span className={`text-xs font-medium px-2 py-0.5 rounded ${
             subtitle === 'New File'
               ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-              : 'bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400'
+              : 'bg-muted text-muted-foreground'
           }`}>
             {subtitle}
           </span>

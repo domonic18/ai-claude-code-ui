@@ -71,12 +71,12 @@ export function ChatInputContainer({
   return (
     <div
       {...getRootProps()}
-      className={`relative flex items-center gap-2 p-3 bg-white dark:bg-gray-800 border-2 rounded-2xl transition-colors ${
+      className={`relative flex items-center gap-2 p-3 bg-card border-2 rounded-2xl transition-colors ${
         isDragActive
-          ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20'
+          ? 'border-primary bg-primary/5'
           : isFocused
-          ? 'border-blue-500 dark:border-blue-400'
-          : 'border-gray-300 dark:border-gray-600'
+          ? 'border-primary'
+          : 'border-border'
       }`}
     >
       <input {...getInputProps()} />
@@ -92,7 +92,7 @@ export function ChatInputContainer({
         placeholder={placeholder}
         disabled={disabled || isLoading}
         rows={minRows}
-        className="flex-1 resize-none bg-transparent outline-none text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 disabled:opacity-50"
+        className="flex-1 resize-none bg-transparent outline-none text-foreground placeholder-muted-foreground disabled:opacity-50"
         style={{ minHeight: `${minRows * 1.5}rem` }}
       />
 

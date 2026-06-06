@@ -76,7 +76,7 @@ function BashInput({ input }: { input: any }) {
         <span className="text-gray-100 ml-2">{input.command}</span>
       </div>
       {input.description && (
-        <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 italic ml-1">
+        <div className="mt-1 text-xs text-muted-foreground italic ml-1">
           {input.description}
         </div>
       )}
@@ -140,7 +140,7 @@ function EditInput({ input, onFileOpen }: { input: any; onFileOpen?: (filePath: 
               e.stopPropagation();
               onFileOpen?.(input.file_path, { old_string: input.old_string, new_string: input.new_string });
             }}
-            className="ml-2 px-2 py-0.5 rounded bg-white/60 dark:bg-gray-800/60 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:text-blue-900/30 font-mono text-xs"
+            className="ml-2 px-2 py-0.5 rounded bg-card/60 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:text-blue-900/30 font-mono text-xs"
           >
             {filename}
           </button>
@@ -189,7 +189,7 @@ function WriteInput({ input, onFileOpen }: { input: any; onFileOpen?: (filePath:
               e.stopPropagation();
               onFileOpen?.(input.file_path, { old_string: '', new_string: input.content });
             }}
-            className="ml-2 px-2.5 py-1 rounded-md bg-white/60 dark:bg-gray-800/60 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 font-mono text-xs font-medium transition-all duration-200 shadow-sm"
+            className="ml-2 px-2.5 py-1 rounded-md bg-card/60 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 font-mono text-xs font-medium transition-all duration-200 shadow-sm"
           >
             {filename}
           </button>
@@ -220,7 +220,7 @@ function WriteInput({ input, onFileOpen }: { input: any; onFileOpen?: (filePath:
 function DefaultInput({ toolInput }: { toolInput: string }) {
   return (
     <CollapsiblePanel title="Tool Input" className="relative mt-3">
-      <pre className="mt-2 text-xs bg-white dark:bg-gray-900 p-3 rounded overflow-x-auto">
+      <pre className="mt-2 text-xs bg-background p-3 rounded overflow-x-auto">
         <code>{toolInput}</code>
       </pre>
     </CollapsiblePanel>

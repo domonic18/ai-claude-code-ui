@@ -18,14 +18,14 @@ export function ChatInputHint({ sendByCtrlEnter = false, hasProject = false }: C
   const { t } = useTranslation();
 
   return (
-    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+    <div className="mt-1 text-xs text-muted-foreground">
       {sendByCtrlEnter ? (
-        <>{t('chat.pressCtrlEnter')} <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">Ctrl+Enter</kbd> {t('chat.toSend')}</>
+        <>{t('chat.pressCtrlEnter')} <kbd className="px-1 py-0.5 bg-muted rounded">Ctrl+Enter</kbd> {t('chat.toSend')}</>
       ) : (
-        <>{t('chat.pressEnter')} <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">Enter</kbd> {t('chat.toSend')}, <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">Shift+Enter</kbd> {t('chat.forNewLine')}</>
+        <>{t('chat.pressEnter')} <kbd className="px-1 py-0.5 bg-muted rounded">Enter</kbd> {t('chat.toSend')}, <kbd className="px-1 py-0.5 bg-muted rounded">Shift+Enter</kbd> {t('chat.forNewLine')}</>
       )}
       {hasProject && !sendByCtrlEnter && (
-        <span>, {t('chat.typeForCommands')} <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">/</kbd> {t('chat.forCommands')} {t('chat.or')} <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">@</kbd> {t('chat.forFiles')}</span>
+        <span>, {t('chat.typeForCommands')} <kbd className="px-1 py-0.5 bg-muted rounded">/</kbd> {t('chat.forCommands')} {t('chat.or')} <kbd className="px-1 py-0.5 bg-muted rounded">@</kbd> {t('chat.forFiles')}</span>
       )}
     </div>
   );

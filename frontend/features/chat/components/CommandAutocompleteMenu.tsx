@@ -80,10 +80,10 @@ function renderEmptyState(menuRef: React.RefObject<HTMLDivElement>, menuPosition
   return (
     <div
       ref={menuRef}
-      className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 p-4"
+      className="bg-card rounded-lg shadow-xl border border-border z-50 p-4"
       style={menuPosition}
     >
-      <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+      <p className="text-sm text-muted-foreground text-center">
         No commands available
       </p>
     </div>
@@ -95,8 +95,8 @@ function renderEmptyState(menuRef: React.RefObject<HTMLDivElement>, menuPosition
  */
 function renderMenuHeader(query: string) {
   return (
-    <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-      <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
+    <div className="px-3 py-2 border-b border-border bg-muted">
+      <p className="text-xs font-medium text-muted-foreground">
         Commands {query && `matching "${query}"`}
       </p>
     </div>
@@ -108,8 +108,8 @@ function renderMenuHeader(query: string) {
  */
 function renderMenuFooter() {
   return (
-    <div className="px-3 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-      <p className="text-xs text-gray-500 dark:text-gray-400">
+    <div className="px-3 py-2 border-t border-border bg-muted">
+      <p className="text-xs text-muted-foreground">
         Use ↑↓ to navigate, Enter to select
       </p>
     </div>
@@ -167,7 +167,7 @@ export function CommandAutocompleteMenu({
   return (
     <div
       ref={menuRef}
-      className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden"
+      className="bg-card rounded-lg shadow-xl border border-border z-50 overflow-hidden"
       style={menuPosition}
     >
       {renderMenuHeader(query)}

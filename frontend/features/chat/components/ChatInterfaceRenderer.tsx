@@ -53,7 +53,7 @@ export function ChatInterfaceRenderer({
   chatInputProps,
 }: ChatInterfaceRendererProps) {
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-gray-900">
+    <div className="flex flex-col h-full bg-background">
       {/* 主聊天区域 */}
       {/* 包含消息列表、思考过程和流式指示器 */}
       <ChatInterfaceMainArea

@@ -35,7 +35,7 @@ export function MobileMenuButton({ onMenuClick }: MobileMenuButtonProps) {
         e.preventDefault();
         onMenuClick();
       }}
-      className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 touch-manipulation active:scale-95 pwa-menu-button flex-shrink-0"
+      className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-accent touch-manipulation active:scale-95 pwa-menu-button flex-shrink-0"
     >
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -74,7 +74,7 @@ export function SessionProjectTitle({ activeTab, selectedSession, selectedProjec
     if (activeTab === 'chat' && selectedSession) {
       return (
         <div className="min-w-0">
-          <h2 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white whitespace-nowrap overflow-x-auto scrollbar-hide">
+          <h2 className="text-sm sm:text-base font-semibold text-foreground whitespace-nowrap overflow-x-auto scrollbar-hide">
             {selectedSession.summary || selectedSession.name || selectedSession.title || (selectedSession.__provider === 'cursor' ? t('common.untitledSession') : t('common.newSession'))}
           </h2>
           <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
@@ -87,10 +87,10 @@ export function SessionProjectTitle({ activeTab, selectedSession, selectedProjec
     if (activeTab === 'chat' && !selectedSession) {
       return (
         <div className="min-w-0">
-          <h2 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">
+          <h2 className="text-sm sm:text-base font-semibold text-foreground">
             {t('common.newSession')}
           </h2>
-          <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+          <div className="text-xs text-muted-foreground truncate">
             {selectedProject?.displayName}
           </div>
         </div>
@@ -99,10 +99,10 @@ export function SessionProjectTitle({ activeTab, selectedSession, selectedProjec
 
     return (
       <div className="min-w-0">
-        <h2 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">
+        <h2 className="text-sm sm:text-base font-semibold text-foreground">
           {t('common.project')}
         </h2>
-        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+        <div className="text-xs text-muted-foreground truncate">
           {selectedProject?.displayName}
         </div>
       </div>
@@ -133,14 +133,14 @@ export function TabNavigation({ activeTab, setActiveTab, isAdmin }: TabNavigatio
 
   return (
     <div className="flex-shrink-0 hidden sm:block">
-      <div className="relative flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1" data-tour="tab-nav">
+      <div className="relative flex bg-muted rounded-lg p-1" data-tour="tab-nav">
         <Tooltip content={t('common.chat')} position="bottom">
           <button
             onClick={() => setActiveTab('chat')}
             className={`relative px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md ${
               activeTab === 'chat'
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
             }`}
           >
             <span className="flex items-center gap-1 sm:gap-1.5">
@@ -157,8 +157,8 @@ export function TabNavigation({ activeTab, setActiveTab, isAdmin }: TabNavigatio
               onClick={() => setActiveTab('shell')}
               className={`relative px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-all duration-200 ${
                 activeTab === 'shell'
-                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
               }`}
             >
               <span className="flex items-center gap-1 sm:gap-1.5">
