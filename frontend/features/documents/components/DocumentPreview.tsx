@@ -17,6 +17,8 @@ interface DocumentPreviewProps {
   mimeType: string | null;
   /** 是否加载中 */
   loading: boolean;
+  /** 面板宽度 */
+  width?: number;
   /** 关闭预览 */
   onClose: () => void;
   /** 跳转到对话回调 */
@@ -37,6 +39,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   content,
   mimeType,
   loading,
+  width = 288,
   onClose,
   onNavigateToConversation
 }) => {
@@ -46,7 +49,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   );
 
   return (
-    <div className="h-full flex flex-col bg-background w-72 min-w-[288px]">
+    <div className="h-full flex flex-col bg-background overflow-hidden" style={{ width: `${width}px` }}>
       {/* 预览头部 */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-muted/30">
         {/* 返回按钮 */}
