@@ -48,6 +48,10 @@ export interface UseSidebarHandlersOptions {
   additionalSessions: Record<string, Session[]>;
   /** Whether more sessions available per project */
   hasMore: Record<string, boolean>;
+  /** Set placeholder session for optimistic display */
+  setPlaceholderSession: (session: Session | null) => void;
+  /** Clear placeholder session */
+  clearPlaceholderSession: () => void;
 }
 
 /**
@@ -132,6 +136,7 @@ export function useSidebarHandlers(options: UseSidebarHandlersOptions): UseSideb
     displayProjects: options.displayProjects,
     additionalSessions: options.additionalSessions,
     hasMore: options.hasMore,
+    setPlaceholderSession: options.setPlaceholderSession,
   });
 
   return {

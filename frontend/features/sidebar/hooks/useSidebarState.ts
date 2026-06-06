@@ -81,9 +81,12 @@ export function useSidebarState(
     refreshProjects, renameProject, deleteProject, updateSessionSummary,
     renameSession, loadMoreSessions, displayProjects: effects.displayProjects,
     additionalSessions, hasMore,
+    setPlaceholderSession: effects.setPlaceholderSession,
+    clearPlaceholderSession: effects.clearPlaceholderSession,
   });
 
   return {
     ...effects, ...handlers, starredProjects, loadingSessions, hasMore, toggleStar, createProject,
+    clearPlaceholderSession: effects.clearPlaceholderSession,
   };
 }

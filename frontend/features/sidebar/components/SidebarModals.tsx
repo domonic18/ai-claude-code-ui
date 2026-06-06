@@ -5,13 +5,13 @@
  * Handles:
  * - Project Creation Wizard (rendered via portal)
  * - Delete Session Confirmation Dialog
+ * - Delete Project Confirmation Dialog
  */
 
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '@/shared/components/ui';
 import ProjectCreationWizard from './ProjectCreationWizard';
-import { logger } from '@/shared/utils/logger';
 import type { Project } from '../types/sidebar.types';
 
 interface SidebarModalsProps {
@@ -33,6 +33,14 @@ interface SidebarModalsProps {
   handleConfirmSessionDelete: () => Promise<void>;
   /** Handle cancel session delete */
   handleCancelSessionDelete: () => void;
+  /** Project delete confirmation state */
+  projectDeleteConfirmState: { isOpen: boolean; projectName: string; displayName: string; sessionCount: number };
+  /** Is deleting project */
+  isDeletingProject: boolean;
+  /** Handle confirm project delete */
+  handleConfirmProjectDelete: () => Promise<void>;
+  /** Handle cancel project delete */
+  handleCancelProjectDelete: () => void;
 }
 
 export function SidebarModals({
@@ -45,8 +53,19 @@ export function SidebarModals({
   isDeleting,
   handleConfirmSessionDelete,
   handleCancelSessionDelete,
+  projectDeleteConfirmState,
+  isDeletingProject,
+  handleConfirmProjectDelete,
+  handleCancelProjectDelete,
 }: SidebarModalsProps) {
   const { t } = useTranslation();
+
+  const projectDeleteMessage = projectDeleteConfirmState.sessionCount > 0
+    ? t('sidebar.confirmDeleteProjectWithSessions', {
+        count: projectDeleteConfirmState.sessionCount,
+        project: projectDeleteConfirmState.projectName,
+      })
+    : t('sidebar.confirmDeleteProject');
 
   return (
     <>
@@ -57,14 +76,11 @@ export function SidebarModals({
             isOpen={showNewProject}
             onClose={() => setShowNewProject(false)}
             onProjectCreated={async (newProject) => {
-              // ProjectCreationWizard 内部已经通过 createProjectApi 创建了项目
-              // 这里只需要通知父组件选择新项目并刷新列表
               console.log('[SidebarModals] A onProjectCreated 触发, project:', JSON.stringify(newProject)?.slice(0, 200));
               if (onProjectSelect && newProject) {
                 console.log('[SidebarModals] B 调用 onProjectSelect');
                 onProjectSelect(newProject);
               }
-              // 刷新项目列表以显示新项目
               if (onRefresh) {
                 console.log('[SidebarModals] C 调用 onRefresh (force=true, 跳过去重)');
                 await onRefresh({ force: true });
@@ -93,6 +109,19 @@ export function SidebarModals({
         isLoading={isDeleting}
         onConfirm={handleConfirmSessionDelete}
         onCancel={handleCancelSessionDelete}
+      />
+
+      {/* Delete Project Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={projectDeleteConfirmState.isOpen}
+        title={t('sidebar.deleteProjectTitle', { project: projectDeleteConfirmState.displayName || projectDeleteConfirmState.projectName })}
+        message={projectDeleteMessage}
+        confirmLabel={t('sidebar.confirmDeleteLabel') || 'Confirm Delete'}
+        cancelLabel={t('sidebar.cancel') || 'Cancel'}
+        type="danger"
+        isLoading={isDeletingProject}
+        onConfirm={handleConfirmProjectDelete}
+        onCancel={handleCancelProjectDelete}
       />
     </>
   );

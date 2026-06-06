@@ -139,11 +139,15 @@ export function useProjectEditHandlers(options: UseProjectEditHandlersOptions): 
       await options.renameProject(projectName, newName);
       setEditingProject(null);
       setEditingName('');
+      if (options.onRefresh) {
+        await options.onRefresh();
+      }
     } catch (error) {
       logger.error('Error renaming project:', error);
-      // Don't clear editing state on error, allowing user to retry
+      setEditingProject(null);
+      setEditingName('');
     }
-  }, [options.renameProject]);
+  }, [options.renameProject, options.onRefresh]);
 
   /**
    * Handle delete project

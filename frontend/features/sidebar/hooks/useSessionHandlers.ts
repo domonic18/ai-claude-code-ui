@@ -35,6 +35,8 @@ interface UseSessionHandlersOptions {
   additionalSessions: Record<string, Session[]>;
   /** Whether more sessions available per project */
   hasMore: Record<string, boolean>;
+  /** Set placeholder session for optimistic display */
+  setPlaceholderSession: (session: Session | null) => void;
 }
 
 // UseSessionHandlersReturn 的类型定义
@@ -140,9 +142,17 @@ export function useSessionHandlers(options: UseSessionHandlersOptions): UseSessi
    */
   const handleNewSession = useCallback(() => {
     if (options.onNewSession && options.selectedProject) {
-      options.onNewSession(options.selectedProject.name);
+      const projectName = options.selectedProject.name;
+      const placeholder: Session = {
+        id: `__placeholder__${Date.now()}`,
+        summary: '',
+        lastActivity: new Date().toISOString(),
+        __projectName: projectName,
+      };
+      options.setPlaceholderSession(placeholder);
+      options.onNewSession(projectName);
     }
-  }, [options.onNewSession, options.selectedProject]);
+  }, [options.onNewSession, options.selectedProject, options.setPlaceholderSession]);
 
   return {
     editingSession,

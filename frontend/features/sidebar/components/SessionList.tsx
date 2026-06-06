@@ -115,12 +115,22 @@ function SessionListItems({
   onSetEditingSessionName: (name: string) => void;
   projectName: string;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       {sessions.map((session) => {
-        const isSelected = selectedSessionId === session.id;
-        const isActive = currentTime.getTime() - new Date(session.lastActivity).getTime() < ACTIVE_SESSION_THRESHOLD;
-        const isEditing = editingSession?.id === session.id;
+        const isPlaceholder = session.id.startsWith('__placeholder__');
+        const isSelected = !isPlaceholder && selectedSessionId === session.id;
+        const isActive = !isPlaceholder && currentTime.getTime() - new Date(session.lastActivity).getTime() < ACTIVE_SESSION_THRESHOLD;
+        const isEditing = !isPlaceholder && editingSession?.id === session.id;
+
+        if (isPlaceholder) {
+          return (
+            <div key={session.id} className="px-3 py-2 text-xs text-muted-foreground italic animate-pulse">
+              {t('sidebar.newSessionPlaceholder')}
+            </div>
+          );
+        }
 
         return (
           <SessionItem
@@ -314,11 +324,16 @@ export const SessionList = memo(function SessionList({
     return <SessionListSkeleton />;
   }
 
-  // Empty state
+  // Empty state - clickable placeholder that triggers new session
   if (allSessions.length === 0 && !isLoadingSessions) {
     return (
       <div className="py-2 px-3 text-left">
-        <p className="text-xs text-muted-foreground">{t('sidebar.noSessionsYet')}</p>
+        <p
+          className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+          onClick={onNewSession}
+        >
+          {t('sidebar.noSessionsYetClickToAdd')}
+        </p>
       </div>
     );
   }

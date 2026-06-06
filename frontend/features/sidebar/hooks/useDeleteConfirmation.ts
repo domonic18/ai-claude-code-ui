@@ -19,6 +19,13 @@ interface DeleteConfirmState {
   provider?: SessionProvider;
 }
 
+interface ProjectDeleteConfirmState {
+  isOpen: boolean;
+  projectName: string;
+  displayName: string;
+  sessionCount: number;
+}
+
 /**
  * Initial state for delete confirmation dialog
  */
@@ -27,6 +34,13 @@ const initialDeleteConfirmState: DeleteConfirmState = {
   projectName: '',
   sessionId: '',
   provider: undefined,
+};
+
+const initialProjectDeleteConfirmState: ProjectDeleteConfirmState = {
+  isOpen: false,
+  projectName: '',
+  displayName: '',
+  sessionCount: 0,
 };
 
 /**
@@ -39,6 +53,10 @@ interface UseDeleteConfirmationOptions {
   onSessionDelete?: (projectName: string, sessionId: string, provider?: SessionProvider) => void;
   /** Function to refresh projects after deletion */
   onRefresh?: () => void | Promise<void>;
+  /** Function to delete a project */
+  deleteProject?: (name: string) => Promise<void>;
+  /** Callback after successful project deletion */
+  onProjectDelete?: (name: string) => void;
 }
 
 /**
@@ -55,6 +73,16 @@ interface UseDeleteConfirmationReturn {
   handleConfirmSessionDelete: () => Promise<void>;
   /** Cancel the deletion */
   handleCancelSessionDelete: () => void;
+  /** Project delete confirmation state */
+  projectDeleteConfirmState: ProjectDeleteConfirmState;
+  /** Whether project deletion is in progress */
+  isDeletingProject: boolean;
+  /** Open the project delete confirmation dialog */
+  handleProjectDelete: (projectName: string, displayName: string, sessionCount?: number) => Promise<void>;
+  /** Confirm and execute the project deletion */
+  handleConfirmProjectDelete: () => Promise<void>;
+  /** Cancel the project deletion */
+  handleCancelProjectDelete: () => void;
 }
 
 /**
@@ -82,9 +110,13 @@ export function useDeleteConfirmation({
   deleteSession,
   onSessionDelete,
   onRefresh,
+  deleteProject,
+  onProjectDelete,
 }: UseDeleteConfirmationOptions): UseDeleteConfirmationReturn {
   const [deleteConfirmState, setDeleteConfirmState] = useState<DeleteConfirmState>(initialDeleteConfirmState);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [projectDeleteConfirmState, setProjectDeleteConfirmState] = useState<ProjectDeleteConfirmState>(initialProjectDeleteConfirmState);
+  const [isDeletingProject, setIsDeletingProject] = useState(false);
 
   /**
    * Open the delete confirmation dialog
@@ -134,11 +166,37 @@ export function useDeleteConfirmation({
     }
   }, [deleteConfirmState, deleteSession, onSessionDelete, onRefresh]);
 
-  /**
-   * Handle canceling the session deletion
-   */
   const handleCancelSessionDelete = useCallback(() => {
     setDeleteConfirmState(initialDeleteConfirmState);
+  }, []);
+
+  const handleProjectDelete = useCallback(async (projectName: string, displayName: string, sessionCount: number = 0) => {
+    setProjectDeleteConfirmState({ isOpen: true, projectName, displayName, sessionCount });
+  }, []);
+
+  const handleConfirmProjectDelete = useCallback(async () => {
+    const { projectName } = projectDeleteConfirmState;
+    setIsDeletingProject(true);
+    try {
+      if (deleteProject) {
+        await deleteProject(projectName);
+      }
+      if (onProjectDelete) {
+        onProjectDelete(projectName);
+      }
+      if (onRefresh) {
+        await onRefresh();
+      }
+      setProjectDeleteConfirmState(initialProjectDeleteConfirmState);
+    } catch (error: unknown) {
+      logger.error('[useDeleteConfirmation] Error deleting project:', error);
+    } finally {
+      setIsDeletingProject(false);
+    }
+  }, [projectDeleteConfirmState, deleteProject, onProjectDelete, onRefresh]);
+
+  const handleCancelProjectDelete = useCallback(() => {
+    setProjectDeleteConfirmState(initialProjectDeleteConfirmState);
   }, []);
 
   return {
@@ -147,6 +205,11 @@ export function useDeleteConfirmation({
     handleSessionDelete,
     handleConfirmSessionDelete,
     handleCancelSessionDelete,
+    projectDeleteConfirmState,
+    isDeletingProject,
+    handleProjectDelete,
+    handleConfirmProjectDelete,
+    handleCancelProjectDelete,
   };
 }
 

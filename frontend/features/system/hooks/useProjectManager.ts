@@ -67,11 +67,6 @@ export function useProjectManager(
     restoreLastSession,
   } = useSessionSelection(config);
 
-  // Wrap handleSessionSelect to inject selectedProjectRef
-  const handleSessionSelect = useCallback((session: Session, projectName?: string) => {
-    rawHandleSessionSelect(session, projectName, selectedProjectRef as any);
-  }, [rawHandleSessionSelect, selectedProjectRef]);
-
   // Projects data sub-hook
   const {
     projects,
@@ -88,6 +83,20 @@ export function useProjectManager(
     restoreLastSession,
     setNewSessionCounter,
   });
+
+  // Wrap handleSessionSelect to also switch project when clicking a session
+  // from a different project
+  const handleSessionSelect = useCallback((session: Session, projectName?: string) => {
+    rawHandleSessionSelect(session, projectName, selectedProjectRef as any);
+
+    const targetProjectName = projectName || session.__projectName;
+    if (targetProjectName && selectedProjectRef.current?.name !== targetProjectName) {
+      const targetProject = projects.find(p => p.name === targetProjectName);
+      if (targetProject) {
+        setSelectedProject(targetProject);
+      }
+    }
+  }, [rawHandleSessionSelect, selectedProjectRef, projects, setSelectedProject]);
 
   // Use handler helpers
   const {
@@ -251,11 +260,19 @@ function useProjectManagerHandlers(options: {
    */
   const handleProjectDelete = useCallback((projectName: string) => {
     if (selectedProjectRef.current?.name === projectName) {
-      setSelectedProject(null);
-      setSelectedSession(null);
-      _clearSessionStorage();
+      const remainingProjects = projects.filter(p => p.name !== projectName);
+      if (remainingProjects.length > 0) {
+        const firstProject = remainingProjects[0];
+        setSelectedProject(firstProject);
+        _autoSelectFirstSession(firstProject, handleSessionSelect, setSelectedSession);
+        config.onProjectSelect?.(firstProject);
+      } else {
+        setSelectedProject(null);
+        setSelectedSession(null);
+        _clearSessionStorage();
+      }
     }
-  }, [selectedProjectRef, setSelectedProject, setSelectedSession]);
+  }, [projects, selectedProjectRef, setSelectedProject, setSelectedSession, handleSessionSelect, config]);
 
   return {
     handleProjectSelect,
