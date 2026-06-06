@@ -13,7 +13,7 @@
 import { loadProjectConfig, saveProjectConfig } from '../config/index.js';
 import { deleteSessionInContainer, getSessionsInContainer } from '../../sessions/container/ContainerSessions.js';
 import containerManager from '../../container/core/index.js';
-import { CONTAINER, FILE_TIMEOUTS } from '../../../config/config.js';
+import { CONTAINER } from '../../../config/config.js';
 import { readStreamOutput } from '../../files/utils/file-utils.js';
 import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('services/projects/project-management/operations');
@@ -87,33 +87,13 @@ async function deleteProject(userId, projectName) {
   logger.info(`[deleteProject] Attempting to delete project "${projectName}" for user ${userId}`);
 
   try {
-    // First check if the project is empty
-    const isEmpty = await isProjectEmpty(userId, projectName);
-
-    if (!isEmpty) {
-      throw new Error('Cannot delete project with existing sessions');
-    }
-
-    // 删除容器内的项目目录
     const projectPath = `${CONTAINER.paths.workspace}/${projectName}`;
 
-    const { stream } = await containerManager.execInContainer(
-      userId,
-      ['rm', '-rf', projectPath]
-    );
+    const { stream } = await containerManager.execInContainer(userId, ['rm', '-rf', projectPath]);
+    await readStreamOutput(stream, { timeout: 10000 });
 
-    await new Promise((resolve, reject) => {
-      stream.on('error', (err) => {
-        logger.error(`[deleteProject] Error removing directory:`, err);
-        reject(err);
-      });
-      stream.on('end', () => {
-        logger.info(`[deleteProject] Project directory removed: ${projectPath}`);
-        resolve();
-      });
-    });
+    logger.info(`[deleteProject] Project directory removed: ${projectPath}`);
 
-    // Remove from project config
     const config = await loadProjectConfig();
     delete config[projectName];
     await saveProjectConfig(config);
