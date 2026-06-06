@@ -23,7 +23,6 @@ export const SidebarHeader = memo(function SidebarHeader({
   isRefreshing,
   onRefresh,
   onNewSession,
-  onNewProject,
   isPWA = false,
   isMobile = false,
   onToggleSidebar,
@@ -34,7 +33,6 @@ export const SidebarHeader = memo(function SidebarHeader({
         isRefreshing={isRefreshing}
         onRefresh={onRefresh}
         onToggleSidebar={onToggleSidebar}
-        onNewProject={onNewProject}
       />
       <MobileHeader
         isRefreshing={isRefreshing}

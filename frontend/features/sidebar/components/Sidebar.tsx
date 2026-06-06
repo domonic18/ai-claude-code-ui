@@ -12,6 +12,8 @@
  */
 
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Plus } from 'lucide-react';
 import SidebarHeader from './SidebarHeader';
 import ProjectList from './ProjectList';
 import UserMenu from './UserMenu';
@@ -54,6 +56,8 @@ export const Sidebar = memo(function Sidebar({
     }
   );
 
+  const { t } = useTranslation();
+
   const handleNewSessionWithPlaceholder = useCallback((projectName: string) => {
     const placeholder: Session = {
       id: `__placeholder__${Date.now()}`,
@@ -76,8 +80,16 @@ export const Sidebar = memo(function Sidebar({
       <div className="h-full flex flex-col bg-card md:select-none" data-tour="sidebar"
         style={isPWA && isMobile ? { paddingTop: '44px' } : {}}>
         <SidebarHeader isRefreshing={state.isRefreshing} onRefresh={state.handleRefresh}
-          onNewSession={state.handleNewSession} isPWA={isPWA} isMobile={isMobile} onToggleSidebar={onToggleSidebar}
-          onNewProject={() => state.setShowNewProject(true)} />
+          onNewSession={state.handleNewSession} isPWA={isPWA} isMobile={isMobile} onToggleSidebar={onToggleSidebar} />
+        <div className="px-3 pt-1 pb-2">
+          <button
+            onClick={() => state.setShowNewProject(true)}
+            className="w-full h-8 bg-primary hover:bg-primary/90 text-primary-foreground rounded-md flex items-center justify-center gap-2 font-medium text-xs active:scale-[0.98] transition-all duration-150"
+          >
+            <Plus className="w-3 h-3" />
+            {t('sidebar.newProject')}
+          </button>
+        </div>
         <ProjectList {...{
           projects: state.mergedProjects, selectedProject, selectedSession,
           expandedProjects: state.expandedProjects, starredProjects, editingProject: state.editingProject,

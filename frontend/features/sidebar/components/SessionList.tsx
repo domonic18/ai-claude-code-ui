@@ -13,8 +13,6 @@
 
 import React, { memo, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus } from 'lucide-react';
-import { Button } from '@/shared/components/ui/Button';
 import { cn } from '@/lib/utils';
 import SessionItem from './SessionItem';
 import type { Session, SessionProvider } from '../types/sidebar.types';
@@ -251,48 +249,6 @@ function useInfiniteScroll(
 }
 
 /**
- * New Session Buttons Component
- */
-function NewSessionButtons({
-  onNewSession,
-  t,
-}: {
-  onNewSession: (() => void) | undefined;
-  t: (key: string) => string;
-}) {
-  if (!onNewSession) return null;
-
-  return (
-    <>
-      {/* New Session Button - Mobile */}
-      <div className="md:hidden px-3 pt-2 pb-1">
-        <button
-          onClick={onNewSession}
-          className="w-full h-8 bg-primary hover:bg-primary/90 text-primary-foreground rounded-md flex items-center justify-center gap-2 font-medium text-xs active:scale-[0.98] transition-all duration-150"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
-            <path d="M5 12h14"></path>
-            <path d="M12 5v14"></path>
-          </svg>
-          {t('sidebar.newSession')}
-        </button>
-      </div>
-
-      {/* New Session Button - Desktop */}
-      <Button
-        variant="default"
-        size="sm"
-        className="hidden md:flex w-full justify-start gap-2 mb-1 h-8 text-xs font-medium bg-primary hover:bg-primary/90 text-primary-foreground transition-colors"
-        onClick={onNewSession}
-      >
-        <Plus className="w-3 h-3" />
-        {t('sidebar.newSession')}
-      </Button>
-    </>
-  );
-}
-
-/**
  * SessionList Component with Infinite Scroll
  */
 export const SessionList = memo(function SessionList({
@@ -343,8 +299,6 @@ export const SessionList = memo(function SessionList({
 
   return (
     <div className={cn('space-y-1', shouldShowScroll && 'max-h-[85vh] overflow-y-auto')}>
-      <NewSessionButtons onNewSession={onNewSession} t={t} />
-
       <SessionListItems
         sessions={allSessions}
         selectedSessionId={selectedSessionId}
