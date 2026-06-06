@@ -144,6 +144,24 @@ export class DocumentService {
   }
 
   /**
+   * 保存文档内容（编辑后写回容器）
+   * @param {number} userId - 用户 ID
+   * @param {string} filePath - 文件在容器内的完整路径
+   * @param {string} content - 新文件内容
+   * @returns {Promise<void>}
+   */
+  async saveDocumentContent(userId, filePath, content) {
+    if (!filePath.startsWith('/workspace/')) {
+      throw new Error('Invalid file path');
+    }
+
+    await containerManager.getOrCreateContainer(userId);
+    await this._writeFileToContainer(userId, filePath, Buffer.from(content, 'utf-8'));
+
+    logger.info({ userId, filePath }, '文档内容已保存');
+  }
+
+  /**
    * 记录 AI 生成的文档
    * @param {number} userId - 用户 ID
    * @param {string} projectName - 项目名称

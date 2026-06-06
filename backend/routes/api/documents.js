@@ -8,6 +8,7 @@
  * - GET    /api/projects/:name/documents        - 获取项目下所有文档
  * - POST   /api/projects/:name/documents/upload - 上传文档
  * - DELETE /api/projects/:name/documents         - 删除文档
+ * - PUT    /api/projects/:name/documents/content - 保存文档内容（编辑）
  * - GET    /api/projects/:name/documents/content - 获取文档内容（预览）
  *
  * @module routes/api/documents
@@ -83,6 +84,13 @@ router.post('/:name/documents/upload', authenticate(), async (req, res, next) =>
  * Body: { file_path: string, doc_type: 'upload' | 'ai_generated' }
  */
 router.delete('/:name/documents', authenticate(), documentController._asyncHandler(documentController.deleteDocument));
+
+/**
+ * PUT /api/projects/:name/documents/content
+ * 保存文档内容（编辑后保存）
+ * Body: { file_path: string, content: string }
+ */
+router.put('/:name/documents/content', authenticate(), documentController._asyncHandler(documentController.saveDocumentContent));
 
 /**
  * GET /api/projects/:name/documents/content?file_path=xxx

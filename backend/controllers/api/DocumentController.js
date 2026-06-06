@@ -113,6 +113,33 @@ export class DocumentController extends BaseController {
   }
 
   /**
+   * 保存文档内容
+   * PUT /api/projects/:name/documents/content
+   * @param {Object} req - Express 请求对象
+   * @param {Object} res - Express 响应对象
+   */
+  async saveDocumentContent(req, res, next) {
+    try {
+      const userId = this._getUserId(req);
+      const { file_path: filePath, content } = req.body;
+
+      if (!filePath || content === undefined) {
+        throw new ValidationError('file_path and content are required');
+      }
+
+      if (!filePath.startsWith('/workspace/')) {
+        throw new ValidationError('Invalid file path');
+      }
+
+      await documentService.saveDocumentContent(userId, filePath, content);
+
+      this._success(res, null, 'Document saved successfully');
+    } catch (error) {
+      this._handleError(error, req, res, next);
+    }
+  }
+
+  /**
    * 获取文档内容（用于预览）
    * GET /api/projects/:name/documents/content
    * @param {Object} req - Express 请求对象
