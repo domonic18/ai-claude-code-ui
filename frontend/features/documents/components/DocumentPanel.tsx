@@ -142,7 +142,7 @@ export const DocumentPanel: React.FC<DocumentPanelProps> = ({
         ) : (
           <>
             <DocumentSection
-              title="上传文档"
+              title="项目文档"
               icon="📎"
               documents={uploads}
               onPreview={handlePreview}
