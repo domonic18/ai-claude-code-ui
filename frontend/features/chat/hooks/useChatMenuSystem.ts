@@ -57,7 +57,7 @@ interface UseChatMenuSystemResult {
   setFileQuery: (query: string) => void;
   setSelectedFileIndex: (index: number) => void;
   setShowFileMenu: (show: boolean) => void;
-  handleFileSelectWrapper: (file: any, index: number, input: string, atPosition: number, fileQuery: string, isHover?: boolean) => void;
+  handleFileSelectWrapper: (file: any, index: number, isHover?: boolean) => void;
   handleFileMenuClose: () => void;
   // Input handler
   handleInputChangeWithCommands: (value: string, cursorPos: number) => void;

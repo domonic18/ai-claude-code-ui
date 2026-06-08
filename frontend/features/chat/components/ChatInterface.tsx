@@ -48,7 +48,21 @@ function prepareChatInputProps(hook: any, selectedProject: any, t: any, sendByCt
     selectedFileIndex: hook.selectedFileIndex,
     atPosition: hook.atPosition,
     onFileSelect: (file: any, index: number, isHover?: boolean) => {
-      hook.handleFileSelectWrapper(file, index, isHover);
+      // Hover only updates selection highlight
+      if (isHover) {
+        hook.handleFileSelectWrapper(file, index, isHover);
+        return;
+      }
+      // Click/Enter: create FileAttachment instead of inserting text
+      const attachment: FileAttachment = {
+        id: `${file.name}-${Date.now()}`,
+        name: file.name,
+        size: file.size || 0,
+        type: file.mimeType || (file.extension ? `application/${file.extension}` : 'application/octet-stream'),
+        path: file.path,
+      };
+      hook.handleAddFile(attachment);
+      hook.handleFileMenuClose();
     },
     onFileMenuClose: hook.handleFileMenuClose,
     filesLoading: hook.filesLoading,

@@ -12,11 +12,11 @@ import type { SlashCommand } from '../hooks/useSlashCommands';
 import type { FileReference } from '../hooks/useFileReferences';
 
 export interface ChatInputMenusProps {
-  /** Current input value */
+  /** Current input value (for slash command text insertion) */
   value: string;
-  /** On change callback */
+  /** On change callback (for slash command text insertion) */
   onChange: (value: string, cursorPosition: number) => void;
-  /** Textarea ref */
+  /** Textarea ref (for cursor positioning) */
   textareaRef: React.RefObject<HTMLTextAreaElement>;
   /** Authenticated fetch function */
   authenticatedFetch?: (url: string, options?: RequestInit) => Promise<Response>;
@@ -37,8 +37,6 @@ export interface ChatInputMenusProps {
   fileMenuOpen?: boolean;
   fileQuery?: string;
   selectedFileIndex?: number;
-  atPosition?: number;
-  cursorPosition: number;
   onFileSelect?: (file: FileReference, index: number, isHover?: boolean) => void;
   onFileMenuClose?: () => void;
   filesLoading?: boolean;
@@ -64,8 +62,6 @@ export function ChatInputMenus({
   fileMenuOpen,
   fileQuery,
   selectedFileIndex,
-  atPosition,
-  cursorPosition,
   onFileSelect,
   onFileMenuClose,
   filesLoading,
@@ -89,8 +85,8 @@ export function ChatInputMenus({
             index,
             isHover,
             value,
-            slashPosition,
-            commandQuery,
+            slashPosition: slashPosition ?? -1,
+            commandQuery: commandQuery || '',
             onChange,
             textareaRef,
             onCommandSelect,
@@ -111,11 +107,6 @@ export function ChatInputMenus({
             file,
             index,
             isHover,
-            value,
-            atPosition,
-            cursorPosition,
-            onChange,
-            textareaRef,
             onFileSelect,
           })
         }

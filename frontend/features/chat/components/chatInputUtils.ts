@@ -72,53 +72,25 @@ interface HandleFileSelectOptions {
   index: number;
   /** Whether this is a hover action */
   isHover?: boolean;
-  /** Current input value */
-  value: string;
-  /** Position of @ symbol */
-  atPosition: number;
-  /** Current cursor position */
-  cursorPosition: number;
-  /** On change callback */
-  onChange: (value: string, cursorPosition: number) => void;
-  /** Textarea ref */
-  textareaRef: React.RefObject<HTMLTextAreaElement>;
   /** On file select callback */
   onFileSelect?: (file: FileReference, index: number, isHover?: boolean) => void;
 }
 
 /**
  * Handle file reference selection from menu
+ *
+ * Delegates to onFileSelect for both hover (update selection) and
+ * click (ChatInterface.tsx creates the attachment).
  */
 export function handleFileSelect({
   file,
   index,
   isHover = false,
-  value,
-  atPosition,
-  cursorPosition,
-  onChange,
-  textareaRef,
   onFileSelect,
 }: HandleFileSelectOptions) {
   if (isHover) {
     onFileSelect?.(file, index, true);
   } else {
-    // Insert file reference into input
-    const beforeFile = value.slice(0, atPosition);
-    const afterFile = value.slice(cursorPosition);
-    const newInput = `${beforeFile}@${file.relativePath} ${afterFile}`;
-    const newPos = atPosition + file.relativePath.length + 2;
-
-    onChange(newInput, newPos);
-
-    // Move cursor after file reference
-    setTimeout(() => {
-      if (textareaRef.current) {
-        textareaRef.current.setSelectionRange(newPos, newPos);
-        textareaRef.current.focus();
-      }
-    }, 0);
-
     onFileSelect?.(file, index);
   }
 }

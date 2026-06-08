@@ -35,7 +35,8 @@ interface UseFileUploadHandlerReturn {
 }
 
 /**
- * Upload a single file to the server
+ * Upload a single file to the DocumentService API
+ * Stores file in /workspace/{project}/documents/uploads/ — unified with right panel
  */
 async function uploadFileToServer(
   file: File,
@@ -51,21 +52,28 @@ async function uploadFileToServer(
     return;
   }
 
+  if (!selectedProject) {
+    logger.error('[uploadFileToServer] selectedProject not available');
+    attachment.error = 'No project selected';
+    onAddFile?.(attachment);
+    return;
+  }
+
   const formData = new FormData();
   formData.append('file', file);
-  if (selectedProject) {
-    formData.append('project', selectedProject.name);
-  }
 
   try {
     attachment.uploadProgress = 0;
     // Only add file once on initial upload
     onAddFile?.(attachment);
 
-    const response = await authenticatedFetch('/api/files/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    const response = await authenticatedFetch(
+      `/api/projects/${encodeURIComponent(selectedProject.name)}/documents/upload`,
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -74,7 +82,7 @@ async function uploadFileToServer(
     }
 
     const data = await response.json();
-    attachment.path = data.data?.path;
+    attachment.path = data.data?.file_path;
     attachment.uploadProgress = 100;
     // Update the existing file instead of adding a duplicate
     onAddFile?.(attachment);
@@ -113,15 +121,17 @@ export function useFileUploadHandler({
       };
 
       if (file.type.startsWith('image/')) {
-        // For images, store as base64 data URL
+        // For images, store as base64 data URL for AI AND upload to DocumentService for right panel
         const reader = new FileReader();
         reader.onload = (e) => {
           attachment.data = e.target?.result as string;
           onAddFile?.(attachment);
+          // Also upload to DocumentService so the image appears in the right panel
+          uploadFileToServer(file, { ...attachment }, authenticatedFetch!, selectedProject, onAddFile);
         };
         reader.readAsDataURL(file);
       } else {
-        // For documents, upload to server and store path
+        // For documents, upload to DocumentService (stores in documents/uploads/)
         uploadFileToServer(file, attachment, authenticatedFetch!, selectedProject, onAddFile);
       }
     });
