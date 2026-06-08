@@ -33,10 +33,14 @@ export class DocumentService {
    * @returns {Promise<{uploads: Array, aiGenerated: Array}>}
    */
   async getProjectDocuments(userId, projectName) {
-    const [uploads, aiGenerated] = await Promise.all([
+    const [uploads, aiManifest, generatedFiles] = await Promise.all([
       this._scanUploads(userId, projectName),
-      this._readAIManifest(userId, projectName)
+      this._readAIManifest(userId, projectName),
+      this._scanGeneratedDir(userId, projectName)
     ]);
+
+    // 合并去重：manifest 记录 + 目录扫描结果（以 file_path 为唯一键）
+    const aiGenerated = this._mergeDocuments(aiManifest, generatedFiles);
 
     return { uploads, aiGenerated };
   }
@@ -192,6 +196,92 @@ export class DocumentService {
   }
 
   // ──────────────────── 私有方法 ────────────────────
+
+  /**
+   * 扫描 generated_docs/ 目录获取实际存在的文件
+   * 作为 manifest 的兜底，确保 Bash 创建的文件也能被发现
+   * @param {number} userId - 用户 ID
+   * @param {string} projectName - 项目名称
+   * @returns {Promise<Array<DocumentItem>>}
+   * @private
+   */
+  async _scanGeneratedDir(userId, projectName) {
+    const generatedDir = `/workspace/${projectName}/generated_docs`;
+
+    try {
+      await containerManager.getOrCreateContainer(userId);
+
+      // 递归列出 generated_docs/ 下所有文件（限制 200 个）
+      const fileListOutput = await this._execCommandOutput(userId, [
+        'sh', '-c',
+        `find "${generatedDir}" -type f 2>/dev/null | head -200`
+      ]);
+
+      if (!fileListOutput || !fileListOutput.trim()) {
+        return [];
+      }
+
+      const filePaths = fileListOutput.trim().split('\n').filter(line => line.trim());
+      const results = [];
+
+      for (const filePath of filePaths) {
+        try {
+          const sizeOutput = await this._execCommandOutput(userId, [
+            'sh', '-c',
+            `wc -c < "${filePath}" 2>/dev/null | tr -d ' '`
+          ]);
+          const mtimeOutput = await this._execCommandOutput(userId, [
+            'sh', '-c',
+            `stat -c '%Y' "${filePath}" 2>/dev/null || echo '0'`
+          ]);
+          const fileName = filePath.split('/').pop();
+          results.push({
+            file_name: fileName,
+            file_path: filePath,
+            file_size: parseInt(sizeOutput.trim(), 10) || 0,
+            type: 'ai_generated',
+            created_at: new Date(parseInt(mtimeOutput.trim(), 10) * 1000).toISOString()
+          });
+        } catch {
+          // 跳过无法读取的文件
+        }
+      }
+
+      return results;
+    } catch (error) {
+      // 目录可能不存在，返回空数组
+      logger.debug({ userId, projectName, err: error }, 'generated_docs 目录扫描跳过');
+      return [];
+    }
+  }
+
+  /**
+   * 合并 manifest 记录与目录扫描结果，去重
+   * 以 file_path 为唯一键，manifest 记录优先（含 conversation_id 等元数据）
+   * @param {Array} manifestDocs - manifest 中的文档记录
+   * @param {Array} scannedDocs - 目录扫描到的文档
+   * @returns {Array} 合并后的文档列表
+   * @private
+   */
+  _mergeDocuments(manifestDocs, scannedDocs) {
+    const merged = new Map();
+
+    // 先放入目录扫描结果（作为基础）
+    for (const doc of scannedDocs) {
+      merged.set(doc.file_path, doc);
+    }
+
+    // manifest 记录覆盖（优先，因为含 conversation_id 等元数据）
+    for (const doc of manifestDocs) {
+      merged.set(doc.file_path, {
+        ...merged.get(doc.file_path),
+        ...doc,
+        type: 'ai_generated'
+      });
+    }
+
+    return Array.from(merged.values());
+  }
 
   /**
    * 扫描 uploads 目录获取用户上传的文档列表

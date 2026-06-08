@@ -33,12 +33,12 @@ export const CONTAINER = {
   paths: {
     // 统一工作目录
     workspace: '/workspace',
-    // Claude 配置根目录（指向项目工作区，以便 SDK 能读取 customAgents）
-    // 注意：SDK 的 CLAUDE_CONFIG_DIR 决定了 settings.json 的读取位置
+    // Claude 配置根目录（仅用于默认项目 my-workspace 的容器初始化 env）
+    // 注意：SDK 执行时由 DockerExecutor.js 覆盖为 /workspace/.claude
     claudeConfig: '/workspace/my-workspace/.claude',
-    // 设置文件
+    // 设置文件（仅用于默认项目初始化）
     settings: '/workspace/my-workspace/.claude/settings.json',
-    // API 密钥文件（保留用于兼容性）
+    // API 密钥文件（仅用于默认项目初始化）
     apiKeys: '/workspace/my-workspace/.claude/api_keys.json',
     // 项目元数据目录
     projects: '/workspace/.claude/projects',

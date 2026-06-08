@@ -125,9 +125,11 @@ export function handleAssistantMessage(sdkMessage, writer, sessionId, state) {
       const logMsg = buildToolLogMsg(tool, state.toolSeq);
       logger.info(logPayload, logMsg);
 
-      // 检测 Write 工具调用 → 记录 AI 生成文档
+      // 检测 Write / Bash 工具调用 → 记录 AI 生成文档
       if (tool.name === 'Write') {
         _trackAIDocument(tool, sessionId, writer);
+      } else if (tool.name === 'Bash') {
+        _trackBashFileWrite(tool, sessionId, writer);
       }
     }
   }
@@ -258,6 +260,90 @@ function _trackAIDocument(tool, sessionId, writer) {
   }).catch(err => {
     logger.warn({ err, sessionId, filePath }, '[DocumentTracker] Failed to record AI document');
   });
+}
+
+/**
+ * 检测 Bash 工具调用中的文件写入操作并记录 AI 生成文档
+ * 匹配常见模式：cat > file, tee file, echo > file, 重定向 > file
+ * @param {Object} tool - 工具调用信息 { name, id, input: { command } }
+ * @param {string} sessionId - 会话 ID
+ * @param {Object} writer - WebSocket 写入器
+ */
+function _trackBashFileWrite(tool, sessionId, writer) {
+  const command = tool.input?.command;
+  if (!command) return;
+
+  // 从会话信息获取 cwd，用于拼接相对路径
+  const session = getSession(sessionId);
+  if (!session) return;
+
+  const userId = session.userId;
+  const cwd = session.options?.cwd || '/workspace';
+  const projectName = cwd.replace(/\/workspace\/?/, '').split('/')[0];
+  if (!userId || !projectName) return;
+
+  // 从 Bash 命令中提取文件写入路径
+  const filePaths = _extractFilePathsFromBash(command);
+  if (filePaths.length === 0) return;
+
+  for (const filePath of filePaths) {
+    // 解析相对路径为绝对路径
+    let absolutePath = filePath;
+    if (filePath.startsWith('./') || filePath.startsWith('../')) {
+      absolutePath = `${cwd}/${filePath}`.replace(/\/+/g, '/').replace(/\/\.\//g, '/');
+    }
+
+    // 只追踪工作区内的文件，跳过 .claude/ 目录下的配置文件
+    if (!absolutePath.startsWith('/workspace/')) continue;
+    if (absolutePath.includes('/.claude/')) continue;
+
+    documentService.recordAIDocument(userId, projectName, {
+      file_path: absolutePath,
+      conversation_id: sessionId,
+      message_id: tool.id
+    }).then(() => {
+      writer.send({
+        type: 'document-created',
+        data: {
+          file_path: absolutePath,
+          file_name: absolutePath.split('/').pop(),
+          conversation_id: sessionId,
+          message_id: tool.id,
+          type: 'ai_generated'
+        }
+      });
+    }).catch(err => {
+      logger.debug({ err, sessionId, command: command.substring(0, 100) }, '[BashTracker] Failed to track Bash file write');
+    });
+  }
+}
+
+/**
+ * 从 Bash 命令字符串中提取文件写入目标路径
+ * @param {string} command - Bash 命令
+ * @returns {string[]} 文件路径数组
+ */
+function _extractFilePathsFromBash(command) {
+  const paths = [];
+
+  // 匹配写入重定向模式：> file 或 >> file
+  // 覆盖 cat > file, echo > file, printf > file, 以及裸重定向
+  const redirectPattern = />{1,2}\s*['"]?((?:\.\/|\.\.\/|\/)[^\s'";&|>]+)['"]?/g;
+  let match;
+  while ((match = redirectPattern.exec(command)) !== null) {
+    const p = match[1];
+    if (p && !p.startsWith('&')) {
+      paths.push(p);
+    }
+  }
+
+  // 匹配 tee 命令：tee file / tee -a file
+  const teePattern = /\btee\s+(?:-[aA]+\s+)?['"]?((?:\.\/|\.\.\/|\/)[^\s'";&|>]+)['"]?/g;
+  while ((match = teePattern.exec(command)) !== null) {
+    paths.push(match[1]);
+  }
+
+  return [...new Set(paths)];
 }
 
 /**
