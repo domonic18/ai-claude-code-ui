@@ -8,6 +8,7 @@
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { logger } from '@/shared/utils/logger';
+import { emitDocumentUploaded } from '@/features/documents/services/documentEvents';
 import type { FileAttachment } from '../types';
 
 interface UseFileUploadHandlerOptions {
@@ -86,6 +87,8 @@ async function uploadFileToServer(
     attachment.uploadProgress = 100;
     // Update the existing file instead of adding a duplicate
     onAddFile?.(attachment);
+    // Notify document panel to refresh its list
+    emitDocumentUploaded();
   } catch (error) {
     logger.error('[uploadFileToServer] File upload error:', error);
     attachment.error = error instanceof Error ? error.message : 'Upload failed';

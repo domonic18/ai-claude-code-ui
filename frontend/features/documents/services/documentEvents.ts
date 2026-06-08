@@ -16,11 +16,14 @@ type DocumentCreatedHandler = (doc: {
 
 type NavigateToConversationHandler = (conversationId: string, messageId?: string) => void;
 
+type DocumentUploadedHandler = () => void;
+
 const createdListeners = new Set<DocumentCreatedHandler>();
 const navigateListeners = new Set<NavigateToConversationHandler>();
+const uploadedListeners = new Set<DocumentUploadedHandler>();
 
 /**
- * 订阅文档创建事件
+ * 订阅文档创建事件（AI 生成文档）
  * @returns 取消订阅函数
  */
 export function onDocumentCreated(handler: DocumentCreatedHandler): () => void {
@@ -52,5 +55,23 @@ export function onNavigateToConversation(handler: NavigateToConversationHandler)
 export function emitNavigateToConversation(conversationId: string, messageId?: string): void {
   for (const handler of navigateListeners) {
     try { handler(conversationId, messageId); } catch { /* ignore */ }
+  }
+}
+
+/**
+ * 订阅用户上传文档完成事件（由 chat 上传完成后发射）
+ * @returns 取消订阅函数
+ */
+export function onDocumentUploaded(handler: DocumentUploadedHandler): () => void {
+  uploadedListeners.add(handler);
+  return () => { uploadedListeners.delete(handler); };
+}
+
+/**
+ * 发射用户上传文档完成事件（由 chat/fileUploadHandler 调用）
+ */
+export function emitDocumentUploaded(): void {
+  for (const handler of uploadedListeners) {
+    try { handler(); } catch { /* ignore */ }
   }
 }

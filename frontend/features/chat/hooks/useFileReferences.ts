@@ -13,6 +13,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { logger } from '@/shared/utils/logger';
+import { onDocumentUploaded, onDocumentCreated } from '@/features/documents/services/documentEvents';
 
 export interface FileReference {
   /** File path (container-absolute) */
@@ -135,6 +136,18 @@ export function useFileReferences({
   }, [selectedProject, authenticatedFetch]);
 
   useEffect(() => { loadFiles(); }, [loadFiles]);
+
+  // 当文档变化时（chat 上传、面板上传、AI 生成）刷新列表
+  useEffect(() => {
+    const unsub1 = onDocumentUploaded(() => { loadFiles(); });
+    const unsub2 = onDocumentCreated(() => { loadFiles(); });
+    return () => { unsub1(); unsub2(); };
+  }, [loadFiles]);
+
+  // @ 菜单打开时也刷新一次，确保展示最新文档
+  useEffect(() => {
+    if (showMenu) { loadFiles(); }
+  }, [showMenu, loadFiles]);
 
   const filteredFiles = useCallback(() => {
     if (!query) return files.slice(0, 20);

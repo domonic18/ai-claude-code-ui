@@ -11,7 +11,7 @@ import {
   uploadDocument,
   deleteDocument as deleteDocApi
 } from '../services/documentService';
-import { onDocumentCreated } from '../services/documentEvents';
+import { onDocumentCreated, onDocumentUploaded } from '../services/documentEvents';
 import { logger } from '../../../shared/utils/logger';
 
 interface UseDocumentsReturn {
@@ -86,13 +86,21 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
     refresh();
   }, [refresh]);
 
-  // 订阅 WebSocket 的 document-created 事件
+  // 订阅 WebSocket 的 document-created 事件（AI 生成文档）
   useEffect(() => {
     const unsubscribe = onDocumentCreated((doc) => {
       addAIDocument(doc as DocumentItem);
     });
     return unsubscribe;
   }, [addAIDocument]);
+
+  // 订阅用户上传文档完成事件（对话框上传后刷新面板）
+  useEffect(() => {
+    const unsubscribe = onDocumentUploaded(() => {
+      refresh();
+    });
+    return unsubscribe;
+  }, [refresh]);
 
   const upload = useCallback(async (file: File) => {
     if (!projectName) {
