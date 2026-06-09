@@ -113,8 +113,12 @@ export class ContainerConfigBuilder {
     // AppArmor 配置：强制访问控制
     // 注意：AppArmor 配置需要先在系统上加载：
     //   sudo apparmor_parser -r workspace/containers/apparmor/docker-claude-code
-    // 如果 AppArmor 未安装或未加载，Docker 会忽略此选项并使用默认配置
-    securityOptions.push(`apparmor=${CONTAINER.security.apparmorProfile}`);
+    // 当宿主内核不支持 AppArmor（如部分云服务器）时，
+    // 设置 APPARMOR_PROFILE=unconfined 或留空即可跳过
+    const apparmorProfile = CONTAINER.security.apparmorProfile;
+    if (apparmorProfile && apparmorProfile !== 'unconfined') {
+      securityOptions.push(`apparmor=${apparmorProfile}`);
+    }
 
     // 禁止提权：防止进程通过 exec 系统调用获得新的权限
     securityOptions.push('no-new-privileges');
