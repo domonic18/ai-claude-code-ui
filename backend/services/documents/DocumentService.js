@@ -323,10 +323,15 @@ export class DocumentService {
    */
   async _scanDirectory(userId, projectName, directory, docType, maxFiles) {
     try {
-      // 纵深防御：service 层再次校验 projectName，防止绕过 controller 校验
+      // 纵深防御：校验 projectName 和 directory 参数安全性
       const nameCheck = validateProjectName(projectName);
       if (!nameCheck.valid) {
         logger.warn({ userId, projectName, err: nameCheck.error }, '[scanDirectory] projectName 校验失败');
+        return [];
+      }
+      const dirCheck = validateContainerPath(directory);
+      if (!dirCheck.valid) {
+        logger.warn({ userId, directory, err: dirCheck.error }, '[scanDirectory] directory 路径校验失败');
         return [];
       }
 
@@ -466,7 +471,7 @@ export class DocumentService {
 
     logger.info({ userId, containerFilePath, bufferSize: buffer.length, containerId: container.id }, '[文档上传] _writeFileToContainer 开始');
 
-    await writeFileViaPutArchive(dockerContainer, containerFilePath, buffer.toString('utf-8'), {
+    await writeFileViaPutArchive(dockerContainer, containerFilePath, buffer, {
       logLabel: 'DocumentService',
     });
 

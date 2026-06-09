@@ -16,6 +16,9 @@ import { validateContainerPath, validateProjectFilePath, validateProjectName } f
 
 const logger = createLogger('controllers/api/DocumentController');
 
+/** 内容大小上限（50MB，与上传限制一致） */
+const MAX_CONTENT_SIZE = 50 * 1024 * 1024;
+
 /**
  * 文档控制器
  */
@@ -27,25 +30,37 @@ export class DocumentController extends BaseController {
     super();
   }
 
+  // ─── 公共辅助方法 ─────────────────────────────────────
+
+  /**
+   * 从请求中提取并校验 projectName
+   * @param {Object} req - Express 请求对象
+   * @returns {string} 校验通过的 projectName
+   * @throws {ValidationError} projectName 缺失或不合法
+   * @protected
+   */
+  _requireProjectName(req) {
+    const { name: projectName } = req.params;
+    if (!projectName) {
+      throw new ValidationError('Project name is required');
+    }
+    const nameCheck = validateProjectName(projectName);
+    if (!nameCheck.valid) {
+      throw new ValidationError(nameCheck.error);
+    }
+    return projectName;
+  }
+
+  // ─── 路由处理方法 ─────────────────────────────────────
+
   /**
    * 获取项目下所有文档
    * GET /api/projects/:name/documents
-   * @param {Object} req - Express 请求对象
-   * @param {Object} res - Express 响应对象
    */
   async getDocuments(req, res, next) {
     try {
       const userId = this._getUserId(req);
-      const { name: projectName } = req.params;
-
-      if (!projectName) {
-        throw new ValidationError('Project name is required');
-      }
-
-      const nameCheck = validateProjectName(projectName);
-      if (!nameCheck.valid) {
-        throw new ValidationError(nameCheck.error);
-      }
+      const projectName = this._requireProjectName(req);
 
       const documents = await documentService.getProjectDocuments(userId, projectName);
 
@@ -58,24 +73,13 @@ export class DocumentController extends BaseController {
   /**
    * 上传文档到项目
    * POST /api/projects/:name/documents/upload
-   * @param {Object} req - Express 请求对象
-   * @param {Object} res - Express 响应对象
    */
   async uploadDocument(req, res, next) {
     try {
       const userId = this._getUserId(req);
-      const { name: projectName } = req.params;
+      const projectName = this._requireProjectName(req);
 
       logger.info({ userId, projectName, hasFile: !!req.file }, '[文档上传] Controller 收到请求');
-
-      if (!projectName) {
-        throw new ValidationError('Project name is required');
-      }
-
-      const nameCheck = validateProjectName(projectName);
-      if (!nameCheck.valid) {
-        throw new ValidationError(nameCheck.error);
-      }
 
       if (!req.file) {
         logger.warn({ userId, projectName }, '[文档上传] req.file 为空，multer 可能未正确解析');
@@ -103,22 +107,15 @@ export class DocumentController extends BaseController {
   /**
    * 删除文档
    * DELETE /api/projects/:name/documents
-   * @param {Object} req - Express 请求对象
-   * @param {Object} res - Express 响应对象
    */
   async deleteDocument(req, res, next) {
     try {
       const userId = this._getUserId(req);
-      const { name: projectName } = req.params;
+      const projectName = this._requireProjectName(req);
       const { file_path: filePath, doc_type: docType } = req.body;
 
-      if (!projectName || !filePath) {
-        throw new ValidationError('Project name and file path are required');
-      }
-
-      const nameCheck = validateProjectName(projectName);
-      if (!nameCheck.valid) {
-        throw new ValidationError(nameCheck.error);
+      if (!filePath) {
+        throw new ValidationError('file_path is required');
       }
 
       const pathCheck = validateProjectFilePath(filePath, projectName);
@@ -137,17 +134,19 @@ export class DocumentController extends BaseController {
   /**
    * 保存文档内容
    * PUT /api/projects/:name/documents/content
-   * @param {Object} req - Express 请求对象
-   * @param {Object} res - Express 响应对象
    */
   async saveDocumentContent(req, res, next) {
     try {
       const userId = this._getUserId(req);
-      const { name: projectName } = req.params;
+      const projectName = this._requireProjectName(req);
       const { file_path: filePath, content } = req.body;
 
       if (!filePath || content === undefined) {
         throw new ValidationError('file_path and content are required');
+      }
+
+      if (typeof content === 'string' && content.length > MAX_CONTENT_SIZE) {
+        throw new ValidationError(`Content exceeds maximum size limit (${MAX_CONTENT_SIZE / 1024 / 1024}MB)`);
       }
 
       const pathCheck = validateProjectFilePath(filePath, projectName);
@@ -166,13 +165,11 @@ export class DocumentController extends BaseController {
   /**
    * 获取文档内容（用于预览）
    * GET /api/projects/:name/documents/content
-   * @param {Object} req - Express 请求对象
-   * @param {Object} res - Express 响应对象
    */
   async getDocumentContent(req, res, next) {
     try {
       const userId = this._getUserId(req);
-      const { name: projectName } = req.params;
+      const projectName = this._requireProjectName(req);
       const { file_path: filePath } = req.query;
 
       if (!filePath) {
@@ -195,22 +192,15 @@ export class DocumentController extends BaseController {
   /**
    * 更新文档摘要
    * PUT /api/projects/:name/documents/summary
-   * @param {Object} req - Express 请求对象
-   * @param {Object} res - Express 响应对象
    */
   async updateSummary(req, res, next) {
     try {
       const userId = this._getUserId(req);
-      const { name: projectName } = req.params;
+      const projectName = this._requireProjectName(req);
       const { file_name: fileName, summary } = req.body;
 
       if (!fileName || summary === undefined) {
         throw new ValidationError('file_name and summary are required');
-      }
-
-      const nameCheck = validateProjectName(projectName);
-      if (!nameCheck.valid) {
-        throw new ValidationError(nameCheck.error);
       }
 
       await readmeService.updateSummary(userId, projectName, fileName, summary);

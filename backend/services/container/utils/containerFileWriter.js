@@ -88,7 +88,7 @@ async function ensureDirInContainer(container, targetDir) {
  *
  * @param {object} container - Docker 容器实例
  * @param {string} containerFilePath - 容器内目标文件路径
- * @param {string} content - 要写入的文件内容
+ * @param {string|Buffer} content - 要写入的文件内容（字符串或 Buffer）
  * @param {object} [options] - 可选配置
  * @param {string} [options.logLabel='containerFileWriter'] - 日志标签
  * @returns {Promise<void>}
@@ -99,10 +99,11 @@ export async function writeFileViaPutArchive(container, containerFilePath, conte
   await fs.mkdir(tmpDir, { recursive: true });
 
   try {
-    // 写入本地临时文件
+    // 写入本地临时文件（Buffer 直接写入，字符串用 utf8）
     const filename = path.basename(containerFilePath);
     const localFilePath = path.join(tmpDir, filename);
-    await fs.writeFile(localFilePath, content, 'utf8');
+    const writeEncoding = Buffer.isBuffer(content) ? undefined : 'utf8';
+    await fs.writeFile(localFilePath, content, writeEncoding);
 
     // 创建 tar 文件
     const tarPath = path.join(tmpDir, 'payload.tar');

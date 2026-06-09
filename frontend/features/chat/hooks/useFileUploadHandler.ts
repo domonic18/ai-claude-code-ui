@@ -132,7 +132,14 @@ export function useFileUploadHandler({
 
     acceptedFiles.forEach(file => {
       if (file.size > maxFileSize) {
-        logger.error(`File ${file.name} exceeds maximum size of ${maxFileSize} bytes`);
+        const attachment: FileAttachment = {
+          id: `${file.name}-${Date.now()}`,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          error: `文件大小超过限制（最大 ${Math.round(maxFileSize / 1024 / 1024)}MB）`,
+        };
+        onAddFile?.(attachment);
         return;
       }
 
