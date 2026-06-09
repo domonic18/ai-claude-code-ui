@@ -191,12 +191,6 @@ export class SummaryService {
     // 查找多模态模型配置
     const multimodalModel = MODELS.available.find(m => m.name === MULTIMODAL_MODEL_NAME);
     const model = multimodalModel || MODELS.available[0];
-    const config = getModelProviderConfig(model.name);
-
-    if (!config.baseURL || !config.authToken) {
-      logger.error({ model: model.name }, '[SummaryService] 多模态模型缺少 API 配置');
-      return null;
-    }
 
     // 从容器读取图片 base64
     let base64Data;
@@ -215,80 +209,48 @@ export class SummaryService {
     const ext = '.' + (fileName.split('.').pop() || '').toLowerCase();
     const mediaType = imageMediaType(ext);
 
-    const baseURL = config.baseURL.replace(/\/+$/, '');
-    const url = `${baseURL}/v1/messages`;
-
     // Anthropic 多模态消息格式
-    const body = {
-      model: model.name,
-      max_tokens: 500,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: mediaType,
-                data: base64Data,
-              },
+    const messages = [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: mediaType,
+              data: base64Data,
             },
-            {
-              type: 'text',
-              text: IMAGE_SUMMARY_PROMPT,
-            },
-          ],
-        },
-      ],
-    };
+          },
+          {
+            type: 'text',
+            text: IMAGE_SUMMARY_PROMPT,
+          },
+        ],
+      },
+    ];
 
-    logger.info({ model: model.name, url, fileName }, '[SummaryService] 调用多模态 API 生成图片摘要');
+    logger.info({ model: model.name, fileName }, '[SummaryService] 调用多模态 API 生成图片摘要');
 
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.authToken}`,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(30_000),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
-        logger.error({ status: response.status, errorText, model: model.name, fileName }, '[SummaryService] 多模态 API 返回错误');
-        return null;
-      }
-
-      const data = await response.json();
-      const content = data?.content?.[0]?.text;
-
-      if (!content) {
-        logger.warn({ data, fileName }, '[SummaryService] 多模态 API 返回空内容');
-        return null;
-      }
-
-      return content.trim();
-    } catch (err) {
-      logger.error({ err, model: model.name, fileName }, '[SummaryService] 多模态 API 调用异常');
-      return null;
-    }
+    return this._callAnthropicMessagesAPI(model, messages, fileName);
   }
 
   /**
-   * 文本摘要：调用默认文本模型
+   * 调用 Anthropic Messages API（通用方法）
+   *
+   * 封装 Anthropic Messages 格式的请求/响应处理，
+   * 被 _callTextAIAPI 和 _generateImageSummary 共用。
+   *
+   * TODO: 当项目需要支持非 Anthropic 模型时，可将此方法重构为
+   * 按模型 provider 分发的策略模式。
+   *
+   * @param {Object} model - 模型配置对象（来自 MODELS.available）
+   * @param {Array} messages - Anthropic Messages 格式的 messages 数组
+   * @param {string} fileName - 文件名（用于日志）
+   * @returns {Promise<string|null>} 摘要文本，失败返回 null
    * @private
    */
-  async _callTextAIAPI(text, fileName) {
-    const model = MODELS.available[0];
-    if (!model) {
-      logger.error('[SummaryService] 无可用模型');
-      return null;
-    }
-
+  async _callAnthropicMessagesAPI(model, messages, fileName) {
     const config = getModelProviderConfig(model.name);
     if (!config.baseURL || !config.authToken) {
       logger.error({ model: model.name }, '[SummaryService] 模型缺少 API 配置');
@@ -301,12 +263,8 @@ export class SummaryService {
     const body = {
       model: model.name,
       max_tokens: 500,
-      messages: [
-        { role: 'user', content: SUMMARY_PROMPT + text },
-      ],
+      messages,
     };
-
-    logger.debug({ model: model.name, url, textLength: text.length, fileName }, '[SummaryService] 调用文本 AI API');
 
     try {
       const response = await fetch(url, {
@@ -339,6 +297,26 @@ export class SummaryService {
       logger.error({ err, model: model.name, fileName }, '[SummaryService] AI API 调用异常');
       return null;
     }
+  }
+
+  /**
+   * 文本摘要：调用默认文本模型
+   * @private
+   */
+  async _callTextAIAPI(text, fileName) {
+    const model = MODELS.available[0];
+    if (!model) {
+      logger.error('[SummaryService] 无可用模型');
+      return null;
+    }
+
+    logger.debug({ model: model.name, textLength: text.length, fileName }, '[SummaryService] 调用文本 AI API');
+
+    const messages = [
+      { role: 'user', content: SUMMARY_PROMPT + text },
+    ];
+
+    return this._callAnthropicMessagesAPI(model, messages, fileName);
   }
 }
 

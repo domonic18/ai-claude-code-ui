@@ -337,13 +337,17 @@ function _trackBashFileWrite(tool, sessionId, writer) {
  * @returns {string[]} 文件路径数组
  */
 function _extractFilePathsFromBash(command) {
+  // 先移除 heredoc 内容，避免误匹配 heredoc 内部的重定向符号
+  // 匹配 << 'DELIM'\n...\nDELIM 或 << "DELIM"\n...\nDELIM 或 << DELIM\n...\nDELIM
+  const cleaned = command.replace(/<<-?\s*['"]?(\w+)['"]?\n[\s\S]*?\n\s*\1/g, '');
+
   const paths = [];
 
   // 匹配写入重定向模式：> file 或 >> file
   // 覆盖 cat > file, echo > file, printf > file, 以及裸重定向
   const redirectPattern = />{1,2}\s*['"]?((?:\.\/|\.\.\/|\/)[^\s'";&|>]+)['"]?/g;
   let match;
-  while ((match = redirectPattern.exec(command)) !== null) {
+  while ((match = redirectPattern.exec(cleaned)) !== null) {
     const p = match[1];
     if (p && !p.startsWith('&')) {
       paths.push(p);
@@ -352,7 +356,7 @@ function _extractFilePathsFromBash(command) {
 
   // 匹配 tee 命令：tee file / tee -a file
   const teePattern = /\btee\s+(?:-[aA]+\s+)?['"]?((?:\.\/|\.\.\/|\/)[^\s'";&|>]+)['"]?/g;
-  while ((match = teePattern.exec(command)) !== null) {
+  while ((match = teePattern.exec(cleaned)) !== null) {
     paths.push(match[1]);
   }
 

@@ -9,8 +9,10 @@
 
 import { BaseController } from '../core/BaseController.js';
 import { documentService } from '../../services/documents/DocumentService.js';
+import { readmeService } from '../../services/documents/ReadmeService.js';
 import { NotFoundError, ValidationError } from '../../middleware/error-handler.middleware.js';
 import { createLogger } from '../../utils/logger.js';
+import { validateContainerPath, validateProjectFilePath, validateProjectName } from '../../utils/pathValidator.js';
 
 const logger = createLogger('controllers/api/DocumentController');
 
@@ -40,6 +42,11 @@ export class DocumentController extends BaseController {
         throw new ValidationError('Project name is required');
       }
 
+      const nameCheck = validateProjectName(projectName);
+      if (!nameCheck.valid) {
+        throw new ValidationError(nameCheck.error);
+      }
+
       const documents = await documentService.getProjectDocuments(userId, projectName);
 
       this._success(res, documents);
@@ -63,6 +70,11 @@ export class DocumentController extends BaseController {
 
       if (!projectName) {
         throw new ValidationError('Project name is required');
+      }
+
+      const nameCheck = validateProjectName(projectName);
+      if (!nameCheck.valid) {
+        throw new ValidationError(nameCheck.error);
       }
 
       if (!req.file) {
@@ -104,6 +116,16 @@ export class DocumentController extends BaseController {
         throw new ValidationError('Project name and file path are required');
       }
 
+      const nameCheck = validateProjectName(projectName);
+      if (!nameCheck.valid) {
+        throw new ValidationError(nameCheck.error);
+      }
+
+      const pathCheck = validateProjectFilePath(filePath, projectName);
+      if (!pathCheck.valid) {
+        throw new ValidationError(pathCheck.error);
+      }
+
       await documentService.deleteDocument(userId, projectName, filePath, docType);
 
       this._success(res, null, 'Document deleted successfully');
@@ -127,8 +149,9 @@ export class DocumentController extends BaseController {
         throw new ValidationError('file_path and content are required');
       }
 
-      if (!filePath.startsWith('/workspace/')) {
-        throw new ValidationError('Invalid file path');
+      const pathCheck = validateContainerPath(filePath);
+      if (!pathCheck.valid) {
+        throw new ValidationError(pathCheck.error);
       }
 
       await documentService.saveDocumentContent(userId, filePath, content);
@@ -154,14 +177,44 @@ export class DocumentController extends BaseController {
         throw new ValidationError('file_path query parameter is required');
       }
 
-      // 安全校验：确保路径在 /workspace 下
-      if (!filePath.startsWith('/workspace/')) {
-        throw new ValidationError('Invalid file path');
+      const pathCheck = validateContainerPath(filePath);
+      if (!pathCheck.valid) {
+        throw new ValidationError(pathCheck.error);
       }
 
       const result = await documentService.getDocumentContent(userId, filePath);
 
       this._success(res, result);
+    } catch (error) {
+      this._handleError(error, req, res, next);
+    }
+  }
+
+  /**
+   * 更新文档摘要
+   * PUT /api/projects/:name/documents/summary
+   * @param {Object} req - Express 请求对象
+   * @param {Object} res - Express 响应对象
+   */
+  async updateSummary(req, res, next) {
+    try {
+      const userId = this._getUserId(req);
+      const { name: projectName } = req.params;
+      const { file_name: fileName, summary } = req.body;
+
+      if (!fileName || summary === undefined) {
+        throw new ValidationError('file_name and summary are required');
+      }
+
+      const nameCheck = validateProjectName(projectName);
+      if (!nameCheck.valid) {
+        throw new ValidationError(nameCheck.error);
+      }
+
+      await readmeService.updateSummary(userId, projectName, fileName, summary);
+      readmeService.invalidateCache(userId, projectName);
+
+      this._success(res, null, 'Summary updated');
     } catch (error) {
       this._handleError(error, req, res, next);
     }

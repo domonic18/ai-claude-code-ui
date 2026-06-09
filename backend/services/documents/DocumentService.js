@@ -15,6 +15,7 @@ import { PassThrough } from 'stream';
 import path from 'path';
 import { summaryService } from './SummaryService.js';
 import { readmeService } from './ReadmeService.js';
+import { validateContainerPath, validateProjectFilePath } from '../../utils/pathValidator.js';
 
 const logger = createLogger('services/documents/DocumentService');
 
@@ -144,10 +145,10 @@ export class DocumentService {
   async deleteDocument(userId, projectName, filePath, docType) {
     await containerManager.getOrCreateContainer(userId);
 
-    // 安全校验：确保路径在项目目录内
-    const safeBase = `/workspace/${projectName}`;
-    if (!filePath.startsWith(safeBase)) {
-      throw new Error('Invalid file path: path traversal detected');
+    // 安全校验：确保路径在项目目录内（normalize 防止 .. 遍历）
+    const pathCheck = validateProjectFilePath(filePath, projectName);
+    if (!pathCheck.valid) {
+      throw new Error(pathCheck.error);
     }
 
     // 删除文件
@@ -181,9 +182,10 @@ export class DocumentService {
    * @returns {Promise<{content: string, mime_type: string}>}
    */
   async getDocumentContent(userId, filePath) {
-    // 安全校验
-    if (!filePath.startsWith('/workspace/')) {
-      throw new Error('Invalid file path');
+    // 安全校验（normalize 防止 .. 遍历）
+    const pathCheck = validateContainerPath(filePath);
+    if (!pathCheck.valid) {
+      throw new Error(pathCheck.error);
     }
 
     await containerManager.getOrCreateContainer(userId);
@@ -205,8 +207,9 @@ export class DocumentService {
    * @returns {Promise<void>}
    */
   async saveDocumentContent(userId, filePath, content) {
-    if (!filePath.startsWith('/workspace/')) {
-      throw new Error('Invalid file path');
+    const pathCheck = validateContainerPath(filePath);
+    if (!pathCheck.valid) {
+      throw new Error(pathCheck.error);
     }
 
     await containerManager.getOrCreateContainer(userId);
@@ -263,53 +266,8 @@ export class DocumentService {
    * @private
    */
   async _scanGeneratedDir(userId, projectName) {
-    const generatedDir = `/workspace/${projectName}/generated_docs`;
-
-    try {
-      await containerManager.getOrCreateContainer(userId);
-
-      // 递归列出 generated_docs/ 下所有文件（限制 200 个）
-      const fileListOutput = await this._execCommandOutput(userId, [
-        'sh', '-c',
-        `find "${generatedDir}" -type f 2>/dev/null | head -200`
-      ]);
-
-      if (!fileListOutput || !fileListOutput.trim()) {
-        return [];
-      }
-
-      const filePaths = fileListOutput.trim().split('\n').filter(line => line.trim());
-      const results = [];
-
-      for (const filePath of filePaths) {
-        try {
-          const sizeOutput = await this._execCommandOutput(userId, [
-            'sh', '-c',
-            `wc -c < "${filePath}" 2>/dev/null | tr -d ' '`
-          ]);
-          const mtimeOutput = await this._execCommandOutput(userId, [
-            'sh', '-c',
-            `stat -c '%Y' "${filePath}" 2>/dev/null || echo '0'`
-          ]);
-          const fileName = filePath.split('/').pop();
-          results.push({
-            file_name: fileName,
-            file_path: filePath,
-            file_size: parseInt(sizeOutput.trim(), 10) || 0,
-            type: 'ai_generated',
-            created_at: new Date(parseInt(mtimeOutput.trim(), 10) * 1000).toISOString()
-          });
-        } catch {
-          // 跳过无法读取的文件
-        }
-      }
-
-      return results;
-    } catch (error) {
-      // 目录可能不存在，返回空数组
-      logger.debug({ userId, projectName, err: error }, 'generated_docs 目录扫描跳过');
-      return [];
-    }
+    const dir = `/workspace/${projectName}/generated_docs`;
+    return this._scanDirectory(userId, projectName, dir, 'ai_generated', 200);
   }
 
   /**
@@ -345,51 +303,66 @@ export class DocumentService {
    * @private
    */
   async _scanUploads(userId, projectName) {
-    const uploadDir = `/workspace/${projectName}/${DOCUMENTS_DIR}/${UPLOADS_SUBDIR}`;
+    const dir = `/workspace/${projectName}/${DOCUMENTS_DIR}/${UPLOADS_SUBDIR}`;
+    return this._scanDirectory(userId, projectName, dir, 'upload', 100);
+  }
 
+  /**
+   * 通用目录扫描方法
+   * 在容器内扫描指定目录，获取文件列表及元数据
+   * @param {number} userId - 用户 ID
+   * @param {string} projectName - 项目名称（仅用于日志）
+   * @param {string} directory - 容器内目录路径
+   * @param {'upload'|'ai_generated'} docType - 文档类型
+   * @param {number} maxFiles - 最大文件数
+   * @returns {Promise<Array>}
+   * @private
+   */
+  async _scanDirectory(userId, projectName, directory, docType, maxFiles) {
     try {
       await containerManager.getOrCreateContainer(userId);
 
-      // 使用 find 列出文件路径，再用 wc/stat 获取元数据（兼容 BusyBox/Alpine）
+      // projectName 已在 controller 层经 PathUtils.validateProjectName 校验，
+      // 禁止 <>:"|?*/\ 等 shell 特殊字符，因此可安全拼接进 sh -c
       const fileListOutput = await this._execCommandOutput(userId, [
         'sh', '-c',
-        `find "${uploadDir}" -type f 2>/dev/null | head -100`
+        `find "${directory}" -type f 2>/dev/null | head -${maxFiles}`,
       ]);
 
       if (!fileListOutput || !fileListOutput.trim()) {
         return [];
       }
 
-      const filePaths = fileListOutput.trim().split('\n').filter(line => line.trim());
-      const results = [];
+      const filePaths = fileListOutput.trim().split('\n')
+        .map(line => line.trim())
+        .filter(Boolean);
 
+      const results = [];
       for (const filePath of filePaths) {
         try {
-          const sizeOutput = await this._execCommandOutput(userId, [
-            'sh', '-c',
-            `wc -c < "${filePath}" 2>/dev/null | tr -d ' '`
-          ]);
-          const mtimeOutput = await this._execCommandOutput(userId, [
-            'sh', '-c',
-            `stat -c '%Y' "${filePath}" 2>/dev/null || echo '0'`
+          const [sizeOutput, mtimeOutput] = await Promise.all([
+            this._execCommandOutput(userId, [
+              'sh', '-c', `wc -c < "${filePath}" 2>/dev/null | tr -d ' '`,
+            ]),
+            this._execCommandOutput(userId, [
+              'sh', '-c', `stat -c '%Y' "${filePath}" 2>/dev/null || echo '0'`,
+            ]),
           ]);
           const fileName = filePath.split('/').pop();
           results.push({
             file_name: fileName,
             file_path: filePath,
             file_size: parseInt(sizeOutput.trim(), 10) || 0,
-            type: 'upload',
-            created_at: new Date(parseInt(mtimeOutput.trim(), 10) * 1000).toISOString()
+            type: docType,
+            created_at: new Date(parseInt(mtimeOutput.trim(), 10) * 1000).toISOString(),
           });
         } catch {
           // 跳过无法读取的文件
         }
       }
-
       return results;
     } catch (error) {
-      // 目录可能不存在，返回空数组
-      logger.debug({ userId, projectName, err: error }, 'uploads 目录扫描跳过');
+      logger.debug({ userId, projectName, directory, err: error }, `${docType} 目录扫描跳过`);
       return [];
     }
   }
@@ -471,10 +444,17 @@ export class DocumentService {
 
   /**
    * 向容器内写入文件
+   *
+   * 使用 spawn 代替 execSync，将路径作为数组参数传递，
+   * 避免命令字符串拼接导致的注入风险。
+   *
+   * @param {number} userId - 用户 ID
+   * @param {string} containerFilePath - 容器内文件路径
+   * @param {Buffer} buffer - 文件内容
    * @private
    */
   async _writeFileToContainer(userId, containerFilePath, buffer) {
-    const { execSync } = await import('child_process');
+    const { spawn } = await import('child_process');
     const container = await containerManager.getOrCreateContainer(userId);
     const dockerContainer = containerManager.docker.getContainer(container.id);
 
@@ -493,15 +473,28 @@ export class DocumentService {
     await fs.writeFile(localFilePath, buffer);
     logger.info({ userId, localFilePath, relativePath }, '[文档上传] 本地临时文件已写入');
 
-    // 创建 tar：从 tmpDir/workspace 目录打包，路径为 relativePath
+    // 创建 tar：使用 spawn 传参，避免 shell 注入
     const tarPath = path.join(tmpDir, 'archive.tar');
-    const tarCommand = `tar --format=posix -cf "${tarPath}" -C "${tmpDir}/workspace" "${relativePath}"`;
-    logger.info({ userId, tarCommand }, '[文档上传] 执行 tar 命令');
+    const tarArgs = ['--format=posix', '-cf', tarPath, '-C', path.join(tmpDir, 'workspace'), relativePath];
+    logger.info({ userId, tarArgs }, '[文档上传] 执行 tar 命令');
 
     try {
-      execSync(tarCommand, { cwd: tmpDir });
+      await new Promise((resolve, reject) => {
+        const proc = spawn('tar', tarArgs, { cwd: tmpDir });
+        const stderrChunks = [];
+        proc.stderr.on('data', (chunk) => stderrChunks.push(chunk));
+        proc.on('error', reject);
+        proc.on('close', (code) => {
+          if (code !== 0) {
+            const stderr = Buffer.concat(stderrChunks).toString();
+            reject(new Error(`tar failed (exit ${code}): ${stderr}`));
+          } else {
+            resolve();
+          }
+        });
+      });
     } catch (tarErr) {
-      logger.error({ err: tarErr, tarCommand }, '[文档上传] tar 命令失败');
+      logger.error({ err: tarErr, tarArgs }, '[文档上传] tar 命令失败');
       throw new Error(`Failed to create tar archive: ${tarErr.message}`);
     }
 
