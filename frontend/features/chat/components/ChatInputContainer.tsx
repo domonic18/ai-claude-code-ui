@@ -94,6 +94,9 @@ export function ChatInputContainer({
         rows={minRows}
         className="flex-1 resize-none bg-transparent outline-none text-foreground placeholder-muted-foreground disabled:opacity-50"
         style={{ minHeight: `${minRows * 1.5}rem` }}
+        /* 阻止浏览器对图片拖拽的默认处理，让 drop 事件冒泡到外层 dropzone */
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => { e.preventDefault(); e.stopPropagation(); }}
       />
 
       {/* Action buttons */}

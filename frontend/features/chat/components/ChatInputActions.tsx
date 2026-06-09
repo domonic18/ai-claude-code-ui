@@ -72,7 +72,8 @@ export function ChatInputActions({
                 };
 
                 if (file.type.startsWith('image/')) {
-                  // For images, store as base64
+                  // 图片：先上传到服务器（同步右侧面板），再读 base64（聊天内联显示）
+                  handleFileUpload(file, attachment);
                   const reader = new FileReader();
                   reader.onload = (ev) => {
                     attachment.data = ev.target?.result as string;
@@ -80,7 +81,7 @@ export function ChatInputActions({
                   };
                   reader.readAsDataURL(file);
                 } else {
-                  // For documents, upload to server
+                  // 文档：上传到服务器
                   handleFileUpload(file, attachment);
                 }
               }

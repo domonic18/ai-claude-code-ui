@@ -3,6 +3,8 @@
  *
  * Handles file upload logic for the ChatInput component.
  * Manages file drop processing, validation, and server uploads.
+ *
+ * 统一流程：所有文件先上传到服务器（同步），图片额外读 base64（异步，不阻塞上传）
  */
 
 import { useCallback } from 'react';
@@ -30,8 +32,8 @@ interface UseFileUploadHandlerReturn {
   /** Get root props for dropzone */
   getRootProps: (props?: React.HTMLAttributes<HTMLElement>) => React.HTMLAttributes<HTMLElement>;
   /** Get input props for dropzone */
-  getInputProps: (props?: React.InputHTMLAttributes<HTMLInputElement>) => React.InputHTMLAttributes<HTMLInputElement>;
-  /** Upload a single file to server (for non-image files) */
+  getInputProps: (props?: React.InputHTMLAttributes<HTMLInputElement>) => React.HTMLAttributes<HTMLInputElement>;
+  /** Upload a single file to server */
   handleFileUpload: (file: File, attachment: FileAttachment) => Promise<void>;
 }
 
@@ -65,7 +67,6 @@ async function uploadFileToServer(
 
   try {
     attachment.uploadProgress = 0;
-    // Only add file once on initial upload
     onAddFile?.(attachment);
 
     const response = await authenticatedFetch(
@@ -85,16 +86,33 @@ async function uploadFileToServer(
     const data = await response.json();
     attachment.path = data.data?.file_path;
     attachment.uploadProgress = 100;
-    // Update the existing file instead of adding a duplicate
     onAddFile?.(attachment);
     // Notify document panel to refresh its list
     emitDocumentUploaded();
   } catch (error) {
     logger.error('[uploadFileToServer] File upload error:', error);
     attachment.error = error instanceof Error ? error.message : 'Upload failed';
-    // Update the existing file with error state
     onAddFile?.(attachment);
   }
+}
+
+/**
+ * 异步读取图片为 base64，不阻塞服务器上传
+ */
+function readImageAsBase64(
+  file: File,
+  attachment: FileAttachment,
+  onAddFile?: (file: FileAttachment) => void
+) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    attachment.data = e.target?.result as string;
+    onAddFile?.(attachment);
+  };
+  reader.onerror = () => {
+    logger.error('[readImageAsBase64] FileReader error for', file.name);
+  };
+  reader.readAsDataURL(file);
 }
 
 /**
@@ -106,10 +124,12 @@ export function useFileUploadHandler({
   authenticatedFetch,
   selectedProject,
 }: UseFileUploadHandlerOptions): UseFileUploadHandlerReturn {
-  /**
-   * Handle file drop
-   */
   const onDrop = useCallback((acceptedFiles: File[]) => {
+    if (!authenticatedFetch || !selectedProject) {
+      logger.error('[onDrop] authenticatedFetch or selectedProject not available');
+      return;
+    }
+
     acceptedFiles.forEach(file => {
       if (file.size > maxFileSize) {
         logger.error(`File ${file.name} exceeds maximum size of ${maxFileSize} bytes`);
@@ -117,35 +137,30 @@ export function useFileUploadHandler({
       }
 
       const attachment: FileAttachment = {
-        id: `${file.name}-${Date.now()}`, // Generate unique ID
+        id: `${file.name}-${Date.now()}`,
         name: file.name,
         size: file.size,
         type: file.type,
       };
 
+      // 所有类型统一：先上传到服务器（同步调用）
+      uploadFileToServer(file, attachment, authenticatedFetch, selectedProject, onAddFile);
+
+      // 图片额外读 base64（异步，不阻塞上传）
       if (file.type.startsWith('image/')) {
-        // For images, store as base64 data URL for AI AND upload to DocumentService for right panel
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          attachment.data = e.target?.result as string;
-          onAddFile?.(attachment);
-          // Also upload to DocumentService so the image appears in the right panel
-          uploadFileToServer(file, { ...attachment }, authenticatedFetch!, selectedProject, onAddFile);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        // For documents, upload to DocumentService (stores in documents/uploads/)
-        uploadFileToServer(file, attachment, authenticatedFetch!, selectedProject, onAddFile);
+        readImageAsBase64(file, attachment, onAddFile);
       }
     });
   }, [maxFileSize, onAddFile, authenticatedFetch, selectedProject]);
 
-  /**
-   * Upload a single file to server (for non-image files)
-   * Used by ChatInputActions file picker button.
-   */
   const handleFileUploadCallback = useCallback((file: File, attachment: FileAttachment) => {
-    return uploadFileToServer(file, attachment, authenticatedFetch!, selectedProject, onAddFile);
+    if (!authenticatedFetch || !selectedProject) {
+      logger.error('[handleFileUpload] authenticatedFetch or selectedProject not available');
+      attachment.error = 'Upload service unavailable';
+      onAddFile?.(attachment);
+      return Promise.resolve();
+    }
+    return uploadFileToServer(file, attachment, authenticatedFetch, selectedProject, onAddFile);
   }, [authenticatedFetch, selectedProject, onAddFile]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
