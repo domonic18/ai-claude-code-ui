@@ -23,6 +23,10 @@ export interface DocumentItem {
   conversation_id?: string | null;
   /** 关联的消息 ID（用于跳转定位） */
   message_id?: string | null;
+  /** 摘要生成状态 */
+  summary_status?: 'pending' | 'ready' | 'error';
+  /** AI 生成的摘要文本 */
+  summary?: string | null;
 }
 
 /** 文档列表响应 */

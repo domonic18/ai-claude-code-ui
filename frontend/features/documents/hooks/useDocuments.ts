@@ -4,12 +4,13 @@
  * 管理项目文档的加载、上传、删除
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { DocumentItem, DocumentListResponse } from '../types/document.types';
 import {
   fetchDocuments,
   uploadDocument,
-  deleteDocument as deleteDocApi
+  deleteDocument as deleteDocApi,
+  updateDocumentSummary
 } from '../services/documentService';
 import { onDocumentCreated, onDocumentUploaded } from '../services/documentEvents';
 import { logger } from '../../../shared/utils/logger';
@@ -29,6 +30,8 @@ interface UseDocumentsReturn {
   upload: (file: File) => Promise<void>;
   /** 删除文档 */
   remove: (filePath: string, docType: 'upload' | 'ai_generated') => Promise<void>;
+  /** 更新文档摘要 */
+  updateSummary: (fileName: string, summary: string) => Promise<void>;
   /** 添加 AI 文档（来自 WebSocket 事件） */
   addAIDocument: (doc: DocumentItem) => void;
 }
@@ -48,7 +51,12 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
     setAiGenerated(prev => {
       // 避免重复
       if (prev.some(d => d.file_path === doc.file_path)) return prev;
-      return [...prev, doc];
+      // WebSocket 事件不含 summary_status，补上 pending 以触发轮询和"生成中"UI
+      return [...prev, {
+        ...doc,
+        summary_status: doc.summary_status ?? 'pending' as const,
+        summary: doc.summary ?? null,
+      }];
     });
   }, []);
 
@@ -102,6 +110,42 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
     return unsubscribe;
   }, [refresh]);
 
+  // 轮询：当有 pending 摘要时每 2 秒刷新一次，最多 60 秒
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    const hasPending =
+      uploads.some(u => u.summary_status === 'pending') ||
+      aiGenerated.some(d => d.summary_status === 'pending');
+
+    if (hasPending && !pollingRef.current) {
+      const startTime = Date.now();
+      pollingRef.current = setInterval(() => {
+        if (Date.now() - startTime > 60_000) {
+          // 超时停止轮询
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current);
+            pollingRef.current = null;
+          }
+          return;
+        }
+        refresh();
+      }, 2000);
+    }
+
+    // 所有摘要都已就绪，停止轮询
+    if (!hasPending && pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [uploads, aiGenerated, refresh]);
+
   const upload = useCallback(async (file: File) => {
     if (!projectName) {
       logger.debug('[useDocuments] upload 跳过: 无 projectName');
@@ -135,6 +179,19 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
     }
   }, [projectName, refresh]);
 
+  const updateSummary = useCallback(async (fileName: string, summary: string) => {
+    if (!projectName) return;
+
+    try {
+      await updateDocumentSummary(projectName, fileName, summary);
+      await refresh();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Update summary failed';
+      setError(msg);
+      logger.error({ err, projectName, fileName }, 'Update summary failed');
+    }
+  }, [projectName, refresh]);
+
   return {
     uploads,
     aiGenerated,
@@ -143,6 +200,7 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
     refresh,
     upload,
     remove,
+    updateSummary,
     addAIDocument
   };
 }

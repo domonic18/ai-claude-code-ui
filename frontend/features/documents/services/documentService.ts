@@ -114,3 +114,21 @@ export async function saveDocumentContent(
   );
   if (!res.ok) throw new Error(`Failed to save document: ${res.statusText}`);
 }
+
+/**
+ * 更新文档摘要
+ */
+export async function updateDocumentSummary(
+  projectName: string,
+  fileName: string,
+  summary: string
+): Promise<void> {
+  const res = await authenticatedFetch(
+    `${API_BASE}/${encodeURIComponent(projectName)}/documents/summary`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ file_name: fileName, summary })
+    }
+  );
+  if (!res.ok) throw new Error(`Failed to update summary: ${res.statusText}`);
+}

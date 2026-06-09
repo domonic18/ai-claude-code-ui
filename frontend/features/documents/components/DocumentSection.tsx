@@ -23,6 +23,8 @@ interface DocumentSectionProps {
   onNavigateToConversation?: (conversationId: string, messageId?: string) => void;
   /** 拖拽到聊天回调 */
   onDragToChat?: (doc: DocumentItemType) => void;
+  /** 编辑摘要回调 */
+  onEditSummary?: (fileName: string, summary: string) => Promise<void>;
 }
 
 /**
@@ -35,7 +37,8 @@ export const DocumentSection: React.FC<DocumentSectionProps> = ({
   onPreview,
   onDelete,
   onNavigateToConversation,
-  onDragToChat
+  onDragToChat,
+  onEditSummary
 }) => {
   if (documents.length === 0) {
     return (
@@ -51,6 +54,8 @@ export const DocumentSection: React.FC<DocumentSectionProps> = ({
     );
   }
 
+  const pendingCount = documents.filter(d => d.summary_status === 'pending').length;
+
   return (
     <div className="px-3 py-3 border-b border-border last:border-b-0">
       <div className="flex items-center gap-1.5 mb-2">
@@ -59,6 +64,11 @@ export const DocumentSection: React.FC<DocumentSectionProps> = ({
           {title}
           <span className="ml-1 text-muted-foreground/60">({documents.length})</span>
         </span>
+        {pendingCount > 0 && (
+          <span className="text-[10px] text-amber-500 animate-pulse">
+            {pendingCount} 个摘要生成中...
+          </span>
+        )}
       </div>
       <div className="space-y-1">
         {documents.map((doc) => (
@@ -73,6 +83,7 @@ export const DocumentSection: React.FC<DocumentSectionProps> = ({
                 : undefined
             }
             onDragToChat={onDragToChat ? () => onDragToChat(doc) : undefined}
+            onEditSummary={onEditSummary}
           />
         ))}
       </div>

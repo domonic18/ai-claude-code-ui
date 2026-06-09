@@ -32,6 +32,7 @@ export const DocumentPanel: React.FC<DocumentPanelProps> = ({
     loading,
     upload,
     remove,
+    updateSummary,
   } = useDocuments(projectName);
 
   const {
@@ -147,6 +148,7 @@ export const DocumentPanel: React.FC<DocumentPanelProps> = ({
               documents={uploads}
               onPreview={handlePreview}
               onDelete={(doc) => handleDelete(doc.file_path, 'upload')}
+              onEditSummary={updateSummary}
             />
             <DocumentSection
               title="AI 生成"
@@ -155,6 +157,7 @@ export const DocumentPanel: React.FC<DocumentPanelProps> = ({
               onPreview={handlePreview}
               onDelete={(doc) => handleDelete(doc.file_path, 'ai_generated')}
               onNavigateToConversation={(convId, msgId) => navigateToConversation(convId, msgId)}
+              onEditSummary={updateSummary}
             />
           </>
         )}
