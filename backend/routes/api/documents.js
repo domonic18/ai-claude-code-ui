@@ -36,15 +36,34 @@ const upload = multer({
     files: 1,
   },
   fileFilter: (_req, file, cb) => {
-    // 允许常见文档类型
+    // 扩展名白名单
     const allowedExts = /\.(md|txt|pdf|doc|docx|xls|xlsx|csv|json|png|jpg|jpeg|gif|svg|webp|html|xml)$/i;
     const ext = '.' + file.originalname.split('.').pop().toLowerCase();
+
+    // MIME 类型白名单（扩展名校验 + MIME 校验双重防线）
+    const allowedMimes = [
+      'text/plain', 'text/markdown', 'text/csv', 'text/html', 'text/xml',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/json',
+      'image/png', 'image/jpeg', 'image/gif', 'image/svg+xml', 'image/webp',
+    ];
+
     logger.info({ fileName: file.originalname, ext, mimeType: file.mimetype }, '[文档上传] multer 文件过滤');
-    if (allowedExts.test(ext)) {
-      cb(null, true);
-    } else {
-      cb(new Error(`Unsupported file type: ${ext}`));
+
+    if (!allowedExts.test(ext)) {
+      return cb(new Error(`Unsupported file type: ${ext}`));
     }
+
+    if (!allowedMimes.includes(file.mimetype)) {
+      logger.warn({ fileName: file.originalname, ext, mimeType: file.mimetype }, '[文档上传] MIME 类型不在白名单');
+      return cb(new Error(`Unsupported MIME type: ${file.mimetype}`));
+    }
+
+    cb(null, true);
   },
 });
 

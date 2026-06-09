@@ -223,10 +223,12 @@ export class ReadmeService {
 
     // 使用 heredoc 写入，避免 shell 转义问题
     // 先写到一个临时文件再 mv，避免部分写入
+    // 使用唯一分隔符防止 AI 生成的摘要内容中碰巧包含分隔符导致截断
+    const delimiter = `README_EOF_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const tmpPath = `${dir}/.readme.tmp`;
     const writeCmd = [
       'sh', '-c',
-      `cat > '${tmpPath}' << 'README_EOF'\n${content}\nREADME_EOF\nmv '${tmpPath}' '${filePath}'`
+      `cat > '${tmpPath}' << '${delimiter}'\n${content}\n${delimiter}\nmv '${tmpPath}' '${filePath}'`
     ];
     await this._execCommand(userId, writeCmd);
   }

@@ -15,7 +15,7 @@ import { PassThrough } from 'stream';
 import path from 'path';
 import { summaryService } from './SummaryService.js';
 import { readmeService } from './ReadmeService.js';
-import { validateContainerPath, validateProjectFilePath } from '../../utils/pathValidator.js';
+import { validateContainerPath, validateProjectFilePath, validateProjectName } from '../../utils/pathValidator.js';
 
 const logger = createLogger('services/documents/DocumentService');
 
@@ -320,10 +320,14 @@ export class DocumentService {
    */
   async _scanDirectory(userId, projectName, directory, docType, maxFiles) {
     try {
-      await containerManager.getOrCreateContainer(userId);
+      // 纵深防御：service 层再次校验 projectName，防止绕过 controller 校验
+      const nameCheck = validateProjectName(projectName);
+      if (!nameCheck.valid) {
+        logger.warn({ userId, projectName, err: nameCheck.error }, '[scanDirectory] projectName 校验失败');
+        return [];
+      }
 
-      // projectName 已在 controller 层经 PathUtils.validateProjectName 校验，
-      // 禁止 <>:"|?*/\ 等 shell 特殊字符，因此可安全拼接进 sh -c
+      await containerManager.getOrCreateContainer(userId);
       const fileListOutput = await this._execCommandOutput(userId, [
         'sh', '-c',
         `find "${directory}" -type f 2>/dev/null | head -${maxFiles}`,

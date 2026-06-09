@@ -143,13 +143,14 @@ export class DocumentController extends BaseController {
   async saveDocumentContent(req, res, next) {
     try {
       const userId = this._getUserId(req);
+      const { name: projectName } = req.params;
       const { file_path: filePath, content } = req.body;
 
       if (!filePath || content === undefined) {
         throw new ValidationError('file_path and content are required');
       }
 
-      const pathCheck = validateContainerPath(filePath);
+      const pathCheck = validateProjectFilePath(filePath, projectName);
       if (!pathCheck.valid) {
         throw new ValidationError(pathCheck.error);
       }
@@ -171,13 +172,14 @@ export class DocumentController extends BaseController {
   async getDocumentContent(req, res, next) {
     try {
       const userId = this._getUserId(req);
+      const { name: projectName } = req.params;
       const { file_path: filePath } = req.query;
 
       if (!filePath) {
         throw new ValidationError('file_path query parameter is required');
       }
 
-      const pathCheck = validateContainerPath(filePath);
+      const pathCheck = validateProjectFilePath(filePath, projectName);
       if (!pathCheck.valid) {
         throw new ValidationError(pathCheck.error);
       }

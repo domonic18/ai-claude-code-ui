@@ -60,13 +60,14 @@ function createMockedService() {
     // 处理 sh -c 写入命令
     if (cmd[0] === 'sh' && cmd[1] === '-c') {
       const script = cmd[2];
-      // 提取 heredoc 内容：cat > '...tmp' << 'README_EOF'\nCONTENT\nREADME_EOF\nmv ...
-      const heredocMatch = script.match(/cat\s+>\s+'[^']*'\s+<<\s+'README_EOF'\n([\s\S]*?)\nREADME_EOF/);
+      // 提取 heredoc 内容：cat > '...tmp' << 'README_EOF_xxx_yyy'\nCONTENT\nREADME_EOF_xxx_yyy\nmv ...
+      // 分隔符为动态生成，格式 README_EOF_{timestamp}_{random}
+      const heredocMatch = script.match(/cat\s+>\s+'[^']*'\s+<<\s+'(README_EOF_[^']+)'\n([\s\S]*?)\n\1/);
       if (heredocMatch) {
         // 提取 mv 目标路径
         const mvMatch = script.match(/mv\s+'[^']*'\s+'([^']*)'/);
         if (mvMatch) {
-          fileStore[mvMatch[1]] = heredocMatch[1];
+          fileStore[mvMatch[1]] = heredocMatch[2];
         }
       }
     }
