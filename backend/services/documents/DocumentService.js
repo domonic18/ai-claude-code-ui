@@ -13,6 +13,8 @@ import containerManager from '../container/core/index.js';
 import { createLogger } from '../../utils/logger.js';
 import { PassThrough } from 'stream';
 import path from 'path';
+import { summaryService } from './SummaryService.js';
+import { readmeService } from './ReadmeService.js';
 
 const logger = createLogger('services/documents/DocumentService');
 
@@ -33,16 +35,44 @@ export class DocumentService {
    * @returns {Promise<{uploads: Array, aiGenerated: Array}>}
    */
   async getProjectDocuments(userId, projectName) {
-    const [uploads, aiManifest, generatedFiles] = await Promise.all([
+    const [uploads, aiManifest, generatedFiles, readmeEntries] = await Promise.all([
       this._scanUploads(userId, projectName),
       this._readAIManifest(userId, projectName),
-      this._scanGeneratedDir(userId, projectName)
+      this._scanGeneratedDir(userId, projectName),
+      readmeService.parseEntries(userId, projectName),
     ]);
 
     // 合并去重：manifest 记录 + 目录扫描结果（以 file_path 为唯一键）
     const aiGenerated = this._mergeDocuments(aiManifest, generatedFiles);
 
-    return { uploads, aiGenerated };
+    // 为 uploads 附加摘要状态和内容
+    const enrichedUploads = uploads.map(upload => {
+      const entry = readmeEntries.find(e => e.fileName === upload.file_name);
+      return {
+        ...upload,
+        summary_status: entry ? 'ready' : 'pending',
+        summary: entry?.summary || null,
+      };
+    });
+
+    // 为 AI 生成文档也附加摘要状态
+    const enrichedAiGenerated = aiGenerated.map(doc => {
+      const entry = readmeEntries.find(e => e.fileName === doc.file_name);
+      return {
+        ...doc,
+        summary_status: entry ? 'ready' : 'pending',
+        summary: entry?.summary || null,
+      };
+    });
+
+    logger.info({
+      projectName,
+      readmeEntries: readmeEntries.map(e => e.fileName),
+      uploads: enrichedUploads.map(u => ({ name: u.file_name, status: u.summary_status })),
+      aiGenerated: enrichedAiGenerated.map(d => ({ name: d.file_name, status: d.summary_status })),
+    }, '[getProjectDocuments] 文档摘要状态');
+
+    return { uploads: enrichedUploads, aiGenerated: enrichedAiGenerated };
   }
 
   /**
@@ -85,13 +115,21 @@ export class DocumentService {
 
     logger.info({ userId, projectName, file: safeName }, '文档上传成功');
 
+    // 异步生成 AI 摘要（fire-and-forget，不阻塞上传响应）
+    summaryService.generateSummary(userId, projectName, {
+      file_path: containerFilePath,
+      file_name: safeName,
+      file_size: file.size,
+    });
+
     return {
       file_name: safeName,
       file_path: containerFilePath,
       file_size: file.size,
       mime_type: file.mimetype,
       type: 'upload',
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      summary_status: 'pending',
     };
   }
 
@@ -115,9 +153,21 @@ export class DocumentService {
     // 删除文件
     await this._execCommand(userId, ['rm', '-f', filePath]);
 
-    // 如果是 AI 生成文档，从 manifest 中移除
+    // 如果是上传文档，从 readme.md 中移除摘要条目
+    if (docType === 'upload') {
+      const fileName = filePath.split('/').pop();
+      await readmeService.removeEntry(userId, projectName, fileName).catch((err) => {
+        logger.warn({ err, userId, projectName, fileName }, '从 readme.md 移除条目失败（非致命）');
+      });
+    }
+
+    // 如果是 AI 生成文档，从 manifest 中移除，并移除 readme 条目
     if (docType === 'ai_generated') {
       await this._removeFromAIManifest(userId, projectName, filePath);
+      const fileName = filePath.split('/').pop();
+      await readmeService.removeEntry(userId, projectName, fileName).catch((err) => {
+        logger.warn({ err, userId, projectName, fileName }, '从 readme.md 移除 AI 文档条目失败（非致命）');
+      });
     }
 
     logger.info({ userId, projectName, filePath, docType }, '文档删除成功');
@@ -191,6 +241,13 @@ export class DocumentService {
 
     manifest.push(entry);
     await this._writeAIManifest(userId, projectName, manifest);
+
+    // 异步生成 AI 文档摘要（fire-and-forget）
+    summaryService.generateSummary(userId, projectName, {
+      file_path: docInfo.file_path,
+      file_name: entry.file_name,
+      file_size: 0, // AI 文档大小未知，摘要里显示"未知"
+    });
 
     logger.info({ userId, projectName, file: entry.file_name }, 'AI 文档已记录');
   }

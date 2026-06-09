@@ -240,25 +240,36 @@ function _trackAIDocument(tool, sessionId, writer) {
   const projectName = cwd.replace(/\/workspace\/?/, '').split('/')[0];
   if (!userId || !projectName) return;
 
-  // 异步记录，不阻塞主消息流
+  // 解析相对路径为绝对路径（与 _trackBashFileWrite 保持一致）
+  let absolutePath = filePath;
+  if (!filePath.startsWith('/')) {
+    absolutePath = `${cwd}/${filePath}`.replace(/\/+/g, '/').replace(/\/\.\//g, '/');
+  }
+
+  // 只追踪工作区内的文件
+  if (!absolutePath.startsWith('/workspace/')) return;
+
+  // 立即通知前端有新文档（不等 recordAIDocument 完成）
+  // recordAIDocument 涉及 Docker I/O（读/写 manifest），可能耗时数秒
+  // 如果先等它完成再发事件，前端右侧面板看不到实时更新
+  writer.send({
+    type: 'document-created',
+    data: {
+      file_path: absolutePath,
+      file_name: absolutePath.split('/').pop(),
+      conversation_id: sessionId,
+      message_id: tool.id,
+      type: 'ai_generated'
+    }
+  });
+
+  // 异步记录到 manifest + 触发摘要生成，不阻塞主消息流
   documentService.recordAIDocument(userId, projectName, {
-    file_path: filePath,
+    file_path: absolutePath,
     conversation_id: sessionId,
     message_id: tool.id
-  }).then(() => {
-    // 通知前端有新文档
-    writer.send({
-      type: 'document-created',
-      data: {
-        file_path: filePath,
-        file_name: filePath.split('/').pop(),
-        conversation_id: sessionId,
-        message_id: tool.id,
-        type: 'ai_generated'
-      }
-    });
   }).catch(err => {
-    logger.warn({ err, sessionId, filePath }, '[DocumentTracker] Failed to record AI document');
+    logger.warn({ err, sessionId, filePath: absolutePath }, '[DocumentTracker] Failed to record AI document');
   });
 }
 
@@ -297,21 +308,23 @@ function _trackBashFileWrite(tool, sessionId, writer) {
     if (!absolutePath.startsWith('/workspace/')) continue;
     if (absolutePath.includes('/.claude/')) continue;
 
+    // 立即通知前端（不等 recordAIDocument 的 Docker I/O 完成）
+    writer.send({
+      type: 'document-created',
+      data: {
+        file_path: absolutePath,
+        file_name: absolutePath.split('/').pop(),
+        conversation_id: sessionId,
+        message_id: tool.id,
+        type: 'ai_generated'
+      }
+    });
+
+    // 异步记录到 manifest + 触发摘要生成
     documentService.recordAIDocument(userId, projectName, {
       file_path: absolutePath,
       conversation_id: sessionId,
       message_id: tool.id
-    }).then(() => {
-      writer.send({
-        type: 'document-created',
-        data: {
-          file_path: absolutePath,
-          file_name: absolutePath.split('/').pop(),
-          conversation_id: sessionId,
-          message_id: tool.id,
-          type: 'ai_generated'
-        }
-      });
     }).catch(err => {
       logger.debug({ err, sessionId, command: command.substring(0, 100) }, '[BashTracker] Failed to track Bash file write');
     });
