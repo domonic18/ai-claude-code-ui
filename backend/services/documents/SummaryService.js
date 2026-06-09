@@ -94,7 +94,7 @@ export class SummaryService {
    *
    * @param {number} userId
    * @param {string} projectName
-   * @param {{file_path: string, file_name: string, file_size: number}} uploadResult
+   * @param {{file_path: string, file_name: string, file_size: number, source?: 'ai'|'upload'}} uploadResult
    */
   generateSummary(userId, projectName, uploadResult) {
     this._doGenerate(userId, projectName, uploadResult).catch((err) => {
@@ -105,15 +105,17 @@ export class SummaryService {
   /**
    * 实际的摘要生成逻辑
    *
-   * AI 生成文档（file_size === 0）存在时序问题：
+   * AI 生成文档存在时序问题：
    * tool_use 消息到达时文件尚未写入，extractText 会失败。
    * 因此对 AI 文档增加重试机制（最多 3 次，间隔 3 秒）。
+   * 通过 uploadResult.source === 'ai' 精确区分 AI 文档，
+   * 不再依赖 file_size === 0 判断（普通空文件上传不应触发重试）。
    *
    * @private
    */
   async _doGenerate(userId, projectName, uploadResult) {
     const { file_path, file_name, file_size } = uploadResult;
-    const isAIDoc = file_size === 0;
+    const isAIDoc = uploadResult.source === 'ai';
     const maxAttempts = isAIDoc ? AI_DOC_MAX_RETRIES : 1;
 
     logger.info({ userId, projectName, fileName: file_name, isImage: isImageFile(file_name), isAIDoc }, '[SummaryService] 开始生成摘要');

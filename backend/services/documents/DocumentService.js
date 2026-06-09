@@ -16,6 +16,7 @@ import path from 'path';
 import { summaryService } from './SummaryService.js';
 import { readmeService } from './ReadmeService.js';
 import { validateContainerPath, validateProjectFilePath, validateProjectName } from '../../utils/pathValidator.js';
+import { writeFileViaPutArchive } from '../container/utils/containerFileWriter.js';
 
 const logger = createLogger('services/documents/DocumentService');
 
@@ -121,6 +122,7 @@ export class DocumentService {
       file_path: containerFilePath,
       file_name: safeName,
       file_size: file.size,
+      source: 'upload',
     });
 
     return {
@@ -250,6 +252,7 @@ export class DocumentService {
       file_path: docInfo.file_path,
       file_name: entry.file_name,
       file_size: 0, // AI 文档大小未知，摘要里显示"未知"
+      source: 'ai', // 显式标记 AI 文档，触发重试机制
     });
 
     logger.info({ userId, projectName, file: entry.file_name }, 'AI 文档已记录');
@@ -449,8 +452,8 @@ export class DocumentService {
   /**
    * 向容器内写入文件
    *
-   * 使用 spawn 代替 execSync，将路径作为数组参数传递，
-   * 避免命令字符串拼接导致的注入风险。
+   * 复用 writeFileViaPutArchive（tar npm 包 + putArchive API），
+   * 避免维护重复的容器文件写入逻辑。
    *
    * @param {number} userId - 用户 ID
    * @param {string} containerFilePath - 容器内文件路径
@@ -458,67 +461,16 @@ export class DocumentService {
    * @private
    */
   async _writeFileToContainer(userId, containerFilePath, buffer) {
-    const { spawn } = await import('child_process');
     const container = await containerManager.getOrCreateContainer(userId);
     const dockerContainer = containerManager.docker.getContainer(container.id);
 
     logger.info({ userId, containerFilePath, bufferSize: buffer.length, containerId: container.id }, '[文档上传] _writeFileToContainer 开始');
 
-    // containerFilePath 格式: /workspace/<project>/documents/uploads/<filename>
-    // 使用正则 ^\/workspace\/ 精确去除前缀，避免误替换项目名中的 "workspace"
-    const relativePath = containerFilePath.replace(/^\/workspace\//, '');
-
-    // 本地临时目录结构: tmpDir/workspace/<relativePath>
-    const tmpDir = `/tmp/doc_upload_${Date.now()}`;
-    const fs = await import('fs/promises');
-
-    const localFilePath = path.join(tmpDir, 'workspace', relativePath);
-    await fs.mkdir(path.dirname(localFilePath), { recursive: true });
-    await fs.writeFile(localFilePath, buffer);
-    logger.info({ userId, localFilePath, relativePath }, '[文档上传] 本地临时文件已写入');
-
-    // 创建 tar：使用 spawn 传参，避免 shell 注入
-    const tarPath = path.join(tmpDir, 'archive.tar');
-    const tarArgs = ['--format=posix', '-cf', tarPath, '-C', path.join(tmpDir, 'workspace'), relativePath];
-    logger.info({ userId, tarArgs }, '[文档上传] 执行 tar 命令');
-
-    try {
-      await new Promise((resolve, reject) => {
-        const proc = spawn('tar', tarArgs, { cwd: tmpDir });
-        const stderrChunks = [];
-        proc.stderr.on('data', (chunk) => stderrChunks.push(chunk));
-        proc.on('error', reject);
-        proc.on('close', (code) => {
-          if (code !== 0) {
-            const stderr = Buffer.concat(stderrChunks).toString();
-            reject(new Error(`tar failed (exit ${code}): ${stderr}`));
-          } else {
-            resolve();
-          }
-        });
-      });
-    } catch (tarErr) {
-      logger.error({ err: tarErr, tarArgs }, '[文档上传] tar 命令失败');
-      throw new Error(`Failed to create tar archive: ${tarErr.message}`);
-    }
-
-    const tarBuffer = await fs.readFile(tarPath);
-    logger.info({ userId, tarSize: tarBuffer.length }, '[文档上传] tar 归档已创建');
-
-    await new Promise((resolve, reject) => {
-      dockerContainer.putArchive(tarBuffer, { path: '/workspace' }, (err) => {
-        if (err) {
-          logger.error({ err, userId }, '[文档上传] putArchive 失败');
-          reject(new Error(`putArchive failed: ${err.message}`));
-        } else {
-          logger.info({ userId }, '[文档上传] putArchive 成功');
-          resolve();
-        }
-      });
+    await writeFileViaPutArchive(dockerContainer, containerFilePath, buffer.toString('utf-8'), {
+      logLabel: 'DocumentService',
     });
 
-    await fs.rm(tmpDir, { recursive: true, force: true });
-    logger.info({ userId, tmpDir }, '[文档上传] 临时文件已清理');
+    logger.info({ userId, containerFilePath }, '[文档上传] 文件已写入容器');
   }
 
   /**
