@@ -18,6 +18,7 @@ import express from 'express';
 import { DocumentController } from '../../controllers/api/index.js';
 import { authenticate } from '../../middleware/index.js';
 import { createLogger } from '../../utils/logger.js';
+import { readmeService } from '../../services/documents/ReadmeService.js';
 
 const logger = createLogger('routes/api/documents');
 const router = express.Router();
@@ -97,5 +98,30 @@ router.put('/:name/documents/content', authenticate(), documentController._async
  * 获取文档内容（用于预览）
  */
 router.get('/:name/documents/content', authenticate(), documentController._asyncHandler(documentController.getDocumentContent));
+
+/**
+ * PUT /api/projects/:name/documents/summary
+ * 更新文档摘要
+ * Body: { file_name: string, summary: string }
+ */
+router.put('/:name/documents/summary', authenticate(), async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    const { name: projectName } = req.params;
+    const { file_name: fileName, summary } = req.body;
+
+    if (!fileName || summary === undefined) {
+      return res.status(400).json({ error: 'file_name and summary are required' });
+    }
+
+    await readmeService.updateSummary(userId, projectName, fileName, summary);
+    readmeService.invalidateCache(userId, projectName);
+
+    res.json({ success: true, message: 'Summary updated' });
+  } catch (err) {
+    logger.error({ err }, '[摘要更新] 路由处理失败');
+    res.status(500).json({ error: 'Failed to update summary' });
+  }
+});
 
 export default router;

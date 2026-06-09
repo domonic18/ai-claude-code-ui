@@ -22,6 +22,7 @@ import { spawnCursor, abortCursorSession, isCursorSessionActive, getActiveCursor
 import { queryCodex, abortCodexSession, isCodexSessionActive, getActiveCodexSessions } from '../../services/execution/codex/index.js';
 import { WebSocketWriter } from '../writer.js';
 import { formatReadInstructions } from '../../services/files/FileDocumentReader.js';
+import { readmeService } from '../../services/documents/ReadmeService.js';
 import { createLogger, sanitizePreview, generateTraceId, generateSpanId, runWithTrace } from '../../utils/logger.js';
 import { recordActivity } from '../../utils/usage-session-tracker.js';
 import containerManager from '../../services/container/core/index.js';
@@ -88,11 +89,25 @@ async function readImageFromContainer(userId, filePath) {
  *
  * @param {Object} data - 客户端发送的消息数据
  * @param {number} userId - 用户 ID，用于容器访问
+ * @param {string} [projectName] - 项目名称，用于注入文档上下文
  * @returns {Promise<{command: string, imageAttachments: Array}>} 处理后的命令和图片附件
  */
-async function buildClaudeCommand(data, userId) {
+async function buildClaudeCommand(data, userId, projectName) {
   let command = data.command || '';
   const attachments = data.attachments || [];
+
+  // 注入项目文档索引作为轻量上下文（元数据 + AI 摘要）
+  if (projectName && userId) {
+    try {
+      const readmeContent = await readmeService.readReadme(userId, projectName);
+      if (readmeContent) {
+        logger.info({ projectName, userId, readmeLength: readmeContent.length }, '[buildClaudeCommand] 注入项目文档索引');
+        command = `[项目文档索引]\n${readmeContent}\n\n---\n\n${command}`;
+      }
+    } catch (err) {
+      logger.warn({ err, projectName, userId }, '[buildClaudeCommand] 读取 readme.md 失败，跳过上下文注入');
+    }
+  }
 
   // 区分三种附件类型
   const imageAttachments = attachments.filter(f => f.data);
@@ -139,7 +154,7 @@ async function buildClaudeCommand(data, userId) {
  */
 async function handleClaudeCommand(data, ws, writer) {
   const originalProjectName = data.options?.projectPath?.replace(/\//g, '-') || '';
-  const { command, imageAttachments } = await buildClaudeCommand(data, ws.user?.userId);
+  const { command, imageAttachments } = await buildClaudeCommand(data, ws.user?.userId, originalProjectName);
 
   logger.info({
     userId: ws.user.userId,
