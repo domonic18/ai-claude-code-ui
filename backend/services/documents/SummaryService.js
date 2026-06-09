@@ -242,9 +242,8 @@ export class SummaryService {
    *
    * 封装 Anthropic Messages 格式的请求/响应处理，
    * 被 _callTextAIAPI 和 _generateImageSummary 共用。
-   *
-   * TODO: 当项目需要支持非 Anthropic 模型时，可将此方法重构为
-   * 按模型 provider 分发的策略模式。
+   * 若后续接入非 Anthropic 兼容模型，可在 _callAnthropicMessagesAPI 前
+   * 按 model.provider 分发到对应的 API 格式处理方法。
    *
    * @param {Object} model - 模型配置对象（来自 MODELS.available）
    * @param {Array} messages - Anthropic Messages 格式的 messages 数组
