@@ -19,20 +19,28 @@ function useDraftPersistence(
   value: string,
   onChange: (value: string, cursorPosition: number) => void
 ): void {
-  // Load draft from localStorage on mount
+  // 只在首次挂载时加载草稿，避免删空时被恢复
+  const initialLoadDone = useRef(false);
+
   useEffect(() => {
+    if (initialLoadDone.current) return;
     if (projectName && typeof window !== 'undefined') {
       const draft = localStorage.getItem(STORAGE_KEYS.DRAFT_INPUT(projectName));
       if (draft && !value) {
         onChange(draft, draft.length);
       }
     }
+    initialLoadDone.current = true;
   }, [projectName, onChange, value]);
 
-  // Save draft to localStorage
+  // 保存草稿：非空时写入，空时清除 localStorage 残留
   useEffect(() => {
-    if (projectName && typeof window !== 'undefined' && value) {
-      localStorage.setItem(STORAGE_KEYS.DRAFT_INPUT(projectName), value);
+    if (projectName && typeof window !== 'undefined') {
+      if (value) {
+        localStorage.setItem(STORAGE_KEYS.DRAFT_INPUT(projectName), value);
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.DRAFT_INPUT(projectName));
+      }
     }
   }, [value, projectName]);
 }
