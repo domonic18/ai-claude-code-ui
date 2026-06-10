@@ -168,7 +168,7 @@ pipeline {
                 echo '--- 推送镜像到腾讯云容器镜像服务 ---'
                 // 使用 Jenkins 凭据登录，避免密码泄露到日志
                 withCredentials([usernamePassword(
-                    credentialsId: 'tencent-registry-credentials',
+                    credentialsId: 'tencent-registry-patent-deploy',
                     usernameVariable: 'REGISTRY_USER',
                     passwordVariable: 'REGISTRY_PASS'
                 )]) {
