@@ -348,7 +348,7 @@ describe('getAvatarBackgroundClass', () => {
   });
 
   it('should return gray background for tool type', () => {
-    expect(getAvatarBackgroundClass('tool')).toBe('bg-gray-600 dark:bg-gray-700');
+    expect(getAvatarBackgroundClass('tool')).toBe('bg-muted-foreground');
   });
 
   it('should return empty string for assistant type', () => {
