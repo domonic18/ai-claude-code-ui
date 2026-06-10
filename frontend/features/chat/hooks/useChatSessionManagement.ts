@@ -57,7 +57,6 @@ export function useChatSessionManagement(options: UseChatSessionManagementOption
   // Sync session state with parent component
   useSessionSync({
     selectedSession: options.selectedSession,
-    selectedProject: options.selectedProject,
     currentSessionId: options.currentSessionId,
     setCurrentSessionId: options.setCurrentSessionId,
     setMessages: options.setMessages,

@@ -13,28 +13,35 @@ import { useFileUploadHandler } from './useFileUploadHandler';
 
 /**
  * Manage draft input persistence to localStorage
+ *
+ * 草稿与项目无关，使用固定 key。只在首次挂载时加载一次。
  */
 function useDraftPersistence(
-  projectName: string,
   value: string,
   onChange: (value: string, cursorPosition: number) => void
 ): void {
-  // Load draft from localStorage on mount
-  useEffect(() => {
-    if (projectName && typeof window !== 'undefined') {
-      const draft = localStorage.getItem(STORAGE_KEYS.DRAFT_INPUT(projectName));
-      if (draft && !value) {
-        onChange(draft, draft.length);
-      }
-    }
-  }, [projectName, onChange, value]);
+  const loadedRef = useRef(false);
 
-  // Save draft to localStorage
+  // 只在首次挂载时加载草稿
   useEffect(() => {
-    if (projectName && typeof window !== 'undefined' && value) {
-      localStorage.setItem(STORAGE_KEYS.DRAFT_INPUT(projectName), value);
+    if (loadedRef.current || typeof window === 'undefined') return;
+    loadedRef.current = true;
+
+    const draft = localStorage.getItem(STORAGE_KEYS.DRAFT_INPUT);
+    if (draft && !value) {
+      onChange(draft, draft.length);
     }
-  }, [value, projectName]);
+  }, [onChange, value]);
+
+  // 保存草稿：非空时写入，空时清除
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (value) {
+      localStorage.setItem(STORAGE_KEYS.DRAFT_INPUT, value);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.DRAFT_INPUT);
+    }
+  }, [value]);
 }
 
 /**
@@ -160,7 +167,7 @@ export function useChatInputState({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Draft persistence
-  useDraftPersistence(projectName, value, onChange);
+  useDraftPersistence(value, onChange);
 
   // Auto-resize textarea
   useTextareaAutoResize(textareaRef, value, minRows, maxRows);

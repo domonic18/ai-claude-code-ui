@@ -8,7 +8,6 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 
 // ─── 延迟关闭配置 ──────────────────────────────────────
 const CLOSE_DELAY_MS = 200;
@@ -86,24 +85,19 @@ function SkillSelectorButton({ selectedTitle, isOpen, onMouseEnter, onMouseLeave
  * SkillFlyoutPanel — 二级 skill 弹出面板
  *
  * 悬停分类时右侧弹出，显示该分类下所有 skill 的中文 title。
+ * 由父组件 SkillCategoryMenu 负责定位，本组件只负责内容渲染。
  */
 interface SkillFlyoutPanelProps {
   skills: Array<{ name: string; title: string; description: string }>;
   selectedSkillName: string | null;
   onSelect: (skill: { name: string; title: string }) => void;
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
 }
 
-function SkillFlyoutPanel({ skills, selectedSkillName, onSelect, onMouseEnter, onMouseLeave }: SkillFlyoutPanelProps) {
+function SkillFlyoutPanel({ skills, selectedSkillName, onSelect }: SkillFlyoutPanelProps) {
   if (!skills || skills.length === 0) return null;
 
   return (
-    <div
-      className="absolute left-full top-0 ml-1 w-48 bg-card border border-border rounded-lg shadow-xl z-50 overflow-hidden"
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-    >
+    <div className="w-48 bg-card border border-border rounded-lg shadow-xl z-50 overflow-y-auto max-h-80 scrollbar-thin">
       {skills.map(skill => {
         const isSelected = skill.name === selectedSkillName;
         return (
@@ -182,11 +176,23 @@ interface SkillCategoryMenuProps {
 
 function SkillCategoryMenu({ groupedSkills, categoryMeta, categoryOrder, selectedSkillName, onSelect, onClose, onMouseEnter, onMouseLeave }: SkillCategoryMenuProps) {
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
+  const [flyoutOffsetTop, setFlyoutOffsetTop] = useState(0);
   const flyoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const outerRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const handleCategoryEnter = useCallback((category: string) => {
     if (flyoutTimerRef.current) clearTimeout(flyoutTimerRef.current);
     setHoveredCategory(category);
+
+    // 计算 flyout 相对外层容器的垂直偏移，使其与当前分类项对齐
+    const itemEl = itemRefs.current[category];
+    const outerEl = outerRef.current;
+    if (itemEl && outerEl) {
+      const outerRect = outerEl.getBoundingClientRect();
+      const itemRect = itemEl.getBoundingClientRect();
+      setFlyoutOffsetTop(itemRect.top - outerRect.top);
+    }
   }, []);
 
   const handleCategoryLeave = useCallback(() => {
@@ -217,14 +223,18 @@ function SkillCategoryMenu({ groupedSkills, categoryMeta, categoryOrder, selecte
     };
   }, []);
 
+  // 当前悬停分类的 skills
+  const hoveredSkills = hoveredCategory ? groupedSkills[hoveredCategory] : null;
+
   return (
     <div
+      ref={outerRef}
       className="relative"
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      {/* 一级分类列表 */}
-      <div className="w-44 bg-card border border-border rounded-lg shadow-xl overflow-visible z-50">
+      {/* 可滚动的一级分类列表 */}
+      <div className="w-44 bg-card border border-border rounded-lg shadow-xl overflow-y-auto max-h-[70vh] scrollbar-thin z-50">
         {categoryOrder.map(category => {
           const meta = categoryMeta[category];
           const skills = groupedSkills[category];
@@ -232,10 +242,11 @@ function SkillCategoryMenu({ groupedSkills, categoryMeta, categoryOrder, selecte
 
           return (
             <div
+              ref={el => { itemRefs.current[category] = el; }}
               key={category}
               onMouseEnter={() => handleCategoryEnter(category)}
               onMouseLeave={handleCategoryLeave}
-              className={`relative flex items-center gap-2 px-3 py-2.5 cursor-pointer text-sm transition-colors
+              className={`flex items-center gap-2 px-3 py-2.5 cursor-pointer text-sm transition-colors
                 ${hoveredCategory === category
                   ? 'bg-accent/50'
                   : 'text-foreground'
@@ -249,21 +260,26 @@ function SkillCategoryMenu({ groupedSkills, categoryMeta, categoryOrder, selecte
               <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
-
-              {/* 二级 skill 弹出面板 — 跟当前分类项对齐 */}
-              {hoveredCategory === category && (
-                <SkillFlyoutPanel
-                  skills={skills}
-                  selectedSkillName={selectedSkillName}
-                  onSelect={handleSelect}
-                  onMouseEnter={handleFlyoutEnter}
-                  onMouseLeave={handleFlyoutLeave}
-                />
-              )}
             </div>
           );
         })}
       </div>
+
+      {/* 二级 flyout 渲染在滚动容器外部，避免被 overflow 裁剪 */}
+      {hoveredCategory && hoveredSkills && hoveredSkills.length > 0 && (
+        <div
+          className="absolute left-[100%] ml-1 z-50"
+          style={{ top: flyoutOffsetTop }}
+          onMouseEnter={handleFlyoutEnter}
+          onMouseLeave={handleFlyoutLeave}
+        >
+          <SkillFlyoutPanel
+            skills={hoveredSkills}
+            selectedSkillName={selectedSkillName}
+            onSelect={handleSelect}
+          />
+        </div>
+      )}
     </div>
   );
 }

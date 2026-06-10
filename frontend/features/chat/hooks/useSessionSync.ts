@@ -7,13 +7,11 @@ import { STORAGE_KEYS } from '../constants';
  */
 export function useSessionSync({
   selectedSession,
-  selectedProject,
   currentSessionId,
   setCurrentSessionId,
   setMessages,
 }: {
   selectedSession?: { id: string; __provider?: string };
-  selectedProject?: { name: string; path: string };
   currentSessionId: string | null;
   setCurrentSessionId: (id: string | null) => void;
   setMessages: (msgs: any[]) => void;
@@ -29,18 +27,14 @@ export function useSessionSync({
     if (newId) {
       if (currentSessionId !== newId) {
         setCurrentSessionId(newId);
-        if (selectedProject?.name) {
-          localStorage.removeItem(STORAGE_KEYS.DRAFT_INPUT(selectedProject.name));
-        }
+        localStorage.removeItem(STORAGE_KEYS.DRAFT_INPUT);
       }
     } else if (prevId !== undefined && newId === undefined) {
       setCurrentSessionId(null);
       setMessages([]);
-      if (selectedProject?.name) {
-        localStorage.removeItem(STORAGE_KEYS.DRAFT_INPUT(selectedProject.name));
-      }
+      localStorage.removeItem(STORAGE_KEYS.DRAFT_INPUT);
     }
-  }, [selectedSession?.id, setMessages, currentSessionId, selectedProject?.name]);
+  }, [selectedSession?.id, setMessages, currentSessionId]);
 
   // 同步会话关联的 provider 到 localStorage，确保下次打开使用正确的 AI 后端
   useEffect(() => {
