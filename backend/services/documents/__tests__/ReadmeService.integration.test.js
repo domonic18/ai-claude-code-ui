@@ -1,7 +1,7 @@
 /**
  * ReadmeService Integration Tests
  *
- * 通过 mock containerManager.execInContainer 模拟 Docker 交互，
+ * 通过 mock containerManager 模块对象模拟 Docker 交互，
  * 测试 ReadmeService 完整流程：appendEntry / removeEntry / updateSummary / parseEntries。
  *
  * 核心回归：验证 "删除 A 丢 B" 的 bug 已修复。
@@ -9,31 +9,15 @@
  * @module services/documents/__tests__/ReadmeService.integration.test
  */
 
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { ReadmeService } from '../ReadmeService.js';
+import containerManager from '../../container/core/index.js';
 
 // ─── Mock 基础设施 ─────────────────────────────────────
 
-/**
- * 创建一个模拟的 Docker exec stream
- * @param {string} stdout - 模拟的 stdout 输出
- * @returns {{ stream: object, stdout: string }}
- */
-function mockStream(stdout = '') {
-  const listeners = {};
-  const stream = {
-    on(event, handler) {
-      listeners[event] = handler;
-      return stream;
-    },
-  };
-  // 异步触发 end 事件，模拟 Docker stream 行为
-  Promise.resolve().then(() => {
-    listeners.end?.();
-  });
-  return { stream, stdout };
-}
+/** 保存原始方法以便恢复 */
+const _originalGetOrCreateContainer = containerManager.getOrCreateContainer;
 
 /** 存储容器内文件内容的 Map */
 let fileStore;
@@ -49,6 +33,10 @@ let svc;
  */
 function createMockedService() {
   const service = new ReadmeService();
+
+  // 拦截 containerManager.getOrCreateContainer — 避免 Docker 和数据库调用
+  // readReadme 和 _writeReadme 内部都通过模块级 import 调用此方法
+  containerManager.getOrCreateContainer = async () => ({ id: 'mock-container' });
 
   // 拦截 _execCommand：记录命令但不执行真实 Docker 操作
   service._execCommand = async (userId, cmd) => {
@@ -78,11 +66,6 @@ function createMockedService() {
     return fileStore[filePath] ?? null;
   };
 
-  // 拦截 containerManager.getOrCreateContainer — 避免 Docker 调用
-  // _writeReadme 和 readReadme 内部调用了 containerManager，需要绕过
-  // 这里我们直接让 _writeReadme 走 mock 的 _execCommand
-  // readReadme 内部调 _readFile，已 mock
-
   return service;
 }
 
@@ -90,6 +73,11 @@ beforeEach(() => {
   fileStore = {};
   execHistory = [];
   svc = createMockedService();
+});
+
+afterEach(() => {
+  // 恢复原始方法，避免污染其他测试
+  containerManager.getOrCreateContainer = _originalGetOrCreateContainer;
 });
 
 // ─── 测试用例 ──────────────────────────────────────────
