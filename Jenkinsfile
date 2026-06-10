@@ -112,6 +112,8 @@ pipeline {
 
                 // agent any 可能分配不同节点，确保源代码可用
                 checkout scm
+                // 递归拉取 git submodule（extensions/ 是独立仓库）
+                sh 'git submodule update --init --recursive'
 
                 // 获取 git short commit hash 作为镜像版本号
                 script {
