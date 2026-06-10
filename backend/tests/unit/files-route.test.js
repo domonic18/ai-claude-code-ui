@@ -185,7 +185,7 @@ describe('Files API Route', () => {
         }));
 
       const renameRoute = routes.find(r =>
-        r.path === '/:projectName/rename' && r.methods.includes('put')
+        r.path === '/:projectName/files/rename' && r.methods.includes('put')
       );
       assert.ok(renameRoute, 'Should have rename route');
     });
