@@ -38,9 +38,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Configure npm to use domestic mirror
-RUN npm config set registry https://registry.npmmirror.com && \
-    npm config set dist-url https://npmmirror.com/mirrors/node && \
-    npm config set node_gyp https://npmmirror.com/mirrors/node
+RUN npm config set registry https://registry.npmmirror.com
 # Copy package files
 COPY package*.json ./
 
