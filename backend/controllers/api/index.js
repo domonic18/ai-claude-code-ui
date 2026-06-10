@@ -10,3 +10,4 @@ export { FileController } from './FileController.js';
 export { UserSettingsController } from './UserSettingsController.js';
 export { McpServerController } from './McpServerController.js';
 export { MemoryController } from './MemoryController.js';
+export { DocumentController } from './DocumentController.js';

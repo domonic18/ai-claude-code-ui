@@ -22,10 +22,59 @@ import { spawnCursor, abortCursorSession, isCursorSessionActive, getActiveCursor
 import { queryCodex, abortCodexSession, isCodexSessionActive, getActiveCodexSessions } from '../../services/execution/codex/index.js';
 import { WebSocketWriter } from '../writer.js';
 import { formatReadInstructions } from '../../services/files/FileDocumentReader.js';
+import { readmeService } from '../../services/documents/ReadmeService.js';
 import { createLogger, sanitizePreview, generateTraceId, generateSpanId, runWithTrace } from '../../utils/logger.js';
 import { recordActivity } from '../../utils/usage-session-tracker.js';
+import containerManager from '../../services/container/core/index.js';
+import { PassThrough } from 'stream';
 
 const logger = createLogger('websocket/handlers/chat');
+
+/** 图片扩展名集合，用于识别路径引用的图片附件 */
+const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp']);
+
+/** 图片扩展名 → MIME 类型映射 */
+const IMAGE_MIME_MAP = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+};
+
+/**
+ * 判断文件路径是否为图片
+ * @param {string} filePath - 文件路径
+ * @returns {boolean}
+ */
+function isImagePath(filePath) {
+  const ext = '.' + (filePath.split('.').pop() || '').toLowerCase();
+  return IMAGE_EXTENSIONS.has(ext);
+}
+
+/**
+ * 从容器中读取图片文件并转为 base64 data URL
+ * @param {number} userId - 用户 ID
+ * @param {string} filePath - 容器内文件绝对路径
+ * @returns {Promise<string>} data URL 格式的 base64 图片
+ */
+async function readImageFromContainer(userId, filePath) {
+  const ext = '.' + (filePath.split('.').pop() || '').toLowerCase();
+  const mimeType = IMAGE_MIME_MAP[ext] || 'image/octet-stream';
+
+  const { stream } = await containerManager.execInContainer(userId, ['base64', filePath]);
+  const output = await new Promise((resolve, reject) => {
+    const stdout = new PassThrough();
+    containerManager.docker.modem.demuxStream(stream, stdout, new PassThrough());
+    let data = '';
+    stdout.on('data', (chunk) => { data += chunk.toString(); });
+    stream.on('error', reject);
+    stream.on('end', () => resolve(data));
+  });
+
+  const base64Data = output.replace(/\s/g, '');
+  return `data:${mimeType};base64,${base64Data}`;
+}
 
 // WebSocket 消息或事件处理
 /**
@@ -33,21 +82,57 @@ const logger = createLogger('websocket/handlers/chat');
  *
  * 将用户上传的文档附件转换为读取指令，拼接到原始命令中，
  * 并将图片附件单独提取供 SDK 使用。
+ * 支持三种附件类型：
+ * 1. 带 data 的 base64 图片（拖拽上传）
+ * 2. 带 path 的图片文件（@ 引用上传的图片）
+ * 3. 带 path 的文档文件（PDF、DOCX 等）
  *
  * @param {Object} data - 客户端发送的消息数据
- * @param {string} data.command - 用户输入的原始命令
- * @param {Array} [data.attachments] - 附件列表
- * @param {Array} data.attachments[].path - 文档附件的文件路径
- * @param {Array} data.attachments[].data - 图片附件的 base64 数据
- * @returns {{command: string, imageAttachments: Array}} 处理后的命令和图片附件
+ * @param {number} userId - 用户 ID，用于容器访问
+ * @param {string} [projectName] - 项目名称，用于注入文档上下文
+ * @returns {Promise<{command: string, imageAttachments: Array}>} 处理后的命令和图片附件
  */
-function buildClaudeCommand(data) {
+async function buildClaudeCommand(data, userId, projectName) {
   let command = data.command || '';
   const attachments = data.attachments || [];
-  // 区分文档附件（通过路径引用）和图片附件（通过 base64 数据）
-  const documentAttachments = attachments.filter(f => f.path);
-  const imageAttachments = attachments.filter(f => f.data);
 
+  // 注入项目文档索引作为轻量上下文（元数据 + AI 摘要）
+  if (projectName && userId) {
+    try {
+      const readmeContent = await readmeService.readReadme(userId, projectName);
+      if (readmeContent) {
+        logger.info({ projectName, userId, readmeLength: readmeContent.length }, '[buildClaudeCommand] 注入项目文档索引');
+        command = `[项目文档索引]\n${readmeContent}\n\n---\n\n${command}`;
+      }
+    } catch (err) {
+      logger.warn({ err, projectName, userId }, '[buildClaudeCommand] 读取 readme.md 失败，跳过上下文注入');
+    }
+  }
+
+  // 区分三种附件类型
+  const imageAttachments = attachments.filter(f => f.data);
+  const pathAttachments = attachments.filter(f => f.path && !f.data);
+  const imagePathAttachments = pathAttachments.filter(f => isImagePath(f.path));
+  const documentAttachments = pathAttachments.filter(f => !isImagePath(f.path));
+
+  // 处理 @ 引用的图片：从容器读取并转为 base64
+  if (imagePathAttachments.length > 0 && userId) {
+    for (const img of imagePathAttachments) {
+      try {
+        const dataUrl = await readImageFromContainer(userId, img.path);
+        imageAttachments.push({
+          ...img,
+          data: dataUrl,
+        });
+      } catch (err) {
+        logger.warn({ err, filePath: img.path, userId }, '[buildClaudeCommand] Failed to read image from container, treating as document');
+        // 读取失败则降级为文档处理
+        documentAttachments.push(img);
+      }
+    }
+  }
+
+  // 处理文档附件：生成读取指令
   if (documentAttachments.length > 0) {
     const filePaths = documentAttachments.map(f => ({ path: f.path, name: f.name, type: f.type }));
     const readInstructions = formatReadInstructions(filePaths);
@@ -69,7 +154,7 @@ function buildClaudeCommand(data) {
  */
 async function handleClaudeCommand(data, ws, writer) {
   const originalProjectName = data.options?.projectPath?.replace(/\//g, '-') || '';
-  const { command, imageAttachments } = buildClaudeCommand(data);
+  const { command, imageAttachments } = await buildClaudeCommand(data, ws.user?.userId, originalProjectName);
 
   logger.info({
     userId: ws.user.userId,

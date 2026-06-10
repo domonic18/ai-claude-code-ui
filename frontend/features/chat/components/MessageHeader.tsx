@@ -65,7 +65,7 @@ export function MessageHeader({
       </div>
 
       {/* Display name */}
-      <div className="text-sm font-medium text-gray-900 dark:text-white">
+      <div className="text-sm font-medium text-foreground">
         {displayLabel}
       </div>
     </div>

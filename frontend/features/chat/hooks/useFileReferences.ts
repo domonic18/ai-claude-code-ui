@@ -2,29 +2,34 @@
  * useFileReferences Hook
  *
  * Manages file reference functionality with @ symbol.
- * Provides file search, filtering, and reference insertion.
+ * Loads uploaded documents from DocumentService API.
  *
  * Features:
  * - Detect @ symbol in input
- * - Load and filter files from project
+ * - Load and filter documents from project uploads
  * - Keyboard navigation
- * - File path completion
+ * - File reference insertion as attachment
  */
 
 import { useState, useCallback, useEffect } from 'react';
 import { logger } from '@/shared/utils/logger';
+import { onDocumentUploaded, onDocumentCreated } from '@/features/documents/services/documentEvents';
 
 export interface FileReference {
-  /** File path */
+  /** File path (container-absolute) */
   path: string;
   /** File name */
   name: string;
   /** File extension */
   extension?: string;
-  /** File type (file/directory) */
+  /** File type */
   type: 'file' | 'directory';
-  /** Relative path from project root */
+  /** Relative path for display */
   relativePath: string;
+  /** File size in bytes */
+  size?: number;
+  /** MIME type */
+  mimeType?: string;
 }
 
 export interface UseFileReferencesOptions {
@@ -64,38 +69,28 @@ export interface UseFileReferencesReturn {
 }
 
 /**
- * Traverse file tree recursively and build file list
- * @param node - File tree node
- * @param parentPath - Parent directory path
- * @param fileList - Accumulated file list
+ * Map document items from DocumentService API to FileReference objects
+ * @param docs - Array of document items from GET /api/projects/{name}/documents
+ * @returns FileReference array
  */
-function traverseFileTree(node: any, parentPath: string, fileList: FileReference[]) {
-  if (!node) return;
-
-  const nodePath = parentPath ? `${parentPath}/${node.name}` : node.name;
-
-  if (node.type === 'file' || !node.children) {
-    const extension = node.name?.includes('.') ? node.name.split('.').pop() : '';
-    fileList.push({
-      path: nodePath,
-      name: node.name,
+function mapDocumentsToReferences(docs: any[]): FileReference[] {
+  return docs.map(doc => {
+    const fileName = doc.file_name || '';
+    const extension = fileName.includes('.') ? fileName.split('.').pop() : '';
+    return {
+      path: doc.file_path,
+      name: fileName,
       extension,
-      type: 'file',
-      relativePath: nodePath,
-    });
-  } else if (node.children) {
-    fileList.push({
-      path: nodePath,
-      name: node.name,
-      type: 'directory',
-      relativePath: nodePath,
-    });
-    node.children.forEach((child: any) => traverseFileTree(child, nodePath, fileList));
-  }
+      type: 'file' as const,
+      relativePath: fileName,
+      size: doc.file_size,
+      mimeType: doc.mime_type,
+    };
+  });
 }
 
 /**
- * Hook for managing file references
+ * Hook for managing file references (uploaded documents)
  */
 export function useFileReferences({
   selectedProject,
@@ -119,18 +114,21 @@ export function useFileReferences({
     if (!selectedProject || !authenticatedFetch) return;
     setIsLoading(true);
     try {
-      const response = await authenticatedFetch(`/api/projects/${encodeURIComponent(selectedProject)}/files`);
-      if (!response.ok) throw new Error('Failed to load files');
+      const response = await authenticatedFetch(
+        `/api/projects/${encodeURIComponent(selectedProject)}/documents`
+      );
+      if (!response.ok) throw new Error('Failed to load documents');
 
-      const data = await response.json();
-      const fileList: FileReference[] = [];
-      const treeData = data.tree || data.data || data;
-      if (Array.isArray(treeData)) {
-        treeData.forEach(node => traverseFileTree(node, '', fileList));
-      }
-      setFiles(fileList);
+      const json = await response.json();
+      const data = json.data || json;
+      // Combine uploads and AI-generated documents
+      const uploads = Array.isArray(data.uploads) ? data.uploads : [];
+      const aiGenerated = Array.isArray(data.aiGenerated) ? data.aiGenerated : [];
+      const allDocs = [...uploads, ...aiGenerated];
+
+      setFiles(mapDocumentsToReferences(allDocs));
     } catch (error) {
-      logger.error('Failed to load files:', error);
+      logger.error('Failed to load documents:', error);
       setFiles([]);
     } finally {
       setIsLoading(false);
@@ -138,6 +136,18 @@ export function useFileReferences({
   }, [selectedProject, authenticatedFetch]);
 
   useEffect(() => { loadFiles(); }, [loadFiles]);
+
+  // 当文档变化时（chat 上传、面板上传、AI 生成）刷新列表
+  useEffect(() => {
+    const unsub1 = onDocumentUploaded(() => { loadFiles(); });
+    const unsub2 = onDocumentCreated(() => { loadFiles(); });
+    return () => { unsub1(); unsub2(); };
+  }, [loadFiles]);
+
+  // @ 菜单打开时也刷新一次，确保展示最新文档
+  useEffect(() => {
+    if (showMenu) { loadFiles(); }
+  }, [showMenu, loadFiles]);
 
   const filteredFiles = useCallback(() => {
     if (!query) return files.slice(0, 20);

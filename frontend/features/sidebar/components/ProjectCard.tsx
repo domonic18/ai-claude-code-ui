@@ -175,10 +175,10 @@ function ProjectActions({
             e.stopPropagation();
             onStartEdit();
           }}
-          onDelete={sessionCount === 0 ? (e) => {
+          onDelete={(e) => {
             e.stopPropagation();
             onDelete();
-          } : undefined}
+          }}
           onToggleExpand={() => {}}
           isExpanded={isExpanded}
         />

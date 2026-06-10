@@ -63,10 +63,10 @@ export function TokenDisplay({ budget, compact = false }: TokenDisplayProps) {
   if (compact) {
     return (
       <div className="flex items-center gap-2 text-xs">
-        <span className="text-gray-600 dark:text-gray-400">
+        <span className="text-muted-foreground">
           {percentage !== null ? `${percentage}%` : t('tokenDisplay.notAvailable')}
         </span>
-        <div className="w-16 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+        <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
           {percentage !== null && (
             <div
               className={`h-full bg-${color}-500 dark:bg-${color}-400 transition-all`}
@@ -80,9 +80,9 @@ export function TokenDisplay({ budget, compact = false }: TokenDisplayProps) {
 
   // Full version
   return (
-    <div className="px-4 py-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+    <div className="px-4 py-2 bg-muted/50 rounded-lg">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <span className="text-sm font-medium text-foreground">
           {t('tokenDisplay.title')}
         </span>
         {percentage !== null && (
@@ -93,7 +93,7 @@ export function TokenDisplay({ budget, compact = false }: TokenDisplayProps) {
       </div>
 
       {/* Progress bar */}
-      <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-2">
+      <div className="w-full h-2 bg-muted rounded-full overflow-hidden mb-2">
         {percentage !== null && (
           <div
             className={`h-full bg-${color}-500 dark:bg-${color}-400 transition-all`}
@@ -103,7 +103,7 @@ export function TokenDisplay({ budget, compact = false }: TokenDisplayProps) {
       </div>
 
       {/* Details */}
-      <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>
           {budget?.used !== undefined
             ? `${budget.used.toLocaleString()} ${t('tokenDisplay.used')}`

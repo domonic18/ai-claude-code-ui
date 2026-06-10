@@ -16,6 +16,7 @@ export function useAppLayout() {
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useLocalStorage('sidebarVisible', true);
+  const [sidebarWidth, setSidebarWidth] = useLocalStorage('sidebarWidth', 320);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isPWA, setIsPWA] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -73,6 +74,7 @@ export function useAppLayout() {
     isMobile, isPWA, isInputFocused,
     sidebarOpen, setSidebarOpen,
     sidebarVisible, setSidebarVisible,
+    sidebarWidth, setSidebarWidth,
     showSettings, setShowSettings,
     settingsInitialTab,
     showQuickSettings, setShowQuickSettings,

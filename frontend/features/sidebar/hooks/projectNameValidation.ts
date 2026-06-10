@@ -129,23 +129,28 @@ export async function createProjectApi(projectName: string): Promise<any> {
   // Default workspace path for user projects
   const workspacePath = `/workspace/${projectName}`;
 
-  logger.info('[ProjectCreationWizard] Creating project:', workspacePath);
+  console.log('[createProjectApi] ① 发起 POST /api/projects/create, body:', { path: workspacePath });
 
   const response = await api.createProject(workspacePath);
+
+  console.log('[createProjectApi] ② 响应状态:', response.status, response.ok, 'content-type:', response.headers.get('content-type'));
 
   const contentType = response.headers.get('content-type');
   if (!contentType || !contentType.includes('application/json')) {
     const text = await response.text();
-    logger.error('[ProjectCreationWizard] Non-JSON response:', text);
+    console.error('[createProjectApi] 非 JSON 响应, body 前200字符:', text.slice(0, 200));
     throw new Error('Server returned an unexpected response');
   }
 
   const data = await response.json();
-  logger.info('[ProjectCreationWizard] Response:', data);
+  console.log('[createProjectApi] ③ 响应 JSON:', JSON.stringify(data).slice(0, 500));
 
   if (!response.ok) {
+    console.error('[createProjectApi] ④ 响应非 2xx, error:', data.error, data.message);
     throw new Error(data.error || data.message || 'Failed to create project');
   }
 
-  return data.project;
+  const result = data.data?.project || data.data || data;
+  console.log('[createProjectApi] ⑤ 提取结果:', JSON.stringify(result).slice(0, 300));
+  return result;
 }

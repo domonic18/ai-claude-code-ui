@@ -13,8 +13,6 @@
 
 import React, { memo, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus } from 'lucide-react';
-import { Button } from '@/shared/components/ui/Button';
 import { cn } from '@/lib/utils';
 import SessionItem from './SessionItem';
 import type { Session, SessionProvider } from '../types/sidebar.types';
@@ -115,12 +113,22 @@ function SessionListItems({
   onSetEditingSessionName: (name: string) => void;
   projectName: string;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       {sessions.map((session) => {
-        const isSelected = selectedSessionId === session.id;
-        const isActive = currentTime.getTime() - new Date(session.lastActivity).getTime() < ACTIVE_SESSION_THRESHOLD;
-        const isEditing = editingSession?.id === session.id;
+        const isPlaceholder = session.id.startsWith('__placeholder__');
+        const isSelected = !isPlaceholder && selectedSessionId === session.id;
+        const isActive = !isPlaceholder && currentTime.getTime() - new Date(session.lastActivity).getTime() < ACTIVE_SESSION_THRESHOLD;
+        const isEditing = !isPlaceholder && editingSession?.id === session.id;
+
+        if (isPlaceholder) {
+          return (
+            <div key={session.id} className="px-3 py-2 text-xs text-muted-foreground italic animate-pulse">
+              {t('sidebar.newSessionPlaceholder')}
+            </div>
+          );
+        }
 
         return (
           <SessionItem
@@ -241,48 +249,6 @@ function useInfiniteScroll(
 }
 
 /**
- * New Session Buttons Component
- */
-function NewSessionButtons({
-  onNewSession,
-  t,
-}: {
-  onNewSession: (() => void) | undefined;
-  t: (key: string) => string;
-}) {
-  if (!onNewSession) return null;
-
-  return (
-    <>
-      {/* New Session Button - Mobile */}
-      <div className="md:hidden px-3 pt-2 pb-1">
-        <button
-          onClick={onNewSession}
-          className="w-full h-8 bg-primary hover:bg-primary/90 text-primary-foreground rounded-md flex items-center justify-center gap-2 font-medium text-xs active:scale-[0.98] transition-all duration-150"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
-            <path d="M5 12h14"></path>
-            <path d="M12 5v14"></path>
-          </svg>
-          {t('sidebar.newSession')}
-        </button>
-      </div>
-
-      {/* New Session Button - Desktop */}
-      <Button
-        variant="default"
-        size="sm"
-        className="hidden md:flex w-full justify-start gap-2 mb-1 h-8 text-xs font-medium bg-primary hover:bg-primary/90 text-primary-foreground transition-colors"
-        onClick={onNewSession}
-      >
-        <Plus className="w-3 h-3" />
-        {t('sidebar.newSession')}
-      </Button>
-    </>
-  );
-}
-
-/**
  * SessionList Component with Infinite Scroll
  */
 export const SessionList = memo(function SessionList({
@@ -314,11 +280,16 @@ export const SessionList = memo(function SessionList({
     return <SessionListSkeleton />;
   }
 
-  // Empty state
+  // Empty state - clickable placeholder that triggers new session
   if (allSessions.length === 0 && !isLoadingSessions) {
     return (
       <div className="py-2 px-3 text-left">
-        <p className="text-xs text-muted-foreground">{t('sidebar.noSessionsYet')}</p>
+        <p
+          className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+          onClick={onNewSession}
+        >
+          {t('sidebar.noSessionsYetClickToAdd')}
+        </p>
       </div>
     );
   }
@@ -328,8 +299,6 @@ export const SessionList = memo(function SessionList({
 
   return (
     <div className={cn('space-y-1', shouldShowScroll && 'max-h-[85vh] overflow-y-auto')}>
-      <NewSessionButtons onNewSession={onNewSession} t={t} />
-
       <SessionListItems
         sessions={allSessions}
         selectedSessionId={selectedSessionId}

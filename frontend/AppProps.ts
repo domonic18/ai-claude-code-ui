@@ -123,7 +123,9 @@ export function useLayoutProps(layout: any) {
     ...sidebarCommonProps,
     sidebarVisible: layout.sidebarVisible,
     onToggleSidebar: layout.setSidebarVisible,
-  }), [sidebarCommonProps, layout.sidebarVisible, layout.setSidebarVisible]);
+    sidebarWidth: layout.sidebarWidth,
+    onSidebarWidthChange: layout.setSidebarWidth,
+  }), [sidebarCommonProps, layout.sidebarVisible, layout.setSidebarVisible, layout.sidebarWidth, layout.setSidebarWidth]);
 
   const mobileSidebar = (sidebarCommonProps: any) => useMemo(() => ({
     ...sidebarCommonProps,

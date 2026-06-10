@@ -39,7 +39,7 @@ export function ChatInputActions({
         className="flex-shrink-0 p-2 rounded-full transition-colors"
       >
         {isLoading ? (
-          <svg className="w-5 h-5 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
+          <svg className="w-5 h-5 animate-spin text-muted-foreground" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
           </svg>
@@ -48,14 +48,14 @@ export function ChatInputActions({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
           </svg>
         ) : (
-          <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
           </svg>
         )}
       </button>
 
       {/* File upload button */}
-      <label className="flex-shrink-0 p-2 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors cursor-pointer">
+      <label className="flex-shrink-0 p-2 rounded-full bg-muted hover:bg-accent transition-colors cursor-pointer">
         <input
           type="file"
           accept=".docx,.pdf,.md,.txt,.js,.ts,.jsx,.tsx,.json,.csv,image/*"
@@ -72,7 +72,8 @@ export function ChatInputActions({
                 };
 
                 if (file.type.startsWith('image/')) {
-                  // For images, store as base64
+                  // 图片：先上传到服务器（同步右侧面板），再读 base64（聊天内联显示）
+                  handleFileUpload(file, attachment);
                   const reader = new FileReader();
                   reader.onload = (ev) => {
                     attachment.data = ev.target?.result as string;
@@ -80,7 +81,7 @@ export function ChatInputActions({
                   };
                   reader.readAsDataURL(file);
                 } else {
-                  // For documents, upload to server
+                  // 文档：上传到服务器
                   handleFileUpload(file, attachment);
                 }
               }
@@ -90,7 +91,7 @@ export function ChatInputActions({
           }}
           className="hidden"
         />
-        <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
         </svg>
       </label>

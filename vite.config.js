@@ -56,7 +56,7 @@ export default defineConfig(({ command, mode }) => {
       minify: 'terser',
       terserOptions: {
         compress: {
-          drop_console: true, // 生产构建移除所有 console.* 调用
+          drop_console: false, // TODO: 调试完毕后改回 true
           drop_debugger: true,
         },
       },

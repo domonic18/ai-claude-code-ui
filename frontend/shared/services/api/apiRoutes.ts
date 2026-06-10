@@ -73,7 +73,7 @@ export const api = {
       }),
     /** Rename a file in a project */
     renameFile: (projectName: string, oldPath: string, newPath: string) =>
-      authenticatedFetch(`/api/projects/${projectName}/rename`, {
+      authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/files/rename`, {
         method: 'PUT',
         body: JSON.stringify({ oldPath, newName: newPath }),
       }),
@@ -122,7 +122,7 @@ export const api = {
     return authenticatedFetch(url);
   },
   renameProject: (projectName: string, displayName: string) =>
-    authenticatedFetch(`/api/projects/${projectName}/rename`, {
+    authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/rename`, {
       method: 'PUT',
       body: JSON.stringify({ displayName }),
     }),
@@ -140,7 +140,7 @@ export const api = {
       method: 'DELETE',
     }),
   deleteProject: (projectName: string) =>
-    authenticatedFetch(`/api/projects/${projectName}`, {
+    authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}`, {
       method: 'DELETE',
     }),
   createProject: (path: string) =>
@@ -166,7 +166,7 @@ export const api = {
       body: JSON.stringify({ path: filePath }),
     }),
   renameFile: (projectName: string, oldPath: string, newName: string) =>
-    authenticatedFetch(`/api/projects/${projectName}/rename`, {
+    authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/files/rename`, {
       method: 'PUT',
       body: JSON.stringify({ oldPath, newName }),
     }),

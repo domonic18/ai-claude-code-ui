@@ -13,7 +13,7 @@
 import { loadProjectConfig, saveProjectConfig } from '../config/index.js';
 import { deleteSessionInContainer, getSessionsInContainer } from '../../sessions/container/ContainerSessions.js';
 import containerManager from '../../container/core/index.js';
-import { CONTAINER, FILE_TIMEOUTS } from '../../../config/config.js';
+import { CONTAINER } from '../../../config/config.js';
 import { readStreamOutput } from '../../files/utils/file-utils.js';
 import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('services/projects/project-management/operations');
@@ -87,33 +87,13 @@ async function deleteProject(userId, projectName) {
   logger.info(`[deleteProject] Attempting to delete project "${projectName}" for user ${userId}`);
 
   try {
-    // First check if the project is empty
-    const isEmpty = await isProjectEmpty(userId, projectName);
-
-    if (!isEmpty) {
-      throw new Error('Cannot delete project with existing sessions');
-    }
-
-    // 删除容器内的项目目录
     const projectPath = `${CONTAINER.paths.workspace}/${projectName}`;
 
-    const { stream } = await containerManager.execInContainer(
-      userId,
-      ['rm', '-rf', projectPath]
-    );
+    const { stream } = await containerManager.execInContainer(userId, ['rm', '-rf', projectPath]);
+    await readStreamOutput(stream, { timeout: 10000 });
 
-    await new Promise((resolve, reject) => {
-      stream.on('error', (err) => {
-        logger.error(`[deleteProject] Error removing directory:`, err);
-        reject(err);
-      });
-      stream.on('end', () => {
-        logger.info(`[deleteProject] Project directory removed: ${projectPath}`);
-        resolve();
-      });
-    });
+    logger.info(`[deleteProject] Project directory removed: ${projectPath}`);
 
-    // Remove from project config
     const config = await loadProjectConfig();
     delete config[projectName];
     await saveProjectConfig(config);
@@ -137,8 +117,13 @@ async function deleteProject(userId, projectName) {
  */
 async function addProjectManually(userId, projectName, displayName = null) {
   try {
-    // 确保容器存在
-    await containerManager.getOrCreateContainer(userId);
+    // 确保容器存在并 ready（关键：使用 wait: true 确保容器准备好接受命令）
+    const container = await containerManager.getOrCreateContainer(
+      userId,
+      {},
+      { wait: true, timeout: 30000 }
+    );
+    logger.info(`[addProjectManually] Container ready: ${container.id} for user ${userId}`);
 
     // 在容器内创建项目目录
     const projectPath = `${CONTAINER.paths.workspace}/${projectName}`;
@@ -148,8 +133,21 @@ async function addProjectManually(userId, projectName, displayName = null) {
       ['mkdir', '-p', projectPath]
     );
 
-    // 使用 readStreamOutput 辅助函数，设置超时
-    await readStreamOutput(stream, { timeout: FILE_TIMEOUTS.streamRead });
+    // 读取输出并等待命令完成
+    await readStreamOutput(stream, { timeout: 10000 });
+
+    // 验证目录是否真的创建了（兼容 BusyBox 的 test）
+    const { stream: verifyStream } = await containerManager.execInContainer(
+      userId,
+      ['sh', '-c', `[ -d "${projectPath}" ] && echo "EXISTS" || echo "MISSING"`]
+    );
+    const verifyOutput = await readStreamOutput(verifyStream, { timeout: 5000 });
+
+    if (!verifyOutput.includes('EXISTS')) {
+      throw new Error(`Failed to create project directory: ${projectPath}`);
+    }
+
+    logger.info(`[addProjectManually] Directory verified: ${projectPath}`);
 
     // Add to config as manually added project
     const config = await loadProjectConfig();
@@ -167,6 +165,7 @@ async function addProjectManually(userId, projectName, displayName = null) {
     }
 
     await saveProjectConfig(config);
+    logger.info(`[addProjectManually] Config saved for project: ${projectName}`);
 
     return {
       name: projectName,

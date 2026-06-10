@@ -11,6 +11,7 @@ import { writeFileViaPutArchive } from '../utils/containerFileWriter.js';
 import { createLogger, sanitizePreview, startTimer } from '../../../utils/logger.js';
 import { copyImagesToContainer } from './dockerImageHandler.js';
 import { handleStreamProcessing } from './dockerStreamHandler.js';
+import { CONTAINER } from '../../../config/config.js';
 
 const logger = createLogger('services/container/claude/DockerExecutor');
 
@@ -36,7 +37,7 @@ async function prepareContainerAndScript(userId, command, options, providerConfi
   let imagePaths = [];
   if (options.images?.length > 0) {
     logger.info('[DockerExecutor] Copying', options.images.length, 'images to container...');
-    imagePaths = await copyImagesToContainer(container, options.images, options.cwd || '/workspace/my-workspace', logger);
+    imagePaths = await copyImagesToContainer(container, options.images, options.cwd || CONTAINER.paths.workspace, logger);
   }
 
   // 构建 SDK 脚本

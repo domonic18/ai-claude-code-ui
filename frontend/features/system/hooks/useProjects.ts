@@ -51,8 +51,8 @@ export function useProjects(
     return executeFetchProjects(user, setIsLoadingProjects, setProjects, hasInitialSyncRef, deps, isRetry, retryCount);
   }, [user, deps]);
 
-  const handleSidebarRefresh = useCallback(async () => {
-    return executeSidebarRefresh(setProjects, deps);
+  const handleSidebarRefresh = useCallback(async (options?: { force?: boolean }) => {
+    return executeSidebarRefresh(setProjects, deps, options);
   }, [deps]);
 
   const updateProjectsFromWebSocket = useCallback((updatedProjects: Project[]) => {

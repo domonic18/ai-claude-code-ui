@@ -107,10 +107,10 @@ router.delete('/:projectName/files', authenticate(), validate({
 }), fileController._asyncHandler(fileController.deleteFile));
 
 /**
- * PUT /api/projects/:projectName/rename
+ * PUT /api/projects/:projectName/files/rename
  * 重命名文件或目录
  */
-router.put('/:projectName/rename', authenticate(), validate({
+router.put('/:projectName/files/rename', authenticate(), validate({
   body: {
     oldPath: { required: true, type: 'string' },
     newName: { required: true, type: 'string' }

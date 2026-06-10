@@ -67,7 +67,7 @@ function CommandListItem({
         px-3 py-2 cursor-pointer flex items-center justify-between
         ${isSelected
           ? 'bg-blue-50 dark:bg-blue-900/30'
-          : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+          : 'hover:bg-accent/50'
         }
       `}
       onClick={() => onSelect(command, index)}
@@ -75,7 +75,7 @@ function CommandListItem({
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="font-mono text-sm font-medium text-gray-900 dark:text-white">
+          <span className="font-mono text-sm font-medium text-foreground">
             {command.name}
           </span>
           {command.type === 'built-in' && (
@@ -90,13 +90,13 @@ function CommandListItem({
           )}
         </div>
         {command.description && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
+          <p className="text-xs text-muted-foreground truncate mt-0.5">
             {command.description}
           </p>
         )}
       </div>
       {isSelected && (
-        <span className="text-gray-400 dark:text-gray-500">
+        <span className="text-muted-foreground">
           ↵
         </span>
       )}

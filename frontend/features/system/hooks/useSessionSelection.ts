@@ -42,11 +42,9 @@ export function useSessionSelection(config: ProjectManagerConfig = {}) {
     // Determine provider if not present
     let provider = session.__provider;
     if (!provider) {
-      // Provider will be set by caller or defaults to 'claude'
       provider = 'claude';
     }
 
-    // Create the enriched session with all metadata
     const enrichedSession: Session = {
       ...session,
       __projectName: currentProjectName,

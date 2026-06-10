@@ -62,7 +62,7 @@ export function ChatInterfaceInputArea({
   onSkillsRetry,
 }: ChatInterfaceInputAreaProps) {
   return (
-    <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700">
+    <div className="flex-shrink-0 border-t border-border">
       <ChatToolbar
         selectedModel={selectedModel}
         models={models}

@@ -68,7 +68,7 @@ export function getAvatarBackgroundClass(type: string): string {
     case 'error':
       return 'bg-red-600';
     case 'tool':
-      return 'bg-gray-600 dark:bg-gray-700';
+      return 'bg-muted-foreground';
     default:
       return ''; // Will use provider-specific logo
   }

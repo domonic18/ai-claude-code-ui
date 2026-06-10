@@ -47,8 +47,8 @@ export interface UseInputHandlerResult {
   /** Handle command menu close */
   handleCommandMenuClose: () => void;
 // ChatInput 组件使用此 hook 管理用户输入的处理、验证和提交
-  /** Handle file selection wrapper */
-  handleFileSelectWrapper: (file: FileReference, index: number, input: string, atPosition: number, fileQuery: string, isHover?: boolean) => void;
+  /** Handle file selection wrapper (hover only — click handled by ChatInterface) */
+  handleFileSelectWrapper: (file: FileReference, index: number, isHover?: boolean) => void;
   /** Handle file menu close */
   handleFileMenuClose: () => void;
 }
@@ -174,23 +174,13 @@ export function useInputHandler(options: UseInputHandlerOptions): UseInputHandle
 
   /**
    * Handle file selection wrapper
-   * Delegates to the useFileReferences hook's handleFileSelect
    *
-   * 文件选择的包装函数，委托给 useFileReferences Hook 的处理函数
-   * 并在用户点击选择时，将文件路径插入到输入框中（替换 @fileQuery）
+   * 文件选择的包装函数，用于 hover 时更新选中索引
+   * 实际的文件选择（点击/Enter）由 ChatInterface.tsx 处理，创建 FileAttachment
    */
-  const handleFileSelectWrapper = useCallback((file: FileReference, index: number, input: string, atPosition: number, fileQuery: string, isHover?: boolean) => {
+  const handleFileSelectWrapper = useCallback((file: FileReference, index: number, isHover?: boolean) => {
     handleFileSelect(file, index, isHover);
-
-    if (!isHover) {
-      // Insert file reference into input
-      const beforeFile = input.slice(0, atPosition);
-      const afterFile = input.slice(atPosition + 1 + fileQuery.length);
-      const newInput = `${beforeFile}@${file.relativePath} ${afterFile}`;
-      setInput(newInput);
-      setShowFileMenu(false);
-    }
-  }, [handleFileSelect, setInput, setShowFileMenu]);
+  }, [handleFileSelect]);
 
   return {
     handleInputChangeWithCommands,

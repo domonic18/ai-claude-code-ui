@@ -132,7 +132,7 @@ function FileListItem({ file, index, isSelected, onSelect, selectedItemRef }: Fi
         px-3 py-2 cursor-pointer flex items-center gap-2
         ${isSelected
           ? 'bg-blue-50 dark:bg-blue-900/30'
-          : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+          : 'hover:bg-accent/50'
         }
       `}
       onClick={() => onSelect(file, index)}
@@ -145,18 +145,18 @@ function FileListItem({ file, index, isSelected, onSelect, selectedItemRef }: Fi
 
       {/* File info */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+        <p className="text-sm font-medium text-foreground truncate">
           {file.name}
         </p>
         {file.relativePath !== file.name && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+          <p className="text-xs text-muted-foreground truncate">
             {file.relativePath}
           </p>
         )}
       </div>
 
       {isSelected && (
-        <span className="text-gray-400 dark:text-gray-500">
+        <span className="text-muted-foreground">
           ↵
         </span>
       )}
@@ -169,8 +169,8 @@ function FileListItem({ file, index, isSelected, onSelect, selectedItemRef }: Fi
  */
 function MenuStateMessage({ message, menuPosition }: { message: string; menuPosition: ReturnType<typeof getMenuPosition> }) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 p-4" style={menuPosition}>
-      <p className="text-sm text-gray-500 dark:text-gray-400 text-center">{message}</p>
+    <div className="bg-card rounded-lg shadow-xl border border-border z-50 p-4" style={menuPosition}>
+      <p className="text-sm text-muted-foreground text-center">{message}</p>
     </div>
   );
 }
@@ -219,17 +219,17 @@ export function FileReferenceMenu({
   }
 
   return (
-    <div ref={menuRef} className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden" style={menuPosition}>
-      <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-        <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Files {query && `matching "${query}"`}</p>
+    <div ref={menuRef} className="bg-card rounded-lg shadow-xl border border-border z-50 overflow-hidden" style={menuPosition}>
+      <div className="px-3 py-2 border-b border-border bg-muted">
+        <p className="text-xs font-medium text-muted-foreground">Files {query && `matching "${query}"`}</p>
       </div>
       <div className="max-h-[300px] overflow-y-auto py-1">
         {files.map((file, index) => (
           <FileListItem key={file.path} file={file} index={index} isSelected={index === selectedIndex} onSelect={onSelect} selectedItemRef={selectedItemRef} />
         ))}
       </div>
-      <div className="px-3 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-        <p className="text-xs text-gray-500 dark:text-gray-400">Use arrow keys to navigate, Enter to select</p>
+      <div className="px-3 py-2 border-t border-border bg-muted">
+        <p className="text-xs text-muted-foreground">Use arrow keys to navigate, Enter to select</p>
       </div>
     </div>
   );

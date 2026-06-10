@@ -37,6 +37,7 @@ export interface Session {
   created_at?: string;
   updated_at?: string;
   __provider?: SessionProvider;
+  __projectName?: string;
   messageCount?: number;
 }
 
@@ -290,8 +291,8 @@ export interface QuickActionsProps {
   onToggleStar: (e: React.MouseEvent) => void;
   /** Start edit callback */
   onStartEdit: (e: React.MouseEvent) => void;
-  /** Delete callback (optional) */
-  onDelete?: (e: React.MouseEvent) => void;
+  /** Delete callback — always available regardless of session count */
+  onDelete: (e: React.MouseEvent) => void;
   /** Toggle expand callback */
   onToggleExpand: () => void;
   /** Whether is expanded */
@@ -370,7 +371,7 @@ export interface ProjectListProps {
   /** Toggle star callback */
   onToggleStar: (projectName: string) => void;
   /** Delete project callback */
-  onDeleteProject: (projectName: string) => Promise<void>;
+  onDeleteProject: (projectName: string, displayName: string) => Promise<void>;
   /** Select project callback */
   onSelectProject: (project: Project) => void;
   /** Session click callback */

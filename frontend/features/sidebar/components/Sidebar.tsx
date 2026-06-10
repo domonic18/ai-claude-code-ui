@@ -11,12 +11,14 @@
  * - Responsive design (mobile/desktop)
  */
 
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Plus } from 'lucide-react';
 import SidebarHeader from './SidebarHeader';
 import ProjectList from './ProjectList';
 import UserMenu from './UserMenu';
 import { SidebarModals } from './SidebarModals';
-import type { SidebarProps } from '../types/sidebar.types';
+import type { SidebarProps, Session } from '../types/sidebar.types';
 import { useProjects, useSessions, useStarredProjects } from '../hooks';
 import { useDeleteConfirmation } from '../hooks/useDeleteConfirmation';
 import { useSidebarState } from '../hooks/useSidebarState';
@@ -34,7 +36,12 @@ export const Sidebar = memo(function Sidebar({
   const { starredProjects, toggleStar } = useStarredProjects();
   const { deleteConfirmState, isDeleting, handleSessionDelete,
     handleConfirmSessionDelete, handleCancelSessionDelete,
-  } = useDeleteConfirmation({ deleteSession: sessionsHook.deleteSession, onSessionDelete, onRefresh });
+    projectDeleteConfirmState, isDeletingProject,
+    handleProjectDelete, handleConfirmProjectDelete, handleCancelProjectDelete,
+  } = useDeleteConfirmation({
+    deleteSession: sessionsHook.deleteSession, onSessionDelete, onRefresh,
+    deleteProject: projectsHook.deleteProject, onProjectDelete,
+  });
 
   const state = useSidebarState(
     { selectedProject, selectedSession, onRefresh, onProjectSelect, onProjectDelete, onSessionSelect, onNewSession, onSessionDelete, isLoading: isLoading ?? false, onShowSettings, isPWA, isMobile, projects: propProjects, onToggleSidebar },
@@ -49,16 +56,40 @@ export const Sidebar = memo(function Sidebar({
     }
   );
 
+  const { t } = useTranslation();
+
+  const handleNewSessionWithPlaceholder = useCallback((projectName: string) => {
+    const placeholder: Session = {
+      id: `__placeholder__${Date.now()}`,
+      summary: '',
+      lastActivity: new Date().toISOString(),
+      __projectName: projectName,
+    };
+    state.setPlaceholderSession(placeholder);
+    onNewSession?.(projectName);
+  }, [onNewSession, state.setPlaceholderSession]);
+
   return (
     <>
       <SidebarModals showNewProject={state.showNewProject} setShowNewProject={state.setShowNewProject}
-        createProject={state.createProject} onProjectSelect={onProjectSelect}
+        createProject={state.createProject} onProjectSelect={onProjectSelect} onRefresh={onRefresh}
         deleteConfirmState={deleteConfirmState} isDeleting={isDeleting}
-        handleConfirmSessionDelete={handleConfirmSessionDelete} handleCancelSessionDelete={handleCancelSessionDelete} />
+        handleConfirmSessionDelete={handleConfirmSessionDelete} handleCancelSessionDelete={handleCancelSessionDelete}
+        projectDeleteConfirmState={projectDeleteConfirmState} isDeletingProject={isDeletingProject}
+        handleConfirmProjectDelete={handleConfirmProjectDelete} handleCancelProjectDelete={handleCancelProjectDelete} />
       <div className="h-full flex flex-col bg-card md:select-none" data-tour="sidebar"
         style={isPWA && isMobile ? { paddingTop: '44px' } : {}}>
         <SidebarHeader isRefreshing={state.isRefreshing} onRefresh={state.handleRefresh}
           onNewSession={state.handleNewSession} isPWA={isPWA} isMobile={isMobile} onToggleSidebar={onToggleSidebar} />
+        <div className="px-3 pt-1 pb-2">
+          <button
+            onClick={() => state.setShowNewProject(true)}
+            className="w-full h-8 bg-primary hover:bg-primary/90 text-primary-foreground rounded-md flex items-center justify-center gap-2 font-medium text-xs active:scale-[0.98] transition-all duration-150"
+          >
+            <Plus className="w-3 h-3" />
+            {t('sidebar.newProject')}
+          </button>
+        </div>
         <ProjectList {...{
           projects: state.mergedProjects, selectedProject, selectedSession,
           expandedProjects: state.expandedProjects, starredProjects, editingProject: state.editingProject,
@@ -66,13 +97,13 @@ export const Sidebar = memo(function Sidebar({
           currentTime: state.currentTime, isLoading, onToggleProject: state.handleToggleProject,
           onStartEditing: state.handleStartEditing, onCancelEditing: state.handleCancelEditing,
           onSaveProjectName: state.handleSaveProjectName, onSetEditingName: state.setEditingName,
-          onToggleStar: toggleStar, onDeleteProject: state.handleDeleteProject, onSelectProject: state.handleSelectProject,
+          onToggleStar: toggleStar, onDeleteProject: handleProjectDelete, onSelectProject: state.handleSelectProject,
           onSessionClick: state.handleSessionClick, onDeleteSession: async (...args) => handleSessionDelete(...args),
           onUpdateSessionSummary: state.handleUpdateSessionSummary, onLoadMoreSessions: state.handleLoadMoreSessions,
           onSetEditingSession: (session) => state.setEditingSession(session?.id ?? null),
           onSetEditingSessionName: state.setEditingSessionName,
           editingSession: state.editingSession ? { id: state.editingSession } as any : null,
-          editingSessionName: state.editingSessionName, onNewSession,
+          editingSessionName: state.editingSessionName, onNewSession: handleNewSessionWithPlaceholder,
         }} />
         <div className="p-2 border-t border-border flex-shrink-0">
           <UserMenu onShowSettings={onShowSettings} />

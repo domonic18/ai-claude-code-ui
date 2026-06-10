@@ -66,7 +66,7 @@ router.put('/:projectName/rename', authenticate(), validate({
 
 /**
  * DELETE /api/projects/:projectName
- * 删除项目（仅当为空时）
+ * 删除项目及其所有对话
  */
 router.delete('/:projectName', authenticate(), projectController._asyncHandler(projectController.deleteProject));
 

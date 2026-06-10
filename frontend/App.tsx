@@ -30,6 +30,7 @@ import '@/shared/i18n';
 import type { Session as SidebarSession } from './features/sidebar/types/sidebar.types';
 import { useSidebarCommonProps, useMainContentProps, useLayoutProps } from './AppProps';
 import { useAppDataSync } from './useAppDataSync';
+import { onNavigateToConversation } from '@/features/documents';
 
 // Main App component with routing
 function AppContent() {
@@ -59,6 +60,20 @@ function AppContent() {
   const { ws, sendMessage, messages } = useWebSocketContext();
 
   useAppDataSync(user, layout, activeSessions, fetchProjects, selectedSession, messages, selectedProject, shouldSkipUpdate, updateProjectsFromWebSocket, incrementExternalMessageUpdate, projects);
+
+  // 订阅文档面板的跳转对话事件
+  useEffect(() => {
+    const unsubscribe = onNavigateToConversation((conversationId) => {
+      const session = {
+        id: conversationId,
+        summary: conversationId,
+        lastActivity: new Date().toISOString(),
+        __provider: 'claude' as const,
+      };
+      handleSessionSelect(session, selectedProject?.name);
+    });
+    return unsubscribe;
+  }, [handleSessionSelect, selectedProject]);
 
   const tourContextValue = useMemo(() => ({ startTour }), [startTour]);
 

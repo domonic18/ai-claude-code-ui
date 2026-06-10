@@ -12,7 +12,7 @@
  * @fileoverview Effects and computed values for sidebar feature
  */
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { TIMESTAMP_UPDATE_INTERVAL } from '../constants/sidebar.constants';
 import type { ExpandedProjects, Session, Project } from '../types/sidebar.types';
 
@@ -51,6 +51,12 @@ export interface UseSidebarEffectsReturn {
   displayProjects: Project[];
   /** Projects with merged additional sessions */
   mergedProjects: Project[];
+  /** Placeholder session for optimistic new session display */
+  placeholderSession: Session | null;
+  /** Set placeholder session */
+  setPlaceholderSession: (session: Session | null) => void;
+  /** Clear placeholder session */
+  clearPlaceholderSession: () => void;
 }
 
 // 由组件调用，自定义 Hook：useSidebarEffects
@@ -63,6 +69,9 @@ export interface UseSidebarEffectsReturn {
 export function useSidebarEffects(options: UseSidebarEffectsOptions): UseSidebarEffectsReturn {
   const [expandedProjects, setExpandedProjects] = useState<ExpandedProjects>(new Set());
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [placeholderSession, setPlaceholderSession] = useState<Session | null>(null);
+
+  const clearPlaceholderSession = useCallback(() => setPlaceholderSession(null), []);
 
   // ===== Computed Values =====
 
@@ -81,28 +90,31 @@ export function useSidebarEffects(options: UseSidebarEffectsOptions): UseSidebar
   const mergedProjects = useMemo(() => {
     return displayProjects.map(project => {
       const additional = options.additionalSessions[project.name] || [];
-      if (additional.length === 0) {
+      const placeholder = placeholderSession && placeholderSession.__projectName === project.name ? [placeholderSession] : [];
+
+      if (additional.length === 0 && placeholder.length === 0) {
         return project;
       }
 
-      // Merge sessions by provider
+      const allAdditional = [...additional, ...placeholder];
+
       return {
         ...project,
         sessions: [
           ...(project.sessions || []),
-          ...additional.filter(s => !s.__provider || s.__provider === 'claude')
+          ...allAdditional.filter(s => !s.__provider || s.__provider === 'claude')
         ],
         cursorSessions: [
           ...(project.cursorSessions || []),
-          ...additional.filter(s => s.__provider === 'cursor')
+          ...allAdditional.filter(s => s.__provider === 'cursor')
         ],
         codexSessions: [
           ...(project.codexSessions || []),
-          ...additional.filter(s => s.__provider === 'codex')
+          ...allAdditional.filter(s => s.__provider === 'codex')
         ],
       };
     });
-  }, [displayProjects, options.additionalSessions]);
+  }, [displayProjects, options.additionalSessions, placeholderSession]);
 
   // ===== Effects =====
 
@@ -161,11 +173,20 @@ export function useSidebarEffects(options: UseSidebarEffectsOptions): UseSidebar
     }
   }, [options.selectedSession?.id, options.selectedProject?.name]);
 
+  useEffect(() => {
+    if (placeholderSession && options.selectedSession?.id && !options.selectedSession.id.startsWith('__placeholder__')) {
+      setPlaceholderSession(null);
+    }
+  }, [options.selectedSession?.id, placeholderSession]);
+
   return {
     expandedProjects,
     setExpandedProjects,
     currentTime,
     displayProjects,
     mergedProjects,
+    placeholderSession,
+    setPlaceholderSession,
+    clearPlaceholderSession,
   };
 }

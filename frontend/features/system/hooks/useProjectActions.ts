@@ -87,6 +87,14 @@ export async function executeFetchProjects(
  * @param {Function} setProjects - Set projects state
  * @param {Object} deps - Project manager dependencies
  */
+/**
+ * Execute sidebar refresh with project synchronization
+ *
+ * @param {Function} setProjects - Set projects state
+ * @param {Object} deps - Project manager dependencies
+ * @param {Object} [options] - Refresh options
+ * @param {boolean} [options.force] - Bypass request deduplicator to guarantee fresh data
+ */
 export async function executeSidebarRefresh(
   setProjects: React.Dispatch<React.SetStateAction<Project[]>>,
   deps: {
@@ -97,32 +105,46 @@ export async function executeSidebarRefresh(
     handleSessionSelect: (session: Session, projectName?: string, selectedProjectRef?: React.RefObject<Project | null>) => void;
     restoreLastSession: (projects: Project[], setSelectedProject: (project: Project) => void) => boolean;
     setNewSessionCounter: React.Dispatch<React.SetStateAction<number>>;
-  }
+  },
+  options?: { force?: boolean }
 ): Promise<void> {
-  return requestDeduplicator.dedupe('projects:refresh', async () => {
+  const doRefresh = async () => {
     try {
+      console.log('[executeSidebarRefresh] ① 发起 GET /api/projects');
       const response = await api.projects.list();
 
       if (!response.ok) {
-        logger.error('Failed to refresh projects:', response.status, response.statusText);
+        console.error('[executeSidebarRefresh] ① 失败:', response.status, response.statusText);
         return;
       }
 
       const responseData = await response.json();
+      console.log('[executeSidebarRefresh] ② 原始响应 keys:', Object.keys(responseData), 'data 长度:', Array.isArray(responseData.data) ? responseData.data.length : 'not array', 'data 名称列表:', Array.isArray(responseData.data) ? responseData.data.map((p: any) => p.name) : 'N/A');
+
       const freshProjects = parseProjectsResponse(responseData);
+      console.log('[executeSidebarRefresh] ③ 解析后项目数:', freshProjects.length, '名称列表:', freshProjects.map(p => p.name));
 
       setProjects(prevProjects => {
         const hasChanges = hasProjectsChanged(prevProjects, freshProjects);
+        console.log('[executeSidebarRefresh] ④ hasProjectsChanged:', hasChanges, 'prev:', prevProjects.length, 'fresh:', freshProjects.length);
         return hasChanges ? freshProjects : prevProjects;
       });
 
       const currentProject = deps.selectedProjectRef.current;
       const currentSession = deps.selectedSessionRef.current;
+      console.log('[executeSidebarRefresh] ⑤ syncSessionAfterRefresh, currentProject:', currentProject?.name, 'currentSession:', currentSession?.id);
       syncSessionAfterRefresh(currentProject, currentSession, freshProjects, deps);
     } catch (error) {
-      logger.error('Error refreshing sidebar:', error);
+      console.error('[executeSidebarRefresh] ✖ 异常:', error);
     }
-  });
+  };
+
+  // force=true skips the deduplicator so we always get the latest data
+  // (e.g. right after creating a new project)
+  if (options?.force) {
+    return doRefresh();
+  }
+  return requestDeduplicator.dedupe('projects:refresh', doRefresh);
 }
 
 /**

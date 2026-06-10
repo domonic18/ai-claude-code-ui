@@ -168,12 +168,8 @@ export class ProjectController extends BaseController {
       const userId = this._getUserId(req);
       const { projectName } = req.params;
 
-      const isEmpty = await this.claudeDiscovery.isProjectEmpty(projectName, { userId });
-      if (!isEmpty) {
-        throw new Error('Cannot delete project with existing sessions');
-      }
-
-      await deleteWorkspace(userId, projectName);
+      const { deleteProject } = await import('../../services/projects/project-management/index.js');
+      await deleteProject(userId, projectName);
       this._success(res, null, 'Project deleted successfully');
     } catch (error) {
       this._handleError(error, req, res, next);
