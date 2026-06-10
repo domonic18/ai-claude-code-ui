@@ -39,8 +39,8 @@ export const ALLOWED_FILE_TYPES = [
 export const STORAGE_KEYS = {
   /** Chat messages for a session */
   MESSAGES: (sessionId: string) => `chat_messages_${sessionId}`,
-  /** Draft input for a session */
-  DRAFT_INPUT: (sessionId: string) => `draft_input_${sessionId}`,
+  /** Draft input (global, not per-project) */
+  DRAFT_INPUT: 'draft_input',
   /** Chat settings */
   SETTINGS: 'chat_settings',
   /** Expanded tools setting */

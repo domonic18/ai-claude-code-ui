@@ -13,36 +13,35 @@ import { useFileUploadHandler } from './useFileUploadHandler';
 
 /**
  * Manage draft input persistence to localStorage
+ *
+ * 草稿与项目无关，使用固定 key。只在首次挂载时加载一次。
  */
 function useDraftPersistence(
-  projectName: string,
   value: string,
   onChange: (value: string, cursorPosition: number) => void
 ): void {
-  // 只在每个 projectName 首次出现时加载草稿，避免删空时被恢复
-  const loadedProjects = useRef(new Set<string>());
+  const loadedRef = useRef(false);
 
+  // 只在首次挂载时加载草稿
   useEffect(() => {
-    if (!projectName || typeof window === 'undefined') return;
-    if (loadedProjects.current.has(projectName)) return;
-    loadedProjects.current.add(projectName);
+    if (loadedRef.current || typeof window === 'undefined') return;
+    loadedRef.current = true;
 
-    const draft = localStorage.getItem(STORAGE_KEYS.DRAFT_INPUT(projectName));
+    const draft = localStorage.getItem(STORAGE_KEYS.DRAFT_INPUT);
     if (draft && !value) {
       onChange(draft, draft.length);
     }
-  }, [projectName, onChange, value]);
+  }, [onChange, value]);
 
-  // 保存草稿：非空时写入，空时清除 localStorage 残留
+  // 保存草稿：非空时写入，空时清除
   useEffect(() => {
-    if (projectName && typeof window !== 'undefined') {
-      if (value) {
-        localStorage.setItem(STORAGE_KEYS.DRAFT_INPUT(projectName), value);
-      } else {
-        localStorage.removeItem(STORAGE_KEYS.DRAFT_INPUT(projectName));
-      }
+    if (typeof window === 'undefined') return;
+    if (value) {
+      localStorage.setItem(STORAGE_KEYS.DRAFT_INPUT, value);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.DRAFT_INPUT);
     }
-  }, [value, projectName]);
+  }, [value]);
 }
 
 /**
@@ -168,7 +167,7 @@ export function useChatInputState({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Draft persistence
-  useDraftPersistence(projectName, value, onChange);
+  useDraftPersistence(value, onChange);
 
   // Auto-resize textarea
   useTextareaAutoResize(textareaRef, value, minRows, maxRows);

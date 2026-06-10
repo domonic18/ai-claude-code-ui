@@ -152,10 +152,7 @@ function clearInputState(
   onSetAttachedFiles([]);
 
   // Clear draft from localStorage to prevent it from being restored on refresh/session switch
-  if (selectedProject?.name) {
-    const draftKey = STORAGE_KEYS.DRAFT_INPUT(selectedProject.name);
-    localStorage.removeItem(draftKey);
-  }
+  localStorage.removeItem(STORAGE_KEYS.DRAFT_INPUT);
 }
 
 /**
