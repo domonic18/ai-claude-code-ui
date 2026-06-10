@@ -6,7 +6,6 @@
 
 import { useCallback } from 'react';
 import type { SlashCommand } from './useSlashCommands';
-import { STORAGE_KEYS } from '../constants';
 
 export interface UseCommandExecutorOptions {
   /** Selected project name */
@@ -46,16 +45,9 @@ export function useCommandExecutor(options: UseCommandExecutorOptions = {}): Use
    * Handle command execution
    */
   const handleCommandExecute = useCallback((command: SlashCommand) => {
-    // Track command usage for history
-    const historyKey = STORAGE_KEYS.COMMAND_HISTORY(selectedProject?.name || 'default');
-    const history = JSON.parse(localStorage.getItem(historyKey) || '[]');
-    const existingIndex = history.findIndex((c: any) => c.name === command.name);
-
-    if (existingIndex >= 0) {
-      history.splice(existingIndex, 1);
-    }
-    history.unshift({ ...command, lastUsed: Date.now() });
-    localStorage.setItem(historyKey, JSON.stringify(history.slice(0, 20)));
+    // Note: Command history tracking is handled by useSlashCommands via updateCommandHistory,
+    // which stores data in Record<string, number> format. Do NOT read/write the same key
+    // as an array here to avoid format conflicts.
 
     // Handle built-in commands
     if (command.type === 'built-in') {
