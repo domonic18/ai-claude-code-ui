@@ -390,6 +390,8 @@ class ContainerManager {
 - [安全与部署配置](./security-deployment-config.md)
 - [项目结构说明](../ai-context/project-structure.md)
 - [API 文档](../api/README.md)
+- [流式输出架构](./streaming-output-architecture.md)
+- [权限控制架构](./permission-control-architecture.md)
 
 ### 4.2 参考资源
 
@@ -431,3 +433,4 @@ class ContainerManager {
 |------|------|------|----------|
 | 1.0 | 2026-01-10 | Claude | 初始版本 |
 | 1.1 | 2026-01-18 | Claude | 更新技术栈和文件路径 |
+| 1.2 | 2026-06-09 | Claude | 添加流式输出和权限控制架构文档引用 |
