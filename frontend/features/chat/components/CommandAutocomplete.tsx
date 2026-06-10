@@ -45,8 +45,8 @@ interface CommandListItemProps {
   index: number;
   /** Selection callback */
   onSelect: (command: SlashCommand, index: number, isHover?: boolean) => void;
-  /** Item ref */
-  ref: React.RefObject<HTMLDivElement>;
+  /** Item ref for scroll-into-view */
+  itemRef?: React.RefObject<HTMLDivElement>;
 }
 
 /**
@@ -58,11 +58,11 @@ function CommandListItem({
   isFrequent,
   index,
   onSelect,
-  ref,
+  itemRef,
 }: CommandListItemProps) {
   return (
     <div
-      ref={isSelected ? ref : null}
+      ref={isSelected ? itemRef : undefined}
       className={`
         px-3 py-2 cursor-pointer flex items-center justify-between
         ${isSelected
@@ -141,7 +141,7 @@ export function CommandAutocomplete({
             isFrequent={isFrequentCommand(command.name)}
             index={index}
             onSelect={onSelect}
-            ref={index === selectedIndex ? selectedItemRef : null}
+            itemRef={index === selectedIndex ? selectedItemRef : undefined}
           />
         ))
       }
