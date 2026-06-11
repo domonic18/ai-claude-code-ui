@@ -11,6 +11,17 @@ import { PROJECT_ROOT } from './envLoader.js';
 import { getResourceLimits } from './containerTierConfig.js';
 
 /**
+ * 系统保留目录名（在 /workspace/ 下不应被识别为用户项目的目录）
+ * DocumentService、ContainerProjectManager 等模块应引用此常量，避免硬编码不一致
+ */
+export const RESERVED_DIR_NAMES = ['generated_docs', 'logs', '.claude', 'memory'];
+
+/**
+ * AI 生成文档的目录名（相对于项目根目录）
+ */
+export const GENERATED_DIR_NAME = 'generated_docs';
+
+/**
  * 容器配置
  *
  * 注意：项目现在完全基于容器化运行，所有操作都在 Docker 容器中执行。
