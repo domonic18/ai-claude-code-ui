@@ -177,6 +177,18 @@ class LogTimer {
     const cost = this.elapsed();
     logger.error({ cost, ...(this._label ? { operation: this._label } : {}), ...extra }, msg);
   }
+
+  /**
+   * 结束计时并写入 debug 日志
+   *
+   * @param {import('pino').Logger} logger - pino logger 实例
+   * @param {string} [msg] - 日志消息
+   * @param {Object} [extra] - 附加字段
+   */
+  endDebug(logger, msg = 'Operation completed', extra = {}) {
+    const cost = this.elapsed();
+    logger.debug({ cost, ...(this._label ? { operation: this._label } : {}), ...extra }, msg);
+  }
 }
 
 /**

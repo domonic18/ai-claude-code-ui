@@ -50,7 +50,7 @@ export class ContainerLifecycleManager {
     if (stateMachine.is(ContainerState.READY)) {
       const existing = await this._handleReadyState(userId, stateMachine);
       if (existing) {
-        getTimer.end(logger, 'Container obtained (hot path)', { userId, path: 'hot' });
+        getTimer.endDebug(logger, 'Container obtained (hot path)', { userId, path: 'hot' });
         return existing;
       }
       // 容器信息丢失但状态为 ready，先重置状态再重建

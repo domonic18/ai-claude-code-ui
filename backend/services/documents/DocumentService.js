@@ -27,6 +27,10 @@ const UPLOADS_SUBDIR = 'uploads';
 const GENERATED_DIR = GENERATED_DIR_NAME;
 const AI_MANIFEST_FILE = '.ai-documents.json';
 
+/** 文档列表内存缓存（避免短时间内重复全量扫描） */
+const DOC_CACHE_TTL_MS = 5_000;
+const documentCache = new Map();
+
 /**
  * 文档管理服务
  * 在用户 Docker 容器内管理项目文档的元数据和文件操作
@@ -39,6 +43,14 @@ export class DocumentService {
    * @returns {Promise<{uploads: Array, aiGenerated: Array}>}
    */
   async getProjectDocuments(userId, projectName) {
+    // 5 秒内直接返回缓存，避免重复全量扫描
+    const cacheKey = `${userId}:${projectName}`;
+    const cached = documentCache.get(cacheKey);
+    if (cached && Date.now() - cached.time < DOC_CACHE_TTL_MS) {
+      logger.debug({ userId, projectName, cacheAge: Date.now() - cached.time }, '[getProjectDocuments] 命中缓存');
+      return cached.data;
+    }
+
     const [uploads, aiManifest, generatedFiles, readmeEntries] = await Promise.all([
       this._scanUploads(userId, projectName),
       this._readAIManifest(userId, projectName),
@@ -76,7 +88,9 @@ export class DocumentService {
       aiGenerated: enrichedAiGenerated.map(d => ({ name: d.file_name, status: d.summary_status })),
     }, '[getProjectDocuments] 文档摘要状态');
 
-    return { uploads: enrichedUploads, aiGenerated: enrichedAiGenerated };
+    const result = { uploads: enrichedUploads, aiGenerated: enrichedAiGenerated };
+    documentCache.set(cacheKey, { data: result, time: Date.now() });
+    return result;
   }
 
   /**
