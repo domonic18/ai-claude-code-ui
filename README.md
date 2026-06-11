@@ -160,17 +160,27 @@ COOKIE_SAMESITE=lax
 
 ## 部署步骤
 
-### 1. 构建并推送镜像
+### 1. 拉取代码
 
 ```bash
-# 构建镜像（带版本号）
-./scripts/build-image.sh
-
-# 推送到远程仓库
-./scripts/push-image.sh
+# 在服务器上拉取最新代码
+git pull origin main
+git submodule update --init --recursive
 ```
 
-### 2. 配置生产环境
+### 2. 构建镜像
+
+```bash
+# 在服务器本地构建镜像
+sudo ./scripts/build-image.sh
+```
+
+构建完成后，修改以下文件中的镜像标签为新版本号：
+
+- `.env.deploy` — 更新 `IMAGE_TAG` 为新版本号
+- `docker-compose.deploy.yml` — 更新镜像标签为新版本号
+
+### 3. 配置生产环境
 
 在目标机器创建 `.env.deploy` 文件，参考 `.env.deploy` 模板配置以下关键项：
 
@@ -193,11 +203,14 @@ SAML_SSO_URL=<IdP SSO URL>
 SAML_IDP_CERTIFICATE=<IdP 证书>
 ```
 
-### 3. 启动服务
+### 4. 启动服务
 
 ```bash
-# 启动服务（使用远程镜像）
+# 启动服务
 docker-compose -f docker-compose.deploy.yml up -d
+
+# 重载 Nginx
+sudo docker exec nginx-proxy nginx -s reload
 
 # 查看日志
 docker-compose -f docker-compose.deploy.yml logs -f
@@ -244,9 +257,12 @@ docker inspect --format='{{.State.Health.Status}}' claude-code-app
 # 查看实时日志
 docker-compose -f docker-compose.deploy.yml logs -f --tail=100
 
-# 更新镜像版本
-docker-compose -f docker-compose.deploy.yml pull
+# 更新服务
+git pull origin main
+sudo ./scripts/build-image.sh
+# 更新 .env.deploy 和 docker-compose.deploy.yml 中的镜像标签
 docker-compose -f docker-compose.deploy.yml up -d
+sudo docker exec nginx-proxy nginx -s reload
 
 # 数据备份
 tar -czf claude-code-backup-$(date +%Y%m%d).tar.gz /var/lib/claude-code/
