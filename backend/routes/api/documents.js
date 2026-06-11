@@ -41,6 +41,7 @@ const upload = multer({
     const ext = '.' + file.originalname.split('.').pop().toLowerCase();
 
     // MIME 类型白名单（扩展名校验 + MIME 校验双重防线）
+    // application/octet-stream 是浏览器对未知/未注册类型的默认回退值，不能单独作为信任依据
     const allowedMimes = [
       'text/plain', 'text/markdown', 'text/csv', 'text/html', 'text/xml',
       'application/pdf',
@@ -58,7 +59,10 @@ const upload = multer({
       return cb(new Error(`Unsupported file type: ${ext}`));
     }
 
-    if (!allowedMimes.includes(file.mimetype)) {
+    // 扩展名合法时，对 application/octet-stream 做宽容处理（浏览器默认值），
+    // 其余 MIME 类型仍走白名单校验。安全由扩展名兜底。
+    const isGenericMime = file.mimetype === 'application/octet-stream';
+    if (!isGenericMime && !allowedMimes.includes(file.mimetype)) {
       logger.warn({ fileName: file.originalname, ext, mimeType: file.mimetype }, '[文档上传] MIME 类型不在白名单');
       return cb(new Error(`Unsupported MIME type: ${file.mimetype}`));
     }
@@ -77,15 +81,26 @@ router.get('/:name/documents', authenticate(), documentController._asyncHandler(
  * POST /api/projects/:name/documents/upload
  * 上传文档到项目
  */
-router.post('/:name/documents/upload', authenticate(), upload.single('file'), (req, res, next) => {
-  if (!req.file) {
-    logger.warn('[文档上传] multer 未解析出文件');
-    return res.status(400).json({ error: 'No file uploaded or unsupported file type' });
-  }
-  logger.info({
-    file: { name: req.file.originalname, size: req.file.size, mimetype: req.file.mimetype },
-  }, '[文档上传] multer 处理完成，交给 controller');
-  documentController.uploadDocument(req, res, next);
+router.post('/:name/documents/upload', authenticate(), (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) {
+      logger.warn({ err, fileName: req.file?.originalname }, '[文档上传] multer 处理失败');
+      return res.status(400).json({
+        error: err.message || 'No file uploaded or unsupported file type',
+      });
+    }
+
+    if (!req.file) {
+      logger.warn('[文档上传] multer 未解析出文件');
+      return res.status(400).json({ error: 'No file uploaded or unsupported file type' });
+    }
+
+    logger.info({
+      file: { name: req.file.originalname, size: req.file.size, mimetype: req.file.mimetype },
+    }, '[文档上传] multer 处理完成，交给 controller');
+
+    documentController.uploadDocument(req, res, next);
+  });
 });
 
 /**
