@@ -17,13 +17,14 @@ import { summaryService } from './SummaryService.js';
 import { readmeService } from './ReadmeService.js';
 import { validateContainerPath, validateProjectFilePath, validateProjectName } from '../../utils/pathValidator.js';
 import { writeFileViaPutArchive } from '../container/utils/containerFileWriter.js';
+import { GENERATED_DIR_NAME } from '../../config/containerConfig.js';
 
 const logger = createLogger('services/documents/DocumentService');
 
 /** 文档目录在容器内的相对路径 */
 const DOCUMENTS_DIR = 'documents';
 const UPLOADS_SUBDIR = 'uploads';
-const GENERATED_DIR = 'generated_docs';
+const GENERATED_DIR = GENERATED_DIR_NAME;
 const AI_MANIFEST_FILE = '.ai-documents.json';
 
 /**
@@ -351,7 +352,7 @@ export class DocumentService {
         .filter(Boolean)
         .filter(fp => {
           // 排除隐藏文件（如 .ai-documents.json）和清单文件
-          const name = fp.split('/').pop();
+          const name = path.basename(fp);
           return !name.startsWith('.') && name !== AI_MANIFEST_FILE;
         });
 
@@ -387,16 +388,32 @@ export class DocumentService {
 
   /**
    * 读取 AI 文档清单
+   * 先尝试新路径（generated_docs/），失败则回退旧路径（documents/）并自动迁移
    * @private
    * @returns {Promise<Array>}
    */
   async _readAIManifest(userId, projectName) {
-    const manifestPath = `/workspace/${projectName}/${GENERATED_DIR}/${AI_MANIFEST_FILE}`;
+    const newPath = `/workspace/${projectName}/${GENERATED_DIR}/${AI_MANIFEST_FILE}`;
 
     try {
       await containerManager.getOrCreateContainer(userId);
-      const content = await this._readFileFromContainer(userId, manifestPath);
+      const content = await this._readFileFromContainer(userId, newPath);
       return JSON.parse(content);
+    } catch {
+      // 新路径不存在，尝试从旧路径迁移
+    }
+
+    // 迁移：从旧路径 documents/.ai-documents.json 读取并写入新路径
+    const oldPath = `/workspace/${projectName}/${DOCUMENTS_DIR}/${AI_MANIFEST_FILE}`;
+    try {
+      const content = await this._readFileFromContainer(userId, oldPath);
+      const manifest = JSON.parse(content);
+      // 写入新路径
+      await this._writeAIManifest(userId, projectName, manifest);
+      // 删除旧文件
+      await this._execCommand(userId, ['rm', '-f', oldPath]);
+      logger.info({ userId, projectName }, '[DocumentService] 清单文件已从旧路径迁移到新路径');
+      return manifest;
     } catch {
       return [];
     }

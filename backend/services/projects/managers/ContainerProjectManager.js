@@ -11,6 +11,7 @@ import { PassThrough } from 'stream';
 import containerManager from '../../container/core/index.js';
 import { getSessionsInContainer } from '../../sessions/container/ContainerSessions.js';
 import { CONTAINER, FILE_TIMEOUTS } from '../../../config/config.js';
+import { RESERVED_DIR_NAMES } from '../../../config/containerConfig.js';
 import { loadProjectConfig } from '../config/index.js';
 import { createLogger } from '../../../utils/logger.js';
 const logger = createLogger('services/projects/managers/ContainerProjectManager');
@@ -143,9 +144,16 @@ export async function getProjectsInContainer(userId) {
     const workspacePath = CONTAINER.paths.workspace;
     logger.info(`[getProjectsInContainer] ① userId=${userId} workspacePath=${workspacePath} containerId=${container.id}`);
 
+    // 动态构建排除列表，基于 RESERVED_DIR_NAMES 共享常量
+    const excludePattern = RESERVED_DIR_NAMES
+      .map(d => d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .map(d => `grep -v "^${d}$"`)
+      .join(' | ');
+    const lsCmd = `ls -1 "$1" 2>/dev/null | ${excludePattern} || echo ""`;
+
     const { stream } = await containerManager.execInContainer(
       userId,
-      ['sh', '-c', 'ls -1 "$1" 2>/dev/null | grep -v "^\\.claude$" | grep -v "^memory$" | grep -v "^generated_docs$" | grep -v "^logs$" | grep -v "^\\." || echo ""', 'listProjects', workspacePath]
+      ['sh', '-c', lsCmd, 'listProjects', workspacePath]
     );
 
     const output = await _collectStreamOutput(stream);
