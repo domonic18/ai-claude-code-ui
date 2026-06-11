@@ -45,6 +45,7 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
   const [aiGenerated, setAiGenerated] = useState<DocumentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const refreshingRef = useRef(false);
 
   /** WebSocket 收到 document-created 事件时调用 */
   const addAIDocument = useCallback((doc: DocumentItem) => {
@@ -66,6 +67,10 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
       return;
     }
 
+    // 请求锁：防止多个组件同时触发 refresh 导致重复请求
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+
     setLoading(true);
     setError(null);
     try {
@@ -86,6 +91,7 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
       logger.error({ err, projectName }, 'Failed to load documents');
     } finally {
       setLoading(false);
+      refreshingRef.current = false;
     }
   }, [projectName]);
 
@@ -110,8 +116,9 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
     return unsubscribe;
   }, [refresh]);
 
-  // 轮询：当有 pending 摘要时每 2 秒刷新一次，最多 60 秒
+  // 轮询：当有 pending 摘要时每 10 秒刷新一次，最多 60 秒 / 10 次
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const retryCountRef = useRef(0);
   useEffect(() => {
     const hasPending =
       uploads.some(u => u.summary_status === 'pending') ||
@@ -119,17 +126,19 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
 
     if (hasPending && !pollingRef.current) {
       const startTime = Date.now();
+      retryCountRef.current = 0;
       pollingRef.current = setInterval(() => {
-        if (Date.now() - startTime > 60_000) {
-          // 超时停止轮询
+        if (Date.now() - startTime > 60_000 || retryCountRef.current > 10) {
+          // 超时或超过最大次数，停止轮询
           if (pollingRef.current) {
             clearInterval(pollingRef.current);
             pollingRef.current = null;
           }
           return;
         }
+        retryCountRef.current++;
         refresh();
-      }, 2000);
+      }, 10000);
     }
 
     // 所有摘要都已就绪，停止轮询
