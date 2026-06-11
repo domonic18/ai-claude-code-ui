@@ -175,10 +175,20 @@ pipeline {
                     sh "echo \${REGISTRY_PASS} | docker login ${env.REGISTRY} -u \${REGISTRY_USER} --password-stdin"
                 }
 
-                // 推送三个镜像
-                sh "docker push ${env.REGISTRY}/${env.IMAGE_PREFIX}/claude-code-ui:base"
-                sh "docker push ${env.REGISTRY}/${env.IMAGE_PREFIX}/claude-code-ui:${env.GIT_SHORT_HASH}"
-                sh "docker push ${env.REGISTRY}/${env.IMAGE_PREFIX}/claude-code-sandbox:${env.GIT_SHORT_HASH}"
+                // 推送三个镜像（带重试，应对网络抖动导致的 TLS handshake timeout）
+                // 重试策略：最多 3 次，间隔 10s/20s/30s，docker push 自身会复用已推送的层
+                script {
+                    def images = [
+                        "${env.REGISTRY}/${env.IMAGE_PREFIX}/claude-code-ui:base",
+                        "${env.REGISTRY}/${env.IMAGE_PREFIX}/claude-code-ui:${env.GIT_SHORT_HASH}",
+                        "${env.REGISTRY}/${env.IMAGE_PREFIX}/claude-code-sandbox:${env.GIT_SHORT_HASH}"
+                    ]
+                    for (img in images) {
+                        retry(3) {
+                            sh "docker push ${img}"
+                        }
+                    }
+                }
 
                 echo "--- 镜像推送完成 ---"
                 echo "base:    ${env.REGISTRY}/${env.IMAGE_PREFIX}/claude-code-ui:base"
