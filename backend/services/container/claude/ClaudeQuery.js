@@ -73,18 +73,26 @@ async function loadMemoryContext(userId, options) {
 
 // 为 SDK 执行将记忆上下文前置到用户命令
 /**
- * 构建增强命令（添加记忆上下文）
+ * 构建增强命令（添加工作目录提示 + 记忆上下文）
+ *
+ * 工作目录提示防止 AI 使用 /workspace/ 绝对前缀写文件，
+ * 确保所有生成文件落在正确的项目子目录下。
+ *
  * @param {string} command - 原始命令
  * @param {string|null} memoryContext - 记忆上下文
+ * @param {string} cwd - 当前工作目录（如 /workspace/我的工作区）
  * @returns {string} 增强后的命令
  */
-function buildEnhancedCommand(command, memoryContext) {
-  if (!memoryContext) {
-    return command;
+function buildEnhancedCommand(command, memoryContext, cwd) {
+  // 注入工作目录提示，确保 AI 将文件写入正确的项目目录
+  const cwdHint = `【系统提示】当前工作目录：${cwd}。所有文件必须写入此目录或其子目录中，禁止使用 /workspace/ 作为文件路径前缀。`;
+  let enhanced = `${cwdHint}\n\n${command}`;
+
+  if (memoryContext) {
+    enhanced += `${MEMORY_SEPARATOR}${MEMORY_SEPARATOR}${MEMORY_START}${MEMORY_SEPARATOR}${memoryContext}${MEMORY_SEPARATOR}${MEMORY_END}${MEMORY_SEPARATOR}${MEMORY_SEPARATOR}`;
   }
 
-  // Add memory to command at execution time
-  return `${command}${MEMORY_SEPARATOR}${MEMORY_SEPARATOR}${MEMORY_START}${MEMORY_SEPARATOR}${memoryContext}${MEMORY_SEPARATOR}${MEMORY_END}${MEMORY_SEPARATOR}${MEMORY_SEPARATOR}`;
+  return enhanced;
 }
 
 // 通知前端会话启动并在 UI 中包含记忆上下文
@@ -223,7 +231,7 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
     sendSessionStart(writer, sessionId, container.id, memoryContext);
 
     // 7. 构建增强命令并执行
-    const enhancedCommand = buildEnhancedCommand(command, memoryContext);
+    const enhancedCommand = buildEnhancedCommand(command, memoryContext, workingDir);
     logger.debug({ sessionId }, '[ClaudeQuery] Executing in container');
     await executeInContainer(userId, enhancedCommand, mappedOptions, writer, sessionId, providerConfig);
     logger.info({ sessionId }, '[ClaudeQuery] Execution completed');

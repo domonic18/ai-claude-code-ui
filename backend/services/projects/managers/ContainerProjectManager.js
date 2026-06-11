@@ -145,7 +145,7 @@ export async function getProjectsInContainer(userId) {
 
     const { stream } = await containerManager.execInContainer(
       userId,
-      ['sh', '-c', 'ls -1 "$1" 2>/dev/null | grep -v "^\\.claude$" | grep -v "^memory$" || echo ""', 'listProjects', workspacePath]
+      ['sh', '-c', 'ls -1 "$1" 2>/dev/null | grep -v "^\\.claude$" | grep -v "^memory$" | grep -v "^generated_docs$" | grep -v "^logs$" | grep -v "^\\." || echo ""', 'listProjects', workspacePath]
     );
 
     const output = await _collectStreamOutput(stream);

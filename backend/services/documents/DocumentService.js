@@ -23,6 +23,7 @@ const logger = createLogger('services/documents/DocumentService');
 /** 文档目录在容器内的相对路径 */
 const DOCUMENTS_DIR = 'documents';
 const UPLOADS_SUBDIR = 'uploads';
+const GENERATED_DIR = 'generated_docs';
 const AI_MANIFEST_FILE = '.ai-documents.json';
 
 /**
@@ -269,7 +270,7 @@ export class DocumentService {
    * @private
    */
   async _scanGeneratedDir(userId, projectName) {
-    const dir = `/workspace/${projectName}/generated_docs`;
+    const dir = `/workspace/${projectName}/${GENERATED_DIR}`;
     return this._scanDirectory(userId, projectName, dir, 'ai_generated', 200);
   }
 
@@ -347,7 +348,12 @@ export class DocumentService {
 
       const filePaths = fileListOutput.trim().split('\n')
         .map(line => line.trim())
-        .filter(Boolean);
+        .filter(Boolean)
+        .filter(fp => {
+          // 排除隐藏文件（如 .ai-documents.json）和清单文件
+          const name = fp.split('/').pop();
+          return !name.startsWith('.') && name !== AI_MANIFEST_FILE;
+        });
 
       const results = [];
       for (const filePath of filePaths) {
@@ -385,7 +391,7 @@ export class DocumentService {
    * @returns {Promise<Array>}
    */
   async _readAIManifest(userId, projectName) {
-    const manifestPath = `/workspace/${projectName}/${DOCUMENTS_DIR}/${AI_MANIFEST_FILE}`;
+    const manifestPath = `/workspace/${projectName}/${GENERATED_DIR}/${AI_MANIFEST_FILE}`;
 
     try {
       await containerManager.getOrCreateContainer(userId);
@@ -401,7 +407,7 @@ export class DocumentService {
    * @private
    */
   async _writeAIManifest(userId, projectName, manifest) {
-    const dirPath = `/workspace/${projectName}/${DOCUMENTS_DIR}`;
+    const dirPath = `/workspace/${projectName}/${GENERATED_DIR}`;
     const manifestPath = `${dirPath}/${AI_MANIFEST_FILE}`;
 
     await containerManager.getOrCreateContainer(userId);
