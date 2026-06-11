@@ -30,6 +30,7 @@ export { ContainerHealthMonitor } from './ContainerHealth.js';
 export { ContainerResourceMonitor } from './ContainerStats.js';
 export { ContainerCleanupManager } from './ContainerCleanup.js';
 export { ContainerLifecycleManager } from './ContainerLifecycle.js';
+export { runInReadOnlyContext, isReadOnlyContext } from './ContainerReadOnlyContext.js';
 
 /**
  * 统一的容器管理器类（向后兼容）

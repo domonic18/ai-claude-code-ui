@@ -21,6 +21,7 @@ import {
 import { handleIntermediateState, validateIntermediateState } from './ContainerStateHandler.js';
 import { createContainerWithStateMachine } from './ContainerStateMachineHandler.js';
 import { createLogger, startTimer } from '../../../utils/logger.js';
+import { isReadOnlyContext } from './ContainerReadOnlyContext.js';
 
 const logger = createLogger('container/core/ContainerLifecycle');
 const { Container } = repositories;
@@ -46,25 +47,29 @@ export class ContainerLifecycleManager {
     const getTimer = startTimer('container/get_or_create');
     const stateMachine = await this._getStateMachine(userId);
 
+    // 自动检测只读上下文（如前端轮询），避免刷新 lastActive
+    const readOnly = options.skipLastActiveUpdate || isReadOnlyContext();
+    const effectiveOptions = { ...options, skipLastActiveUpdate: readOnly };
+
     // 已就绪：检查运行状态（热路径）
     if (stateMachine.is(ContainerState.READY)) {
-      const existing = await this._handleReadyState(userId, stateMachine);
+      const existing = await this._handleReadyState(userId, stateMachine, effectiveOptions);
       if (existing) {
-        getTimer.end(logger, 'Container obtained (hot path)', { userId, path: 'hot' });
+        getTimer.end(logger, 'Container obtained (hot path)', { userId, path: 'hot', readOnly });
         return existing;
       }
       // 容器信息丢失但状态为 ready，先重置状态再重建
       stateMachine.transitionTo(ContainerState.NON_EXISTENT);
       await containerStateStore.save(stateMachine);
-      getTimer.end(logger, 'Container obtained (cold path - re-create)', { userId, path: 'cold-recreate' });
+      getTimer.end(logger, 'Container obtained (cold path - re-create)', { userId, path: 'cold-recreate', readOnly });
       return createContainerWithStateMachine(this.docker, userId, userConfig, stateMachine, this.containers, this.config);
     }
 
     // 创建中：等待或报错
     const { INTERMEDIATE_STATES } = await import('./ContainerStateHandler.js');
     if (INTERMEDIATE_STATES.includes(stateMachine.getState())) {
-      const result = await handleIntermediateState(userId, userConfig, options, stateMachine, this.getOrCreateContainer.bind(this));
-      getTimer.end(logger, 'Container obtained (intermediate state resolved)', { userId, path: 'intermediate' });
+      const result = await handleIntermediateState(userId, userConfig, effectiveOptions, stateMachine, this.getOrCreateContainer.bind(this));
+      getTimer.end(logger, 'Container obtained (intermediate state resolved)', { userId, path: 'intermediate', readOnly });
       return result;
     }
 
@@ -74,7 +79,7 @@ export class ContainerLifecycleManager {
       await containerStateStore.save(stateMachine);
     }
 
-    getTimer.end(logger, 'Container obtained (cold path - new)', { userId, path: 'cold-new' });
+    getTimer.end(logger, 'Container obtained (cold path - new)', { userId, path: 'cold-new', readOnly });
     return createContainerWithStateMachine(this.docker, userId, userConfig, stateMachine, this.containers, this.config);
   }
 
@@ -91,7 +96,9 @@ export class ContainerLifecycleManager {
   }
 
   async execInContainer(userId, command, options = {}) {
-    const info = await this.getOrCreateContainer(userId);
+    // 自动检测只读上下文，避免轮询等只读操作刷新 lastActive
+    const readOnly = options.skipLastActiveUpdate || isReadOnlyContext();
+    const info = await this.getOrCreateContainer(userId, {}, { skipLastActiveUpdate: readOnly });
     return ContainerOps.execInContainer(this.docker, info.id, command, options);
   }
 
@@ -105,16 +112,25 @@ export class ContainerLifecycleManager {
 
   // ─── 状态处理 ──────────────────────────────────────
 
-  /** @returns {Promise<Object|undefined>} 容器信息，或 undefined 需要重新创建 */
-  async _handleReadyState(userId, stateMachine) {
+  /**
+   * 处理 READY 状态的容器
+   * @param {number} userId - 用户 ID
+   * @param {Object} stateMachine - 状态机实例
+   * @param {Object} options - 选项
+   * @param {boolean} [options.skipLastActiveUpdate=false] - 是否跳过更新 lastActive（用于后台轮询等只读场景）
+   * @returns {Promise<Object|undefined>} 容器信息，或 undefined 需要重新创建
+   */
+  async _handleReadyState(userId, stateMachine, options = {}) {
     const containerInfo = this.containers.get(userId);
     if (!containerInfo) return undefined;
 
     try {
       const status = await this.healthMonitor.getContainerStatus(containerInfo.id);
       if (status === 'running') {
-        containerInfo.lastActive = new Date();
-        updateLastActive(Container, containerInfo);
+        if (!options.skipLastActiveUpdate) {
+          containerInfo.lastActive = new Date();
+          updateLastActive(Container, containerInfo);
+        }
         return containerInfo;
       }
     } catch (err) {
