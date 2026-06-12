@@ -58,6 +58,11 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
   // Mutation 错误状态：mutation 失败时展示给用户，成功时清除
   const [mutationError, setMutationError] = useState<string | null>(null);
 
+  // 项目切换时清除残留的 mutation 错误，避免在项目 B 显示项目 A 的错误
+  useEffect(() => {
+    setMutationError(null);
+  }, [projectName]);
+
   // 从缓存数据中解构 uploads / aiGenerated
   const uploads = data?.uploads ?? [];
   const aiGenerated = data?.aiGenerated ?? [];
@@ -94,12 +99,24 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
     [uploads, aiGenerated],
   );
 
-  // 轮询控制：用 ref 跟踪 polling interval，避免 queryKey 变化时重新创建
+  // 轮询控制：当 hasPending 从 false→true 时启动，从 true→false 时停止
+  // 不在 true→true 时重置计数器（避免 cleanup+重启导致 retryCount/startTime 归零）
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef(0);
   const retryCountRef = useRef(0);
 
+  // 组件卸载时清理轮询 interval
   useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    // hasPending=true 且没有活跃轮询 → 启动
     if (hasPending && !pollingRef.current) {
       startTimeRef.current = Date.now();
       retryCountRef.current = 0;
@@ -116,17 +133,11 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
       }, 10_000);
     }
 
+    // hasPending=false 且有活跃轮询 → 停止
     if (!hasPending && pollingRef.current) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
     }
-
-    return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
-    };
   }, [hasPending, refetch]);
 
   // 手动刷新（保留接口兼容性）
@@ -178,7 +189,9 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
     uploads,
     aiGenerated,
     loading: isLoading,
-    error: mutationError ?? queryError?.message ?? null,
+    // 错误优先级：queryError（当前实时错误）> mutationError（最近操作错误）
+    // 避免旧的 mutation 错误遮蔽当前的网络/请求错误
+    error: queryError?.message ?? mutationError ?? null,
     refresh,
     upload,
     remove,
