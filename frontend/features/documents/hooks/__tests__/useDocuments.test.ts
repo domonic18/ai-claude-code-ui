@@ -5,12 +5,15 @@
  * - addAIDocument 补上 summary_status: 'pending'
  * - polling 同时检查 uploads 和 aiGenerated 的 pending 状态
  * - pending 变 ready 后轮询停止
+ * - projectName 为 null 不发送请求
  *
  * @module features/documents/hooks/__tests__/useDocuments.test
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React from 'react';
 
 // ─── Mock 依赖 ─────────────────────────────────────────
 
@@ -28,17 +31,15 @@ vi.mock('@/features/documents/services/documentService', () => ({
 
 // documentEvents 事件总线：保存回调引用
 let documentCreatedHandler = null;
-let documentUploadedHandler = null;
 
 vi.mock('@/features/documents/services/documentEvents', () => ({
   onDocumentCreated: (handler) => {
     documentCreatedHandler = handler;
     return () => { documentCreatedHandler = null; };
   },
-  onDocumentUploaded: (handler) => {
-    documentUploadedHandler = handler;
-    return () => { documentUploadedHandler = null; };
-  },
+  onDocumentUploaded: () => () => {},
+  emitDocumentCreated: vi.fn(),
+  emitDocumentUploaded: vi.fn(),
 }));
 
 vi.mock('@/shared/utils/logger', () => ({
@@ -69,6 +70,19 @@ function makeDoc(overrides = {}) {
 
 const EMPTY_RESPONSE = { uploads: [], aiGenerated: [] };
 
+/** 创建 QueryClient + wrapper */
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+    },
+  });
+  function Wrapper({ children }) {
+    return React.createElement(QueryClientProvider, { client: queryClient }, children);
+  }
+  return { wrapper: Wrapper, queryClient };
+}
+
 describe('useDocuments', () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -77,7 +91,6 @@ describe('useDocuments', () => {
     mockDeleteDocument.mockResolvedValue(undefined);
     mockUpdateDocumentSummary.mockResolvedValue(undefined);
     documentCreatedHandler = null;
-    documentUploadedHandler = null;
   });
 
   afterEach(() => {
@@ -89,9 +102,10 @@ describe('useDocuments', () => {
 
   describe('addAIDocument', () => {
     it('应补上 summary_status: pending', async () => {
-      const { result } = renderHook(() => useDocuments('proj'));
+      const { wrapper } = createWrapper();
+      const { result } = renderHook(() => useDocuments('proj'), { wrapper });
 
-      // 等待初始 refresh 完成
+      // 等待初始 query 完成
       await waitFor(() => expect(mockFetchDocuments).toHaveBeenCalled());
 
       const doc = {
@@ -115,7 +129,8 @@ describe('useDocuments', () => {
     });
 
     it('不应重复添加相同 file_path 的文档', async () => {
-      const { result } = renderHook(() => useDocuments('proj'));
+      const { wrapper } = createWrapper();
+      const { result } = renderHook(() => useDocuments('proj'), { wrapper });
       await waitFor(() => expect(mockFetchDocuments).toHaveBeenCalled());
 
       const doc = makeDoc({
@@ -133,7 +148,8 @@ describe('useDocuments', () => {
     });
 
     it('保留已有的 summary_status 和 summary', async () => {
-      const { result } = renderHook(() => useDocuments('proj'));
+      const { wrapper } = createWrapper();
+      const { result } = renderHook(() => useDocuments('proj'), { wrapper });
       await waitFor(() => expect(mockFetchDocuments).toHaveBeenCalled());
 
       const doc = makeDoc({
@@ -154,34 +170,35 @@ describe('useDocuments', () => {
   // ─── 轮询 ───────────────────────────────────────────
 
   describe('polling', () => {
-    it('有 pending 文档时启动轮询（2秒间隔）', async () => {
+    it('有 pending 文档时启动轮询', async () => {
+      const { wrapper } = createWrapper();
       mockFetchDocuments.mockResolvedValue({
         uploads: [makeDoc({ summary_status: 'pending' })],
         aiGenerated: [],
       });
 
-      renderHook(() => useDocuments('proj'));
+      renderHook(() => useDocuments('proj'), { wrapper });
       await waitFor(() => expect(mockFetchDocuments).toHaveBeenCalledTimes(1));
 
-      // 推进 2 秒，应触发第一次轮询 refresh
-      act(() => { vi.advanceTimersByTime(2100); });
+      // 推进 11 秒（轮询间隔 10 秒），应触发第一次轮询
+      act(() => { vi.advanceTimersByTime(11_000); });
 
       await waitFor(() => {
-        // 至少 2 次：初始 refresh + 第一次轮询
         expect(mockFetchDocuments.mock.calls.length).toBeGreaterThanOrEqual(2);
       });
     });
 
     it('aiGenerated pending 也触发轮询', async () => {
+      const { wrapper } = createWrapper();
       mockFetchDocuments.mockResolvedValue({
         uploads: [],
         aiGenerated: [makeDoc({ type: 'ai_generated', summary_status: 'pending' })],
       });
 
-      renderHook(() => useDocuments('proj'));
+      renderHook(() => useDocuments('proj'), { wrapper });
       await waitFor(() => expect(mockFetchDocuments).toHaveBeenCalledTimes(1));
 
-      act(() => { vi.advanceTimersByTime(2100); });
+      act(() => { vi.advanceTimersByTime(11_000); });
 
       await waitFor(() => {
         expect(mockFetchDocuments.mock.calls.length).toBeGreaterThanOrEqual(2);
@@ -189,6 +206,7 @@ describe('useDocuments', () => {
     });
 
     it('所有 pending 变 ready 后轮询停止', async () => {
+      const { wrapper } = createWrapper();
       // 第一次返回 pending
       mockFetchDocuments.mockResolvedValueOnce({
         uploads: [makeDoc({ summary_status: 'pending' })],
@@ -196,39 +214,33 @@ describe('useDocuments', () => {
       });
 
       // 第二次（轮询）返回 ready
-      mockFetchDocuments.mockResolvedValueOnce({
-        uploads: [makeDoc({ summary_status: 'ready' })],
-        aiGenerated: [],
-      });
-
-      // 后续调用也返回 ready
       mockFetchDocuments.mockResolvedValue({
         uploads: [makeDoc({ summary_status: 'ready' })],
         aiGenerated: [],
       });
 
-      renderHook(() => useDocuments('proj'));
+      renderHook(() => useDocuments('proj'), { wrapper });
       await waitFor(() => expect(mockFetchDocuments).toHaveBeenCalledTimes(1));
 
       // 触发第一次轮询 → 拿到 ready
-      act(() => { vi.advanceTimersByTime(2100); });
+      act(() => { vi.advanceTimersByTime(11_000); });
       await waitFor(() => expect(mockFetchDocuments).toHaveBeenCalledTimes(2));
 
-      // 再推进 10 秒，不应再调用
+      // 再推进 12 秒，不应再调用（轮询已停止）
       const callsAfterStop = mockFetchDocuments.mock.calls.length;
-      act(() => { vi.advanceTimersByTime(10_000); });
+      act(() => { vi.advanceTimersByTime(12_000); });
 
-      // 允许 0 次额外调用（轮询已停止）
       expect(mockFetchDocuments.mock.calls.length).toBe(callsAfterStop);
     });
 
     it('轮询超过 60 秒后自动停止', async () => {
+      const { wrapper } = createWrapper();
       mockFetchDocuments.mockResolvedValue({
         uploads: [makeDoc({ summary_status: 'pending' })],
         aiGenerated: [],
       });
 
-      renderHook(() => useDocuments('proj'));
+      renderHook(() => useDocuments('proj'), { wrapper });
       await waitFor(() => expect(mockFetchDocuments).toHaveBeenCalledTimes(1));
 
       // 推进 65 秒
@@ -248,8 +260,9 @@ describe('useDocuments', () => {
 
   describe('projectName 为 null', () => {
     it('不调用 fetchDocuments', async () => {
+      const { wrapper } = createWrapper();
       mockFetchDocuments.mockResolvedValue({ ...EMPTY_RESPONSE });
-      renderHook(() => useDocuments(null));
+      renderHook(() => useDocuments(null), { wrapper });
 
       // 等一会让 useEffect 执行
       act(() => { vi.advanceTimersByTime(100); });
