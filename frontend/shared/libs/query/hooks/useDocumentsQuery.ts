@@ -49,7 +49,7 @@ export function useDocumentsQuery(projectName: string | null) {
     queryKey: documentKeys.list(projectName ?? ''),
     queryFn: () => fetchDocuments(projectName!),
     enabled: !!projectName,
-    staleTime: 10_000, // 10 秒内不重新请求
+    staleTime: 8_000, // 8 秒内不重新请求（需 >= 轮询间隔 4s，避免轮询外的自动 refetch）
   });
 }
 
