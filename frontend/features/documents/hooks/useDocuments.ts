@@ -55,6 +55,9 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
   const deleteMutation = useDeleteDocumentMutation();
   const summaryMutation = useUpdateSummaryMutation();
 
+  // Mutation 错误状态：mutation 失败时展示给用户，成功时清除
+  const [mutationError, setMutationError] = useState<string | null>(null);
+
   // 从缓存数据中解构 uploads / aiGenerated
   const uploads = data?.uploads ?? [];
   const aiGenerated = data?.aiGenerated ?? [];
@@ -136,7 +139,10 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
     if (!projectName) return;
     try {
       await uploadMutation.mutateAsync({ projectName, file });
+      setMutationError(null);
     } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Upload failed';
+      setMutationError(msg);
       logger.error({ err, projectName, fileName: file.name }, 'Upload failed');
       throw err;
     }
@@ -147,7 +153,10 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
     if (!projectName) return;
     try {
       await deleteMutation.mutateAsync({ projectName, filePath, docType });
+      setMutationError(null);
     } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Delete failed';
+      setMutationError(msg);
       logger.error({ err, projectName, filePath }, 'Delete failed');
     }
   }, [projectName, deleteMutation]);
@@ -157,7 +166,10 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
     if (!projectName) return;
     try {
       await summaryMutation.mutateAsync({ projectName, fileName, summary });
+      setMutationError(null);
     } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Update summary failed';
+      setMutationError(msg);
       logger.error({ err, projectName, fileName }, 'Update summary failed');
     }
   }, [projectName, summaryMutation]);
@@ -166,7 +178,7 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
     uploads,
     aiGenerated,
     loading: isLoading,
-    error: queryError?.message ?? null,
+    error: mutationError ?? queryError?.message ?? null,
     refresh,
     upload,
     remove,
