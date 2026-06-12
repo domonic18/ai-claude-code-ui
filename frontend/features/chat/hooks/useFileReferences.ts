@@ -2,18 +2,17 @@
  * useFileReferences Hook
  *
  * Manages file reference functionality with @ symbol.
- * Loads uploaded documents from DocumentService API.
+ * Shares document data with useDocuments via TanStack Query cache.
  *
  * Features:
  * - Detect @ symbol in input
- * - Load and filter documents from project uploads
+ * - Filter documents from shared TanStack Query cache
  * - Keyboard navigation
  * - File reference insertion as attachment
  */
 
-import { useState, useCallback, useEffect } from 'react';
-import { logger } from '@/shared/utils/logger';
-import { onDocumentUploaded, onDocumentCreated } from '@/features/documents/services/documentEvents';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useDocumentsQuery } from '@/shared/libs/query/hooks';
 
 export interface FileReference {
   /** File path (container-absolute) */
@@ -35,7 +34,7 @@ export interface FileReference {
 export interface UseFileReferencesOptions {
   /** Selected project name */
   selectedProject?: string;
-  /** Authenticated fetch function */
+  /** @deprecated No longer needed — data fetched via TanStack Query shared cache */
   authenticatedFetch?: (url: string, options?: RequestInit) => Promise<Response>;
   /** Callback when file is referenced */
   onFileReference?: (file: FileReference) => void;
@@ -69,12 +68,14 @@ export interface UseFileReferencesReturn {
 }
 
 /**
- * Map document items from DocumentService API to FileReference objects
- * @param docs - Array of document items from GET /api/projects/{name}/documents
+ * Map document items from DocumentListResponse to FileReference objects
+ * @param uploads - Array of uploaded document items
+ * @param aiGenerated - Array of AI-generated document items
  * @returns FileReference array
  */
-function mapDocumentsToReferences(docs: any[]): FileReference[] {
-  return docs.map(doc => {
+function mapDocumentsToReferences(uploads: any[], aiGenerated: any[]): FileReference[] {
+  const allDocs = [...(uploads ?? []), ...(aiGenerated ?? [])];
+  return allDocs.map(doc => {
     const fileName = doc.file_name || '';
     const extension = fileName.includes('.') ? fileName.split('.').pop() : '';
     return {
@@ -91,14 +92,23 @@ function mapDocumentsToReferences(docs: any[]): FileReference[] {
 
 /**
  * Hook for managing file references (uploaded documents)
+ *
+ * Shares the same TanStack Query cache as useDocuments — no duplicate requests.
  */
 export function useFileReferences({
   selectedProject,
-  authenticatedFetch,
+  // authenticatedFetch is no longer used; kept for API compatibility
   onFileReference,
 }: UseFileReferencesOptions): UseFileReferencesReturn {
-  const [files, setFiles] = useState<FileReference[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  // 共享 useDocumentsQuery 缓存：同一个 queryKey，只发一次请求
+  const { data, isLoading } = useDocumentsQuery(selectedProject ?? null);
+
+  // 将 DocumentListResponse 映射为 FileReference[]
+  const files = useMemo(
+    () => mapDocumentsToReferences(data?.uploads ?? [], data?.aiGenerated ?? []),
+    [data],
+  );
+
   const [showMenu, setShowMenu] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -110,46 +120,7 @@ export function useFileReferences({
     }
   }, [showMenu, query]);
 
-  const loadFiles = useCallback(async () => {
-    if (!selectedProject || !authenticatedFetch) return;
-    setIsLoading(true);
-    try {
-      const response = await authenticatedFetch(
-        `/api/projects/${encodeURIComponent(selectedProject)}/documents`
-      );
-      if (!response.ok) throw new Error('Failed to load documents');
-
-      const json = await response.json();
-      const data = json.data || json;
-      // Combine uploads and AI-generated documents
-      const uploads = Array.isArray(data.uploads) ? data.uploads : [];
-      const aiGenerated = Array.isArray(data.aiGenerated) ? data.aiGenerated : [];
-      const allDocs = [...uploads, ...aiGenerated];
-
-      setFiles(mapDocumentsToReferences(allDocs));
-    } catch (error) {
-      logger.error('Failed to load documents:', error);
-      setFiles([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [selectedProject, authenticatedFetch]);
-
-  useEffect(() => { loadFiles(); }, [loadFiles]);
-
-  // 当文档变化时（chat 上传、面板上传、AI 生成）刷新列表
-  useEffect(() => {
-    const unsub1 = onDocumentUploaded(() => { loadFiles(); });
-    const unsub2 = onDocumentCreated(() => { loadFiles(); });
-    return () => { unsub1(); unsub2(); };
-  }, [loadFiles]);
-
-  // @ 菜单打开时也刷新一次，确保展示最新文档
-  useEffect(() => {
-    if (showMenu) { loadFiles(); }
-  }, [showMenu, loadFiles]);
-
-  const filteredFiles = useCallback(() => {
+  const filteredFiles = useMemo(() => {
     if (!query) return files.slice(0, 20);
     const lowerQuery = query.toLowerCase();
     return files
@@ -163,7 +134,7 @@ export function useFileReferences({
   }, [onFileReference]);
 
   return {
-    files, filteredFiles: filteredFiles(), showMenu, query, selectedIndex,
+    files, filteredFiles, showMenu, query, selectedIndex,
     atPosition, isLoading, setQuery, setSelectedIndex, setAtPosition,
     setShowMenu, handleFileSelect,
   };

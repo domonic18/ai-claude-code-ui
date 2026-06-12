@@ -1,18 +1,21 @@
 /**
  * useDocuments Hook
  *
- * 管理项目文档的加载、上传、删除
+ * 管理项目文档的加载、上传、删除。
+ * 基于 TanStack Query 统一数据获取，与 useFileReferences 共享同一份缓存。
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { DocumentItem, DocumentListResponse } from '../types/document.types';
 import {
-  fetchDocuments,
-  uploadDocument,
-  deleteDocument as deleteDocApi,
-  updateDocumentSummary
-} from '../services/documentService';
-import { onDocumentCreated, onDocumentUploaded } from '../services/documentEvents';
+  useDocumentsQuery,
+  useUploadDocumentMutation,
+  useDeleteDocumentMutation,
+  useUpdateSummaryMutation,
+} from '@/shared/libs/query/hooks';
+import { documentKeys } from '@/shared/libs/query/queryKeys';
+import { onDocumentCreated } from '../services/documentEvents';
 import { logger } from '../../../shared/utils/logger';
 
 interface UseDocumentsReturn {
@@ -41,64 +44,37 @@ interface UseDocumentsReturn {
  * @param projectName - 当前项目名称
  */
 export function useDocuments(projectName: string | null): UseDocumentsReturn {
-  const [uploads, setUploads] = useState<DocumentItem[]>([]);
-  const [aiGenerated, setAiGenerated] = useState<DocumentItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const refreshingRef = useRef(false);
+  const queryClient = useQueryClient();
+  const queryKey = documentKeys.list(projectName ?? '');
 
-  /** WebSocket 收到 document-created 事件时调用 */
+  // 核心 query：获取文档列表，TanStack Query 自动去重和缓存
+  const { data, isLoading, error: queryError, refetch } = useDocumentsQuery(projectName);
+
+  // Mutation hooks：操作成功后自动 invalidate 缓存
+  const uploadMutation = useUploadDocumentMutation();
+  const deleteMutation = useDeleteDocumentMutation();
+  const summaryMutation = useUpdateSummaryMutation();
+
+  // 从缓存数据中解构 uploads / aiGenerated
+  const uploads = data?.uploads ?? [];
+  const aiGenerated = data?.aiGenerated ?? [];
+
+  // 乐观更新：WebSocket 收到 document-created 事件时，直接写入缓存
   const addAIDocument = useCallback((doc: DocumentItem) => {
-    setAiGenerated(prev => {
+    queryClient.setQueryData<DocumentListResponse>(queryKey, (old) => {
+      if (!old) return old;
       // 避免重复
-      if (prev.some(d => d.file_path === doc.file_path)) return prev;
-      // WebSocket 事件不含 summary_status，补上 pending 以触发轮询和"生成中"UI
-      return [...prev, {
-        ...doc,
-        summary_status: doc.summary_status ?? 'pending' as const,
-        summary: doc.summary ?? null,
-      }];
+      if (old.aiGenerated.some(d => d.file_path === doc.file_path)) return old;
+      return {
+        ...old,
+        aiGenerated: [...old.aiGenerated, {
+          ...doc,
+          summary_status: doc.summary_status ?? 'pending' as const,
+          summary: doc.summary ?? null,
+        }],
+      };
     });
-  }, []);
-
-  const refresh = useCallback(async () => {
-    if (!projectName) {
-      logger.debug('[useDocuments] refresh 跳过: 无 projectName');
-      return;
-    }
-
-    // 请求锁：防止多个组件同时触发 refresh 导致重复请求
-    if (refreshingRef.current) return;
-    refreshingRef.current = true;
-
-    setLoading(true);
-    setError(null);
-    try {
-      logger.debug('[useDocuments] 开始刷新文档列表', { projectName });
-      const data: DocumentListResponse = await fetchDocuments(projectName);
-      logger.debug('[useDocuments] 文档列表获取成功', {
-        projectName,
-        uploadCount: data.uploads?.length ?? 0,
-        aiCount: data.aiGenerated?.length ?? 0,
-        uploads: data.uploads?.map(d => d.file_name),
-        aiGenerated: data.aiGenerated?.map(d => d.file_name)
-      });
-      setUploads(data.uploads || []);
-      setAiGenerated(data.aiGenerated || []);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to load documents';
-      setError(msg);
-      logger.error({ err, projectName }, 'Failed to load documents');
-    } finally {
-      setLoading(false);
-      refreshingRef.current = false;
-    }
-  }, [projectName]);
-
-  // 项目变化时重新加载
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  }, [queryClient, queryKey]);
 
   // 订阅 WebSocket 的 document-created 事件（AI 生成文档）
   useEffect(() => {
@@ -108,28 +84,24 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
     return unsubscribe;
   }, [addAIDocument]);
 
-  // 订阅用户上传文档完成事件（对话框上传后刷新面板）
-  useEffect(() => {
-    const unsubscribe = onDocumentUploaded(() => {
-      refresh();
-    });
-    return unsubscribe;
-  }, [refresh]);
+  // 条件式轮询：当有 pending 摘要时每 10 秒刷新一次
+  const hasPending = useMemo(
+    () => uploads.some(u => u.summary_status === 'pending') ||
+         aiGenerated.some(d => d.summary_status === 'pending'),
+    [uploads, aiGenerated],
+  );
 
-  // 轮询：当有 pending 摘要时每 10 秒刷新一次，最多 60 秒 / 10 次
+  // 轮询控制：用 ref 跟踪 polling interval，避免 queryKey 变化时重新创建
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startTimeRef = useRef(0);
   const retryCountRef = useRef(0);
-  useEffect(() => {
-    const hasPending =
-      uploads.some(u => u.summary_status === 'pending') ||
-      aiGenerated.some(d => d.summary_status === 'pending');
 
+  useEffect(() => {
     if (hasPending && !pollingRef.current) {
-      const startTime = Date.now();
+      startTimeRef.current = Date.now();
       retryCountRef.current = 0;
       pollingRef.current = setInterval(() => {
-        if (Date.now() - startTime > 60_000 || retryCountRef.current > 10) {
-          // 超时或超过最大次数，停止轮询
+        if (Date.now() - startTimeRef.current > 60_000 || retryCountRef.current >= 10) {
           if (pollingRef.current) {
             clearInterval(pollingRef.current);
             pollingRef.current = null;
@@ -137,11 +109,10 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
           return;
         }
         retryCountRef.current++;
-        refresh();
-      }, 10000);
+        refetch();
+      }, 10_000);
     }
 
-    // 所有摘要都已就绪，停止轮询
     if (!hasPending && pollingRef.current) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
@@ -153,63 +124,53 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
         pollingRef.current = null;
       }
     };
-  }, [uploads, aiGenerated, refresh]);
+  }, [hasPending, refetch]);
 
+  // 手动刷新（保留接口兼容性）
+  const refresh = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
+  // 上传文档
   const upload = useCallback(async (file: File) => {
-    if (!projectName) {
-      logger.debug('[useDocuments] upload 跳过: 无 projectName');
-      return;
-    }
-
-    logger.debug('[useDocuments] 开始上传', { projectName, fileName: file.name, fileSize: file.size, fileType: file.type });
+    if (!projectName) return;
     try {
-      await uploadDocument(projectName, file);
-      logger.debug('[useDocuments] 上传 API 调用成功，准备刷新列表', { projectName, fileName: file.name });
-      await refresh();
-      logger.debug('[useDocuments] 刷新列表完成', { projectName, fileName: file.name });
+      await uploadMutation.mutateAsync({ projectName, file });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Upload failed';
-      setError(msg);
       logger.error({ err, projectName, fileName: file.name }, 'Upload failed');
       throw err;
     }
-  }, [projectName, refresh]);
+  }, [projectName, uploadMutation]);
 
+  // 删除文档（乐观更新已内置在 useDeleteDocumentMutation 中）
   const remove = useCallback(async (filePath: string, docType: 'upload' | 'ai_generated') => {
     if (!projectName) return;
-
     try {
-      await deleteDocApi(projectName, filePath, docType);
-      await refresh();
+      await deleteMutation.mutateAsync({ projectName, filePath, docType });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Delete failed';
-      setError(msg);
       logger.error({ err, projectName, filePath }, 'Delete failed');
     }
-  }, [projectName, refresh]);
+  }, [projectName, deleteMutation]);
 
-  const updateSummary = useCallback(async (fileName: string, summary: string) => {
+  // 更新文档摘要
+  const updateSummaryFn = useCallback(async (fileName: string, summary: string) => {
     if (!projectName) return;
-
     try {
-      await updateDocumentSummary(projectName, fileName, summary);
-      await refresh();
+      await summaryMutation.mutateAsync({ projectName, fileName, summary });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Update summary failed';
-      setError(msg);
       logger.error({ err, projectName, fileName }, 'Update summary failed');
     }
-  }, [projectName, refresh]);
+  }, [projectName, summaryMutation]);
 
   return {
     uploads,
     aiGenerated,
-    loading,
-    error,
+    loading: isLoading,
+    error: queryError?.message ?? null,
     refresh,
     upload,
     remove,
-    updateSummary,
-    addAIDocument
+    updateSummary: updateSummaryFn,
+    addAIDocument,
   };
 }
