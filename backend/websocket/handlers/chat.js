@@ -96,19 +96,6 @@ async function buildClaudeCommand(data, userId, projectName) {
   let command = data.command || '';
   const attachments = data.attachments || [];
 
-  // 注入项目文档索引作为轻量上下文（元数据 + AI 摘要）
-  if (projectName && userId) {
-    try {
-      const readmeContent = await readmeService.readReadme(userId, projectName);
-      if (readmeContent) {
-        logger.info({ projectName, userId, readmeLength: readmeContent.length }, '[buildClaudeCommand] 注入项目文档索引');
-        command = `[项目文档索引]\n${readmeContent}\n\n---\n\n${command}`;
-      }
-    } catch (err) {
-      logger.warn({ err, projectName, userId }, '[buildClaudeCommand] 读取 readme.md 失败，跳过上下文注入');
-    }
-  }
-
   // 区分三种附件类型
   const imageAttachments = attachments.filter(f => f.data);
   const pathAttachments = attachments.filter(f => f.path && !f.data);
@@ -132,11 +119,24 @@ async function buildClaudeCommand(data, userId, projectName) {
     }
   }
 
-  // 处理文档附件：生成读取指令
+  // 处理文档附件：生成读取指令（在文档索引之前，确保 @ 文件被优先读取）
   if (documentAttachments.length > 0) {
     const filePaths = documentAttachments.map(f => ({ path: f.path, name: f.name, type: f.type }));
     const readInstructions = formatReadInstructions(filePaths);
-    command = `I have uploaded the following files:\n\n${readInstructions}\n\nPlease read each file content using the specified method, then answer: ${command}`;
+    command = `The user has referenced the following files — read these FIRST:\n\n${readInstructions}\n\nAfter reading the referenced files, answer the user's question below.\n\n${command}`;
+  }
+
+  // 注入项目文档索引作为轻量知识库（摘要级上下文，按需读取全文）
+  if (projectName && userId) {
+    try {
+      const readmeContent = await readmeService.readReadme(userId, projectName);
+      if (readmeContent) {
+        logger.info({ projectName, userId, readmeLength: readmeContent.length }, '[buildClaudeCommand] 注入项目文档索引');
+        command = `[项目文档索引 — 以下是项目中所有可用文档的摘要目录，仅当回答问题需要时才按需读取对应文件全文]\n${readmeContent}\n\n---\n\n${command}`;
+      }
+    } catch (err) {
+      logger.warn({ err, projectName, userId }, '[buildClaudeCommand] 读取 readme.md 失败，跳过上下文注入');
+    }
   }
 
   return { command, imageAttachments };
