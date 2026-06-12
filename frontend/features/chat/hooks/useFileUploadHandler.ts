@@ -10,7 +10,7 @@
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { logger } from '@/shared/utils/logger';
-import { emitDocumentUploaded } from '@/features/documents/services/documentEvents';
+import { useInvalidateDocuments } from '@/shared/libs/query/hooks';
 import type { FileAttachment } from '../types';
 
 interface UseFileUploadHandlerOptions {
@@ -46,7 +46,8 @@ async function uploadFileToServer(
   attachment: FileAttachment,
   authenticatedFetch: (url: string, options?: RequestInit) => Promise<Response>,
   selectedProject: { name: string; path: string } | null,
-  onAddFile?: (file: FileAttachment) => void
+  onAddFile?: (file: FileAttachment) => void,
+  onUploadComplete?: () => void,
 ): Promise<void> {
   if (!authenticatedFetch) {
     logger.error('[uploadFileToServer] authenticatedFetch not available');
@@ -87,8 +88,8 @@ async function uploadFileToServer(
     attachment.path = data.data?.file_path;
     attachment.uploadProgress = 100;
     onAddFile?.(attachment);
-    // Notify document panel to refresh its list
-    emitDocumentUploaded();
+    // Invalidate TanStack Query cache so document panel and @ menu refresh
+    onUploadComplete?.();
   } catch (error) {
     logger.error('[uploadFileToServer] File upload error:', error);
     attachment.error = error instanceof Error ? error.message : 'Upload failed';
@@ -124,6 +125,8 @@ export function useFileUploadHandler({
   authenticatedFetch,
   selectedProject,
 }: UseFileUploadHandlerOptions): UseFileUploadHandlerReturn {
+  const invalidateDocuments = useInvalidateDocuments();
+
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (!authenticatedFetch || !selectedProject) {
       logger.error('[onDrop] authenticatedFetch or selectedProject not available');
@@ -151,14 +154,17 @@ export function useFileUploadHandler({
       };
 
       // 所有类型统一：先上传到服务器（同步调用）
-      uploadFileToServer(file, attachment, authenticatedFetch, selectedProject, onAddFile);
+      uploadFileToServer(
+        file, attachment, authenticatedFetch, selectedProject, onAddFile,
+        () => invalidateDocuments(selectedProject.name),
+      );
 
       // 图片额外读 base64（异步，不阻塞上传）
       if (file.type.startsWith('image/')) {
         readImageAsBase64(file, attachment, onAddFile);
       }
     });
-  }, [maxFileSize, onAddFile, authenticatedFetch, selectedProject]);
+  }, [maxFileSize, onAddFile, authenticatedFetch, selectedProject, invalidateDocuments]);
 
   const handleFileUploadCallback = useCallback((file: File, attachment: FileAttachment) => {
     if (!authenticatedFetch || !selectedProject) {
@@ -167,8 +173,11 @@ export function useFileUploadHandler({
       onAddFile?.(attachment);
       return Promise.resolve();
     }
-    return uploadFileToServer(file, attachment, authenticatedFetch, selectedProject, onAddFile);
-  }, [authenticatedFetch, selectedProject, onAddFile]);
+    return uploadFileToServer(
+      file, attachment, authenticatedFetch, selectedProject, onAddFile,
+      () => invalidateDocuments(selectedProject.name),
+    );
+  }, [authenticatedFetch, selectedProject, onAddFile, invalidateDocuments]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,

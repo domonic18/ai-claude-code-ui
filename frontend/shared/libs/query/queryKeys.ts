@@ -110,6 +110,17 @@ export const settingsKeys = {
 };
 
 /**
+ * 文档相关的 Query Keys
+ */
+export const documentKeys = {
+  /** 所有文档相关查询的根 key */
+  all: ['documents'] as const,
+
+  /** 指定项目的文档列表 */
+  list: (projectName: string) => [...documentKeys.all, projectName] as const,
+};
+
+/**
  * 统一导出的 Query Keys
  */
 export const queryKeys = {
@@ -118,6 +129,7 @@ export const queryKeys = {
   sessions: sessionKeys,
   cursor: cursorKeys,
   settings: settingsKeys,
+  documents: documentKeys,
 };
 
 export default queryKeys;

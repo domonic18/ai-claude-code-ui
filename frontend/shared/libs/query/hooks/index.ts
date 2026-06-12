@@ -21,3 +21,17 @@ export type {
   DeleteSessionMutationParams,
 } from './useSessionsQuery';
 
+// Documents
+export {
+  useDocumentsQuery,
+  useUploadDocumentMutation,
+  useDeleteDocumentMutation,
+  useUpdateSummaryMutation,
+  useInvalidateDocuments,
+} from './useDocumentsQuery';
+export type {
+  UploadDocumentMutationParams,
+  DeleteDocumentMutationParams,
+  UpdateSummaryMutationParams,
+} from './useDocumentsQuery';
+
