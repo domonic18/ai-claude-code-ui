@@ -31,6 +31,11 @@ const AI_MANIFEST_FILE = '.ai-documents.json';
 const DOC_CACHE_TTL_MS = 5_000;
 const documentCache = new Map();
 
+/** 使指定项目的文档列表缓存失效 */
+function invalidateDocCache(userId, projectName) {
+  documentCache.delete(`${userId}:${projectName}`);
+}
+
 /**
  * 文档管理服务
  * 在用户 Docker 容器内管理项目文档的元数据和文件操作
@@ -133,6 +138,9 @@ export class DocumentService {
 
     logger.info({ userId, projectName, file: safeName }, '文档上传成功');
 
+    // 上传成功后立即失效缓存，确保后续列表查询返回最新数据
+    invalidateDocCache(userId, projectName);
+
     // 异步生成 AI 摘要（fire-and-forget，不阻塞上传响应）
     summaryService.generateSummary(userId, projectName, {
       file_path: containerFilePath,
@@ -188,6 +196,9 @@ export class DocumentService {
         logger.warn({ err, userId, projectName, fileName }, '从 readme.md 移除 AI 文档条目失败（非致命）');
       });
     }
+
+    // 删除成功后立即失效缓存
+    invalidateDocCache(userId, projectName);
 
     logger.info({ userId, projectName, filePath, docType }, '文档删除成功');
     return true;
@@ -262,6 +273,9 @@ export class DocumentService {
 
     manifest.push(entry);
     await this._writeAIManifest(userId, projectName, manifest);
+
+    // AI 文档记录后立即失效缓存
+    invalidateDocCache(userId, projectName);
 
     // 异步生成 AI 文档摘要（fire-and-forget）
     summaryService.generateSummary(userId, projectName, {

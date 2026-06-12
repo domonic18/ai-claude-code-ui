@@ -103,7 +103,6 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
   // 不在 true→true 时重置计数器（避免 cleanup+重启导致 retryCount/startTime 归零）
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef(0);
-  const retryCountRef = useRef(0);
 
   // 组件卸载时清理轮询 interval
   useEffect(() => {
@@ -116,19 +115,17 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
   }, []);
 
   useEffect(() => {
-    // hasPending=true 且没有活跃轮询 → 启动
+    // hasPending=true 且没有活跃轮询 → 启动，最多持续 60 秒
     if (hasPending && !pollingRef.current) {
       startTimeRef.current = Date.now();
-      retryCountRef.current = 0;
       pollingRef.current = setInterval(() => {
-        if (Date.now() - startTimeRef.current > 60_000 || retryCountRef.current >= 10) {
+        if (Date.now() - startTimeRef.current > 60_000) {
           if (pollingRef.current) {
             clearInterval(pollingRef.current);
             pollingRef.current = null;
           }
           return;
         }
-        retryCountRef.current++;
         refetch();
       }, 10_000);
     }

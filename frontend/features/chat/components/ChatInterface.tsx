@@ -63,14 +63,10 @@ function prepareChatInputProps(hook: any, selectedProject: any, t: any, sendByCt
       };
       hook.handleAddFile(attachment);
       hook.handleFileMenuClose();
-      // 将 @query 替换为 @文件名 + 空格，标记引用已结束
-      const atPos = hook.atPosition;
-      const queryLen = hook.fileQuery?.length ?? 0;
-      if (atPos >= 0 && hook.input) {
-        const insertPos = atPos + 1 + queryLen;
-        const before = hook.input.slice(0, atPos + 1); // 保留 @
-        const after = hook.input.slice(insertPos);
-        hook.setInput(before + file.name + ' ' + after);
+      // 将末尾的 @query 替换为 @文件名 + 空格，标记引用已结束
+      // 使用正则匹配最后一个 @ 及其后续非空白字符，避免手动切片的边界错误
+      if (hook.input) {
+        hook.setInput(hook.input.replace(/@[^\s]*$/, '@' + file.name + ' '));
       }
     },
     onFileMenuClose: hook.handleFileMenuClose,
