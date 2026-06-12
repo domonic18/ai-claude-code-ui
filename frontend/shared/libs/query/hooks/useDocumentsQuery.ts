@@ -20,6 +20,7 @@
  * ```
  */
 
+import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { documentKeys } from '../queryKeys';
 import {
@@ -186,9 +187,9 @@ export function useUpdateSummaryMutation() {
 export function useInvalidateDocuments() {
   const queryClient = useQueryClient();
 
-  return (projectName: string) => {
+  return useCallback((projectName: string) => {
     queryClient.invalidateQueries({
       queryKey: documentKeys.list(projectName),
     });
-  };
+  }, [queryClient]);
 }
