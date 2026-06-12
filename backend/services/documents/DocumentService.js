@@ -29,11 +29,22 @@ const AI_MANIFEST_FILE = '.ai-documents.json';
 
 /** 文档列表内存缓存（避免短时间内重复全量扫描） */
 const DOC_CACHE_TTL_MS = 5_000;
+const DOC_CACHE_MAX_SIZE = 500;
 const documentCache = new Map();
 
 /** 使指定项目的文档列表缓存失效 */
 function invalidateDocCache(userId, projectName) {
   documentCache.delete(`${userId}:${projectName}`);
+}
+
+/** 写入缓存前检查大小上限，超过时清空最旧的条目 */
+function setDocCache(cacheKey, data) {
+  if (documentCache.size >= DOC_CACHE_MAX_SIZE) {
+    // Map 按插入顺序迭代，删除最早的条目释放空间
+    const oldestKey = documentCache.keys().next().value;
+    documentCache.delete(oldestKey);
+  }
+  documentCache.set(cacheKey, { data, time: Date.now() });
 }
 
 /**
@@ -94,7 +105,7 @@ export class DocumentService {
     }, '[getProjectDocuments] 文档摘要状态');
 
     const result = { uploads: enrichedUploads, aiGenerated: enrichedAiGenerated };
-    documentCache.set(cacheKey, { data: result, time: Date.now() });
+    setDocCache(cacheKey, result);
     return result;
   }
 

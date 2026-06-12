@@ -127,7 +127,7 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
           return;
         }
         refetch();
-      }, 10_000);
+      }, 4_000);
     }
 
     // hasPending=false 且有活跃轮询 → 停止

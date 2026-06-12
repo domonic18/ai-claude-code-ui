@@ -48,7 +48,8 @@ export class ContainerLifecycleManager {
     const stateMachine = await this._getStateMachine(userId);
 
     // 自动检测只读上下文（如前端轮询），避免刷新 lastActive
-    const readOnly = options.skipLastActiveUpdate || isReadOnlyContext();
+    // 用 ?? 让显式传参优先：skipLastActiveUpdate=false 强制刷新，undefined 时才检测上下文
+    const readOnly = options.skipLastActiveUpdate ?? isReadOnlyContext();
     const effectiveOptions = { ...options, skipLastActiveUpdate: readOnly };
 
     // 已就绪：检查运行状态（热路径）
@@ -97,7 +98,7 @@ export class ContainerLifecycleManager {
 
   async execInContainer(userId, command, options = {}) {
     // 自动检测只读上下文，避免轮询等只读操作刷新 lastActive
-    const readOnly = options.skipLastActiveUpdate || isReadOnlyContext();
+    const readOnly = options.skipLastActiveUpdate ?? isReadOnlyContext();
     const info = await this.getOrCreateContainer(userId, {}, { skipLastActiveUpdate: readOnly });
     return ContainerOps.execInContainer(this.docker, info.id, command, options);
   }

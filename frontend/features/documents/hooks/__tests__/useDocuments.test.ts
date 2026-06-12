@@ -180,8 +180,8 @@ describe('useDocuments', () => {
       renderHook(() => useDocuments('proj'), { wrapper });
       await waitFor(() => expect(mockFetchDocuments).toHaveBeenCalledTimes(1));
 
-      // 推进 11 秒（轮询间隔 10 秒），应触发第一次轮询
-      act(() => { vi.advanceTimersByTime(11_000); });
+      // 推进 5 秒（轮询间隔 4 秒 + 缓冲），应触发第一次轮询
+      act(() => { vi.advanceTimersByTime(5_000); });
 
       await waitFor(() => {
         expect(mockFetchDocuments.mock.calls.length).toBeGreaterThanOrEqual(2);
@@ -223,12 +223,12 @@ describe('useDocuments', () => {
       await waitFor(() => expect(mockFetchDocuments).toHaveBeenCalledTimes(1));
 
       // 触发第一次轮询 → 拿到 ready
-      act(() => { vi.advanceTimersByTime(11_000); });
+      act(() => { vi.advanceTimersByTime(5_000); });
       await waitFor(() => expect(mockFetchDocuments).toHaveBeenCalledTimes(2));
 
-      // 再推进 12 秒，不应再调用（轮询已停止）
+      // 再推进 6 秒，不应再调用（轮询已停止）
       const callsAfterStop = mockFetchDocuments.mock.calls.length;
-      act(() => { vi.advanceTimersByTime(12_000); });
+      act(() => { vi.advanceTimersByTime(6_000); });
 
       expect(mockFetchDocuments.mock.calls.length).toBe(callsAfterStop);
     });
