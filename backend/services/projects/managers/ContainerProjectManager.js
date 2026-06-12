@@ -9,6 +9,7 @@
 
 import { PassThrough } from 'stream';
 import containerManager from '../../container/core/index.js';
+import { runInReadOnlyContext } from '../../container/core/ContainerReadOnlyContext.js';
 import { getSessionsInContainer } from '../../sessions/container/ContainerSessions.js';
 import { CONTAINER, FILE_TIMEOUTS } from '../../../config/config.js';
 import { RESERVED_DIR_NAMES } from '../../../config/containerConfig.js';
@@ -132,50 +133,55 @@ async function loadProjectSessions(userId, projectList) {
  * @returns {Promise<Array>} 项目列表
  */
 export async function getProjectsInContainer(userId) {
-  try {
-    let container;
+  // 项目列表查询通常是前端自动轮询触发，标记为只读上下文，
+  // 确保整个调用链（包括 getOrCreateContainer、execInContainer、session 读取）
+  // 都不会刷新容器的 lastActive，避免容器因轮询而永不过期。
+  return runInReadOnlyContext(async () => {
     try {
-      container = await containerManager.getOrCreateContainer(userId, {}, { wait: true, timeout: FILE_TIMEOUTS.quickRequest });
-    } catch (err) {
-      logger.error(`[ContainerProjectManager] Failed to get/create container for user ${userId}: ${err.message}`);
-      return [];
+      let container;
+      try {
+        container = await containerManager.getOrCreateContainer(userId, {}, { wait: true, timeout: FILE_TIMEOUTS.quickRequest });
+      } catch (err) {
+        logger.error(`[ContainerProjectManager] Failed to get/create container for user ${userId}: ${err.message}`);
+        return [];
+      }
+
+      const workspacePath = CONTAINER.paths.workspace;
+      logger.info(`[getProjectsInContainer] ① userId=${userId} workspacePath=${workspacePath} containerId=${container.id}`);
+
+      // 动态构建排除列表，基于 RESERVED_DIR_NAMES 共享常量
+      const excludePattern = RESERVED_DIR_NAMES
+        .map(d => d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .map(d => `grep -v "^${d}$"`)
+        .join(' | ');
+      const lsCmd = `ls -1 "$1" 2>/dev/null | ${excludePattern} || echo ""`;
+
+      const { stream } = await containerManager.execInContainer(
+        userId,
+        ['sh', '-c', lsCmd, 'listProjects', workspacePath]
+      );
+
+      const output = await _collectStreamOutput(stream);
+      logger.info(`[getProjectsInContainer] ② ls 输出 (raw): ${JSON.stringify(output)}`);
+
+      let projectConfig = {};
+      try { projectConfig = await loadProjectConfig(); } catch {
+        logger.debug('Failed to load project config, using defaults');
+      }
+
+      const projectList = parseProjectList(output, projectConfig);
+      logger.info(`[getProjectsInContainer] ③ 解析后项目数=${projectList.length}, 名称列表: ${projectList.map(p => p.name).join(', ')}`);
+
+      if (projectList.length === 0) {
+        const defaultEntry = await createDefaultWorkspace(userId, workspacePath);
+        if (defaultEntry) projectList.push(defaultEntry);
+      }
+
+      await loadProjectSessions(userId, projectList);
+      logger.info(`[getProjectsInContainer] ④ 最终返回 ${projectList.length} 个项目`);
+      return projectList;
+    } catch (error) {
+      throw new Error(`Failed to get projects in container: ${error.message}`);
     }
-
-    const workspacePath = CONTAINER.paths.workspace;
-    logger.info(`[getProjectsInContainer] ① userId=${userId} workspacePath=${workspacePath} containerId=${container.id}`);
-
-    // 动态构建排除列表，基于 RESERVED_DIR_NAMES 共享常量
-    const excludePattern = RESERVED_DIR_NAMES
-      .map(d => d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-      .map(d => `grep -v "^${d}$"`)
-      .join(' | ');
-    const lsCmd = `ls -1 "$1" 2>/dev/null | ${excludePattern} || echo ""`;
-
-    const { stream } = await containerManager.execInContainer(
-      userId,
-      ['sh', '-c', lsCmd, 'listProjects', workspacePath]
-    );
-
-    const output = await _collectStreamOutput(stream);
-    logger.info(`[getProjectsInContainer] ② ls 输出 (raw): ${JSON.stringify(output)}`);
-
-    let projectConfig = {};
-    try { projectConfig = await loadProjectConfig(); } catch {
-      logger.debug('Failed to load project config, using defaults');
-    }
-
-    const projectList = parseProjectList(output, projectConfig);
-    logger.info(`[getProjectsInContainer] ③ 解析后项目数=${projectList.length}, 名称列表: ${projectList.map(p => p.name).join(', ')}`);
-
-    if (projectList.length === 0) {
-      const defaultEntry = await createDefaultWorkspace(userId, workspacePath);
-      if (defaultEntry) projectList.push(defaultEntry);
-    }
-
-    await loadProjectSessions(userId, projectList);
-    logger.info(`[getProjectsInContainer] ④ 最终返回 ${projectList.length} 个项目`);
-    return projectList;
-  } catch (error) {
-    throw new Error(`Failed to get projects in container: ${error.message}`);
-  }
+  });
 }
