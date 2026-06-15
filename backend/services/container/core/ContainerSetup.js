@@ -52,14 +52,24 @@ export async function execWithTimeout(container, command, timeout = 15000) {
 
 // 在容器创建后由 LifecycleManager 调用以设置工作区结构
 /**
- * 确保容器内有默认工作区目录结构
+ * 确保容器内存在全局（与具体项目无关）的工作区目录结构
+ *
+ * 只创建所有项目共享的目录，不再为默认项目 my-workspace 无条件建目录。
+ * 否则用户删除 my-workspace 后，容器每 2 小时空闲被清理、重建时会把它
+ * "复活"（Bug1）。
+ *
+ * 保留的全局目录：
+ * - /workspace                 工作区根
+ * - /workspace/.claude/projects 全局会话历史存储（所有项目的会话都写在这里，
+ *                               与具体项目目录分离）
+ *
  * @param {Object} container - Docker 容器实例
  * @returns {Promise<void>}
  */
 export async function ensureDefaultWorkspace(container) {
     const result = await execWithTimeout(
         container,
-        'mkdir -p /workspace/my-workspace/uploads /workspace/my-workspace/.claude/projects && chmod 755 /workspace && ls -la /workspace/',
+        'mkdir -p /workspace/.claude/projects && chmod 755 /workspace && ls -la /workspace/',
         15000
     );
 
@@ -95,22 +105,13 @@ export async function syncExtensionsToContainer(container) {
         });
     });
 
-    // 同步到 /workspace/my-workspace（确保 hooks 路径正确）
-    const tarStream2 = await createExtensionTar({
-        includeSkills: true,
-        includeAgents: true,
-        includeCommands: true,
-        includeHooks: true,
-        includeKnowledge: true,
-        includeConfig: true
-    });
-
-    await new Promise((resolve, reject) => {
-        container.putArchive(tarStream2, { path: '/workspace/my-workspace' }, (err) => {
-            if (err) reject(err);
-            else resolve();
-        });
-    });
+    // 不再向 /workspace/my-workspace 再同步一份扩展。
+    // 原因：SDK 运行时 HOME=/workspace、CLAUDE_CONFIG_DIR=/workspace/.claude，
+    // 插件/技能/hooks 从 /workspace/.claude 加载（见 DockerExecutor.js、
+    // ScriptBuilder.js: plugins path=/workspace/.claude），上一处 putArchive
+    // 到 /workspace 已覆盖 /workspace/.claude。此处继续 putArchive 到
+    // /workspace/my-workspace 是冗余的，且会在容器重建时无条件创建该目录，
+    // 把用户删掉的默认项目 my-workspace "复活"（Bug1）。
 
     // 设置 hooks 脚本执行权限
     await setHooksPermissions(container);
@@ -174,31 +175,4 @@ export async function createMemoryDirectoryAndFile(container) {
     } catch (error) {
         logger.warn({ err: error }, 'Failed to create memory directory/file');
     }
-}
-
-// 由 LifecycleManager 调用以提供用户友好的工作区文档
-/**
- * 在容器内创建 README.md 文件
- * @param {Object} container - Docker 容器实例
- * @returns {Promise<void>}
- */
-export async function createReadmeInContainer(container) {
-    const readmeContent = `# My Workspace
-
-Welcome to your Claude Code workspace! This is your default project where you can start coding.
-
-## Getting Started
-
-- Use the chat interface to ask Claude to help you with coding tasks
-- Use the file explorer to browse and edit files
-- Use the terminal to run commands
-
-Happy coding!
-`;
-
-    const command = `cat > /workspace/my-workspace/README.md << 'EOF'
-${readmeContent}
-EOF`;
-
-    await execWithTimeout(container, command, 5000);
 }
