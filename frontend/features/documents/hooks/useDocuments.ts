@@ -3,20 +3,36 @@
  *
  * 管理项目文档的加载、上传、删除。
  * 基于 TanStack Query 统一数据获取，与 useFileReferences 共享同一份缓存。
+ *
+ * AI 生成文档采用「乐观合并层」：
+ * - 收到 WebSocket document-created 事件后，立即把文档写入独立的 optimisticDocs state（即时显示）；
+ * - 与服务端 data.aiGenerated 在 useMemo 中合并展示；
+ * - 乐观文档不进 query 缓存，因此免疫轮询/staleTime/refocus/invalidate 等任何 refetch 的整体替换；
+ * - 服务端 recordAIDocument 完成后（通常数秒），refetch 返回的列表会包含该文档，乐观项即被确认移除；
+ * - 60s 兜底超时清理，防止 record 失败导致乐观文档永久残留。
  */
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import type { DocumentItem, DocumentListResponse } from '../types/document.types';
+import type { DocumentItem } from '../types/document.types';
 import {
   useDocumentsQuery,
   useUploadDocumentMutation,
   useDeleteDocumentMutation,
   useUpdateSummaryMutation,
 } from '@/shared/libs/query/hooks';
-import { documentKeys } from '@/shared/libs/query/queryKeys';
 import { onDocumentCreated } from '../services/documentEvents';
 import { logger } from '../../../shared/utils/logger';
+
+/** 乐观文档在 optimisticDocs 中的最长存活时间，超时未确认即清理（与轮询 60s 上限对齐） */
+const OPTIMISTIC_DOC_TTL_MS = 60_000;
+
+/** 稳定的空数组引用，避免 data 为空时每次渲染创建新引用触发 useMemo 重算 */
+const EMPTY_AI_GENERATED: DocumentItem[] = [];
+
+/** 乐观文档项：在 DocumentItem 基础上记录加入时间，用于兜底超时清理 */
+interface OptimisticDoc extends DocumentItem {
+  _addedAt: number;
+}
 
 interface UseDocumentsReturn {
   /** 用户上传的文档 */
@@ -44,9 +60,6 @@ interface UseDocumentsReturn {
  * @param projectName - 当前项目名称
  */
 export function useDocuments(projectName: string | null): UseDocumentsReturn {
-  const queryClient = useQueryClient();
-  const queryKey = documentKeys.list(projectName ?? '');
-
   // 核心 query：获取文档列表，TanStack Query 自动去重和缓存
   const { data, isLoading, error: queryError, refetch } = useDocumentsQuery(projectName);
 
@@ -58,31 +71,59 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
   // Mutation 错误状态：mutation 失败时展示给用户，成功时清除
   const [mutationError, setMutationError] = useState<string | null>(null);
 
-  // 项目切换时清除残留的 mutation 错误，避免在项目 B 显示项目 A 的错误
+  // 乐观文档：来自 WebSocket document-created 事件、尚未被服务端确认的 AI 文档。
+  // 存放在独立 state 而非 query 缓存，使其免疫任何 refetch 的整体替换（根治竞态）。
+  const [optimisticDocs, setOptimisticDocs] = useState<OptimisticDoc[]>([]);
+
+  // 项目切换时清除残留的 mutation 错误 + 乐观文档，避免跨项目泄漏
   useEffect(() => {
     setMutationError(null);
+    setOptimisticDocs([]);
   }, [projectName]);
 
-  // 从缓存数据中解构 uploads / aiGenerated
+  // 从缓存数据中解构 uploads / 服务端 aiGenerated
   const uploads = data?.uploads ?? [];
-  const aiGenerated = data?.aiGenerated ?? [];
+  const serverAiGenerated = data?.aiGenerated ?? EMPTY_AI_GENERATED;
 
-  // 乐观更新：WebSocket 收到 document-created 事件时，直接写入缓存
-  const addAIDocument = useCallback((doc: DocumentItem) => {
-    queryClient.setQueryData<DocumentListResponse>(queryKey, (old) => {
-      if (!old) return old;
-      // 避免重复
-      if (old.aiGenerated.some(d => d.file_path === doc.file_path)) return old;
-      return {
-        ...old,
-        aiGenerated: [...old.aiGenerated, {
-          ...doc,
-          summary_status: doc.summary_status ?? 'pending' as const,
-          summary: doc.summary ?? null,
-        }],
-      };
+  // 合并层：服务端 aiGenerated + 未被服务端确认的乐观文档（按 file_path 去重，服务端优先）。
+  // 乐观文档不进 query 缓存，因此 refetch 只会刷新 serverAiGenerated，不会覆盖乐观文档。
+  const aiGenerated = useMemo(() => {
+    if (optimisticDocs.length === 0) return serverAiGenerated;
+    const confirmedPaths = new Set(serverAiGenerated.map(d => d.file_path));
+    const pending = optimisticDocs.filter(d => !confirmedPaths.has(d.file_path));
+    return pending.length === 0 ? serverAiGenerated : [...serverAiGenerated, ...pending];
+  }, [serverAiGenerated, optimisticDocs]);
+
+  // 服务端确认：当 refetch 返回的列表已包含某乐观文档的 file_path 时，视为已确认，移除乐观项。
+  // functional update 内部判断，引用不变时返回原数组，避免无谓渲染。
+  useEffect(() => {
+    const confirmedPaths = new Set(serverAiGenerated.map(d => d.file_path));
+    setOptimisticDocs(prev => {
+      if (prev.length === 0) return prev;
+      const remaining = prev.filter(d => !confirmedPaths.has(d.file_path));
+      return remaining.length === prev.length ? prev : remaining;
     });
-  }, [queryClient, queryKey]);
+  }, [serverAiGenerated]);
+
+  // 乐观更新：收到 document-created 事件时，立即写入独立 state（即时显示，免疫 refetch 覆盖）。
+  // setTimeout 回调只用函数式 setState、不读外部 state，无需 ref 中转（符合 hooks 规则2）。
+  const addAIDocument = useCallback((doc: DocumentItem) => {
+    setOptimisticDocs(prev => {
+      // 入口去重
+      if (prev.some(d => d.file_path === doc.file_path)) return prev;
+      const entry: OptimisticDoc = {
+        ...doc,
+        summary_status: doc.summary_status ?? 'pending',
+        summary: doc.summary ?? null,
+        _addedAt: Date.now(),
+      };
+      // 60s 兜底清理：该项若一直未被服务端确认（record 失败等）则移除，防止永久残留。
+      setTimeout(() => {
+        setOptimisticDocs(cur => cur.filter(d => d.file_path !== doc.file_path));
+      }, OPTIMISTIC_DOC_TTL_MS);
+      return [...prev, entry];
+    });
+  }, []);
 
   // 订阅 WebSocket 的 document-created 事件（AI 生成文档）
   useEffect(() => {
@@ -92,7 +133,7 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
     return unsubscribe;
   }, [addAIDocument]);
 
-  // 条件式轮询：当有 pending 摘要时每 10 秒刷新一次
+  // 条件式轮询：当有 pending 摘要时每 4 秒刷新一次
   const hasPending = useMemo(
     () => uploads.some(u => u.summary_status === 'pending') ||
          aiGenerated.some(d => d.summary_status === 'pending'),
