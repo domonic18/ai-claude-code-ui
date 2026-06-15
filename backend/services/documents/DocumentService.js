@@ -133,8 +133,10 @@ export class DocumentService {
 
     // 修复 multer 传递的文件名编码（UTF-8 字节被错误按 Latin-1 解码）
     const fixedName = this._fixFilename(file.originalname);
-    // 生成安全的文件名
-    const safeName = this._sanitizeFilename(fixedName);
+    // 清理非法字符并分离基础名/扩展名
+    const { baseName, ext } = this._sanitizeFilename(fixedName);
+    // 解析不冲突的文件名：同名时自动追加 _1、_2… 序号，避免覆盖丢数据
+    const safeName = await this._resolveUniqueName(userId, containerDir, baseName, ext);
     const containerFilePath = `${containerDir}/${safeName}`;
     logger.info({ userId, safeName, containerFilePath }, '[文档上传] 安全文件名已生成');
 
@@ -575,31 +577,91 @@ export class DocumentService {
   }
 
   /**
-   * 清理文件名，防止路径注入
-   * 保留中文及常见 CJK 字符，截断超长文件名
+   * 清理文件名：去除非法字符、截断超长名，分离基础名与扩展名
+   * 不再附加随机后缀（防同名覆盖改由 _resolveUniqueName 在容器侧处理，
+   * 避免给所有文件名都加 _xxxxxx 乱码后缀）
+   *
    * @private
+   * @param {string} originalName - 原始文件名
+   * @returns {{baseName: string, ext: string}} baseName 不含扩展名，ext 含前导点（如 '.md'），无扩展名时为空串
    */
   _sanitizeFilename(originalName) {
     // 允许：字母、数字、点、下划线、连字符、CJK 统一汉字、CJK 符号、全角字符
     const name = originalName.replace(/[^\w.\-一-鿿㐀-䶿　-〿＀-￯]/g, '_');
-
-    const uniqueId = Date.now().toString(36);
-    const dotIndex = name.lastIndexOf('.');
     const MAX_BASENAME = 60; // 基础文件名最大长度，避免 tar 路径超限
+    const dotIndex = name.lastIndexOf('.');
 
+    let baseName;
+    let ext;
     if (dotIndex > 0) {
-      const ext = name.slice(dotIndex); // 含点，如 .docx
-      let baseName = name.slice(0, dotIndex);
-      if (baseName.length > MAX_BASENAME) {
-        baseName = baseName.slice(0, MAX_BASENAME);
-      }
-      return `${baseName}_${uniqueId}${ext}`;
+      ext = name.slice(dotIndex); // 含点，如 .docx
+      baseName = name.slice(0, dotIndex);
+    } else {
+      baseName = name;
+      ext = '';
     }
-    let baseName = name;
+
     if (baseName.length > MAX_BASENAME) {
       baseName = baseName.slice(0, MAX_BASENAME);
     }
-    return `${baseName}_${uniqueId}`;
+
+    // 原名为空或仅含点号/非法字符时，baseName 可能为空或纯点号，
+    // 会导致空文件名或形如 "dir/." 的非法路径。用默认名兜底。
+    if (!baseName || /^\.+$/.test(baseName)) {
+      baseName = '未命名';
+    }
+
+    return { baseName, ext };
+  }
+
+  /**
+   * 解析目标目录内不冲突的文件名
+   * 优先使用原始名；已存在则追加 _1、_2… 序号，序号耗尽回退时间戳兜底。
+   * 这样单文件场景下文件名保持干净，同时仍能避免同名覆盖丢数据。
+   *
+   * @private
+   * @param {number} userId - 用户 ID
+   * @param {string} dir - 容器内目标目录
+   * @param {string} baseName - 基础文件名（已清理、不含扩展名）
+   * @param {string} ext - 扩展名（含前导点，如 '.md'）
+   * @returns {Promise<string>} 不冲突的完整文件名
+   */
+  async _resolveUniqueName(userId, dir, baseName, ext) {
+    const candidate = `${baseName}${ext}`;
+    if (!(await this._pathExists(userId, `${dir}/${candidate}`))) {
+      return candidate;
+    }
+
+    for (let i = 1; i < 1000; i++) {
+      const seqCandidate = `${baseName}_${i}${ext}`;
+      if (!(await this._pathExists(userId, `${dir}/${seqCandidate}`))) {
+        return seqCandidate;
+      }
+    }
+
+    // 兜底：序号耗尽（极端情况），回退时间戳
+    return `${baseName}_${Date.now().toString(36)}${ext}`;
+  }
+
+  /**
+   * 检测容器内路径对应的文件是否存在
+   * 通过 sh 位置参数 $1 传路径，避免文件名含特殊字符时被 shell 解释。
+   *
+   * @private
+   * @param {number} userId - 用户 ID
+   * @param {string} fullPath - 容器内文件完整路径
+   * @returns {Promise<boolean>}
+   */
+  async _pathExists(userId, fullPath) {
+    try {
+      const out = await this._execCommandOutput(userId, [
+        'sh', '-c', 'test -f "$1" && echo yes || echo no', '_', fullPath,
+      ]);
+      return out.trim() === 'yes';
+    } catch {
+      // 命令失败时视为不存在，交由后续写入兜底
+      return false;
+    }
   }
 
   /**
