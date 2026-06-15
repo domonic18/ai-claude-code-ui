@@ -145,13 +145,14 @@ export class ProjectController extends BaseController {
    */
   async renameProject(req, res, next) {
     try {
+      const userId = this._getUserId(req);
       const { projectName } = req.params;
       const { displayName } = req.body;
 
       validateDisplayName(displayName);
 
       const { renameProject } = await import('../../services/projects/project-management/index.js');
-      await renameProject(projectName, displayName);
+      await renameProject(userId, projectName, displayName);
 
       this._success(res, { projectName, displayName }, 'Project renamed successfully');
     } catch (error) {

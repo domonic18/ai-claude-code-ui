@@ -22,12 +22,13 @@ const logger = createLogger('services/projects/project-management/operations');
 // 由 PUT /api/projects/:id/rename 调用，更新项目显示名称
 /**
  * 重命名项目的显示名称
+ * @param {number} userId - 用户 ID（配置按用户隔离）
  * @param {string} projectName - 项目名称
  * @param {string} newDisplayName - 新的显示名称
  * @returns {Promise<boolean>} 是否成功
  */
-async function renameProject(projectName, newDisplayName) {
-  const config = await loadProjectConfig();
+async function renameProject(userId, projectName, newDisplayName) {
+  const config = await loadProjectConfig(userId);
 
   if (!newDisplayName || newDisplayName.trim() === '') {
     // Remove custom name if empty, will fall back to auto-generated
@@ -39,7 +40,7 @@ async function renameProject(projectName, newDisplayName) {
     };
   }
 
-  await saveProjectConfig(config);
+  await saveProjectConfig(userId, config);
   return true;
 }
 
@@ -109,9 +110,9 @@ async function deleteProject(userId, projectName) {
 
     logger.info(`[deleteProject] Removed project dir "${projectPath}" and session dir "${sessionPath}"`);
 
-    const config = await loadProjectConfig();
+    const config = await loadProjectConfig(userId);
     delete config[projectName];
-    await saveProjectConfig(config);
+    await saveProjectConfig(userId, config);
 
     logger.info(`[deleteProject] Project "${projectName}" deleted successfully`);
     return true;
@@ -165,7 +166,7 @@ async function addProjectManually(userId, projectName, displayName = null) {
     logger.info(`[addProjectManually] Directory verified: ${projectPath}`);
 
     // Add to config as manually added project
-    const config = await loadProjectConfig();
+    const config = await loadProjectConfig(userId);
 
     if (config[projectName]) {
       throw new Error(`Project already configured: ${projectName}`);
@@ -179,7 +180,7 @@ async function addProjectManually(userId, projectName, displayName = null) {
       config[projectName].displayName = displayName;
     }
 
-    await saveProjectConfig(config);
+    await saveProjectConfig(userId, config);
     logger.info(`[addProjectManually] Config saved for project: ${projectName}`);
 
     return {
