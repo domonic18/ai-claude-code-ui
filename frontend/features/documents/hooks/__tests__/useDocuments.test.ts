@@ -236,6 +236,67 @@ describe('useDocuments', () => {
       // 去重：乐观文档已被服务端数据替换，总数仍为 1
       expect(result.current.aiGenerated.length).toBe(1);
     });
+
+    it('未确认的乐观文档在 60s 后被兜底清理', async () => {
+      const { wrapper } = createWrapper();
+      // 服务端始终不返回该文档，模拟 recordAIDocument 失败
+      mockFetchDocuments.mockResolvedValue({ uploads: [], aiGenerated: [] });
+      const { result } = renderHook(() => useDocuments('proj'), { wrapper });
+      await waitFor(() => expect(mockFetchDocuments).toHaveBeenCalled());
+
+      act(() => {
+        documentCreatedHandler?.({
+          file_name: 'stuck.md',
+          file_path: '/workspace/proj/stuck.md',
+          type: 'ai_generated',
+          conversation_id: 'c1',
+          message_id: 'm1',
+        });
+      });
+      await waitFor(() => expect(result.current.aiGenerated.length).toBe(1));
+
+      // 推进过 60s TTL，兜底定时器应移除该乐观文档
+      act(() => { vi.advanceTimersByTime(61_000); });
+
+      expect(result.current.aiGenerated.length).toBe(0);
+    });
+
+    it('服务端确认后兜底定时器已清理，推进过 TTL 不会误删服务端数据', async () => {
+      const { wrapper } = createWrapper();
+      mockFetchDocuments.mockResolvedValue({ uploads: [], aiGenerated: [] });
+      const { result } = renderHook(() => useDocuments('proj'), { wrapper });
+      await waitFor(() => expect(mockFetchDocuments).toHaveBeenCalled());
+
+      act(() => {
+        documentCreatedHandler?.({
+          file_name: 'ai.md',
+          file_path: '/workspace/proj/ai.md',
+          type: 'ai_generated',
+          conversation_id: 'c1',
+          message_id: 'm1',
+        });
+      });
+      await waitFor(() => expect(result.current.aiGenerated.length).toBe(1));
+
+      // 服务端确认（同 file_path 返回 ready）
+      mockFetchDocuments.mockResolvedValue({
+        uploads: [],
+        aiGenerated: [{
+          ...makeDoc({ type: 'ai_generated' }),
+          file_name: 'ai.md',
+          file_path: '/workspace/proj/ai.md',
+          summary_status: 'ready',
+          summary: '正式摘要',
+        }],
+      });
+      act(() => { vi.advanceTimersByTime(5_000); });
+      await waitFor(() => expect(result.current.aiGenerated[0].summary_status).toBe('ready'));
+
+      // 推进过 TTL：确认时已 clearTimeout，孤儿定时器不会触发，服务端数据仍在
+      act(() => { vi.advanceTimersByTime(61_000); });
+      expect(result.current.aiGenerated.length).toBe(1);
+      expect(result.current.aiGenerated[0].summary).toBe('正式摘要');
+    });
   });
 
   // ─── 轮询 ───────────────────────────────────────────

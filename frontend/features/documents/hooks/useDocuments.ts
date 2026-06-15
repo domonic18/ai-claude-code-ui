@@ -29,11 +29,6 @@ const OPTIMISTIC_DOC_TTL_MS = 60_000;
 /** 稳定的空数组引用，避免 data 为空时每次渲染创建新引用触发 useMemo 重算 */
 const EMPTY_AI_GENERATED: DocumentItem[] = [];
 
-/** 乐观文档项：在 DocumentItem 基础上记录加入时间，用于兜底超时清理 */
-interface OptimisticDoc extends DocumentItem {
-  _addedAt: number;
-}
-
 interface UseDocumentsReturn {
   /** 用户上传的文档 */
   uploads: DocumentItem[];
@@ -73,13 +68,34 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
 
   // 乐观文档：来自 WebSocket document-created 事件、尚未被服务端确认的 AI 文档。
   // 存放在独立 state 而非 query 缓存，使其免疫任何 refetch 的整体替换（根治竞态）。
-  const [optimisticDocs, setOptimisticDocs] = useState<OptimisticDoc[]>([]);
+  const [optimisticDocs, setOptimisticDocs] = useState<DocumentItem[]>([]);
 
-  // 项目切换时清除残留的 mutation 错误 + 乐观文档，避免跨项目泄漏
+  // 乐观兜底定时器：file_path -> timer。
+  // 在「服务端确认 / 项目切换 / 组件卸载」时统一 clearTimeout，避免孤儿定时器
+  // 在文档已移除或组件已销毁后仍触发 setState（多余渲染 / 跨项目 file_path 碰撞）。
+  const optimisticTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  /** 清理指定乐观文档的兜底定时器 */
+  const clearOptimisticCleanup = useCallback((filePath: string) => {
+    const timer = optimisticTimeoutsRef.current.get(filePath);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      optimisticTimeoutsRef.current.delete(filePath);
+    }
+  }, []);
+
+  /** 清理全部乐观兜底定时器（项目切换 / 组件卸载） */
+  const clearAllOptimisticCleanups = useCallback(() => {
+    optimisticTimeoutsRef.current.forEach(timer => clearTimeout(timer));
+    optimisticTimeoutsRef.current.clear();
+  }, []);
+
+  // 项目切换时清除残留的 mutation 错误 + 乐观文档及其兜底定时器，避免跨项目泄漏
   useEffect(() => {
     setMutationError(null);
+    clearAllOptimisticCleanups();
     setOptimisticDocs([]);
-  }, [projectName]);
+  }, [projectName, clearAllOptimisticCleanups]);
 
   // 从缓存数据中解构 uploads / 服务端 aiGenerated
   const uploads = data?.uploads ?? [];
@@ -103,27 +119,40 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
       const remaining = prev.filter(d => !confirmedPaths.has(d.file_path));
       return remaining.length === prev.length ? prev : remaining;
     });
-  }, [serverAiGenerated]);
+    // 已确认乐观文档的兜底定时器立即清理，避免 60s 后的孤儿回调造成多余渲染
+    optimisticTimeoutsRef.current.forEach((timer, filePath) => {
+      if (confirmedPaths.has(filePath)) clearOptimisticCleanup(filePath);
+    });
+  }, [serverAiGenerated, clearOptimisticCleanup]);
 
   // 乐观更新：收到 document-created 事件时，立即写入独立 state（即时显示，免疫 refetch 覆盖）。
-  // setTimeout 回调只用函数式 setState、不读外部 state，无需 ref 中转（符合 hooks 规则2）。
+  // 兜底定时器在 setState updater 之外登记：保证每条事件只调度一次，
+  // 且不受 StrictMode 下 updater 双重调用影响（副作用不放进纯 updater）。
   const addAIDocument = useCallback((doc: DocumentItem) => {
+    // 先清理该路径可能存在的旧定时器（重复事件幂等，避免累积），再重新登记 60s 兜底清理。
+    clearOptimisticCleanup(doc.file_path);
+    const timer = setTimeout(() => {
+      optimisticTimeoutsRef.current.delete(doc.file_path);
+      // 60s 内仍未被服务端确认 → 兜底移除，防止永久残留。
+      // 若已被确认 / 项目切换清空，cur 中已无该项 → 返回原数组，避免多余渲染。
+      setOptimisticDocs(cur =>
+        cur.some(d => d.file_path === doc.file_path)
+          ? cur.filter(d => d.file_path !== doc.file_path)
+          : cur,
+      );
+    }, OPTIMISTIC_DOC_TTL_MS);
+    optimisticTimeoutsRef.current.set(doc.file_path, timer);
+
     setOptimisticDocs(prev => {
       // 入口去重
       if (prev.some(d => d.file_path === doc.file_path)) return prev;
-      const entry: OptimisticDoc = {
+      return [...prev, {
         ...doc,
         summary_status: doc.summary_status ?? 'pending',
         summary: doc.summary ?? null,
-        _addedAt: Date.now(),
-      };
-      // 60s 兜底清理：该项若一直未被服务端确认（record 失败等）则移除，防止永久残留。
-      setTimeout(() => {
-        setOptimisticDocs(cur => cur.filter(d => d.file_path !== doc.file_path));
-      }, OPTIMISTIC_DOC_TTL_MS);
-      return [...prev, entry];
+      }];
     });
-  }, []);
+  }, [clearOptimisticCleanup]);
 
   // 订阅 WebSocket 的 document-created 事件（AI 生成文档）
   useEffect(() => {
@@ -145,15 +174,16 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef(0);
 
-  // 组件卸载时清理轮询 interval
+  // 组件卸载时清理轮询 interval + 乐观兜底定时器，防止孤儿定时器在卸载后仍触发 setState
   useEffect(() => {
     return () => {
       if (pollingRef.current) {
         clearInterval(pollingRef.current);
         pollingRef.current = null;
       }
+      clearAllOptimisticCleanups();
     };
-  }, []);
+  }, [clearAllOptimisticCleanups]);
 
   useEffect(() => {
     // hasPending=true 且没有活跃轮询 → 启动，最多持续 60 秒
