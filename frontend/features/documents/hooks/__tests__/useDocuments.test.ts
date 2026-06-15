@@ -167,6 +167,77 @@ describe('useDocuments', () => {
     });
   });
 
+  // ─── 乐观合并层（竞态修复）─────────────────────────
+
+  describe('乐观合并层（竞态修复）', () => {
+    it('refetch 返回不含乐观文档时不覆盖乐观文档', async () => {
+      const { wrapper } = createWrapper();
+      // 服务端始终返回空，模拟 recordAIDocument 尚未完成
+      mockFetchDocuments.mockResolvedValue({ uploads: [], aiGenerated: [] });
+
+      const { result } = renderHook(() => useDocuments('proj'), { wrapper });
+      await waitFor(() => expect(mockFetchDocuments).toHaveBeenCalled());
+
+      // WebSocket 推送 → 乐观文档写入
+      act(() => {
+        documentCreatedHandler?.({
+          file_name: 'ai-doc.md',
+          file_path: '/workspace/proj/ai-doc.md',
+          type: 'ai_generated',
+          conversation_id: 'c1',
+          message_id: 'm1',
+        });
+      });
+      await waitFor(() => expect(result.current.aiGenerated.length).toBe(1));
+
+      // 推进时间触发轮询 refetch（服务端 record 仍未完成，列表为空）
+      act(() => { vi.advanceTimersByTime(5_000); });
+      await waitFor(() => expect(mockFetchDocuments.mock.calls.length).toBeGreaterThanOrEqual(2));
+
+      // 关键断言：服务端返回空，但乐观文档仍在（未被 refetch 覆盖）
+      expect(result.current.aiGenerated.length).toBe(1);
+      expect(result.current.aiGenerated[0].file_path).toBe('/workspace/proj/ai-doc.md');
+    });
+
+    it('服务端返回该文档后，乐观文档被确认并替换为服务端数据', async () => {
+      const { wrapper } = createWrapper();
+      mockFetchDocuments.mockResolvedValue({ uploads: [], aiGenerated: [] });
+      const { result } = renderHook(() => useDocuments('proj'), { wrapper });
+      await waitFor(() => expect(mockFetchDocuments).toHaveBeenCalled());
+
+      act(() => {
+        documentCreatedHandler?.({
+          file_name: 'ai.md',
+          file_path: '/workspace/proj/ai.md',
+          type: 'ai_generated',
+          conversation_id: 'c1',
+          message_id: 'm1',
+        });
+      });
+      await waitFor(() => expect(result.current.aiGenerated.length).toBe(1));
+      expect(result.current.aiGenerated[0].summary_status).toBe('pending');
+
+      // 服务端 record 完成，refetch 返回 ready 文档（同 file_path）
+      mockFetchDocuments.mockResolvedValue({
+        uploads: [],
+        aiGenerated: [{
+          ...makeDoc({ type: 'ai_generated' }),
+          file_name: 'ai.md',
+          file_path: '/workspace/proj/ai.md',
+          summary_status: 'ready',
+          summary: '正式摘要',
+        }],
+      });
+      // 推进时间触发轮询
+      act(() => { vi.advanceTimersByTime(5_000); });
+
+      await waitFor(() => expect(result.current.aiGenerated[0].summary_status).toBe('ready'));
+      expect(result.current.aiGenerated[0].summary).toBe('正式摘要');
+      // 去重：乐观文档已被服务端数据替换，总数仍为 1
+      expect(result.current.aiGenerated.length).toBe(1);
+    });
+  });
+
   // ─── 轮询 ───────────────────────────────────────────
 
   describe('polling', () => {
