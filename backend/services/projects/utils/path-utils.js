@@ -130,14 +130,6 @@ async function extractProjectDirectory(projectName) {
   // 优先检查内存缓存
   if (hasInCache(projectName)) return hasInCache(projectName);
 
-  // 尝试从项目配置中获取原始路径
-  const { loadProjectConfig } = await import('../config/index.js');
-  const config = await loadProjectConfig();
-  if (config[projectName]?.originalPath) {
-    setCache(projectName, config[projectName].originalPath);
-    return config[projectName].originalPath;
-  }
-
   // 扫描 ~/.claude/projects/<name>/ 下的 JSONL 文件
   const projectDir = path.join(os.homedir(), '.claude', 'projects', projectName);
 

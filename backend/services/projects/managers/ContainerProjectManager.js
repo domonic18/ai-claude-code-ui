@@ -140,7 +140,7 @@ export async function getProjectsInContainer(userId) {
       logger.info(`[getProjectsInContainer] ② ls 输出 (raw): ${JSON.stringify(output)}`);
 
       let projectConfig = {};
-      try { projectConfig = await loadProjectConfig(); } catch {
+      try { projectConfig = await loadProjectConfig(userId); } catch {
         logger.debug('Failed to load project config, using defaults');
       }
 
