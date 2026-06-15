@@ -12,6 +12,7 @@
 
 import { loadProjectConfig, saveProjectConfig } from '../config/index.js';
 import { deleteSessionInContainer, getSessionsInContainer } from '../../sessions/container/ContainerSessions.js';
+import { getProjectDir } from '../../sessions/container/sessionReader.js';
 import containerManager from '../../container/core/index.js';
 import { CONTAINER } from '../../../config/config.js';
 import { readStreamOutput } from '../../files/utils/file-utils.js';
@@ -78,7 +79,14 @@ async function isProjectEmpty(userId, projectName) {
 
 // 由 DELETE /api/projects/:id 调用，删除项目及所有会话
 /**
- * 删除空项目（容器模式）
+ * 删除项目（容器模式）
+ *
+ * 同时清理两类持久化数据，否则删除不完整、重建同名项目时会"复活"：
+ * 1. 项目代码目录 /workspace/{projectName}
+ * 2. 会话历史目录 /workspace/.claude/projects/{encodeProjectName(projectName)}/
+ *    （会话与项目代码分离存储，且都在用户命名卷里持久化；
+ *     不清理这里会导致删后重建同名项目时旧会话被读回）
+ *
  * @param {number} userId - 用户 ID
  * @param {string} projectName - 项目名称
  * @returns {Promise<boolean>} 是否成功
@@ -88,11 +96,18 @@ async function deleteProject(userId, projectName) {
 
   try {
     const projectPath = `${CONTAINER.paths.workspace}/${projectName}`;
+    // 会话历史目录（与项目代码目录分离存储，必须一并清理）
+    const sessionPath = getProjectDir(projectName);
 
-    const { stream } = await containerManager.execInContainer(userId, ['rm', '-rf', projectPath]);
+    // 用一条 sh -c 同时删除项目目录和会话目录，减少容器往返
+    // 路径由服务端常量 + 编码函数生成，不接受外部输入拼接，无注入风险
+    const { stream } = await containerManager.execInContainer(
+      userId,
+      ['sh', '-c', 'rm -rf "$1" "$2"', 'deleteProject', projectPath, sessionPath]
+    );
     await readStreamOutput(stream, { timeout: 10000 });
 
-    logger.info(`[deleteProject] Project directory removed: ${projectPath}`);
+    logger.info(`[deleteProject] Removed project dir "${projectPath}" and session dir "${sessionPath}"`);
 
     const config = await loadProjectConfig();
     delete config[projectName];
