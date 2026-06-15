@@ -129,7 +129,6 @@ async function syncUserExtensions(userDataDir) {
 async function runSetup(container) {
   await ensureWorkspaceWithRetry(container);
   await syncContainerExtensions(container);
-  await createContainerReadme(container);
 }
 
 /**
@@ -157,17 +156,5 @@ async function syncContainerExtensions(container) {
     await ContainerSetup.syncExtensionsToContainer(container);
   } catch (e) {
     logger.warn(`Failed to sync extensions:`, e.message);
-  }
-}
-
-/**
- * Create README in container (ignore errors)
- * @param {Object} container - Container object
- */
-async function createContainerReadme(container) {
-  try {
-    await ContainerSetup.createReadmeInContainer(container);
-  } catch (e) {
-    logger.warn(`Failed to create README:`, e.message);
   }
 }

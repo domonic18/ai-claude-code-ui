@@ -84,31 +84,6 @@ function parseProjectList(output, projectConfig) {
 
 // ContainerProjectManager.js 功能函数
 /**
- * 在容器内创建默认工作区
- * @param {number} userId - 用户 ID
- * @param {string} workspacePath - 工作空间路径
- * @returns {Object|null} 创建的项目条目，失败返回 null
- */
-async function createDefaultWorkspace(userId, workspacePath) {
-  logger.info('[ContainerProjectManager] No projects found, creating default workspace');
-  try {
-    const { stream: createStream } = await containerManager.execInContainer(
-      userId,
-      ['sh', '-c', 'mkdir -p "$1/my-workspace" && echo "created"', 'createDefault', workspacePath]
-    );
-
-    await _collectStreamOutput(createStream);
-
-    logger.info('[ContainerProjectManager] Default workspace created: my-workspace');
-    return createProjectEntry('my-workspace', 'my-workspace');
-  } catch (error) {
-    logger.warn({ err: error }, 'Failed to create default workspace');
-    return null;
-  }
-}
-
-// ContainerProjectManager.js 功能函数
-/**
  * 加载项目列表的会话信息
  * @param {number} userId - 用户 ID
  * @param {Array} projectList - 项目列表
@@ -172,9 +147,12 @@ export async function getProjectsInContainer(userId) {
       const projectList = parseProjectList(output, projectConfig);
       logger.info(`[getProjectsInContainer] ③ 解析后项目数=${projectList.length}, 名称列表: ${projectList.map(p => p.name).join(', ')}`);
 
+      // 用户可以拥有 0 个项目，空列表是合法终态。
+      // 不再自动创建默认 my-workspace —— 否则用户删除项目后刷新页面会把它"复活"（Bug1）。
+      // my-workspace 与普通项目一样，由用户主动创建。
       if (projectList.length === 0) {
-        const defaultEntry = await createDefaultWorkspace(userId, workspacePath);
-        if (defaultEntry) projectList.push(defaultEntry);
+        logger.info('[getProjectsInContainer] No projects found, returning empty list');
+        return projectList;
       }
 
       await loadProjectSessions(userId, projectList);
