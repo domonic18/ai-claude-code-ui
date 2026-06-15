@@ -49,8 +49,9 @@ export {
 export {
   loadProjectConfig,
   saveProjectConfig,
-  CONFIG_PATH,
-  CLAUDE_DIR
+  deleteProjectConfig,
+  getConfigPath,
+  CONFIGS_DIR
 } from './config/project-config.js';
 
 export {
