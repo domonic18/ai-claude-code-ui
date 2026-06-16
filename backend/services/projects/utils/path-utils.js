@@ -120,7 +120,7 @@ async function scanJsonlForCwd(jsonlFiles, projectDir, projectName) {
 /**
  * 从项目名解析出实际的文件系统目录路径
  *
- * 按优先级尝试：缓存 → 项目配置 → JSONL 扫描 → 兜底解码。
+ * 按优先级尝试：缓存 → JSONL 扫描 → 兜底解码。
  * 结果会被缓存以避免重复扫描。
  *
  * @param {string} projectName - 编码后的项目名

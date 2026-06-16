@@ -101,7 +101,10 @@ async function deleteProject(userId, projectName) {
     const sessionPath = getProjectDir(projectName);
 
     // 用一条 sh -c 同时删除项目目录和会话目录，减少容器往返
-    // 路径由服务端常量 + 编码函数生成，不接受外部输入拼接，无注入风险
+    // 安全性来自位置参数：projectPath/sessionPath 作为 $1/$2 传入，命令里用 "$1" "$2"
+    // 引用，是字面量 argv，不会被 shell 重新解析，故含特殊字符也无注入。
+    // 注意 projectName 本身并未转义——切勿把此行改成 rm -rf "${projectPath}" 之类的字符串插值，
+    // 那会引入真实的命令注入。
     const { stream } = await containerManager.execInContainer(
       userId,
       ['sh', '-c', 'rm -rf "$1" "$2"', 'deleteProject', projectPath, sessionPath]
