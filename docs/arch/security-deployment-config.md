@@ -981,15 +981,12 @@ monitoring:
   prometheusUrl: http://localhost:9090
   grafanaUrl: http://localhost:3000
 
-# 日志配置
+# 日志配置（应用层 pino，详见 backend/utils/logger.js 与 §2.5.3）
+# 同时写 stdout（供 docker logs）与文件 $DATA_DIR/logs/app.log，无外部依赖
 logging:
-  level: info
-  format: json
-  output:
-    - type: file
-      path: /var/log/claude-code-ui/app.log
-    - type: syslog
-      facility: local0
+  level: info              # 环境变量 LOG_LEVEL
+  dir: ${DATA_DIR}/logs    # 环境变量 LOG_DIR 可覆盖，默认 ${DATA_DIR}/logs
+  file: app.log            # 持续追加，不轮转（轮转策略见 §2.5.3）
 ```
 
 ### 2.4 部署步骤
@@ -1076,6 +1073,25 @@ loki:
   ports:
     - "3100:3100"
 ```
+
+#### 2.5.3 应用日志持久化
+
+应用自身使用 pino 输出结构化日志，与上文的 Prometheus / Loki（外部指标与日志聚合）互补，这里说明应用进程日志如何落盘。
+
+**目标**：容器内 pino 日志同时写 stdout（供 `docker logs` 实时查看）和持久化文件 `$DATA_DIR/logs/app.log`（供事后排查），不引入新依赖、不做轮转。
+
+**双写实现**：根 logger 用 `pino.multistream` 建立双目标（stdout + 文件），文件流用 `pino.destination` 建立。选用 `multistream` 而非 `transport.targets`：后者走 worker 线程，既禁止自定义 level 格式化器（`pino/lib/tools.js` 直接抛错），也无法把 formatter 函数跨线程序列化（`DataCloneError`）；`multistream` 不走 worker，`formatters`/`timestamp` 在主进程原生生效。完整实现在 `backend/utils/logger.js`。
+
+**落点规则（`resolveLogDir()`）**：优先级 `LOG_DIR` > `$DATA_DIR/logs` > 项目根 `logs/`（dev 兜底）。默认落在 `DATA_DIR`，**绝不落在 `/workspace`**，避免污染用户工作卷、被用户数据清理逻辑波及。
+
+**容器权限配合**（呼应 §1.3 容器用户权限管理）：容器以 root 启动、经 `gosu` 切换到 node 用户运行。若 logs 目录由 root 创建且未放权，node 用户无写权，pino 写文件会失败。`docker/entrypoint.sh` 的 `set_data_dir_permissions()` 在切用户前执行 `mkdir -p $DATA_DIR/logs` 并 `chmod 777`；注意 `mkdir` 必须在 `chmod -R` 之前执行，否则递归放权会漏掉尚未创建的 logs 子目录。pino 文件目标同时设 `mkdir: true` 作为双保险。
+
+**日志轮转（待办）**：当前 `app.log` 持续追加、不轮转。日志量大时二选一：
+
+- **宿主机 `logrotate`**：`copytruncate` 模式，无需重启容器，运维侧解决；
+- **代码层 `pino-roll`**：把文件 target 换成 `pino-roll`，按大小/时间切分，需新增依赖。
+
+此项为明确的待办，尚未实施。
 
 ### 2.6 备份策略
 

@@ -14,6 +14,8 @@
  */
 
 import pino from 'pino';
+import path from 'path';
+import fs from 'fs';
 import crypto from 'crypto';
 import { AsyncLocalStorage } from 'async_hooks';
 
@@ -32,11 +34,6 @@ const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
  * 仅用于 DEBUG 级别的内容预览，生产环境默认不输出 DEBUG
  */
 const LOG_PREVIEW_LENGTH = 50;
-
-/**
- * 是否为开发环境
- */
-const IS_DEV = process.env.NODE_ENV !== 'production';
 
 /**
  * 敏感信息正则模式列表
@@ -304,18 +301,53 @@ function localIsoTimestamp() {
   return `,"time":"${local}"`;
 }
 
+/**
+ * 解析日志目录，优先级：LOG_DIR > DATA_DIR/logs > 项目根 logs/（dev 兜底）
+ *
+ * 设计要点：
+ * - 不 import config，避免循环依赖（config 可能反向依赖 logger）
+ * - 默认落在 DATA_DIR（容器内 /var/lib/claude-code），绝不落在 /workspace，
+ *   以免污染用户工作卷
+ *
+ * @returns {string} 日志目录绝对路径
+ */
+function resolveLogDir() {
+  const envLogDir = process.env.LOG_DIR;
+  if (envLogDir && envLogDir.trim()) {
+    return path.resolve(envLogDir);
+  }
+  const dataDir = process.env.DATA_DIR;
+  if (dataDir && dataDir.trim()) {
+    return path.join(dataDir, 'logs');
+  }
+  // dev 兜底：项目根 logs/（已加入 .gitignore）
+  return path.join(process.cwd(), 'logs');
+}
+
+const LOG_DIR = resolveLogDir();
+
+// 目录不可写时仅告警不阻断：stdout 目标仍可用，文件目标会失败但不影响进程启动
+try {
+  fs.mkdirSync(LOG_DIR, { recursive: true });
+} catch (err) {
+  process.stderr.write(`[logger] 无法创建日志目录 ${LOG_DIR}: ${err.message}，文件日志不可用，仅 stdout\n`);
+}
+
+// 双目标写流：stdout + 文件。
+// 不用 pino 的 transport.targets（多目标）：它走 worker 线程，既禁止自定义
+// level 格式化器（pino/lib/tools.js 直接抛错），也无法把 formatters 函数跨线程传递
+// （DataCloneError）。改用 multistream：不走 worker，formatters/timestamp 在主进程
+// 原生生效，可同时写 stdout 和文件。
+const fileDest = pino.destination(path.join(LOG_DIR, 'app.log'));
+
 const rootLogger = pino({
   level: LOG_LEVEL,
   formatters: sharedFormatters,
   timestamp: localIsoTimestamp,
-  // 开发环境输出到 stdout（保持 JSON 格式一致性，可搭配 pino-pretty 管道使用）
-  ...(IS_DEV ? {
-    transport: {
-      target: 'pino/file',
-      options: { destination: 1 },
-    },
-  } : {}),
-});
+}, pino.multistream([
+  { level: LOG_LEVEL, stream: process.stdout },
+  { level: LOG_LEVEL, stream: fileDest },
+]));
 
 // ---------------------------------------------------------------------------
 // 创建子 Logger
