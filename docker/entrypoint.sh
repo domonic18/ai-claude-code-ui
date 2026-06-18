@@ -68,6 +68,10 @@ setup_data_dir() {
 # Set permissions for data directory
 # Using 777 for maximum compatibility across different file systems and Docker Desktop for Mac
 set_data_dir_permissions() {
+    # 预创建 logs 子目录并放权：容器以 root 创建后切换到 node 用户，
+    # 若不显式放权，pino 写 $DATA_DIR/logs/app.log 会因属主为 root 而失败
+    mkdir -p "$DATA_DIR/logs" 2>/dev/null || true
+    chmod 777 "$DATA_DIR/logs" 2>/dev/null || true
     chmod -R 777 "$DATA_DIR" 2>/dev/null || true
     log_debug "Data directory permissions set" "\"dataDir\":\"$DATA_DIR\""
 }
