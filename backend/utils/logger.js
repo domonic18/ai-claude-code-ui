@@ -326,11 +326,14 @@ function resolveLogDir() {
 
 const LOG_DIR = resolveLogDir();
 
-// 目录不可写时仅告警不阻断：stdout 目标仍可用，文件目标会失败但不影响进程启动
+// 目录不可写时仅告警不阻断：跳过文件流、仅保留 stdout，不影响进程启动
+// （文件流仅在目录就绪时创建，避免指向不可写路径后写入静默失败）
+const streams = [{ level: LOG_LEVEL, stream: process.stdout }];
 try {
   fs.mkdirSync(LOG_DIR, { recursive: true });
+  streams.push({ level: LOG_LEVEL, stream: pino.destination(path.join(LOG_DIR, 'app.log')) });
 } catch (err) {
-  process.stderr.write(`[logger] 无法创建日志目录 ${LOG_DIR}: ${err.message}，文件日志不可用，仅 stdout\n`);
+  process.stderr.write(`[logger] 无法创建日志目录 ${LOG_DIR}: ${err.message}，文件日志不可用，已降级为仅 stdout\n`);
 }
 
 // 双目标写流：stdout + 文件。
@@ -338,16 +341,11 @@ try {
 // level 格式化器（pino/lib/tools.js 直接抛错），也无法把 formatters 函数跨线程传递
 // （DataCloneError）。改用 multistream：不走 worker，formatters/timestamp 在主进程
 // 原生生效，可同时写 stdout 和文件。
-const fileDest = pino.destination(path.join(LOG_DIR, 'app.log'));
-
 const rootLogger = pino({
   level: LOG_LEVEL,
   formatters: sharedFormatters,
   timestamp: localIsoTimestamp,
-}, pino.multistream([
-  { level: LOG_LEVEL, stream: process.stdout },
-  { level: LOG_LEVEL, stream: fileDest },
-]));
+}, pino.multistream(streams));
 
 // ---------------------------------------------------------------------------
 // 创建子 Logger
