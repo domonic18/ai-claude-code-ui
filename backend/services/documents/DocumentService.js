@@ -32,6 +32,14 @@ const DOC_CACHE_TTL_MS = 5_000;
 const DOC_CACHE_MAX_SIZE = 500;
 const documentCache = new Map();
 
+/**
+ * 正在生成摘要的 AI 文档 key 集合（兜底补触发去重用）。
+ * key 形如 `${userId}:${projectName}:${fileName}`。
+ * readme.appendEntry 不去重，必须用此锁防止轮询期间对同一 pending 文档重复触发，
+ * 否则会在 readme.md 写出多个重复条目。摘要生成结束（成功或兜底）后自动释放。
+ */
+const pendingSummaryKeys = new Set();
+
 /** 使指定项目的文档列表缓存失效 */
 function invalidateDocCache(userId, projectName) {
   documentCache.delete(`${userId}:${projectName}`);
@@ -106,7 +114,49 @@ export class DocumentService {
 
     const result = { uploads: enrichedUploads, aiGenerated: enrichedAiGenerated };
     setDocCache(cacheKey, result);
+
+    // 兜底：为「没人管」的 pending AI 文档补触发摘要生成。
+    // 正常路径下 Write 工具会触发 recordAIDocument→摘要；但任何绕过追踪的写入
+    // （或追踪失败）会让文档永久卡 pending。这里幂等补一次，保证最终收敛到 ready。
+    this._recoverPendingAISummaries(userId, projectName, enrichedAiGenerated);
+
     return result;
+  }
+
+  /**
+   * 兜底补触发：为 summary_status 仍为 pending 的 AI 文档补一次摘要生成。
+   *
+   * 仅作用于 AI 生成文档（上传文档在 uploadDocument 时已触发，且文件立即可读、
+   * 有兜底摘要，不会卡 pending）。用 pendingSummaryKeys 做 in-flight 去重，
+   * 保证轮询期间对同一文档只触发一次；生成完成后（成功或写入兜底摘要）释放锁，
+   * 下次若仍 pending 才会重试。
+   *
+   * @private
+   * @param {number} userId
+   * @param {string} projectName
+   * @param {Array<Object>} aiDocs - 已附加 summary_status 的 AI 文档列表
+   */
+  _recoverPendingAISummaries(userId, projectName, aiDocs) {
+    for (const doc of aiDocs) {
+      if (doc.summary_status !== 'pending') continue;
+
+      const key = `${userId}:${projectName}:${doc.file_name}`;
+      if (pendingSummaryKeys.has(key)) continue;
+      pendingSummaryKeys.add(key);
+
+      logger.info(
+        { userId, projectName, fileName: doc.file_name },
+        '[DocumentService] 兜底补触发 AI 文档摘要（目录扫描发现 pending）'
+      );
+
+      // generateSummary 返回的 promise 永不 reject（内部已兜底），可安全 .finally
+      summaryService.generateSummary(userId, projectName, {
+        file_path: doc.file_path,
+        file_name: doc.file_name,
+        file_size: doc.file_size || 0,
+        source: 'ai',
+      }).finally(() => pendingSummaryKeys.delete(key));
+    }
   }
 
   /**
@@ -694,6 +744,14 @@ export class DocumentService {
     };
     return mimeMap[ext] || 'application/octet-stream';
   }
+}
+
+/**
+ * 仅用于测试：重置兜底补触发的 in-flight 状态，保证用例间隔离。
+ * 生产代码不应调用。
+ */
+export function _resetRecoveryStateForTests() {
+  pendingSummaryKeys.clear();
 }
 
 /** 单例导出 */

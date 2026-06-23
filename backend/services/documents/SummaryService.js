@@ -90,14 +90,18 @@ function _delay(ms) {
 export class SummaryService {
   /**
    * 异步生成文档摘要并写入 readme.md
-   * 此方法为 fire-and-forget，调用者不需要 await
+   *
+   * 默认按 fire-and-forget 调用；返回内部 promise 供调用方在需要时感知完成
+   * （如目录扫描兜底用 `.finally` 释放 in-flight 锁）。promise 永不 reject
+   * （内部已 catch 并写入兜底摘要），因此调用方无需额外捕获。
    *
    * @param {number} userId
    * @param {string} projectName
    * @param {{file_path: string, file_name: string, file_size: number, source?: 'ai'|'upload'}} uploadResult
+   * @returns {Promise<void>}
    */
   generateSummary(userId, projectName, uploadResult) {
-    this._doGenerate(userId, projectName, uploadResult).catch((err) => {
+    return this._doGenerate(userId, projectName, uploadResult).catch((err) => {
       logger.error({ err, userId, projectName, fileName: uploadResult.file_name }, '[SummaryService] 摘要生成失败');
     });
   }
