@@ -74,14 +74,31 @@ export function processOutputLine(line, writer, sessionId, state) {
 
 /**
  * Processes multi-line output
+ *
+ * 行缓冲说明：Docker exec 流不保证一行 JSON 在单个 `data` 事件里完整到达，
+ * 大体积 SDK 消息（如长文档的 Write/Edit tool_use，单行可达数十 KB）会被
+ * 切成多个 `data` 事件。若按 chunk 独立 `split('\n')`，残缺的 JSON 片段会被
+ * `tryParseJSON` 静默丢弃，导致 Write 工具调用完全丢失（文档不显示、摘要卡 pending）。
+ *
+ * 因此在 `state.stdoutBuffer` 上累积未结束的尾巴，拼到下次输入前，只解析
+ * 已以 `\n` 结尾的完整行。`state` 由上层每个流新建一次，缓冲天然按流隔离。
+ *
  * @param {string} output - Output to process
  * @param {Object} writer - Message writer
  * @param {string} sessionId - Session ID
- * @param {Object} state - State object
+ * @param {Object} state - State object（持有跨 chunk 的 stdoutBuffer 行缓冲）
  */
 export function processOutput(output, writer, sessionId, state) {
-  const lines = output.split('\n').filter(line => line.trim());
-  logger.debug({ sessionId, lineCount: lines.length }, '[MessageTransformer] Processing output lines');
+  const buffer = (state.stdoutBuffer || '') + output;
+  const segments = buffer.split('\n');
+  // 最后一段可能不完整（无结尾 \n），留待与下一个 data 事件拼接
+  state.stdoutBuffer = segments.pop();
+  const lines = segments.filter(line => line.trim());
+
+  logger.debug(
+    { sessionId, lineCount: lines.length, hasBuffered: !!state.stdoutBuffer },
+    '[MessageTransformer] Processing output lines'
+  );
 
   for (const line of lines) {
     processOutputLine(line, writer, sessionId, state);
