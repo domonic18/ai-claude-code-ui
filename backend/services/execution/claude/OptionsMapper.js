@@ -171,6 +171,13 @@ export function mapCliOptionsToSDK(options = {}) {
     preset: 'claude_code'
   };
 
+  // 开启逐 token 流式：让 SDK yield stream_event（partial text delta）。
+  // 默认 SDK 把整条 assistant message 攒齐才作为一个 chunk 产出（首字 ~10s）；
+  // 开启后从接近 TTFT(~2s) 起逐 token 流出，把"干等"变成"看着它写"。
+  // 总生成时间不变；仅在网关真流式透传 SSE 时生效——是否生效由
+  // dockerStreamHandler 的 [SDK_PERF] text_ttft 与 delta cadence 日志判定。
+  sdkOptions.includePartialMessages = true;
+
   // 映射 CLAUDE.md 加载的设置源
   sdkOptions.settingSources = ['project', 'user', 'local'];
 

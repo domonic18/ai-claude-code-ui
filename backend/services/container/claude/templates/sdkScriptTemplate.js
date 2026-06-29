@@ -148,9 +148,31 @@ ${generateCanUseToolCallback(autoAnswer)}
     console.error("[SDK] Query started, waiting for chunks...");
 
     let chunkCount = 0;
+    let deltaCount = 0;
+    const evtFirstSeen = {};
+    const evtCount = {};
     for await (const chunk of result) {
       chunkCount++;
       if (chunkCount === 1) console.error("[SDK_PERF] first_chunk:" + Date.now());
+
+      // 逐 token 流式：includePartialMessages 开启后，SDK 会 yield type='stream_event'，
+      // 其 event 是 Anthropic 原始 SSE 事件（content_block_delta/message_start/ping/...）。
+      // 全部走 stream_event 专用通道交给后端解析：后端只把 content_block_delta 的 text
+      // 转发为 stream-delta，其余忽略。绝不能混入 content——否则每个事件都会被
+      // handleDefaultMessage 当 claude-response 灌爆前端（实测一次会话涌出上万条）。
+      if (chunk && chunk.type === "stream_event") {
+        deltaCount++;
+        const et = (chunk.event && chunk.event.type) || "unknown";
+        evtCount[et] = (evtCount[et] || 0) + 1;
+        // 诊断：首次见到每种事件类型时 dump 一次结构（定位文本增量到底在哪个字段）
+        if (!evtFirstSeen[et]) {
+          evtFirstSeen[et] = true;
+          console.error("[SDK] EVT_SAMPLE[" + et + "] " + JSON.stringify(chunk.event).slice(0, 350));
+        }
+        console.log(JSON.stringify({ type: "stream_event", event: chunk.event }));
+        continue;
+      }
+
       console.error("[SDK] Received chunk #" + chunkCount + " type=" + (chunk && chunk.type) || "unknown");
 
       // 输出 chunk 到 stdout 供前端接收
@@ -164,7 +186,8 @@ ${generateCanUseToolCallback(autoAnswer)}
       }
     }
 
-    console.error("[SDK] Query complete, total chunks:", chunkCount);
+    console.error("[SDK] EVT_DIST " + JSON.stringify(evtCount));
+    console.error("[SDK] Query complete, total chunks:", chunkCount, "deltas:", deltaCount);
     console.log(JSON.stringify({
       type: "done",
       sessionId: "${sessionId}"
