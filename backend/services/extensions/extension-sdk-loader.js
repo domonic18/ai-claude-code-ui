@@ -64,11 +64,11 @@ export async function loadSkillsForSDK() {
  * @returns {Promise<Object>} Agent 定义对象，key 为 agent 名称
  * @example
  * {
- *   'generate-docs-agent': {
- *     description: '文档生成工作流编排器',
+ *   'batch-patent-generator': {
+ *     description: '批量专利前置阶段：生成三篇论文 + 创意挖掘',
  *     tools: ['Skill', 'Task', 'Read'],
- *     prompt: '你是智能文档生成专家...',
- *     skills: ['skill-a', 'skill-b']
+ *     prompt: '你是批量专利文档生成专家...',
+ *     skills: ['paper-engineering-paper', 'paper-science-paper', 'paper-economy-paper']
  *   }
  * }
  */
