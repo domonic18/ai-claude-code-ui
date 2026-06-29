@@ -13,17 +13,23 @@ import { generateMessageId, decodeHtmlEntities } from './wsUtils';
 /**
  * 处理流式内容增量（content_block_delta）和内容块结束（content_block_stop）
  *
- * delta 事件携带文本片段，通过 updateStreamContent 实时追加到 UI；
- * stop 事件标志当前内容块传输完毕，调用 completeStream 完成流式渲染。
+ * delta 事件携带文本片段或思考片段，通过 updateStreamContent / updateStreamThinking
+ * 实时追加到 UI；stop 事件标志当前内容块传输完毕，调用 completeStream 完成流式渲染。
  *
  * @param messageData - WebSocket 消息体
  * @param callbacks - UI 状态更新回调集合
  * @returns 是否匹配到流式增量或停止事件
  */
 export function handleStreamingDelta(messageData: any, callbacks: MessageHandlerCallbacks): boolean {
-  if (messageData.type === 'content_block_delta' && messageData.delta?.text) {
-    callbacks.updateStreamContent?.(decodeHtmlEntities(messageData.delta.text));
-    return true;
+  if (messageData.type === 'content_block_delta' && messageData.delta) {
+    if (messageData.delta.text) {
+      callbacks.updateStreamContent?.(decodeHtmlEntities(messageData.delta.text));
+      return true;
+    }
+    if (messageData.delta.thinking) {
+      callbacks.updateStreamThinking?.(decodeHtmlEntities(messageData.delta.thinking));
+      return true;
+    }
   }
   if (messageData.type === 'content_block_stop') {
     callbacks.completeStream?.();
