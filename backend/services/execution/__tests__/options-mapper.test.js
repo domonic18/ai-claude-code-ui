@@ -92,6 +92,8 @@ describe('OptionsMapper', () => {
 
       assert.equal(sdkOptions.systemPrompt.type, 'preset');
       assert.equal(sdkOptions.systemPrompt.preset, 'claude_code');
+      // 逐 token 流式必须开启，否则首字延迟回到 message 级（~10s）
+      assert.equal(sdkOptions.includePartialMessages, true);
     });
 
     it('should include setting sources', () => {

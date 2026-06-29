@@ -120,6 +120,13 @@ async function filterSDKOptions(options, userId) {
   setDefaultTools(sdkOptions);
   await configureExtensions(sdkOptions, options);
 
+  // 开启逐 token 流式（容器路径 ClaudeQuery→ScriptBuilder 实际生效处）。
+  // 注意：OptionsMapper.mapCliOptionsToSDK 是另一条(ClaudeExecutor)路径，不经过容器，
+  // 所以必须在此处再设一次，否则 includePartialMessages 进不了沙箱、deltas 恒为 0。
+  // 让 SDK yield stream_event(text delta)，首字从 message 级(~10s+)提前到接近 TTFT(~2s)。
+  // 前提：provider 端点真流式（moonshot 直连已用 curl 验证 ✅）。
+  sdkOptions.includePartialMessages = true;
+
   const userDisallowedTools = determinePermissionMode(sdkOptions, settings);
   cleanupSdkOptions(sdkOptions, options, userDisallowedTools);
 

@@ -31,6 +31,61 @@ function hasRealError(stderrOutput) {
 }
 
 /**
+ * 解析容器内 [SDK_PERF] 时间戳标记，配对后输出阶段 cost。
+ * 容器内所有标记同源时钟（Date.now()），故 delta 不受宿主/容器时钟偏移影响。
+ * 此前这些标记喷到 stderr 后被丢弃，是网关/模型延迟不可见的主因。
+ * @param {Object} perf - 累积的 perf 时间戳对象（按 marker 名）
+ * @param {string} line - stderr 单行
+ * @param {string} sessionId - 会话 ID
+ */
+function recordSdkPerf(perf, line, sessionId) {
+  const m = line.match(/^\[SDK_PERF\]\s*(\w+):(\d+)\s*$/);
+  if (!m) return;
+  const [, name, tsStr] = m;
+  perf[name] = parseInt(tsStr, 10);
+  if (name === 'api_call_start' && perf.script_start != null) {
+    logger.info({ sessionId, cost: perf.api_call_start - perf.script_start, phase: 'sdk_init' }, '[SDK_PERF] Container SDK init (script_start → api_call_start)');
+  } else if (name === 'first_chunk' && perf.api_call_start != null) {
+    logger.info({ sessionId, cost: perf.first_chunk - perf.api_call_start, phase: 'model_first_event' }, '[SDK_PERF] Model first event (api_call_start → first_chunk)');
+  } else if (name === 'first_delta' && perf.api_call_start != null) {
+    logger.info({ sessionId, cost: perf.first_delta - perf.api_call_start, phase: 'text_ttft' }, '[SDK_PERF] Text TTFT (api_call_start → first_delta)');
+  }
+}
+
+/**
+ * 输出 partial delta 到达节奏摘要，判定网关是否真流式透传 SSE：
+ * - span 大（秒级）、meanGap/p90 为几十~几百 ms 且无明显聚集 → 网关真流式 ✅
+ * - span 极小（<500ms）或 maxGap≈span（一个大间隔后集中涌出）→ 网关缓冲 ❌
+ * deltas 用宿主时钟记录（衡量 delta 到达后端的节奏）。
+ * @param {number[]} deltas - delta 到达时间戳数组
+ * @param {string} sessionId - 会话 ID
+ */
+function emitDeltaCadence(deltas, sessionId, textCount = 0, thinkingCount = 0) {
+  if (!Array.isArray(deltas) || deltas.length === 0) {
+    // 即使没有 text/thinking 增量（如纯工具调用会话），也记录计数便于排查
+    if (textCount || thinkingCount) {
+      logger.info({ sessionId, deltaCount: 0, textDeltaCount: textCount, thinkingDeltaCount: thinkingCount }, '[SDK_PERF] Partial delta cadence (no timed deltas)');
+    }
+    return;
+  }
+  const n = deltas.length;
+  const span = deltas[n - 1] - deltas[0];
+  if (n === 1) {
+    logger.info({ sessionId, cost: 0, deltaCount: 1, textDeltaCount: textCount, thinkingDeltaCount: thinkingCount }, '[SDK_PERF] Partial delta cadence (single delta)');
+    return;
+  }
+  const gaps = [];
+  for (let i = 1; i < n; i++) gaps.push(deltas[i] - deltas[i - 1]);
+  gaps.sort((a, b) => a - b);
+  const meanGap = Math.round(span / (n - 1));
+  const p90Gap = gaps[Math.floor(gaps.length * 0.9)];
+  logger.info(
+    { sessionId, cost: span, deltaCount: n, textDeltaCount: textCount, thinkingDeltaCount: thinkingCount, meanGap, p90Gap, maxGap: gaps[gaps.length - 1] },
+    '[SDK_PERF] Partial delta cadence (span=cost)'
+  );
+}
+
+/**
  * Create stream processing context
  * @param {object} stream - Docker exec stream
  * @param {object} stdout - stdout PassThrough stream
@@ -97,11 +152,18 @@ function setupStdoutHandler(stdout, chunks, writer, sessionId, state, onChunk) {
 function setupStderrHandler(stderr, chunks, sessionId) {
   // 在注册时捕获当前 trace 上下文，以便在流回调中恢复
   const capturedTrace = getTraceContext();
+  // 容器内 SDK 脚本通过 [SDK_PERF] 喷出的时间戳（同源时钟，delta 有效）
+  const perf = {};
 
   stderr.on('data', (chunk) => {
     runWithTrace(capturedTrace, () => {
       const stderrText = chunk.toString();
       chunks.push(stderrText);
+
+      // 解析 [SDK_PERF] 标记并输出阶段 cost（此前被丢弃，是网关/模型延迟不可见的主因）
+      for (const line of stderrText.split('\n')) {
+        if (line.startsWith('[SDK_PERF]')) recordSdkPerf(perf, line, sessionId);
+      }
 
       if (hasRealError(stderrText)) {
         logger.error({ sessionId, stderr: stderrText.substring(0, 500) }, '[DockerExecutor] STDERR error detected');
@@ -249,7 +311,7 @@ function handleStreamProcessing(stream, stdout, stderr, writer, sessionId) {
   const stdoutChunks = [];
   const stderrChunks = [];
   let dataCount = 0;
-  const state = { sessionCreatedSent: false, toolSeq: 0, toolTimers: new Map(), onDone: null, apiCallSeq: 0, lastEventTime: null };
+  const state = { sessionCreatedSent: false, toolSeq: 0, toolTimers: new Map(), onDone: null, apiCallSeq: 0, lastEventTime: null, deltas: [] };
 
   // TTFT (Time To First Token) 计时：从流处理开始到首个有效 stdout chunk
   const ttftTimer = startTimer('claude/first_token');
@@ -274,6 +336,8 @@ function handleStreamProcessing(stream, stdout, stderr, writer, sessionId) {
       if (streamDurationTimer) {
         streamDurationTimer.end(logger, 'Stream duration ended', { sessionId, totalChunks: dataCount });
       }
+      // 输出 partial delta 节奏摘要（判定网关是否真流式透传 SSE）
+      emitDeltaCadence(state.deltas, sessionId, state.textDeltaCount || 0, state.thinkingDeltaCount || 0);
     };
 
     // SDK 输出 done 消息后进程往往不主动退出，导致 stream.on('end') 永远不来。
