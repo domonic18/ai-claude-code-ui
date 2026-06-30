@@ -172,9 +172,15 @@ ${generateCanUseToolCallback(autoAnswer)}
 
 ${generateCleanup(tmpOptionsFile, tmpScriptFile)}
 
+    process.exit(0);
 ${generateErrorHandling(tmpOptionsFile, tmpScriptFile)}
 }
 
-execute();
+try {
+  await execute();
+} catch (err) {
+  console.error("[SDK] Fatal error:", err);
+  process.exit(1);
+}
 `;
 }
