@@ -188,7 +188,7 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
  */
 export function useMessageStream(options: UseMessageStreamOptions = {}): UseMessageStreamReturn {
   const {
-    throttleInterval = 100,
+    throttleInterval = 20,
     onStreamComplete,
     onStreamUpdate,
   } = options;
