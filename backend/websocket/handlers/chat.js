@@ -175,7 +175,14 @@ async function handleClaudeCommand(data, ws, writer) {
     skill: data.options?.skill || undefined,
   };
 
-  await queryClaudeSDKInContainer(command, containerOptions, writer);
+  // 追踪活跃会话，ws 关闭时自动中止
+  ws.activeSessionId = containerOptions.sessionId || containerOptions.tempSessionId;
+  try {
+    await queryClaudeSDKInContainer(command, containerOptions, writer);
+  } finally {
+    // 完成后清除追踪，避免误 abort 后续会话
+    ws.activeSessionId = null;
+  }
 }
 
 // WebSocket 消息或事件处理
@@ -367,6 +374,21 @@ export function handleChatConnection(ws, connectedClients) {
   ws.on('close', () => {
     logger.info('Chat client disconnected');
     connectedClients.delete(ws);
+    // 中止进行中的查询，释放容器资源，避免 stream 空挂
+    if (ws.activeSessionId) {
+      abortClaudeSDKSessionInContainer(ws.activeSessionId);
+      logger.info({ sessionId: ws.activeSessionId }, '[WebSocket] Auto-aborted active session on client disconnect');
+    }
+  });
+
+  ws.on('error', (err) => {
+    logger.error({ err }, '[WebSocket] Chat connection error');
+    connectedClients.delete(ws);
+    // 连接出错时同样中止进行中的查询
+    if (ws.activeSessionId) {
+      abortClaudeSDKSessionInContainer(ws.activeSessionId);
+      logger.info({ sessionId: ws.activeSessionId }, '[WebSocket] Auto-aborted active session on connection error');
+    }
   });
 }
 

@@ -133,12 +133,14 @@ export async function abortSession(sessionId) {
   session.status = 'aborted';
   session.endTime = Date.now();
 
-  // 通过销毁 stream 来终止 Docker exec 进程
+  // 通过销毁 stream 来终止 Docker exec 进程。
+  // 传 Error 对象确保触发 'error' 事件，使 handleStreamProcessing 的
+  // Promise settle（resolve/reject），从而释放挂起的 queryClaudeSDKInContainer。
+  // 仅 destroy() 不传 error 可能只触发 'close' 而不触发 'error'，导致空挂。
   if (session.stream) {
     try {
-      // 调用 stream.destroy() 中断流，从而终止 exec 进程
-      session.stream.destroy();
-      logger.debug(`[SessionManager] Destroyed stream for session: ${sessionId}`);
+      session.stream.destroy(new Error('Session aborted'));
+      logger.debug({ sessionId }, '[SessionManager] Destroyed stream with error for session');
     } catch (error) {
       logger.error({ err: error, sessionId }, 'Error destroying stream for session');
     }
