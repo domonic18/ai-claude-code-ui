@@ -89,6 +89,23 @@ export function handleAssistantMessage(sdkMessage, writer, sessionId, state) {
     const sinceLastMs = state.lastEventTime ? now - state.lastEventTime : null;
     state.lastEventTime = now;
     const usage = sdkMessage.message?.usage || sdkMessage.usage || null;
+    const msg = sdkMessage.message || {};
+    const content = msg.content || sdkMessage.content;
+    // content 块构成（诊断慢轮：是否含长 thinking）
+    const blocks = {};
+    let thinkingChars = 0;
+    let thinkingPreview = null;
+    if (Array.isArray(content)) {
+      for (const p of content) {
+        const t = p.type || 'unknown';
+        blocks[t] = (blocks[t] || 0) + 1;
+        if (t === 'thinking' && typeof p.thinking === 'string') {
+          thinkingChars += p.thinking.length;
+          if (!thinkingPreview) thinkingPreview = p.thinking.slice(0, 200);
+        }
+      }
+    }
+    const isSlow = sinceLastMs != null && sinceLastMs > 30000;
     const logPayload = {
       sessionId,
       apiCallSeq: state.apiCallSeq,
@@ -98,14 +115,17 @@ export function handleAssistantMessage(sdkMessage, writer, sessionId, state) {
       cacheCreation: usage?.cache_creation_input_tokens ?? null,
       cacheRead: usage?.cache_read_input_tokens ?? null,
       contentType: ctx.contentType,
+      stopReason: msg.stop_reason ?? null,
+      contentBlocks: blocks,
+      thinkingChars,
       sinceLastMs,
     };
-    // 第 1 轮额外 dump message 结构，排查 output_tokens=0（确认 usage 字段路径）
-    if (state.apiCallSeq === 1 && sdkMessage.message) {
-      logPayload._dumpMessageKeys = Object.keys(sdkMessage.message);
-      logPayload._dumpStopReason = sdkMessage.message.stop_reason ?? null;
+    // 慢轮（>30s）dump thinking 摘要，定位是否长思考导致
+    if (isSlow) {
+      logPayload._slowTurn = true;
+      logPayload.thinkingPreview = thinkingPreview;
     }
-    logger.info(logPayload, `[API #${state.apiCallSeq}] assistant turn`);
+    logger.info(logPayload, `[API #${state.apiCallSeq}] assistant turn${isSlow ? ' [SLOW]' : ''}`);
   }
 
   // 检测 API 代理错误（如 OneAPI 503 "无可用渠道"）
