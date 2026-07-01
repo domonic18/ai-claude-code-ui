@@ -133,6 +133,12 @@ async function filterSDKOptions(options, userId) {
     }, '[ScriptBuilder] Autonomous mode activated (bypassPermissions)');
   }
 
+  // 关闭 extended thinking（env 开关）：诊断 kimi/minimax 慢轮是否 thinking 导致
+  if (process.env.DISABLE_THINKING === '1') {
+    sdkOptions.thinking = { type: 'disabled' };
+    logger.info({ sessionId: options.sessionId || '' }, '[ScriptBuilder] Extended thinking disabled (DISABLE_THINKING=1)');
+  }
+
   return sdkOptions;
 }
 
