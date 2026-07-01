@@ -153,6 +153,9 @@ function setupStreamEndHandler(ctx, stdoutChunks, stderrChunks, sessionId, getDa
 
   ctx.stream.on('end', () => {
     runWithTrace(capturedTrace, () => {
+      // onDone 已主动 settle（done 消息触发的提前结束）后，忽略后续可能的 end 事件，避免冗余日志
+      if (ctx.settled) return;
+
       if (ctx.timeoutHandle) clearTimeout(ctx.timeoutHandle);
 
       const session = getSession(sessionId);

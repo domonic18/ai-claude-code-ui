@@ -203,6 +203,44 @@ export function startTimer(label) {
   return new LogTimer(label);
 }
 
+/**
+ * 用计时器包裹异步操作，自动在成功/失败路径结束计时（异常安全）。
+ *
+ * 成功时写 info 级 end 日志；fn 抛异常时写 error 级 endError 日志后重新抛出，
+ * 确保错误路径下计时器也一定被结束（避免 perf 日志缺失）。
+ *
+ * @param {string} label - 计时器标签（写入 operation 字段）
+ * @param {import('pino').Logger} logger - pino logger 实例
+ * @param {() => (Promise<T> | T)} fn - 被包裹的操作
+ * @param {Object} [opts] - 可选项
+ * @param {string} [opts.successMsg='Operation completed'] - 成功日志消息
+ * @param {string} [opts.errorMsg='Operation failed'] - 失败日志消息
+ * @param {Object|((result: T) => Object)} [opts.successExtra] - 成功附加字段（值对象，或入参为 fn 结果、返回字段对象的函数）
+ * @param {Object|((error: Error) => Object)} [opts.errorExtra] - 失败附加字段（值对象，或入参为错误对象、返回字段对象的函数）
+ * @returns {Promise<T>|T} fn 的返回值
+ * @template T
+ *
+ * @example
+ * const container = await withTimer('claude/container_get', logger,
+ *   () => containerManager.getOrCreateContainer(userId, { tier: userTier }),
+ *   { successMsg: 'Container obtained', successExtra: (c) => ({ sessionId, containerName: c.name }) }
+ * );
+ */
+export async function withTimer(label, logger, fn, opts = {}) {
+  const timer = startTimer(label);
+  const resolveExtra = (extra, arg) =>
+    typeof extra === 'function' ? extra(arg) : (extra || {});
+
+  try {
+    const result = await fn();
+    timer.end(logger, opts.successMsg ?? 'Operation completed', resolveExtra(opts.successExtra, result));
+    return result;
+  } catch (error) {
+    timer.endError(logger, opts.errorMsg ?? 'Operation failed', resolveExtra(opts.errorExtra, error));
+    throw error;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // AsyncLocalStorage 链路传播
 // ---------------------------------------------------------------------------

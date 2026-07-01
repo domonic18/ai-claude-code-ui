@@ -13,7 +13,7 @@ import { createSession, updateSession } from './SessionManager.js';
 import { CONTAINER } from '../../../config/config.js';
 import { getModelProviderConfig } from '../../../config/modelConfig.js';
 import { memoryService } from '../../memory/index.js';
-import { createLogger, sanitizePreview, startTimer } from '../../../utils/logger.js';
+import { createLogger, sanitizePreview, startTimer, withTimer } from '../../../utils/logger.js';
 const logger = createLogger('services/container/claude/ClaudeQuery');
 
 // 用于在命令中包装记忆上下文的记忆标记
@@ -193,19 +193,23 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
 
   try {
     // 1. 加载记忆上下文
-    const memoryTimer = startTimer('claude/memory_load');
-    const memoryContext = await loadMemoryContext(userId, {
-      containerMode: options.containerMode
-    });
-    memoryTimer.end(logger, 'Memory context loaded', { sessionId, memoryLength: memoryContext?.length || 0 });
+    const memoryContext = await withTimer('claude/memory_load', logger,
+      () => loadMemoryContext(userId, { containerMode: options.containerMode }),
+      {
+        successMsg: 'Memory context loaded',
+        successExtra: (result) => ({ sessionId, memoryLength: result?.length || 0 }),
+      }
+    );
 
     // 2. 获取或创建用户容器
     logger.debug({ sessionId, userId }, '[ClaudeQuery] Getting container for user');
-    const containerTimer = startTimer('claude/container_get');
-    const container = await containerManager.getOrCreateContainer(userId, {
-      tier: userTier
-    });
-    containerTimer.end(logger, 'Container obtained', { sessionId, containerName: container.name });
+    const container = await withTimer('claude/container_get', logger,
+      () => containerManager.getOrCreateContainer(userId, { tier: userTier }),
+      {
+        successMsg: 'Container obtained',
+        successExtra: (c) => ({ sessionId, containerName: c.name }),
+      }
+    );
 
     // 3. 映射工作目录
     const workingDir = mapWorkingDirectory(isContainerProject, projectPath, cwd);

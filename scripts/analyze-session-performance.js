@@ -124,9 +124,9 @@ function parseLogs(logText) {
     try {
       const entry = JSON.parse(line.substring(jsonStart));
       const sid = entry.sessionId;
-      if (!sid || sid.startsWith('temp-')) {
-        // 保留 temp- 前缀的 session，但尝试从后续日志中找到真实 sessionId
-      }
+      // 跳过无 sessionId 的日志行；temp- 前缀会话以其 temp- 名正常累积
+      // （单次查询全程使用同一 sid，无需关联"真实 sessionId"）
+      if (!sid) continue;
 
       if (!sessions.has(sid)) {
         sessions.set(sid, { stages: {}, raw: [], toolResults: [] });
