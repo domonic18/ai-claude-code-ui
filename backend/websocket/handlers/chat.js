@@ -23,7 +23,7 @@ import { queryCodex, abortCodexSession, isCodexSessionActive, getActiveCodexSess
 import { WebSocketWriter } from '../writer.js';
 import { formatReadInstructions } from '../../services/files/FileDocumentReader.js';
 import { readmeService } from '../../services/documents/ReadmeService.js';
-import { createLogger, sanitizePreview, generateTraceId, generateSpanId, runWithTrace } from '../../utils/logger.js';
+import { createLogger, sanitizePreview, generateTraceId, generateSpanId, runWithTrace, startTimer } from '../../utils/logger.js';
 import { recordActivity } from '../../utils/usage-session-tracker.js';
 import containerManager from '../../services/container/core/index.js';
 import { PassThrough } from 'stream';
@@ -154,7 +154,9 @@ async function buildClaudeCommand(data, userId, projectName) {
  */
 async function handleClaudeCommand(data, ws, writer) {
   const originalProjectName = data.options?.projectPath?.replace(/\//g, '-') || '';
+  const cmdTimer = startTimer('chat/command_build');
   const { command, imageAttachments } = await buildClaudeCommand(data, ws.user?.userId, originalProjectName);
+  cmdTimer.end(logger, 'Command built', { userId: ws.user?.userId, projectPath: originalProjectName });
 
   logger.info({
     userId: ws.user.userId,
