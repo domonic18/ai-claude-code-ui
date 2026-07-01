@@ -201,10 +201,11 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
 
     // 2. 获取或创建用户容器
     logger.debug({ sessionId, userId }, '[ClaudeQuery] Getting container for user');
+    const containerTimer = startTimer('claude/container_get');
     const container = await containerManager.getOrCreateContainer(userId, {
       tier: userTier
     });
-    logger.info({ sessionId, containerName: container.name }, '[ClaudeQuery] Container obtained');
+    containerTimer.end(logger, 'Container obtained', { sessionId, containerName: container.name });
 
     // 3. 映射工作目录
     const workingDir = mapWorkingDirectory(isContainerProject, projectPath, cwd);

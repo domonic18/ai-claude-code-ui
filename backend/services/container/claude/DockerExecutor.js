@@ -74,7 +74,9 @@ export async function executeInContainer(userId, command, options, writer, sessi
 
   try {
     // 步骤 1：准备容器和脚本
+    const scriptTimer = startTimer('claude/script_build');
     const { docker, sdkScriptInfo, providerConfig: resolvedConfig } = await prepareContainerAndScript(userId, command, options, providerConfig);
+    scriptTimer.end(logger, 'Script prepared', { sessionId, scriptSize: sdkScriptInfo.scriptContent.length });
 
     // 步骤 2：在容器中执行脚本（启用 stdin 以支持 Agent 交互提问）
     const spawnTimer = startTimer('claude/docker_exec_spawn');
