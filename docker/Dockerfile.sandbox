@@ -31,6 +31,9 @@ RUN apt-get update && apt-get install -y \
     fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
+# 预装 patent skills 所需的 Python 依赖（PCT DOCX 转换工具包）
+RUN pip3 install --no-cache-dir --break-system-packages Pillow>=10
+
 # Create workspace and config directories
 RUN mkdir -p /workspace /app /workspace/.claude/projects && \
     chown -R node:node /workspace /app
