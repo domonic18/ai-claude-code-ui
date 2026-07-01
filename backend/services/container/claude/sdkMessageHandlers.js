@@ -80,6 +80,34 @@ function buildToolLogMsg(tool, seq) {
 export function handleAssistantMessage(sdkMessage, writer, sessionId, state) {
   const ctx = extractMessageContext(sdkMessage);
 
+  // API 推理埋点：每个 assistant message = 一次 API 调用（计轮数 / per-turn token / 推理时长）
+  // sinceLastMs = 距上一个事件（tool_result 到达或上一轮 assistant）的间隔，
+  // 近似本次推理耗时（含 SDK loop 开销，扣除工具执行即得纯推理）。
+  if (state) {
+    state.apiCallSeq = (state.apiCallSeq || 0) + 1;
+    const now = Date.now();
+    const sinceLastMs = state.lastEventTime ? now - state.lastEventTime : null;
+    state.lastEventTime = now;
+    const usage = sdkMessage.message?.usage || sdkMessage.usage || null;
+    const logPayload = {
+      sessionId,
+      apiCallSeq: state.apiCallSeq,
+      usageRaw: usage,
+      inputTokens: usage?.input_tokens ?? null,
+      outputTokens: usage?.output_tokens ?? null,
+      cacheCreation: usage?.cache_creation_input_tokens ?? null,
+      cacheRead: usage?.cache_read_input_tokens ?? null,
+      contentType: ctx.contentType,
+      sinceLastMs,
+    };
+    // 第 1 轮额外 dump message 结构，排查 output_tokens=0（确认 usage 字段路径）
+    if (state.apiCallSeq === 1 && sdkMessage.message) {
+      logPayload._dumpMessageKeys = Object.keys(sdkMessage.message);
+      logPayload._dumpStopReason = sdkMessage.message.stop_reason ?? null;
+    }
+    logger.info(logPayload, `[API #${state.apiCallSeq}] assistant turn`);
+  }
+
   // 检测 API 代理错误（如 OneAPI 503 "无可用渠道"）
   if (ctx.contentType === 'text' && ctx.summary) {
     const { isApiError, statusCode } = detectApiError(ctx.summary);
@@ -203,6 +231,8 @@ export function handleDefaultMessage(sdkMessage, writer, sessionId, state) {
       const statusStr = tr.isError ? '  FAILED' : '  ok';
       logger.info(logPayload, `[ToolResult]  ${toolName}${statusStr}${durationStr}  ${(tr.resultPreview || '').substring(0, 100)}`);
     }
+    // 工具结果到达 = 事件点，用于配对下一轮 assistant 的推理时长
+    state.lastEventTime = Date.now();
   } else {
     logger.debug(
       { sessionId, sdkMessageType: sdkMessage.type, contentType: ctx.contentType },

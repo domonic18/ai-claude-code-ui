@@ -129,7 +129,7 @@ function parseLogs(logText) {
       }
 
       if (!sessions.has(sid)) {
-        sessions.set(sid, { stages: {}, raw: [] });
+        sessions.set(sid, { stages: {}, raw: [], toolResults: [] });
       }
       sessions.get(sid).raw.push(entry);
 
@@ -145,6 +145,15 @@ function parseLogs(logText) {
         if (stage.pattern.test(msg) && entry[stage.field] !== undefined) {
           sessions.get(sid).stages[stage.key] = entry[stage.field];
         }
+      }
+
+      // 解析工具结果耗时（用于 ⑧ 流式传输内部拆解：工具执行 vs API推理+loop）
+      if (msg.includes('[ToolResult]') && typeof entry.durationMs === 'number') {
+        sessions.get(sid).toolResults.push({
+          toolName: entry.toolName || 'unknown',
+          durationMs: entry.durationMs,
+          isError: !!entry.isError,
+        });
       }
     } catch {
       // 忽略解析失败的行
@@ -320,6 +329,52 @@ function renderReport(sessions) {
     console.log(line);
   }
 
+  // ── ⑧ 流式传输内部拆解（agentic loop：工具执行 vs API推理+loop）──
+  console.log(`\n  ${'-'.repeat(76)}`);
+  console.log('  ⑧ 流式传输内部拆解');
+  console.log(`  ${'-'.repeat(76)}`);
+
+  const loopCols = sessions.map((s) => {
+    const toolResults = s.toolResults || [];
+    const toolTotalMs = toolResults.reduce((a, t) => a + (t.durationMs || 0), 0);
+    const toolCount = toolResults.length;
+    const streamMs = s.stages.p8_stream;
+    const apiLoopMs = streamMs != null ? streamMs - toolTotalMs : null;
+    const toolRatio = streamMs && streamMs > 0 ? toolTotalMs / streamMs : null;
+    return { toolTotalMs, toolCount, streamMs, apiLoopMs, toolRatio, toolResults };
+  });
+
+  console.log(`  ${pad('会话', 8)}| ${pad('⑧流式', 12)} | ${pad('工具总耗时', 12)} | ${pad('工具次数', 10)} | ${pad('API+loop', 12)} | ${pad('工具占比', 10)}`);
+  console.log(`  ${'-'.repeat(76)}`);
+  sessions.forEach((s, idx) => {
+    const c = loopCols[idx];
+    const ratioStr = c.toolRatio != null ? `${(c.toolRatio * 100).toFixed(0)}%` : '-';
+    console.log(`  ${pad('#' + (idx + 1), 8)}| ${pad(fmtMs(c.streamMs), 12)} | ${pad(fmtMs(c.toolTotalMs), 12)} | ${pad(c.toolCount, 10)} | ${pad(fmtMs(c.apiLoopMs), 12)} | ${pad(ratioStr, 10)}`);
+  });
+
+  // 工具耗时分布（按 toolName 聚合，降序）
+  const byTool = new Map();
+  for (const c of loopCols) {
+    for (const t of c.toolResults) {
+      if (!byTool.has(t.toolName)) byTool.set(t.toolName, { count: 0, totalMs: 0, maxMs: 0 });
+      const agg = byTool.get(t.toolName);
+      agg.count++;
+      agg.totalMs += t.durationMs || 0;
+      agg.maxMs = Math.max(agg.maxMs, t.durationMs || 0);
+    }
+  }
+  if (byTool.size > 0) {
+    console.log(`\n  工具耗时分布（按工具，降序）`);
+    console.log(`  ${'-'.repeat(76)}`);
+    console.log(`  ${pad('工具', 16)}| ${pad('次数', 8)} | ${pad('总耗时', 12)} | ${pad('平均', 10)} | ${pad('最大', 10)}`);
+    console.log(`  ${'-'.repeat(76)}`);
+    const toolRows = [...byTool.entries()].sort((a, b) => b[1].totalMs - a[1].totalMs);
+    for (const [name, agg] of toolRows) {
+      const avg = agg.count > 0 ? agg.totalMs / agg.count : 0;
+      console.log(`  ${pad(name, 16)}| ${pad(agg.count, 8)} | ${pad(fmtMs(agg.totalMs), 12)} | ${pad(fmtMs(avg), 10)} | ${pad(fmtMs(agg.maxMs), 10)}`);
+    }
+  }
+
   // ── 关键发现 ──
   console.log(`\n  ${'-'.repeat(76)}`);
   console.log('  关键发现');
@@ -354,6 +409,17 @@ function renderReport(sessions) {
   if (streamRatios.length > 0) {
     const avgRatio = streamRatios.reduce((a, b) => a + b, 0) / streamRatios.length;
     findings.push(`流式传输占 exec 比例: 平均 ${(avgRatio * 100).toFixed(1)}%`);
+  }
+
+  // 工具耗时占 ⑧ 比例 + 最慢工具
+  const toolRatios = loopCols.map((c) => c.toolRatio).filter((v) => v != null);
+  if (toolRatios.length > 0) {
+    const avgRatio = toolRatios.reduce((a, b) => a + b, 0) / toolRatios.length;
+    findings.push(`工具耗时占 ⑧ 平均 ${(avgRatio * 100).toFixed(0)}%（剩余为 API 推理 + loop 间隙）`);
+  }
+  if (byTool.size > 0) {
+    const top = [...byTool.entries()].sort((a, b) => b[1].totalMs - a[1].totalMs)[0];
+    findings.push(`最耗时工具: ${top[0]}（${top[1].count} 次，共 ${fmtMs(top[1].totalMs)}，最大 ${fmtMs(top[1].maxMs)}）`);
   }
 
   for (const f of findings) {

@@ -246,7 +246,7 @@ function handleStreamProcessing(stream, stdout, stderr, writer, sessionId) {
   const stdoutChunks = [];
   const stderrChunks = [];
   let dataCount = 0;
-  const state = { sessionCreatedSent: false, toolSeq: 0, toolTimers: new Map(), onDone: null };
+  const state = { sessionCreatedSent: false, toolSeq: 0, toolTimers: new Map(), onDone: null, apiCallSeq: 0, lastEventTime: null };
 
   // TTFT (Time To First Token) 计时：从流处理开始到首个有效 stdout chunk
   const ttftTimer = startTimer('claude/first_token');
