@@ -38,6 +38,11 @@ export function processOutputLine(line, writer, sessionId, state) {
       sessionId: jsonData.sessionId || sessionId,
       exitCode: 0
     });
+    // 主动通知流处理层：SDK 已输出 done，可以立即结束 docker exec stream。
+    // 否则 SDK 进程不主动退出，stream.on('end') 永远不来，导致空挂。
+    if (state.onDone) {
+      state.onDone();
+    }
     return;
   }
 
