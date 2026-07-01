@@ -246,7 +246,7 @@ function handleStreamProcessing(stream, stdout, stderr, writer, sessionId) {
   const stdoutChunks = [];
   const stderrChunks = [];
   let dataCount = 0;
-  const state = { sessionCreatedSent: false, toolSeq: 0, toolTimers: new Map() };
+  const state = { sessionCreatedSent: false, toolSeq: 0, toolTimers: new Map(), onDone: null };
 
   // TTFT (Time To First Token) 计时：从流处理开始到首个有效 stdout chunk
   const ttftTimer = startTimer('claude/first_token');
@@ -271,6 +271,24 @@ function handleStreamProcessing(stream, stdout, stderr, writer, sessionId) {
       if (streamDurationTimer) {
         streamDurationTimer.end(logger, 'Stream duration ended', { sessionId, totalChunks: dataCount });
       }
+    };
+
+    // SDK 输出 done 消息后进程往往不主动退出，导致 stream.on('end') 永远不来。
+    // MessageTransformer 检测到 done 时回调此处，主动 settle 并释放 stream。
+    state.onDone = () => {
+      if (context.settled) return;
+      const teardownTimer = startTimer('claude/teardown');
+      if (context.timeoutHandle) clearTimeout(context.timeoutHandle);
+
+      const stdoutOutput = stdoutChunks.join('');
+      context.settle(context.resolve, { output: stdoutOutput, sessionId });
+
+      // 销毁 stream 释放容器资源，否则 docker exec 一直挂到 timeout
+      context.stdout.destroy();
+      context.stderr.destroy();
+      context.stream.destroy();
+
+      teardownTimer.end(logger, 'Teardown completed', { sessionId, totalChunks: dataCount, stdoutLength: stdoutOutput.length });
     };
 
     setupExecutionTimeout(context, sessionId);
