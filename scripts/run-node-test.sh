@@ -11,6 +11,10 @@ set -euo pipefail
 # Provide fallback values for required env vars when running in CI without .env
 export AVAILABLE_MODELS="${AVAILABLE_MODELS:-test:Test}"
 
+# 标记测试环境：logger.js 据此跳过 pino 文件流，避免 sonic-boom 在短命测试进程
+# 退出时 flushSync 报 "not ready yet" 而被 node:test 判为进程级失败（CI 误红）。
+export NODE_ENV="${NODE_ENV:-test}"
+
 # Extract Node.js major version (e.g. "v20.19.3" → 20)
 NODE_MAJOR=$(node -e "console.log(process.versions.node.split('.')[0])")
 
