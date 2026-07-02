@@ -9,7 +9,7 @@
 
 import { createLogger } from '../../../utils/logger.js';
 import { tryParseJSON } from './messageParsingHelpers.js';
-import { sendSessionCreated, handleSdkMessage } from './sdkMessageHandlers.js';
+import { sendSessionCreated, handleSdkMessage, handleStreamEvent } from './sdkMessageHandlers.js';
 
 const logger = createLogger('services/container/claude/MessageTransformer');
 
@@ -32,33 +32,9 @@ export function processOutputLine(line, writer, sessionId, state) {
   }
 
   // 逐 token 流式：SDK yield 的 stream_event 是 Anthropic 原始 SSE 事件。
-  // 为复用前端已有的 handleStreamingDelta(content_block_delta → updateStreamContent)，
-  // 把文本/思考增量包装成 claude-response 消息（data = content_block_delta 格式），
-  // 而非走独立的 stream-delta 通道。content_block_stop 触发 completeStream 收尾。
+  // 处理逻辑（content_block_delta → claude-response）见 sdkMessageHandlers.handleStreamEvent。
   if (jsonData.type === 'stream_event' && jsonData.event) {
-    const ev = jsonData.event;
-    if (ev.type === 'content_block_delta' && ev.delta) {
-      if (typeof ev.delta.text === 'string') {
-        if (Array.isArray(state.deltas)) state.deltas.push(Date.now());
-        state.textDeltaCount = (state.textDeltaCount || 0) + 1;
-        writer.send({
-          type: 'claude-response',
-          data: { type: 'content_block_delta', delta: { text: ev.delta.text } }
-        });
-      } else if (typeof ev.delta.thinking === 'string') {
-        if (Array.isArray(state.deltas)) state.deltas.push(Date.now());
-        state.thinkingDeltaCount = (state.thinkingDeltaCount || 0) + 1;
-        writer.send({
-          type: 'claude-response',
-          data: { type: 'content_block_delta', delta: { thinking: ev.delta.thinking } }
-        });
-      }
-    } else if (ev.type === 'content_block_stop') {
-      writer.send({
-        type: 'claude-response',
-        data: { type: 'content_block_stop' }
-      });
-    }
+    handleStreamEvent(jsonData.event, writer, state);
     return;
   }
 

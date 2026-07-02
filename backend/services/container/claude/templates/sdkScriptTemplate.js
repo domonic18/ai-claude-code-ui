@@ -89,6 +89,14 @@ function generateCleanup(tmpOptionsFile, tmpScriptFile) {
 const VALID_PERMISSION_MODES = ['default', 'acceptEdits', 'bypassPermissions', 'plan'];
 
 /**
+ * 合法 sessionId 字符集——只允许字母/数字/连字符/下划线（可为空串）。
+ * 目的：sessionId 会直接 ${} 嵌入下方模板字符串，此处白名单阻止
+ * 引号/反斜杠/$/反引号等字符导致的脚本注入。
+ * 兼容 UUID、`temp-` 前缀临时 ID、空串等后端实际使用的格式。
+ */
+const SAFE_SESSION_ID = /^[A-Za-z0-9_-]*$/;
+
+/**
  * Generate SDK script content
  * @param {string} tmpOptionsFile - Temporary options file path
  * @param {string} tmpScriptFile - Temporary script file path
@@ -101,6 +109,10 @@ const VALID_PERMISSION_MODES = ['default', 'acceptEdits', 'bypassPermissions', '
 export function generateSDKScript(tmpOptionsFile, tmpScriptFile, commandBase64, sessionId, imagePaths, permissionMode = 'default') {
   if (!VALID_PERMISSION_MODES.includes(permissionMode)) {
     throw new TypeError(`Invalid permissionMode: "${permissionMode}". Must be one of: ${VALID_PERMISSION_MODES.join(', ')}`);
+  }
+  // 白名单校验：sessionId 嵌入模板字符串前拦截注入字符（见 SAFE_SESSION_ID）
+  if (typeof sessionId !== 'string' || !SAFE_SESSION_ID.test(sessionId)) {
+    throw new TypeError('Invalid sessionId: must contain only alphanumeric characters, hyphens, or underscores');
   }
   const autoAnswer = permissionMode === 'bypassPermissions';
 

@@ -429,3 +429,43 @@ export function handleSdkMessage(sdkMessage, writer, sessionId, state) {
     handleDefaultMessage(sdkMessage, writer, sessionId, state);
   }
 }
+
+/**
+ * 处理逐 token 流式事件（stream_event 包装的是 Anthropic 原始 SSE 事件）。
+ *
+ * includePartialMessages 开启后 SDK 会 yield stream_event。此处把 content_block_delta
+ * 的 text/thinking 增量包装成 claude-response 消息转发，复用前端已有的
+ * updateStreamContent 渲染逻辑；content_block_stop 触发 completeStream 收尾。
+ * 同时在 state.deltas 累积到达时间戳，供流式节奏诊断（emitDeltaCadence）使用。
+ *
+ * 注：Anthropic SSE 的 delta 是 union 类型，单事件只携带 text 或 thinking 之一，
+ * 故用 if/else if 互斥处理即可。
+ *
+ * @param {Object} event - Anthropic 原始 SSE 事件对象
+ * @param {Object} writer - 消息写入器
+ * @param {Object} state - 状态对象（含 deltas/textDeltaCount/thinkingDeltaCount）
+ */
+export function handleStreamEvent(event, writer, state) {
+  if (event.type === 'content_block_delta' && event.delta) {
+    if (typeof event.delta.text === 'string') {
+      if (Array.isArray(state.deltas)) state.deltas.push(Date.now());
+      state.textDeltaCount = (state.textDeltaCount || 0) + 1;
+      writer.send({
+        type: 'claude-response',
+        data: { type: 'content_block_delta', delta: { text: event.delta.text } }
+      });
+    } else if (typeof event.delta.thinking === 'string') {
+      if (Array.isArray(state.deltas)) state.deltas.push(Date.now());
+      state.thinkingDeltaCount = (state.thinkingDeltaCount || 0) + 1;
+      writer.send({
+        type: 'claude-response',
+        data: { type: 'content_block_delta', delta: { thinking: event.delta.thinking } }
+      });
+    }
+  } else if (event.type === 'content_block_stop') {
+    writer.send({
+      type: 'claude-response',
+      data: { type: 'content_block_stop' }
+    });
+  }
+}
