@@ -364,14 +364,22 @@ function resolveLogDir() {
 
 const LOG_DIR = resolveLogDir();
 
-// 目录不可写时仅告警不阻断：跳过文件流、仅保留 stdout，不影响进程启动
-// （文件流仅在目录就绪时创建，避免指向不可写路径后写入静默失败）
+// 测试环境（NODE_ENV=test，由 run-node-test.sh 注入）只保留 stdout：
+// 文件流（pino.destination = sonic-boom）在短命测试进程退出时往往尚未 ready，
+// 此时 --test-force-exit 触发的 flushSync 会抛 "sonic boom is not ready yet"，
+// 被 node:test 捕获为进程级失败，使测试误红、CI: Test 阻断 CD。
+// 生产/开发环境仍写双目标（stdout + 文件）。
+const isTestEnv = process.env.NODE_ENV === 'test';
 const streams = [{ level: LOG_LEVEL, stream: process.stdout }];
-try {
-  fs.mkdirSync(LOG_DIR, { recursive: true });
-  streams.push({ level: LOG_LEVEL, stream: pino.destination(path.join(LOG_DIR, 'app.log')) });
-} catch (err) {
-  process.stderr.write(`[logger] 无法创建日志目录 ${LOG_DIR}: ${err.message}，文件日志不可用，已降级为仅 stdout\n`);
+if (!isTestEnv) {
+  // 目录不可写时仅告警不阻断：跳过文件流、仅保留 stdout，不影响进程启动
+  // （文件流仅在目录就绪时创建，避免指向不可写路径后写入静默失败）
+  try {
+    fs.mkdirSync(LOG_DIR, { recursive: true });
+    streams.push({ level: LOG_LEVEL, stream: pino.destination(path.join(LOG_DIR, 'app.log')) });
+  } catch (err) {
+    process.stderr.write(`[logger] 无法创建日志目录 ${LOG_DIR}: ${err.message}，文件日志不可用，已降级为仅 stdout\n`);
+  }
 }
 
 // 双目标写流：stdout + 文件。
