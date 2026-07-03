@@ -8,7 +8,6 @@
 import React, { useCallback } from 'react';
 import { useDocuments } from '../hooks/useDocuments';
 import { useDocumentPreview } from '../hooks/useDocumentPreview';
-import { useNavigateToConversation } from '../hooks/useNavigateToConversation';
 import { useDocumentPanelResize } from '../hooks/useDocumentPanelResize';
 import { DocumentSection } from './DocumentSection';
 import { DocumentUploadZone } from './DocumentUploadZone';
@@ -51,8 +50,6 @@ export const DocumentPanel: React.FC<DocumentPanelProps> = ({
     handleSave,
     handleDownload,
   } = useDocumentPreview();
-
-  const navigateToConversation = useNavigateToConversation();
 
   const { panelWidth, isResizing, handleMouseDown } = useDocumentPanelResize();
 
@@ -99,11 +96,6 @@ export const DocumentPanel: React.FC<DocumentPanelProps> = ({
             onEditContentChange={setEditContent}
             onSave={handleSave}
             onDownload={handleDownload}
-            onNavigateToConversation={
-              previewDoc.conversation_id
-                ? (convId, msgId) => navigateToConversation(convId, msgId)
-                : undefined
-            }
           />
         </div>
       </div>
@@ -158,7 +150,6 @@ export const DocumentPanel: React.FC<DocumentPanelProps> = ({
               documents={aiGenerated}
               onPreview={handlePreview}
               onDelete={(doc) => handleDelete(doc.file_path, 'ai_generated')}
-              onNavigateToConversation={(convId, msgId) => navigateToConversation(convId, msgId)}
               onEditSummary={updateSummary}
             />
           </>
