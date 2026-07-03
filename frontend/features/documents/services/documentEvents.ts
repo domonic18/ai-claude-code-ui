@@ -75,3 +75,30 @@ export function emitDocumentUploaded(): void {
     try { handler(); } catch { /* ignore */ }
   }
 }
+
+// 会话完成事件（claude-complete / codex-complete 等）：
+// 触发文档面板兜底刷新，捕获绕过实时追踪(document-created)的 AI 生成文件。
+// 典型场景：skill 通过 Bash 调 Python 脚本生成 docx，命令无重定向语法，
+// 后端 _trackBashFileWrite 正则提取不到路径，未发 document-created；
+// 此时靠会话结束后的目录扫描(_scanGeneratedDir)兜底发现。
+type ConversationCompleteHandler = () => void;
+
+const conversationCompleteListeners = new Set<ConversationCompleteHandler>();
+
+/**
+ * 订阅会话完成事件
+ * @returns 取消订阅函数
+ */
+export function onConversationComplete(handler: ConversationCompleteHandler): () => void {
+  conversationCompleteListeners.add(handler);
+  return () => { conversationCompleteListeners.delete(handler); };
+}
+
+/**
+ * 发射会话完成事件（由 WebSocket handler 在收到 claude-complete 等消息时调用）
+ */
+export function emitConversationComplete(): void {
+  for (const handler of conversationCompleteListeners) {
+    try { handler(); } catch { /* ignore */ }
+  }
+}

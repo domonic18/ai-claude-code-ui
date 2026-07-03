@@ -20,7 +20,7 @@ import {
   useDeleteDocumentMutation,
   useUpdateSummaryMutation,
 } from '@/shared/libs/query/hooks';
-import { onDocumentCreated } from '../services/documentEvents';
+import { onDocumentCreated, onConversationComplete } from '../services/documentEvents';
 import { logger } from '../../../shared/utils/logger';
 
 /** 乐观文档在 optimisticDocs 中的最长存活时间，超时未确认即清理（与轮询 60s 上限对齐） */
@@ -161,6 +161,17 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
     });
     return unsubscribe;
   }, [addAIDocument]);
+
+  // 会话结束(claude-complete)时刷新当前项目文档：兜底捕获绕过实时追踪的生成文件
+  // （如 skill 通过 Bash 调 Python 脚本生成 docx，未发 document-created）。
+  // claude-complete 为全局消息，按当前 projectName 刷新；DocumentService 5s 缓存兜底重复请求。
+  useEffect(() => {
+    const unsubscribe = onConversationComplete(() => {
+      if (!projectName) return;
+      refetch();
+    });
+    return unsubscribe;
+  }, [projectName, refetch]);
 
   // 条件式轮询：当有 pending 摘要时每 4 秒刷新一次
   const hasPending = useMemo(

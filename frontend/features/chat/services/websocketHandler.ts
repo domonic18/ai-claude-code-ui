@@ -30,6 +30,7 @@ import { handleSessionCreated, handleTokenBudget, handleMemoryContext, handleTod
 import { handleClaudeResponse, handleClaudeOutput, handleClaudeInteractivePrompt, handleAgentQuestion, handleClaudeError } from './claudeHandler';
 import { handleCursorSystem, handleCursorToolUse, handleCursorError, handleCursorResult, handleCursorOutput } from './cursorHandler';
 import { handleCodexResponse, handleCodexComplete } from './codexHandler';
+import { emitConversationComplete } from '@/features/documents/services/documentEvents';
 
 // Import callbacks type
 import type { MessageHandlerCallbacks } from './types';
@@ -57,7 +58,12 @@ const MESSAGE_HANDLERS: Record<string, (message: WebSocketMessage, callbacks: Me
   'cursor-error': (msg, cbs) => handleCursorError(msg, cbs),
   'cursor-result': (msg, cbs, sid) => handleCursorResult(msg, cbs, sid),
   'cursor-output': (msg, cbs) => handleCursorOutput(msg, cbs),
-  'claude-complete': (msg, cbs, sid) => handleClaudeComplete(msg, cbs, sid),
+  'claude-complete': (msg, cbs, sid) => {
+    const handled = handleClaudeComplete(msg, cbs, sid);
+    // 会话结束：触发文档面板兜底刷新，捕获 Bash/脚本等绕过实时追踪(document-created)的生成文件
+    emitConversationComplete();
+    return handled;
+  },
   'codex-response': (msg, cbs) => handleCodexResponse(msg, cbs),
   'codex-complete': (msg, cbs, sid) => handleCodexComplete(msg, cbs, sid),
   'session-aborted': (msg, cbs, sid) => handleSessionAborted(msg, cbs, sid),
