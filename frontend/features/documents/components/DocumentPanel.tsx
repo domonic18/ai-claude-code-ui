@@ -40,6 +40,7 @@ export const DocumentPanel: React.FC<DocumentPanelProps> = ({
     previewContent,
     previewMimeType,
     previewLoading,
+    notPreviewable,
     previewMode,
     editContent,
     saving,
@@ -88,6 +89,7 @@ export const DocumentPanel: React.FC<DocumentPanelProps> = ({
             content={previewContent}
             mimeType={previewMimeType}
             loading={previewLoading}
+            notPreviewable={notPreviewable}
             width={panelWidth}
             mode={previewMode}
             editContent={editContent}
