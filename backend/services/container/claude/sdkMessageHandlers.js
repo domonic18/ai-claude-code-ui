@@ -246,10 +246,14 @@ export function handleDefaultMessage(sdkMessage, writer, sessionId, state) {
       if (tr.resultPreview) {
         logPayload.resultPreview = tr.resultPreview;
       }
+      if (typeof tr.resultChars === 'number') {
+        logPayload.resultChars = tr.resultChars;
+      }
 
       const durationStr = durationMs !== null ? `  ${durationMs >= 1000 ? (durationMs / 1000).toFixed(1) + 's' : durationMs + 'ms'}` : '';
       const statusStr = tr.isError ? '  FAILED' : '  ok';
-      logger.info(logPayload, `[ToolResult]  ${toolName}${statusStr}${durationStr}  ${(tr.resultPreview || '').substring(0, 100)}`);
+      const charsStr = typeof tr.resultChars === 'number' ? `  ${tr.resultChars}chars` : '';
+      logger.info(logPayload, `[ToolResult]  ${toolName}${statusStr}${durationStr}${charsStr}  ${(tr.resultPreview || '').substring(0, 100)}`);
     }
     // 工具结果到达 = 事件点，用于配对下一轮 assistant 的推理时长
     state.lastEventTime = Date.now();
