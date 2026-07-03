@@ -144,6 +144,10 @@ export function extractMessageContext(sdkMessage) {
  * @param {Object} sdkMessage - SDK message containing tool_result blocks
  * @returns {{ toolName: string|null, isError: boolean, resultPreview: string }[]}
  */
+// 工具结果预览截断长度（env 可调，诊断用）。默认 200；测试时设 LOG_TOOL_RESULT_MAX=100000
+// 等大数可记录近乎完整的结果内容。resultChars 始终记录完整字符数，不受此限制影响。
+const TOOL_RESULT_PREVIEW_MAX = Number(process.env.LOG_TOOL_RESULT_MAX) || 200;
+
 export function extractToolResults(sdkMessage) {
   const results = [];
   const content = resolveContent(sdkMessage);
@@ -152,19 +156,21 @@ export function extractToolResults(sdkMessage) {
 
   for (const part of content) {
     if (part.type === 'tool_result') {
-      let preview = '';
+      // 归一化完整文本：resultChars 记录精确大小（诊断上下文膨胀用），预览再截断
+      let fullText = '';
       if (typeof part.content === 'string') {
-        preview = truncate(part.content, 200);
+        fullText = part.content;
       } else if (Array.isArray(part.content)) {
-        const texts = part.content
+        fullText = part.content
           .filter(p => p.type === 'text' && p.text)
-          .map(p => p.text);
-        if (texts.length > 0) preview = truncate(texts.join('\n'), 200);
+          .map(p => p.text)
+          .join('\n');
       }
       results.push({
         toolUseId: (part.tool_use_id || part.id || '').substring(0, 8),
         isError: part.is_error || false,
-        resultPreview: preview || null
+        resultPreview: fullText ? truncate(fullText, TOOL_RESULT_PREVIEW_MAX) : null,
+        resultChars: fullText.length,
       });
     }
   }
