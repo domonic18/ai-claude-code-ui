@@ -10,6 +10,27 @@ import { fetchDocumentContent, saveDocumentContent } from '../services/documentS
 import { logger } from '../../../shared/utils/logger';
 import { downloadData } from '../../../shared/utils/file/file';
 
+// 可预览的文件扩展名白名单：文本/代码类
+// Office(doc/docx/pdf/xls/xlsx/ppt/pptx)、压缩包、音视频、图片等二进制文件不在此列——
+// 它们无法在面板内安全渲染（会显示 PK... 等乱码），统一走"提示下载"分支
+const PREVIEWABLE_EXTENSIONS = new Set([
+  'md', 'markdown', 'txt', 'log',
+  'json', 'csv', 'xml', 'html', 'css',
+  'js', 'ts', 'jsx', 'tsx',
+  'py', 'java', 'c', 'cpp', 'h', 'go', 'rs', 'rb', 'php', 'sh', 'bash', 'sql',
+  'yaml', 'yml', 'toml', 'ini', 'conf',
+]);
+
+/**
+ * 判断文件是否可在文档面板内预览（仅文本/代码类可预览）
+ * @param fileName - 文件名
+ * @returns true 表示可预览；二进制文档（docx/pdf/图片等）返回 false，由调用方提示下载
+ */
+function canPreviewDocument(fileName: string): boolean {
+  const ext = fileName.split('.').pop()?.toLowerCase() || '';
+  return PREVIEWABLE_EXTENSIONS.has(ext);
+}
+
 type PreviewMode = 'preview' | 'edit';
 
 interface UseDocumentPreviewReturn {
@@ -17,6 +38,7 @@ interface UseDocumentPreviewReturn {
   previewContent: string | null;
   previewMimeType: string | null;
   previewLoading: boolean;
+  notPreviewable: boolean;
   previewMode: PreviewMode;
   editContent: string;
   saving: boolean;
@@ -34,6 +56,7 @@ export function useDocumentPreview(): UseDocumentPreviewReturn {
   const [previewContent, setPreviewContent] = useState<string | null>(null);
   const [previewMimeType, setPreviewMimeType] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [notPreviewable, setNotPreviewable] = useState(false);
   const [previewMode, setPreviewMode] = useState<PreviewMode>('preview');
   const [editContent, setEditContent] = useState('');
   const [saving, setSaving] = useState(false);
@@ -45,6 +68,14 @@ export function useDocumentPreview(): UseDocumentPreviewReturn {
     setPreviewContent(null);
     setPreviewMode('preview');
     setProjectName(pName);
+
+    // 二进制文档（docx/pdf/图片等）无法在面板内预览：跳过读取内容，避免 PK... 乱码
+    if (!canPreviewDocument(doc.file_name)) {
+      setNotPreviewable(true);
+      setPreviewLoading(false);
+      return;
+    }
+    setNotPreviewable(false);
 
     try {
       const result = await fetchDocumentContent(pName, doc.file_path);
@@ -64,6 +95,7 @@ export function useDocumentPreview(): UseDocumentPreviewReturn {
     setPreviewDoc(null);
     setPreviewContent(null);
     setPreviewMimeType(null);
+    setNotPreviewable(false);
     setPreviewMode('preview');
     setEditContent('');
     setProjectName(null);
@@ -86,7 +118,24 @@ export function useDocumentPreview(): UseDocumentPreviewReturn {
   }, [previewDoc, projectName, editContent]);
 
   const handleDownload = useCallback(() => {
-    if (!previewDoc || !previewContent) return;
+    if (!previewDoc) return;
+
+    // 不可预览的二进制文件：走服务端下载接口，返回原始二进制流
+    // 避免用已被字符串化的 previewContent 重建 Blob，导致下载后文件损坏（仍是乱码）
+    if (notPreviewable) {
+      if (!projectName) return;
+      const url = `/api/projects/${encodeURIComponent(projectName)}/file/download?filePath=${encodeURIComponent(previewDoc.file_path)}`;
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = previewDoc.file_name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+
+    // 文本文件：用已加载的内容直接构造 Blob 下载
+    if (!previewContent) return;
     const ext = previewDoc.file_name.split('.').pop()?.toLowerCase() || 'txt';
     const mimeMap: Record<string, string> = {
       md: 'text/markdown',
@@ -97,13 +146,14 @@ export function useDocumentPreview(): UseDocumentPreviewReturn {
       csv: 'text/csv',
     };
     downloadData(previewContent, previewDoc.file_name, mimeMap[ext] || 'text/plain');
-  }, [previewDoc, previewContent]);
+  }, [previewDoc, previewContent, notPreviewable, projectName]);
 
   return {
     previewDoc,
     previewContent,
     previewMimeType,
     previewLoading,
+    notPreviewable,
     previewMode,
     editContent,
     saving,
