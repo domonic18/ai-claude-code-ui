@@ -134,6 +134,7 @@ tasks/
 # Workspace files (runtime data only, not code directories)
 # 忽略根目录的运行时 workspace 数据，但保留代码目录
 /workspace/
+/onwer_space/
 
 # 明确保留 backend/services/workspace 代码目录（覆盖全局 gitignore）
 !backend/services/workspace/
