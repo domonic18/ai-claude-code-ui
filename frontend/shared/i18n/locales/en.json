@@ -459,7 +459,9 @@
     "cancel": "Cancel",
     "loading": "Loading...",
     "placeholder": "Project requirements, background, things to avoid, etc.",
-    "previewEmpty": "Click \"Edit\" to add a project prompt"
+    "previewEmpty": "Click \"Edit\" to add a project prompt",
+    "expand": "Expand",
+    "collapse": "Collapse"
   },
   "tour": {
     "title": "Product Tour",

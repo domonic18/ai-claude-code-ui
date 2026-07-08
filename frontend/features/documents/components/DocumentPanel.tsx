@@ -1,8 +1,11 @@
 /**
  * DocumentPanel
  *
- * 右侧固定文档面板：上方用户上传文档，下方 AI 生成文档
- * 包含上传区域和文档预览
+ * 右侧固定文档面板：
+ * - 顶部：项目提示词（项目级配置，独立块）
+ * - 项目资料（含上传入口 + 用户上传文档）
+ * - AI 生成
+ * 图标统一 lucide，风格对齐左侧栏
  */
 
 import React, { useCallback } from 'react';
@@ -116,49 +119,39 @@ export const DocumentPanel: React.FC<DocumentPanelProps> = ({
         <div className="absolute inset-y-0 -left-1.5 -right-1.5" />
       </div>
       <div className="h-full flex flex-col bg-background border-l border-border overflow-hidden" style={{ width: `${panelWidth}px` }}>
-      {/* 项目提示词（最顶部，项目级） */}
-      <ProjectPromptSection projectName={projectName} />
+        {/* 项目提示词（顶部独立块，项目级配置） */}
+        <ProjectPromptSection projectName={projectName} />
 
-      {/* 面板标题 */}
-      <div className="px-3 py-2.5 border-b border-border bg-muted/30">
-        <h3 className="text-sm font-semibold text-foreground">文档</h3>
-      </div>
-
-      {/* 上传区域 */}
-      <div className="px-2 py-2 border-b border-border">
-        <DocumentUploadZone
-          onUpload={handleUpload}
-          disabled={!projectName}
-        />
-      </div>
-
-      {/* 文档列表 */}
-      <div className="flex-1 overflow-y-auto">
-        {loading && uploads.length === 0 && aiGenerated.length === 0 ? (
-          <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-            加载中...
-          </div>
-        ) : (
-          <>
-            <DocumentSection
-              title="项目文档"
-              icon="📎"
-              documents={uploads}
-              onPreview={handlePreview}
-              onDelete={(doc) => handleDelete(doc.file_path, 'upload')}
-              onEditSummary={updateSummary}
-            />
-            <DocumentSection
-              title="AI 生成"
-              icon="🤖"
-              documents={aiGenerated}
-              onPreview={handlePreview}
-              onDelete={(doc) => handleDelete(doc.file_path, 'ai_generated')}
-              onEditSummary={updateSummary}
-            />
-          </>
-        )}
-      </div>
+        {/* 文档列表（滚动区） */}
+        <div className="flex-1 overflow-y-auto">
+          {loading && uploads.length === 0 && aiGenerated.length === 0 ? (
+            <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+              加载中...
+            </div>
+          ) : (
+            <>
+              <DocumentSection
+                title="项目资料"
+                storageKey="uploads"
+                documents={uploads}
+                headerContent={
+                  <DocumentUploadZone onUpload={handleUpload} disabled={!projectName} />
+                }
+                onPreview={handlePreview}
+                onDelete={(doc) => handleDelete(doc.file_path, 'upload')}
+                onEditSummary={updateSummary}
+              />
+              <DocumentSection
+                title="AI 生成"
+                storageKey="aiGenerated"
+                documents={aiGenerated}
+                onPreview={handlePreview}
+                onDelete={(doc) => handleDelete(doc.file_path, 'ai_generated')}
+                onEditSummary={updateSummary}
+              />
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

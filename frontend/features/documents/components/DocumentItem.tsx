@@ -1,11 +1,20 @@
 /**
  * DocumentItem
  *
- * 单个文档项组件：文件名 + 操作按钮（预览、删除、跳转）
- * 支持拖拽到聊天输入框，展示和编辑 AI 摘要
+ * 单个文档项：文件名 + 操作（预览/删除/跳转），支持拖拽到聊天、展示与编辑 AI 摘要
+ * 图标统一使用 lucide，风格对齐左侧栏
  */
 
 import React, { useCallback, useState } from 'react';
+import {
+  FileText,
+  FileCode,
+  Image as FileImage,
+  FileSpreadsheet,
+  File,
+  ExternalLink,
+  Trash2,
+} from 'lucide-react';
 import type { DocumentItem as DocumentItemType } from '../types/document.types';
 
 interface DocumentItemProps {
@@ -23,26 +32,16 @@ interface DocumentItemProps {
   onEditSummary?: (fileName: string, summary: string) => Promise<void>;
 }
 
-/** 根据文件扩展名返回图标 */
-function getFileIcon(fileName: string): string {
+type IconType = React.ComponentType<{ className?: string }>;
+
+/** 根据文件扩展名返回 lucide 文件图标 */
+function getFileIcon(fileName: string): IconType {
   const ext = fileName.split('.').pop()?.toLowerCase() || '';
-  const iconMap: Record<string, string> = {
-    md: '📝',
-    txt: '📄',
-    pdf: '📕',
-    doc: '📘',
-    docx: '📘',
-    xls: '📗',
-    xlsx: '📗',
-    csv: '📊',
-    json: '📋',
-    png: '🖼️',
-    jpg: '🖼️',
-    jpeg: '🖼️',
-    svg: '🖼️',
-    html: '🌐',
-  };
-  return iconMap[ext] || '📄';
+  if (['md', 'txt', 'pdf', 'doc', 'docx'].includes(ext)) return FileText;
+  if (['json', 'html', 'htm', 'js', 'ts', 'jsx', 'tsx', 'css', 'xml', 'yml', 'yaml'].includes(ext)) return FileCode;
+  if (['png', 'jpg', 'jpeg', 'svg', 'gif', 'webp', 'bmp'].includes(ext)) return FileImage;
+  if (['csv', 'xls', 'xlsx'].includes(ext)) return FileSpreadsheet;
+  return File;
 }
 
 /** 格式化文件大小 */
@@ -52,6 +51,9 @@ function formatSize(bytes?: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
+
+/** 摘要超过此字符数才出现「展开/收起」 */
+const SUMMARY_COLLAPSE_THRESHOLD = 60;
 
 /**
  * 单个文档项
@@ -67,6 +69,10 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState('');
   const [saving, setSaving] = useState(false);
+  // 长摘要的展开 / 收起：默认收起（截断到 2 行），仅超阈值时才出现切换；不持久化
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
+
+  const FileIcon = getFileIcon(doc.file_name);
 
   const handleDragStart = useCallback((e: React.DragEvent) => {
     if (!onDragToChat) return;
@@ -98,24 +104,24 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({
     }
   }, [onEditSummary, doc.file_name, editText]);
 
-  const hasSummary = doc.summary_status === 'ready' && doc.summary;
+  const summaryText = doc.summary ?? '';
+  const hasSummary = doc.summary_status === 'ready' && summaryText.length > 0;
+  const isLongSummary = summaryText.length > SUMMARY_COLLAPSE_THRESHOLD;
   const canEdit = !!onEditSummary;
 
   return (
-    <div className="group rounded-md hover:bg-muted/50 transition-colors">
+    <div className="group rounded-md hover:bg-accent/30 transition-colors">
       {/* 文件行 — 点击预览 */}
       <div
-        className="flex items-center gap-2 px-2 py-1.5 cursor-pointer"
+        className="flex items-center gap-2 px-2 py-2 cursor-pointer"
         draggable={!!onDragToChat}
         onDragStart={handleDragStart}
         onClick={onPreview}
         title={`路径: ${doc.file_path}${doc.file_size ? `\n大小: ${formatSize(doc.file_size)}` : ''}`}
       >
-        {/* 文件图标 */}
-        <span className="text-sm flex-shrink-0">{getFileIcon(doc.file_name)}</span>
+        <FileIcon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
 
-        {/* 文件名 */}
-        <span className="text-xs text-foreground truncate flex-1 min-w-0">
+        <span className="text-sm text-foreground truncate flex-1 min-w-0">
           {doc.file_name}
         </span>
 
@@ -124,45 +130,59 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({
           {onNavigateToConversation && (
             <button
               onClick={(e) => { e.stopPropagation(); onNavigateToConversation(); }}
-              className="p-0.5 rounded hover:bg-accent/20 text-muted-foreground hover:text-foreground"
+              className="p-0.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
               title="跳转到对话"
             >
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-              </svg>
+              <ExternalLink className="w-3 h-3" />
             </button>
           )}
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="p-0.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive"
+            className="p-0.5 rounded hover:bg-destructive/15 text-muted-foreground hover:text-destructive"
             title="删除"
           >
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <Trash2 className="w-3 h-3" />
           </button>
         </div>
       </div>
 
-      {/* 摘要区域 — 仅在已就绪时显示 */}
+      {/* 摘要区域 — 仅在已就绪时显示；超阈值可展开/收起 */}
       {hasSummary && !editing && (
-        <div className="px-2 pb-1 pl-7" onClick={(e) => e.stopPropagation()}>
-          <div className="text-[10px] text-muted-foreground bg-muted/30 rounded px-2 py-1 leading-relaxed">
-            {doc.summary}
-            {canEdit && (
-              <button
-                onClick={handleStartEdit}
-                className="ml-1 text-primary hover:text-primary/80 underline"
-              >
-                编辑
-              </button>
-            )}
+        <div className="px-2 pb-1" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-muted/40 rounded px-2 py-1.5">
+            <div
+              className={`text-xs text-muted-foreground leading-snug ${
+                isLongSummary && !summaryExpanded ? 'line-clamp-2' : ''
+              }`}
+            >
+              {summaryText}
+            </div>
           </div>
+          {(isLongSummary || canEdit) && (
+            <div className="flex items-center gap-2 mt-0.5 px-1">
+              {isLongSummary && (
+                <button
+                  onClick={() => setSummaryExpanded((v) => !v)}
+                  className="text-[10px] text-primary hover:text-primary/80 underline"
+                >
+                  {summaryExpanded ? '收起' : '展开'}
+                </button>
+              )}
+              {canEdit && (
+                <button
+                  onClick={handleStartEdit}
+                  className="text-[10px] text-primary hover:text-primary/80 underline"
+                >
+                  编辑
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
       {editing && (
-        <div className="px-2 pb-1 pl-7 space-y-1" onClick={(e) => e.stopPropagation()}>
+        <div className="px-2 pb-1 space-y-1" onClick={(e) => e.stopPropagation()}>
           <textarea
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
@@ -191,3 +211,5 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({
     </div>
   );
 };
+
+export default DocumentItem;

@@ -111,3 +111,32 @@ export function focusElement(element: HTMLElement, delay = 0): void {
 export function getComputedStyle(element: HTMLElement, property: string): string {
   return window.getComputedStyle(element).getPropertyValue(property);
 }
+
+/**
+ * 读取布尔型 localStorage 偏好（如折叠 / 展开状态）
+ * @param key - 存储 key
+ * @param defaultValue - 未存储或读取失败（隐私模式 / 存储禁用）时的默认值
+ * @returns 解析后的布尔值
+ */
+export function loadBoolPref(key: string, defaultValue: boolean): boolean {
+  try {
+    const v = localStorage.getItem(key);
+    if (v === null) return defaultValue;
+    return v === 'true';
+  } catch {
+    return defaultValue;
+  }
+}
+
+/**
+ * 写入布尔型 localStorage 偏好（失败静默：偏好不持久化，但不影响交互）
+ * @param key - 存储 key
+ * @param value - 布尔值
+ */
+export function saveBoolPref(key: string, value: boolean): void {
+  try {
+    localStorage.setItem(key, String(value));
+  } catch {
+    // 隐私模式 / 存储禁用：静默失败
+  }
+}
