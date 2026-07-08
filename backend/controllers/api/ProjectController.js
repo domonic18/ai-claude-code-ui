@@ -129,9 +129,14 @@ export class ProjectController extends BaseController {
     try {
       const userId = this._getUserId(req);
       const { projectName, sessionId } = req.params;
-      const { limit = 100, offset = 0 } = this._getPagination(req, { page: 1, limit: 100 });
+      // 单个会话的历史需完整返回（前端不分会页）：默认 limit=null 取全部，
+      // 仅当客户端显式传 ?limit 时才截断。避免长会话被默认 100 条截掉最新一轮。
+      const explicitLimit = (req.query.limit != null && req.query.limit !== '')
+        ? parseInt(req.query.limit, 10)
+        : null;
+      const offset = parseInt(req.query.offset, 10) || 0;
 
-      const result = await getSessionMessages(userId, projectName, sessionId, limit, offset);
+      const result = await getSessionMessages(userId, projectName, sessionId, explicitLimit, offset);
 
       this._success(res, result);
     } catch (error) {
