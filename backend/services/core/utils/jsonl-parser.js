@@ -114,36 +114,33 @@ export function parseJsonlContent(content) {
  * @param {*} entry.message.content - 消息内容
  * @returns {Object} 过滤后的条目（内容被修改时返回新对象）
  */
-export function filterMemoryContextFromEntry(entry) {
-  if (entry.message?.role === 'user' && entry.message?.content) {
-    const textContent = _extractTextContent(entry.message.content);
-    const filteredContent = filterMemoryContext(textContent);
-    if (filteredContent !== textContent) {
-      return { ...entry, message: { ...entry.message, content: filteredContent } };
+/**
+ * 通用 entry 上下文过滤器工厂
+ *
+ * 对 user 角色消息内容执行指定过滤函数；内容被修改时返回新 entry（避免无谓拷贝）。
+ * 统一了 role 检查、文本提取、差异比较的模板，新增上下文类型只需传入 filterFn。
+ *
+ * @param {(text: string) => string} filterFn - 文本过滤函数（如 filterMemoryContext）
+ * @returns {(entry: Object) => Object} entry 过滤函数
+ */
+function createContextFilter(filterFn) {
+  return function filterContextFromEntry(entry) {
+    if (entry.message?.role === 'user' && entry.message?.content) {
+      const textContent = _extractTextContent(entry.message.content);
+      const filteredContent = filterFn(textContent);
+      if (filteredContent !== textContent) {
+        return { ...entry, message: { ...entry.message, content: filteredContent } };
+      }
     }
-  }
-  return entry;
+    return entry;
+  };
 }
 
-/**
- * 从条目中过滤项目提示词上下文
- *
- * 对 user 角色的消息内容执行 filterProjectPrompt 过滤，
- * 移除拼接进去的 --- Project Prompt --- 段落，避免泄漏到 UI。
- *
- * @param {Object} entry - JSONL 条目对象
- * @returns {Object} 过滤后的条目（内容被修改时返回新对象）
- */
-export function filterProjectPromptFromEntry(entry) {
-  if (entry.message?.role === 'user' && entry.message?.content) {
-    const textContent = _extractTextContent(entry.message.content);
-    const filteredContent = filterProjectPrompt(textContent);
-    if (filteredContent !== textContent) {
-      return { ...entry, message: { ...entry.message, content: filteredContent } };
-    }
-  }
-  return entry;
-}
+/** 从条目中剥离记忆上下文（--- Memory Context --- 块） */
+export const filterMemoryContextFromEntry = createContextFilter(filterMemoryContext);
+
+/** 从条目中剥离项目提示词上下文（--- Project Prompt --- 块） */
+export const filterProjectPromptFromEntry = createContextFilter(filterProjectPrompt);
 
 export default { JsonlParser };
 

@@ -45,11 +45,17 @@ export function useProjectPrompt(projectName: string | null): UseProjectPromptRe
     isDirtyRef.current = content !== savedContent;
   }, [content, savedContent]);
 
+  // 加载请求序号：每次 loadPrompt 自增，响应回来时若已非最新则丢弃，
+  // 避免快速切项目 / 会话结束刷新时，旧请求的响应覆盖新请求的结果（竞态）。
+  const loadIdRef = useRef(0);
+
   const loadPrompt = useCallback(async (name: string) => {
+    const myId = ++loadIdRef.current;
     setLoading(true);
     try {
       const res = await api.projectPrompt.read(name);
       const result = await res.json();
+      if (myId !== loadIdRef.current) return; // 已有更新的加载请求，丢弃本次响应
       if (!result.success || !result.data) {
         throw new Error(result.error || 'Failed to read project prompt');
       }
@@ -57,11 +63,12 @@ export function useProjectPrompt(projectName: string | null): UseProjectPromptRe
       setContent(c);
       setSavedContent(c);
     } catch (err) {
+      if (myId !== loadIdRef.current) return; // 过期请求，不处理错误、不 setState
       logger.error({ err, projectName: name }, 'Failed to load project prompt');
       setContent('');
       setSavedContent('');
     } finally {
-      setLoading(false);
+      if (myId === loadIdRef.current) setLoading(false); // 仅最新请求负责复位 loading
     }
   }, []);
 
