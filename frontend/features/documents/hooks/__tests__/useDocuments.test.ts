@@ -38,6 +38,7 @@ vi.mock('@/features/documents/services/documentEvents', () => ({
     return () => { documentCreatedHandler = null; };
   },
   onDocumentUploaded: () => () => {},
+  onConversationComplete: () => () => {},
   emitDocumentCreated: vi.fn(),
   emitDocumentUploaded: vi.fn(),
 }));
