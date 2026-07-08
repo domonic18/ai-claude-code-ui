@@ -451,6 +451,16 @@
     "saved": "已保存",
     "placeholder": "长期记忆可以记录用户的工作习惯、要求和准则等"
   },
+  "projectPrompt": {
+    "title": "项目提示词",
+    "edit": "编辑",
+    "save": "保存",
+    "saving": "保存中...",
+    "cancel": "取消",
+    "loading": "加载中...",
+    "placeholder": "可填写当前项目要求、背景、规避的事项等",
+    "previewEmpty": "点击「编辑」填写项目提示词"
+  },
   "tour": {
     "title": "产品导览",
     "step1Title": "对话列表",

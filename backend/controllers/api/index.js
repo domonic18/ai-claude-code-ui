@@ -11,3 +11,4 @@ export { UserSettingsController } from './UserSettingsController.js';
 export { McpServerController } from './McpServerController.js';
 export { MemoryController } from './MemoryController.js';
 export { DocumentController } from './DocumentController.js';
+export { ProjectPromptController } from './ProjectPromptController.js';

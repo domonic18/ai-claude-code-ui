@@ -12,6 +12,7 @@ import { useDocumentPanelResize } from '../hooks/useDocumentPanelResize';
 import { DocumentSection } from './DocumentSection';
 import { DocumentUploadZone } from './DocumentUploadZone';
 import { DocumentPreview } from './DocumentPreview';
+import { ProjectPromptSection } from './ProjectPromptSection';
 import type { DocumentItem } from '../types/document.types';
 
 interface DocumentPanelProps {
@@ -115,6 +116,9 @@ export const DocumentPanel: React.FC<DocumentPanelProps> = ({
         <div className="absolute inset-y-0 -left-1.5 -right-1.5" />
       </div>
       <div className="h-full flex flex-col bg-background border-l border-border overflow-hidden" style={{ width: `${panelWidth}px` }}>
+      {/* 项目提示词（最顶部，项目级） */}
+      <ProjectPromptSection projectName={projectName} />
+
       {/* 面板标题 */}
       <div className="px-3 py-2.5 border-b border-border bg-muted/30">
         <h3 className="text-sm font-semibold text-foreground">文档</h3>

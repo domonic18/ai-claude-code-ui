@@ -11,7 +11,7 @@ import { createLogger } from '../../../utils/logger.js';
 import {
   createSession, extractTextFromEntry, _extractTextContent, processUserEntry, processAssistantEntry
 } from './jsonlHelpers.js';
-import { filterMemoryContext } from '../../../utils/memoryUtils.js';
+import { filterMemoryContext, filterProjectPrompt } from '../../../utils/memoryUtils.js';
 import {
   processSessionEntry, postProcessSessions, calculateStats
 } from './jsonlSessionHelpers.js';
@@ -114,16 +114,33 @@ export function parseJsonlContent(content) {
  * @param {*} entry.message.content - 消息内容
  * @returns {Object} 过滤后的条目（内容被修改时返回新对象）
  */
-export function filterMemoryContextFromEntry(entry) {
-  if (entry.message?.role === 'user' && entry.message?.content) {
-    const textContent = _extractTextContent(entry.message.content);
-    const filteredContent = filterMemoryContext(textContent);
-    if (filteredContent !== textContent) {
-      return { ...entry, message: { ...entry.message, content: filteredContent } };
+/**
+ * 通用 entry 上下文过滤器工厂
+ *
+ * 对 user 角色消息内容执行指定过滤函数；内容被修改时返回新 entry（避免无谓拷贝）。
+ * 统一了 role 检查、文本提取、差异比较的模板，新增上下文类型只需传入 filterFn。
+ *
+ * @param {(text: string) => string} filterFn - 文本过滤函数（如 filterMemoryContext）
+ * @returns {(entry: Object) => Object} entry 过滤函数
+ */
+function createContextFilter(filterFn) {
+  return function filterContextFromEntry(entry) {
+    if (entry.message?.role === 'user' && entry.message?.content) {
+      const textContent = _extractTextContent(entry.message.content);
+      const filteredContent = filterFn(textContent);
+      if (filteredContent !== textContent) {
+        return { ...entry, message: { ...entry.message, content: filteredContent } };
+      }
     }
-  }
-  return entry;
+    return entry;
+  };
 }
+
+/** 从条目中剥离记忆上下文（--- Memory Context --- 块） */
+export const filterMemoryContextFromEntry = createContextFilter(filterMemoryContext);
+
+/** 从条目中剥离项目提示词上下文（--- Project Prompt --- 块） */
+export const filterProjectPromptFromEntry = createContextFilter(filterProjectPrompt);
 
 export default { JsonlParser };
 

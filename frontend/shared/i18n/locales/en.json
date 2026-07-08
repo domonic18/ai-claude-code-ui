@@ -451,6 +451,16 @@
     "saved": "Saved",
     "placeholder": "Long-term memory can record user's work habits, requirements, and guidelines..."
   },
+  "projectPrompt": {
+    "title": "Project Prompt",
+    "edit": "Edit",
+    "save": "Save",
+    "saving": "Saving...",
+    "cancel": "Cancel",
+    "loading": "Loading...",
+    "placeholder": "Project requirements, background, things to avoid, etc.",
+    "previewEmpty": "Click \"Edit\" to add a project prompt"
+  },
   "tour": {
     "title": "Product Tour",
     "step1Title": "Conversations",

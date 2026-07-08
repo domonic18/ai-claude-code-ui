@@ -17,7 +17,7 @@
  */
 
 import { createLogger } from '../../../utils/logger.js';
-import { filterMemoryContextFromEntry } from '../../core/utils/jsonl-parser.js';
+import { filterMemoryContextFromEntry, filterProjectPromptFromEntry } from '../../core/utils/jsonl-parser.js';
 import { buildSessionGroups, addToSessionGroup, mergeGroupedAndStandalone } from './sessionGrouping.js';
 import { updateSessionSummaryInContainer, deleteSessionInContainer } from './sessionWriter.js';
 import {
@@ -116,8 +116,8 @@ function _sortAndFilterMessages(messages) {
     return timeA - timeB;
   });
 
-  // 过滤所有用户消息中的记忆上下文
-  return messages.map(filterMemoryContextFromEntry);
+  // 过滤所有用户消息中的记忆上下文与项目提示词上下文
+  return messages.map(filterMemoryContextFromEntry).map(filterProjectPromptFromEntry);
 }
 
 // ContainerSessions.js 功能函数

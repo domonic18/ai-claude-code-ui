@@ -14,7 +14,7 @@ import cookieParser from 'cookie-parser';
 import { FILES, SERVER, CORS } from './config.js';
 
 import { auth, settings, modelsRouter, users, saml } from '../routes/core/index.js';
-import { projects, sessions, files, git, userSettings, mcpServers, extensions, memory, documents } from '../routes/api/index.js';
+import { projects, sessions, files, git, userSettings, mcpServers, extensions, memory, documents, projectPrompt } from '../routes/api/index.js';
 import { claude, cursor, codex, mcp, taskmaster, agent } from '../routes/integrations/index.js';
 import { commands, system, uploads } from '../routes/tools/index.js';
 import { cliAuth, customCommands } from '../routes/index.js';
@@ -64,6 +64,7 @@ function setupProtectedRoutes(app) {
   app.use('/api/projects', authenticateToken, files);
   app.use('/api/projects', authenticateToken, projects);
   app.use('/api/projects', authenticateToken, documents);
+  app.use('/api/projects', authenticateToken, projectPrompt);
   app.use('/api/sessions', authenticateToken, sessions);
   app.use('/api/git', authenticateToken, git);
   app.use('/api/memory', authenticateToken, memory);

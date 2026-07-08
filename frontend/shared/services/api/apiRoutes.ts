@@ -288,4 +288,15 @@ export const api = {
         body: JSON.stringify({ content }),
       }),
   },
+
+  // Project prompt endpoints（项目级，按 projectName 区分）
+  projectPrompt: {
+    read: (projectName: string) =>
+      authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/prompt`),
+    write: (projectName: string, content: string) =>
+      authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/prompt`, {
+        method: 'PUT',
+        body: JSON.stringify({ content }),
+      }),
+  },
 };
