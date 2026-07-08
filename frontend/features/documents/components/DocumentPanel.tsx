@@ -143,6 +143,7 @@ export const DocumentPanel: React.FC<DocumentPanelProps> = ({
             <DocumentSection
               title="项目文档"
               icon="📎"
+              storageKey="uploads"
               documents={uploads}
               onPreview={handlePreview}
               onDelete={(doc) => handleDelete(doc.file_path, 'upload')}
@@ -151,6 +152,7 @@ export const DocumentPanel: React.FC<DocumentPanelProps> = ({
             <DocumentSection
               title="AI 生成"
               icon="🤖"
+              storageKey="aiGenerated"
               documents={aiGenerated}
               onPreview={handlePreview}
               onDelete={(doc) => handleDelete(doc.file_path, 'ai_generated')}

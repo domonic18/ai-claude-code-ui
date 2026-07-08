@@ -53,6 +53,9 @@ function formatSize(bytes?: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
 
+/** 摘要超过此字符数才出现「展开/收起」；更短的内容完整展示更易读 */
+const SUMMARY_COLLAPSE_THRESHOLD = 60;
+
 /**
  * 单个文档项
  */
@@ -67,6 +70,8 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState('');
   const [saving, setSaving] = useState(false);
+  // 长摘要的展开 / 收起：默认展开（完整展示），仅超阈值时才出现切换；不持久化
+  const [summaryExpanded, setSummaryExpanded] = useState(true);
 
   const handleDragStart = useCallback((e: React.DragEvent) => {
     if (!onDragToChat) return;
@@ -98,7 +103,9 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({
     }
   }, [onEditSummary, doc.file_name, editText]);
 
-  const hasSummary = doc.summary_status === 'ready' && doc.summary;
+  const summaryText = doc.summary ?? '';
+  const hasSummary = doc.summary_status === 'ready' && summaryText.length > 0;
+  const isLongSummary = summaryText.length > SUMMARY_COLLAPSE_THRESHOLD;
   const canEdit = !!onEditSummary;
 
   return (
@@ -144,20 +151,36 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({
         </div>
       </div>
 
-      {/* 摘要区域 — 仅在已就绪时显示 */}
+      {/* 摘要区域 — 仅在已就绪时显示；超阈值可展开/收起 */}
       {hasSummary && !editing && (
         <div className="px-2 pb-1 pl-7" onClick={(e) => e.stopPropagation()}>
-          <div className="text-[10px] text-muted-foreground bg-muted/30 rounded px-2 py-1 leading-relaxed">
-            {doc.summary}
-            {canEdit && (
-              <button
-                onClick={handleStartEdit}
-                className="ml-1 text-primary hover:text-primary/80 underline"
-              >
-                编辑
-              </button>
-            )}
+          <div
+            className={`text-[10px] text-muted-foreground bg-muted/30 rounded px-2 py-1 leading-relaxed ${
+              isLongSummary && !summaryExpanded ? 'line-clamp-2' : ''
+            }`}
+          >
+            {summaryText}
           </div>
+          {(isLongSummary || canEdit) && (
+            <div className="flex items-center gap-2 mt-0.5 px-1">
+              {isLongSummary && (
+                <button
+                  onClick={() => setSummaryExpanded((v) => !v)}
+                  className="text-[10px] text-primary hover:text-primary/80 underline"
+                >
+                  {summaryExpanded ? '收起' : '展开'}
+                </button>
+              )}
+              {canEdit && (
+                <button
+                  onClick={handleStartEdit}
+                  className="text-[10px] text-primary hover:text-primary/80 underline"
+                >
+                  编辑
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 

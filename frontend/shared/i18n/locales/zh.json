@@ -459,7 +459,9 @@
     "cancel": "取消",
     "loading": "加载中...",
     "placeholder": "可填写当前项目要求、背景、规避的事项等",
-    "previewEmpty": "点击「编辑」填写项目提示词"
+    "previewEmpty": "点击「编辑」填写项目提示词",
+    "expand": "展开",
+    "collapse": "收起"
   },
   "tour": {
     "title": "产品导览",
