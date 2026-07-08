@@ -8,6 +8,7 @@
 import type { ChatMessage } from '../types';
 import { shouldSkipUserMessage } from '../config/messageFilters';
 import { decodeHtmlEntities } from './stringProcessors';
+import { stripInjectedWrappers } from './injectionStripper';
 import {
   buildUserMessage,
   buildThinkingMessage,
@@ -22,13 +23,14 @@ import {
  * @returns Extracted text content
  */
 export function extractUserContent(content: any): string {
-  if (Array.isArray(content)) {
-    return content
-      .filter((part: any) => part.type === 'text')
-      .map((part: any) => decodeHtmlEntities(part.text))
-      .join('\n');
-  }
-  return decodeHtmlEntities(typeof content === 'string' ? content : String(content));
+  const raw = Array.isArray(content)
+    ? content
+        .filter((part: any) => part.type === 'text')
+        .map((part: any) => decodeHtmlEntities(part.text))
+        .join('\n')
+    : decodeHtmlEntities(typeof content === 'string' ? content : String(content));
+  // 剥离后端注入的 <ccui-inject> 块（如 skill 触发行），保持气泡只显示用户原话
+  return stripInjectedWrappers(raw);
 }
 
 /**

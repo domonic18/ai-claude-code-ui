@@ -165,10 +165,15 @@ export function mapCliOptionsToSDK(options = {}) {
   // 应用自定义 API 配置
   applyCustomApiConfig(sdkOptions, options);
 
-  // 映射系统提示配置
+  // 映射系统提示配置：在 claude_code 预设之上追加系统上下文（cwd/memory/文档索引/文件读取/skill 等）
+  // systemContextParts 由各层累积，这里装配为 append（为空则保持预设原样）
+  const contextAppend = Array.isArray(options.systemContextParts) && options.systemContextParts.length > 0
+    ? options.systemContextParts.join('\n\n')
+    : undefined;
   sdkOptions.systemPrompt = {
     type: 'preset',
-    preset: 'claude_code'
+    preset: 'claude_code',
+    ...(contextAppend ? { append: contextAppend } : {})
   };
 
   // 开启逐 token 流式：让 SDK yield stream_event（partial text delta）。

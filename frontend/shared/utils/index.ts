@@ -10,6 +10,5 @@ export * from './error';
 export * from './file';
 export * from './format';
 export * from './logger';
-export * from './memory';
 export * from './request';
 export * from './validation';
