@@ -13,3 +13,4 @@ export { default as mcpServers } from './mcp-servers.js';
 export { default as extensions } from './extensions.js';
 export { default as memory } from './memory.js';
 export { default as documents } from './documents.js';
+export { default as projectPrompt } from './project-prompt.js';

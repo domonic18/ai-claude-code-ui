@@ -80,3 +80,9 @@ export {
 export {
   generateDisplayName
 } from './utils/index.js';
+
+// ============================================================================
+// 项目级提示词
+// ============================================================================
+
+export { ProjectPromptService, default as projectPromptService } from './ProjectPromptService.js';

@@ -11,7 +11,7 @@ import { createLogger } from '../../../utils/logger.js';
 import {
   createSession, extractTextFromEntry, _extractTextContent, processUserEntry, processAssistantEntry
 } from './jsonlHelpers.js';
-import { filterMemoryContext } from '../../../utils/memoryUtils.js';
+import { filterMemoryContext, filterProjectPrompt } from '../../../utils/memoryUtils.js';
 import {
   processSessionEntry, postProcessSessions, calculateStats
 } from './jsonlSessionHelpers.js';
@@ -118,6 +118,26 @@ export function filterMemoryContextFromEntry(entry) {
   if (entry.message?.role === 'user' && entry.message?.content) {
     const textContent = _extractTextContent(entry.message.content);
     const filteredContent = filterMemoryContext(textContent);
+    if (filteredContent !== textContent) {
+      return { ...entry, message: { ...entry.message, content: filteredContent } };
+    }
+  }
+  return entry;
+}
+
+/**
+ * 从条目中过滤项目提示词上下文
+ *
+ * 对 user 角色的消息内容执行 filterProjectPrompt 过滤，
+ * 移除拼接进去的 --- Project Prompt --- 段落，避免泄漏到 UI。
+ *
+ * @param {Object} entry - JSONL 条目对象
+ * @returns {Object} 过滤后的条目（内容被修改时返回新对象）
+ */
+export function filterProjectPromptFromEntry(entry) {
+  if (entry.message?.role === 'user' && entry.message?.content) {
+    const textContent = _extractTextContent(entry.message.content);
+    const filteredContent = filterProjectPrompt(textContent);
     if (filteredContent !== textContent) {
       return { ...entry, message: { ...entry.message, content: filteredContent } };
     }
