@@ -1,11 +1,11 @@
 /**
  * ProjectPromptSection
  *
- * 项目级提示词的内联编辑区，嵌入 DocumentPanel 最顶部（「文档」标题之上）。
- * - 查看态：标题 + 内容预览（过长时默认截断到 PROMPT_PREVIEW_LINES 行，可展开/收起；
- *           展开状态按项目名持久化到 localStorage）+「编辑」按钮
- * - 编辑态：textarea +「保存」「取消」（限高 + 内部滚动，避免撑爆面板）
- * - projectName 为空（未选项目）时返回 null
+ * 项目级提示词的内联编辑区，嵌入 DocumentPanel 最顶部。
+ * - 查看态：标题 + 内容预览（灰底块；过长默认截断，可展开/收起，按项目持久化）
+ *           +「编辑」按钮（与展开/收起并排）
+ * - 编辑态：textarea +「保存」「取消」（限高 + 内部滚动）
+ * - projectName 为空时返回 null
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -30,9 +30,7 @@ export const ProjectPromptSection: React.FC<ProjectPromptSectionProps> = ({ proj
   const [editing, setEditing] = useState(false);
 
   // 展开状态：默认收起（截断预览）；按项目名持久化到 localStorage。
-  // storageKey 随 projectName 变化；切换项目时通过下面的 effect 同步该项目的展开偏好。
   const storageKey = projectName ? `project-prompt:expanded:${projectName}` : null;
-  // 首帧用 lazy initializer 读出该项目的偏好（避免收起→展开闪烁）；切换项目时由 effect 同步
   const [expanded, setExpanded] = useState<boolean>(() =>
     storageKey ? loadBoolPref(storageKey, false) : false,
   );
@@ -46,7 +44,6 @@ export const ProjectPromptSection: React.FC<ProjectPromptSectionProps> = ({ proj
   }, [storageKey]);
 
   const handleToggleExpand = useCallback(() => {
-    // 函数式更新：持久化在回调内读取 next 值，保证写入与渲染一致
     setExpanded((prev) => {
       const next = !prev;
       if (storageKey) saveBoolPref(storageKey, next);
@@ -56,14 +53,12 @@ export const ProjectPromptSection: React.FC<ProjectPromptSectionProps> = ({ proj
 
   if (!projectName) return null;
 
-  // 长内容判定（仅有内容时）：换行行数或字符数超过预览阈值，用于决定是否显示「展开/收起」
   const hasContent = savedContent.length > 0;
   const lineCount = savedContent.split('\n').length;
   const isLong =
     hasContent && (lineCount > PROMPT_PREVIEW_LINES || savedContent.length > PROMPT_PREVIEW_LINES * 40);
 
   const handleEdit = () => {
-    // 进入编辑态时以已保存内容为基准，丢弃上次未保存的改动
     setContent(savedContent);
     setEditing(true);
   };
@@ -78,23 +73,14 @@ export const ProjectPromptSection: React.FC<ProjectPromptSectionProps> = ({ proj
       await save();
       setEditing(false);
     } catch {
-      // 保存失败保持编辑态；错误已在 hook 内记录日志，按钮 saving 状态会复位
+      // 保存失败保持编辑态；错误已在 hook 内记录日志
     }
   };
 
   return (
     <div className="px-3 py-2.5 border-b border-border bg-muted/30">
-      <div className="flex items-center justify-between mb-1">
-        <h3 className="text-sm font-semibold text-foreground">{t('projectPrompt.title')}</h3>
-        {!editing && (
-          <button
-            onClick={handleEdit}
-            disabled={loading}
-            className="text-xs text-primary hover:underline disabled:opacity-50"
-          >
-            {loading ? t('projectPrompt.loading') : t('projectPrompt.edit')}
-          </button>
-        )}
+      <div className="mb-1.5">
+        <h3 className="text-sm font-medium text-muted-foreground">{t('projectPrompt.title')}</h3>
       </div>
 
       {editing ? (
@@ -126,21 +112,32 @@ export const ProjectPromptSection: React.FC<ProjectPromptSectionProps> = ({ proj
         </div>
       ) : (
         <div>
-          <div
-            className={`text-xs text-muted-foreground whitespace-pre-wrap min-h-[1.25rem] ${
-              isLong && !expanded ? 'line-clamp-6' : ''
-            }`}
-          >
-            {savedContent || t('projectPrompt.previewEmpty')}
-          </div>
-          {isLong && (
-            <button
-              onClick={handleToggleExpand}
-              className="mt-1 text-xs text-primary hover:text-primary/80 underline"
+          <div className="bg-muted/40 rounded px-2 py-1.5">
+            <div
+              className={`text-xs text-muted-foreground leading-snug whitespace-pre-wrap min-h-[1.5rem] ${
+                isLong && !expanded ? 'line-clamp-6' : ''
+              }`}
             >
-              {expanded ? t('projectPrompt.collapse') : t('projectPrompt.expand')}
+              {savedContent || t('projectPrompt.previewEmpty')}
+            </div>
+          </div>
+          <div className="flex items-center gap-3 mt-1.5">
+            {isLong && (
+              <button
+                onClick={handleToggleExpand}
+                className="text-xs text-primary hover:text-primary/80 underline"
+              >
+                {expanded ? t('projectPrompt.collapse') : t('projectPrompt.expand')}
+              </button>
+            )}
+            <button
+              onClick={handleEdit}
+              disabled={loading}
+              className="text-xs text-primary hover:text-primary/80 underline disabled:opacity-50"
+            >
+              {loading ? t('projectPrompt.loading') : t('projectPrompt.edit')}
             </button>
-          )}
+          </div>
         </div>
       )}
     </div>
