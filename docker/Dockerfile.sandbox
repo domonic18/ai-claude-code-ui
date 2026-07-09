@@ -32,7 +32,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # 预装 patent skills 所需的 Python 依赖（PCT DOCX 转换工具包）
-RUN pip3 install --no-cache-dir --break-system-packages Pillow>=10
+# ⚠️ 版本约束必须加引号：未加引号时 shell(/bin/sh -c) 会把 '>=10' 解析为输出重定向
+# （> =10），在 WORKDIR(/workspace) 下生成名为 =10 的垃圾文件，进而被项目发现误识别为项目，
+# 导致 SDK chdir 到文件路径报 spawn ENOTDIR。
+RUN pip3 install --no-cache-dir --break-system-packages 'Pillow>=10'
 
 # Create workspace and config directories
 RUN mkdir -p /workspace /app /workspace/.claude/projects && \
