@@ -17,12 +17,11 @@ import { projectPromptService } from '../../projects/index.js';
 import { createLogger, sanitizePreview, startTimer, withTimer } from '../../../utils/logger.js';
 const logger = createLogger('services/container/claude/ClaudeQuery');
 
-// 用于在命令中包装记忆上下文的记忆标记
+// 用于在 system prompt 中标记记忆上下文分节（仅做结构化，不再用于剥离用户消息）
 const MEMORY_START = '--- Memory Context ---';
 const MEMORY_END = '--- End Memory Context ---';
-const MEMORY_SEPARATOR = '\n';
 
-// 用于在命令中包装项目级提示词的标记（与 memory 对称，不含路径）
+// 用于在 system prompt 中标记项目级提示词分节（与 memory 对称，不含路径）
 const PROJECT_PROMPT_START = '--- Project Prompt ---';
 const PROJECT_PROMPT_END = '--- End Project Prompt ---';
 
@@ -100,33 +99,33 @@ async function loadProjectPromptContext(userId, projectName, options) {
   return null;
 }
 
-// 为 SDK 执行将记忆上下文前置到用户命令
 /**
- * 构建增强命令（添加工作目录提示 + 记忆上下文）
+ * 构建系统上下文分片（工作目录提示 + 记忆上下文 + 项目级提示词）
  *
- * 工作目录提示防止 AI 使用 /workspace/ 绝对前缀写文件，
- * 确保所有生成文件落在正确的项目子目录下。
+ * 这些内容不再拼进用户命令，而是作为 systemContextParts 累积，最终由
+ * systemPrompt.append 注入，使 SDK 的 user turn 保持为用户原始输入。
  *
- * @param {string} command - 原始命令
  * @param {string|null} memoryContext - 记忆上下文
+ * @param {string|null} projectPromptContext - 项目级提示词
  * @param {string} cwd - 当前工作目录（如 /workspace/我的工作区）
- * @returns {string} 增强后的命令
+ * @returns {string[]} 系统上下文分片数组
  */
-function buildEnhancedCommand(command, memoryContext, projectPromptContext, cwd) {
-  // 注入工作目录提示，确保 AI 将文件写入正确的项目目录
-  const cwdHint = `【系统提示】当前工作目录：${cwd}。所有文件必须写入此目录或其子目录中，禁止使用 /workspace/ 作为文件路径前缀。`;
-  let enhanced = `${cwdHint}\n\n${command}`;
+function buildContextParts(memoryContext, projectPromptContext, cwd) {
+  const parts = [];
+
+  // 工作目录提示，确保 AI 将文件写入正确的项目目录
+  parts.push(`【系统提示】当前工作目录：${cwd}。所有文件必须写入此目录或其子目录中，禁止使用 /workspace/ 作为文件路径前缀。`);
 
   if (memoryContext) {
-    enhanced += `${MEMORY_SEPARATOR}${MEMORY_SEPARATOR}${MEMORY_START}${MEMORY_SEPARATOR}${memoryContext}${MEMORY_SEPARATOR}${MEMORY_END}${MEMORY_SEPARATOR}${MEMORY_SEPARATOR}`;
+    parts.push(`${MEMORY_START}\n${memoryContext}\n${MEMORY_END}`);
   }
 
   // 项目级提示词置于记忆块之后（项目级更具体，后置）；空则不注入
   if (projectPromptContext) {
-    enhanced += `${MEMORY_SEPARATOR}${MEMORY_SEPARATOR}${PROJECT_PROMPT_START}${MEMORY_SEPARATOR}${projectPromptContext}${MEMORY_SEPARATOR}${PROJECT_PROMPT_END}${MEMORY_SEPARATOR}${MEMORY_SEPARATOR}`;
+    parts.push(`${PROJECT_PROMPT_START}\n${projectPromptContext}\n${PROJECT_PROMPT_END}`);
   }
 
-  return enhanced;
+  return parts;
 }
 
 // 通知前端会话启动并在 UI 中包含记忆上下文
@@ -275,10 +274,14 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
     // 6. 发送会话启动和记忆上下文消息
     sendSessionStart(writer, sessionId, container.id, memoryContext);
 
-    // 7. 构建增强命令并执行
-    const enhancedCommand = buildEnhancedCommand(command, memoryContext, projectPromptContext, workingDir);
+    // 7. 累积系统上下文到选项（不再污染用户命令），并以原始命令执行
+    const contextParts = buildContextParts(memoryContext, projectPromptContext, workingDir);
+    mappedOptions.systemContextParts = [
+      ...(Array.isArray(mappedOptions.systemContextParts) ? mappedOptions.systemContextParts : []),
+      ...contextParts,
+    ];
     logger.debug({ sessionId }, '[ClaudeQuery] Executing in container');
-    await executeInContainer(userId, enhancedCommand, mappedOptions, writer, sessionId, providerConfig);
+    await executeInContainer(userId, command, mappedOptions, writer, sessionId, providerConfig);
     logger.info({ sessionId }, '[ClaudeQuery] Execution completed');
     queryTimer.end(logger, 'Claude query completed', { sessionId });
 

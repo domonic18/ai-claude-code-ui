@@ -90,19 +90,45 @@ const AUTONOMOUS_MODE_RULES = [
 ];
 
 /**
- * bypassPermissions 模式下注入自主执行系统提示词
+ * 装配 systemPrompt.append：合并系统上下文分片（cwd/memory/project-prompt/文档索引/文件读取/skill）
+ * 与自主执行模式规则（bypassPermissions 时）。
  *
- * 告诉 AI 不要提问、不要等待确认、自动继续执行所有任务。
  * 使用 SDK 的 systemPrompt.append 机制，在默认 claude_code 提示词后追加指令。
+ * 仅在存在追加内容时设置 systemPrompt，否则保持 SDK 默认。
+ * 装配后清除非合法的 systemContextParts 字段，避免透传给 SDK。
  *
  * @param {object} sdkOptions - SDK 选项（可变）
+ * @param {object} options - 原始选项（用于日志 sessionId）
+ * @param {number} userId - 用户 ID（日志）
  */
-function injectAutonomousSystemPrompt(sdkOptions) {
-  sdkOptions.systemPrompt = {
-    type: 'preset',
-    preset: 'claude_code',
-    append: AUTONOMOUS_MODE_RULES.join('\n'),
-  };
+function assembleSystemPrompt(sdkOptions, options, userId) {
+  const appendParts = [];
+
+  // 各层累积的系统上下文分片（来自 chat.js / ClaudeQuery.js / buildSDKScript）
+  if (Array.isArray(sdkOptions.systemContextParts) && sdkOptions.systemContextParts.length > 0) {
+    appendParts.push(...sdkOptions.systemContextParts);
+  }
+
+  // bypassPermissions 模式下追加自主执行指令，防止 AI 中途停下来提问
+  if (sdkOptions.permissionMode === 'bypassPermissions') {
+    appendParts.push(AUTONOMOUS_MODE_RULES.join('\n'));
+    logger.info({
+      userId,
+      sessionId: options.sessionId || '',
+      permissionMode: 'bypassPermissions',
+    }, '[ScriptBuilder] Autonomous mode activated (bypassPermissions)');
+  }
+
+  if (appendParts.length > 0) {
+    sdkOptions.systemPrompt = {
+      type: 'preset',
+      preset: 'claude_code',
+      append: appendParts.join('\n\n'),
+    };
+  }
+
+  // systemContextParts 非合法 SDK 选项，装配完毕后清除
+  delete sdkOptions.systemContextParts;
 }
 
 /**
@@ -130,21 +156,14 @@ async function filterSDKOptions(options, userId) {
   const userDisallowedTools = determinePermissionMode(sdkOptions, settings);
   cleanupSdkOptions(sdkOptions, options, userDisallowedTools);
 
-  // bypassPermissions 模式下注入自主执行指令，防止 AI 中途停下来提问
-  if (sdkOptions.permissionMode === 'bypassPermissions') {
-    injectAutonomousSystemPrompt(sdkOptions);
-    logger.info({
-      userId,
-      sessionId: options.sessionId || '',
-      permissionMode: 'bypassPermissions',
-    }, '[ScriptBuilder] Autonomous mode activated (bypassPermissions)');
-  }
-
   // 关闭 extended thinking（env 开关）：诊断 kimi/minimax 慢轮是否 thinking 导致
   if (process.env.DISABLE_THINKING === '1') {
     sdkOptions.thinking = { type: 'disabled' };
     logger.info({ sessionId: options.sessionId || '' }, '[ScriptBuilder] Extended thinking disabled (DISABLE_THINKING=1)');
   }
+
+  // 装配 systemPrompt.append（系统上下文分片 + 自主模式规则）
+  assembleSystemPrompt(sdkOptions, options, userId);
 
   return sdkOptions;
 }
@@ -160,13 +179,16 @@ export async function buildSDKScript(command, options, userId) {
   const sessionId = options.sessionId || '';
   const imagePaths = options.imagePaths || [];
 
-  // 如果用户手动选择了 skill，在 command 前追加 skill 调用指令
+  // 用户手动选择的 skill：触发行放回用户消息（需与用户原话同处，才能指代如"这个技能"）。
+  // 用 <ccui-inject> 包裹，前端 extractUserContent 显示时剥掉，保持气泡干净。
+  // 注：skill 与 cwd/索引/记忆等 ambient 上下文不同——它是"本次请求用哪个技能"的直接指令，
+  // 不能进 system prompt（否则与用户原话分离，模型无法解析指代）。
   if (options.skill) {
     // 校验 skill 名称：只允许字母、数字、连字符、下划线，防止注入
     if (!/^[a-zA-Z0-9_-]{1,64}$/.test(options.skill)) {
       throw new Error(`Invalid skill name: ${options.skill}`);
     }
-    command = `请使用 "${options.skill}" skill 完成此任务。\n\n${command}`;
+    command = `<ccui-inject type="skill">请使用 "${options.skill}" skill 完成此任务。</ccui-inject>\n\n${command}`;
     logger.info({ skill: options.skill }, '[ScriptBuilder] Skill explicitly selected by user');
   }
 
@@ -182,7 +204,23 @@ export async function buildSDKScript(command, options, userId) {
     optionsSize: JSON.stringify(sdkOptions).length,
   }, '[ScriptBuilder] SDK options summary');
 
-
+  // ── Prompt 可观测性 ──────────────────────────────────────
+  // 默认仅记录结构信息（长度/是否注入）；对话内容属敏感数据，遵循日志规范默认不打印。
+  // 排障时设置环境变量 LOG_FULL_PROMPT=1，可打印完整 user prompt 与 systemPrompt.append。
+  const fullPromptDebug = process.env.LOG_FULL_PROMPT === '1';
+  const spAppend = sdkOptions.systemPrompt?.append;
+  logger.info({
+    sessionId,
+    commandLength: command.length,
+    hasSystemPrompt: !!sdkOptions.systemPrompt,
+    systemPromptAppendLength: typeof spAppend === 'string' ? spAppend.length : 0,
+    systemContextPartsCount: Array.isArray(options.systemContextParts) ? options.systemContextParts.length : 0,
+    fullPromptLogging: fullPromptDebug,
+  }, '[ScriptBuilder] Prompt summary（command=用户原话；上下文经 systemPrompt.append 注入）');
+  if (fullPromptDebug) {
+    logger.info({ sessionId, prompt: command }, '[ScriptBuilder][FULL_PROMPT] user prompt（应为用户原话，不含任何注入）');
+    logger.info({ sessionId, systemPrompt: sdkOptions.systemPrompt }, '[ScriptBuilder][FULL_PROMPT] systemPrompt（preset + append，含 cwd/索引/文件/skill/memory/project-prompt）');
+  }
 
   const optionsBase64 = Buffer.from(JSON.stringify(sdkOptions)).toString('base64');
   const commandBase64 = Buffer.from(command, 'utf-8').toString('base64');

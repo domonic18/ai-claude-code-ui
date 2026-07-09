@@ -24,7 +24,6 @@ import {
   isValidJson,
   getPasswordStrength,
 } from '../validation/validators';
-import { filterMemoryContext } from '../memory';
 import {
   getFileExtension,
   getFileNameWithoutExtension,
@@ -385,45 +384,6 @@ describe('validators', () => {
       const result = getPasswordStrength('Password123');
       expect(result.score).toBeGreaterThan(2);
       expect(result.feedback).toContain('special characters');
-    });
-  });
-});
-
-describe('memory', () => {
-  describe('filterMemoryContext', () => {
-    it('should return original text if no memory markers', () => {
-      const text = 'This is regular text';
-      expect(filterMemoryContext(text)).toBe(text);
-    });
-
-    it('should remove memory context', () => {
-      const text = 'User input\n--- Memory Context ---\nThis is memory\n--- End Memory Context ---';
-      const result = filterMemoryContext(text);
-      expect(result).toBe('User input');
-    });
-
-    it('should handle null input', () => {
-      expect(filterMemoryContext(null)).toBeNull();
-    });
-
-    it('should handle undefined input', () => {
-      expect(filterMemoryContext(undefined)).toBeUndefined();
-    });
-
-    it('should handle empty string', () => {
-      expect(filterMemoryContext('')).toBe('');
-    });
-
-    it('should preserve text after memory context', () => {
-      const text = 'Before\n--- Memory Context ---\nMemory content\n--- End Memory Context ---\nAfter';
-      const result = filterMemoryContext(text);
-      // trim() removes newlines between before and after text
-      expect(result).toBe('BeforeAfter');
-    });
-
-    it('should handle incomplete memory markers', () => {
-      const text = 'Text\n--- Memory Context ---\nMemory content';
-      expect(filterMemoryContext(text)).toBe(text);
     });
   });
 });

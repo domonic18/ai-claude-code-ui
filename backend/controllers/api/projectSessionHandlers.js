@@ -31,6 +31,11 @@ export async function getSessionMessages(userId, projectName, sessionId, limit, 
     offset
   );
 
+  // limit=null 时 ContainerSessions 返回的是数组（全部消息）；否则返回 {messages,...} 分页对象
+  if (Array.isArray(result)) {
+    return { messages: result };
+  }
+
   if (result && result.messages) {
     return {
       messages: result.messages,
@@ -40,7 +45,7 @@ export async function getSessionMessages(userId, projectName, sessionId, limit, 
     };
   }
 
-  return { messages: result.messages || [] };
+  return { messages: [] };
 }
 
 // 处理业务逻辑，供路由层调用

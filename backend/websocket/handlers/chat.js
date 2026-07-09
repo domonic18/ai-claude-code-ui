@@ -93,7 +93,9 @@ async function readImageFromContainer(userId, filePath) {
  * @returns {Promise<{command: string, imageAttachments: Array}>} 处理后的命令和图片附件
  */
 async function buildClaudeCommand(data, userId, projectName) {
-  let command = data.command || '';
+  // 用户命令保持原样：系统上下文不再拼进 command，改为累积到 systemContextParts，
+  // 最终经 systemPrompt.append 注入，使 SDK 的 user turn 即用户原始输入（避免气泡泄露）
+  const command = data.command || '';
   const attachments = data.attachments || [];
 
   // 区分三种附件类型
@@ -119,11 +121,17 @@ async function buildClaudeCommand(data, userId, projectName) {
     }
   }
 
-  // 处理文档附件：生成读取指令（在文档索引之前，确保 @ 文件被优先读取）
+  // 系统上下文分片：文档读取指令、项目文档索引等不再拼进用户命令，
+  // 而是累积到 systemContextParts，最终经 systemPrompt.append 注入（保持用户消息为原始输入）
+  const systemContextParts = [];
+
+  // 文档附件读取指令（确保 @ 文件被优先读取）
   if (documentAttachments.length > 0) {
     const filePaths = documentAttachments.map(f => ({ path: f.path, name: f.name, type: f.type }));
     const readInstructions = formatReadInstructions(filePaths);
-    command = `The user has referenced the following files — read these FIRST:\n\n${readInstructions}\n\nAfter reading the referenced files, answer the user's question below.\n\n${command}`;
+    systemContextParts.push(
+      `The user has referenced the following files — read these FIRST:\n\n${readInstructions}\n\nAfter reading the referenced files, answer the user's question below.`
+    );
   }
 
   // 注入项目文档索引作为轻量知识库（摘要级上下文，按需读取全文）
@@ -132,14 +140,16 @@ async function buildClaudeCommand(data, userId, projectName) {
       const readmeContent = await readmeService.readReadme(userId, projectName);
       if (readmeContent) {
         logger.info({ projectName, userId, readmeLength: readmeContent.length }, '[buildClaudeCommand] 注入项目文档索引');
-        command = `[项目文档索引 — 以下是项目中所有可用文档的摘要目录，仅当回答问题需要时才按需读取对应文件全文]\n${readmeContent}\n\n---\n\n${command}`;
+        systemContextParts.push(
+          `[项目文档索引 — 以下是项目中所有可用文档的摘要目录，仅当回答问题需要时才按需读取对应文件全文]\n${readmeContent}`
+        );
       }
     } catch (err) {
       logger.warn({ err, projectName, userId }, '[buildClaudeCommand] 读取 readme.md 失败，跳过上下文注入');
     }
   }
 
-  return { command, imageAttachments };
+  return { command, imageAttachments, systemContextParts };
 }
 
 // WebSocket 消息或事件处理
@@ -155,7 +165,7 @@ async function buildClaudeCommand(data, userId, projectName) {
 async function handleClaudeCommand(data, ws, writer) {
   const originalProjectName = data.options?.projectPath?.replace(/\//g, '-') || '';
   const cmdTimer = startTimer('chat/command_build');
-  const { command, imageAttachments } = await buildClaudeCommand(data, ws.user?.userId, originalProjectName);
+  const { command, imageAttachments, systemContextParts } = await buildClaudeCommand(data, ws.user?.userId, originalProjectName);
   cmdTimer.end(logger, 'Command built', { userId: ws.user?.userId, projectPath: originalProjectName });
 
   logger.info({
@@ -175,6 +185,8 @@ async function handleClaudeCommand(data, ws, writer) {
     projectPath: originalProjectName,
     images: imageAttachments.length > 0 ? imageAttachments : undefined,
     skill: data.options?.skill || undefined,
+    // 系统上下文分片（文档索引/文件读取指令等），最终由 systemPrompt.append 注入
+    systemContextParts,
   };
 
   // 追踪活跃会话，ws 关闭时自动中止
