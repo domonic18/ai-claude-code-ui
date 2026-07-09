@@ -129,7 +129,11 @@ export async function getProjectsInContainer(userId) {
         .map(d => d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
         .map(d => `grep -v "^${d}$"`)
         .join(' | ');
-      const lsCmd = `ls -1 "$1" 2>/dev/null | ${excludePattern} || echo ""`;
+      // 只列出目录（-type d），避免把 /workspace 下的普通文件（如镜像残留的 =10 垃圾文件）
+      // 误识别为项目，进而触发 SDK chdir 到文件路径报 spawn ENOTDIR。
+      // -printf '%f\n' 输出目录 basename（不含父路径），与原 ls -1 的解析逻辑兼容。
+      // sandbox 镜像为 GNU findutils，-printf 已验证可用（参见 DocumentService 目录扫描）。
+      const lsCmd = `find "$1" -maxdepth 1 -mindepth 1 -type d -printf '%f\\n' 2>/dev/null | ${excludePattern} | sort || echo ""`;
 
       const { stream } = await containerManager.execInContainer(
         userId,
