@@ -279,11 +279,11 @@ export const api = {
   // Generic GET method for any endpoint
   get: (endpoint: string) => authenticatedFetch(`/api${endpoint}`),
 
-  // Memory endpoints
-  memory: {
-    read: () => authenticatedFetch('/api/memory'),
+  // User prompt endpoints
+  userPrompt: {
+    read: () => authenticatedFetch('/api/user-prompt'),
     write: (content: string) =>
-      authenticatedFetch('/api/memory', {
+      authenticatedFetch('/api/user-prompt', {
         method: 'PUT',
         body: JSON.stringify({ content }),
       }),

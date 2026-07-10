@@ -444,12 +444,12 @@
     "comingSoon": "即将推出",
     "opencodeDescription": "OpenCode 集成即将推出。此功能目前正在开发中，将在未来更新中提供。"
   },
-  "memory": {
-    "title": "记忆",
+  "userPrompt": {
+    "title": "用户提示词",
     "save": "保存",
     "saving": "保存中...",
     "saved": "已保存",
-    "placeholder": "长期记忆可以记录用户的工作习惯、要求和准则等"
+    "placeholder": "用户提示词用于记录用户的工作习惯、要求和准则等"
   },
   "projectPrompt": {
     "title": "项目提示词",

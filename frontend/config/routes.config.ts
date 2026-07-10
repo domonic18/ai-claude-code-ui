@@ -51,9 +51,9 @@ export const ROUTES = {
   SETTINGS_PROFILE: '/settings/profile',
 
   /**
-   * Memory routes
+   * User prompt routes
    */
-  MEMORY: '/memory',
+  USER_PROMPT: '/user-prompt',
 
   /**
    * Admin routes
@@ -98,7 +98,7 @@ export const ROUTE_TITLES: Record<keyof Omit<typeof ROUTES, 'PROJECT' | 'PROJECT
   SETTINGS_MCP_SERVERS: 'MCP Servers',
   SETTINGS_CREDENTIALS: 'Credentials',
   SETTINGS_PROFILE: 'Profile',
-  MEMORY: 'Memory',
+  USER_PROMPT: 'User Prompt',
   ADMIN: 'Admin',
   ADMIN_EXTENSIONS: 'Extension Management',
   FILES: 'Files',
@@ -186,9 +186,9 @@ export const ROUTE_META: Record<string, RouteMeta> = {
     requiresAuth: true,
     hideFromNav: true,
   },
-  [ROUTES.MEMORY]: {
-    title: 'Memory',
-    description: 'Manage long-term memory and preferences',
+  [ROUTES.USER_PROMPT]: {
+    title: 'User Prompt',
+    description: 'Manage user prompt and preferences',
     requiresAuth: true,
     hideFromNav: true,
   },

@@ -1,27 +1,27 @@
 /**
- * MemoryPage.tsx
+ * UserPromptPage.tsx
  *
- * 记忆管理页面
- * 允许用户编辑和保存长期记忆文件
+ * 用户提示词管理页面
+ * 允许用户编辑和保存用户提示词文件
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Save, Brain, Loader2, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Save, FileText, Loader2, CheckCircle } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
-import { memoryService } from '@/shared/services/memoryService';
+import { userPromptService } from '@/shared/services/userPromptService';
 import { logger } from '@/shared/utils/logger';
 
-interface MemoryData {
+interface UserPromptData {
   content: string;
   path: string;
 }
 
 /**
- * 记忆编辑器属性
+ * 用户提示词编辑器属性
  */
-interface MemoryEditorProps {
+interface UserPromptEditorProps {
   content: string;
   isLoading: boolean;
   isSaving: boolean;
@@ -30,9 +30,9 @@ interface MemoryEditorProps {
 }
 
 /**
- * 记忆内容编辑器：渲染 textarea + 保存按钮，支持加载/保存中状态
+ * 用户提示词内容编辑器：渲染 textarea + 保存按钮，支持加载/保存中状态
  */
-function MemoryEditor({ content, isLoading, isSaving, onSave, onChange }: MemoryEditorProps) {
+function UserPromptEditor({ content, isLoading, isSaving, onSave, onChange }: UserPromptEditorProps) {
   const { t } = useTranslation();
 
   if (isLoading) {
@@ -46,11 +46,11 @@ function MemoryEditor({ content, isLoading, isSaving, onSave, onChange }: Memory
   return (
     <div className="space-y-4">
       <textarea
-        id="memory-editor"
+        id="user-prompt-editor"
         value={content}
         onChange={(e) => onChange(e.target.value)}
         className="w-full h-[60vh] min-h-[400px] p-4 font-mono text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-y"
-        placeholder={t('memory.placeholder')}
+        placeholder={t('userPrompt.placeholder')}
         spellCheck={false}
       />
       <div className="flex justify-end">
@@ -62,12 +62,12 @@ function MemoryEditor({ content, isLoading, isSaving, onSave, onChange }: Memory
           {isSaving ? (
             <>
               <Loader2 className="w-4 h-4 mr-2" />
-              {t('memory.saving')}
+              {t('userPrompt.saving')}
             </>
           ) : (
             <>
               <Save className="w-4 h-4 mr-2" />
-              {t('memory.save')}
+              {t('userPrompt.save')}
             </>
           )}
         </Button>
@@ -79,15 +79,15 @@ function MemoryEditor({ content, isLoading, isSaving, onSave, onChange }: Memory
 /**
  * 页面头部属性
  */
-interface MemoryPageHeaderProps {
+interface UserPromptPageHeaderProps {
   saveSuccess: boolean;
   t: (key: string) => string;
 }
 
 /**
- * 记忆页面头部：返回按钮、标题、保存成功指示器
+ * 用户提示词页面头部：返回按钮、标题、保存成功指示器
  */
-function MemoryPageHeader({ saveSuccess, t }: MemoryPageHeaderProps) {
+function UserPromptPageHeader({ saveSuccess, t }: UserPromptPageHeaderProps) {
   return (
     <header className="border-b border-border bg-card">
       <div className="max-w-6xl mx-auto px-4 py-4">
@@ -103,15 +103,15 @@ function MemoryPageHeader({ saveSuccess, t }: MemoryPageHeaderProps) {
 
           {/* Title */}
           <div className="flex items-center gap-2">
-            <Brain className="w-5 h-5 text-primary" />
-            <h1 className="text-xl font-semibold">{t('memory.title')}</h1>
+            <FileText className="w-5 h-5 text-primary" />
+            <h1 className="text-xl font-semibold">{t('userPrompt.title')}</h1>
           </div>
 
           {/* Success indicator */}
           {saveSuccess && (
             <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
               <CheckCircle className="w-4 h-4" />
-              <span className="text-sm">{t('memory.saved')}</span>
+              <span className="text-sm">{t('userPrompt.saved')}</span>
             </div>
           )}
         </div>
@@ -139,11 +139,11 @@ function ErrorMessage({ error }: ErrorMessageProps) {
   );
 }
 
-// 由父组件调用，React 组件或常量：MemoryPage
+// 由父组件调用，React 组件或常量：UserPromptPage
 /**
- * 记忆页面组件
+ * 用户提示词页面组件
  */
-export function MemoryPage() {
+export function UserPromptPage() {
   const { t } = useTranslation();
   const [content, setContent] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
@@ -151,50 +151,50 @@ export function MemoryPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 加载记忆文件
-  const loadMemory = useCallback(async () => {
+  // 加载用户提示词文件
+  const loadUserPrompt = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
-      const data: MemoryData = await memoryService.readMemory();
+      const data: UserPromptData = await userPromptService.readUserPrompt();
       setContent(data.content);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load memory';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load user prompt';
       setError(errorMessage);
-      logger.error('[MemoryPage] Error loading memory:', err);
+      logger.error('[UserPromptPage] Error loading user prompt:', err);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // 保存记忆文件
+  // 保存用户提示词文件
   const handleSave = useCallback(async () => {
     try {
       setIsSaving(true);
       setError(null);
-      await memoryService.writeMemory(content);
+      await userPromptService.writeUserPrompt(content);
       setIsSaving(false);
       setSaveSuccess(true);
 
       // 3秒后隐藏成功提示
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to save memory';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save user prompt';
       setError(errorMessage);
       setIsSaving(false);
-      logger.error('[MemoryPage] Error saving memory:', err);
+      logger.error('[UserPromptPage] Error saving user prompt:', err);
     }
   }, [content]);
 
-  // 组件加载时获取记忆
+  // 组件加载时获取用户提示词
   useEffect(() => {
-    loadMemory();
-  }, [loadMemory]);
+    loadUserPrompt();
+  }, [loadUserPrompt]);
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <MemoryPageHeader saveSuccess={saveSuccess} t={t} />
+      <UserPromptPageHeader saveSuccess={saveSuccess} t={t} />
 
       {/* Content */}
       <main className="max-w-6xl mx-auto px-4 py-8">
@@ -202,7 +202,7 @@ export function MemoryPage() {
         <ErrorMessage error={error} />
 
         {/* Editor */}
-        <MemoryEditor
+        <UserPromptEditor
           content={content}
           isLoading={isLoading}
           isSaving={isSaving}
@@ -214,4 +214,4 @@ export function MemoryPage() {
   );
 }
 
-export default MemoryPage;
+export default UserPromptPage;

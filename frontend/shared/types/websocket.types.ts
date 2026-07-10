@@ -52,13 +52,13 @@ export interface MessageQueueItem {
   retries: number;
 }
 
-// MemoryContextMessage 的类型定义
+// UserPromptContextMessage 的类型定义
 /**
- * Memory context message
- * Sent by backend to provide memory context to the AI
+ * User prompt context message
+ * Sent by backend to provide user prompt context to the AI
  */
-export interface MemoryContextMessage {
-  type: 'memory-context';
+export interface UserPromptContextMessage {
+  type: 'user-prompt-context';
   sessionId: string;
   content: string;
 }

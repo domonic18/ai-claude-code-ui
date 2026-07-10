@@ -105,10 +105,10 @@ export function useChatWebSocketProcessor(options: UseChatWebSocketProcessorOpti
         updateStreamThinking: (thinking) => {
           options.updateStreamThinking(thinking);
         },
-        onMemoryContext: (content, sessionId) => {
-          // Memory context is received but not displayed in chat
+        onUserPromptContext: (content, sessionId) => {
+          // User prompt context is received but not displayed in chat
           // Used for debugging/monitoring purposes only
-          logger.info('[ChatInterface] Memory context received:', content?.length, 'chars for session:', sessionId);
+          logger.info('[ChatInterface] User prompt context received:', content?.length, 'chars for session:', sessionId);
         },
         getCurrentSessionId: () => options.currentSessionId,
         getSelectedProjectName: () => options.selectedProjectName,

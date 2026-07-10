@@ -23,7 +23,7 @@ import { ProtectedRoute } from '@/router';
 import { useProductTour } from '@/shared/hooks/useProductTour';
 import { ProductTour } from '@/shared/components/tour';
 import { APP_NAME } from '@/shared/constants/app.constants';
-import { Homepage, SettingsPage, AdminPage, MemoryPage, NotFoundPage } from '@/pages';
+import { Homepage, SettingsPage, AdminPage, UserPromptPage, NotFoundPage } from '@/pages';
 import { LoginForm, SetupForm } from '@/features/auth';
 
 import '@/shared/i18n';
@@ -174,7 +174,7 @@ function App() {
                   <Route path="/chat" element={<AppContent />} />
                   <Route path="/settings" element={<SettingsPage />} />
                   <Route path="/admin" element={<AdminPage />} />
-                  <Route path="/memory" element={<MemoryPage />} />
+                  <Route path="/user-prompt" element={<UserPromptPage />} />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
