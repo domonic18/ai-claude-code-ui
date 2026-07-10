@@ -6,7 +6,7 @@
 
 import containerManager from '../core/index.js';
 import { buildSDKScript } from './ScriptBuilder.js';
-import { setSessionStream, setSessionStdin } from './SessionManager.js';
+import { setSessionStream, setSessionStdin, setSessionKillFn } from './SessionManager.js';
 import { writeFileViaPutArchive } from '../utils/containerFileWriter.js';
 import { createLogger, sanitizePreview, startTimer } from '../../../utils/logger.js';
 import { copyImagesToContainer } from './dockerImageHandler.js';
@@ -104,6 +104,34 @@ export async function executeInContainer(userId, command, options, writer, sessi
 
     // 步骤 3：保存 stream 并设置多路分离
     setSessionStream(sessionId, stream);
+
+    // 注册容器内进程 kill 函数：abort 时显式 kill 容器内 SDK 进程组。
+    // 非 TTY 模式下 destroy stream 不杀进程，必须显式 kill；且要杀进程组而非单个进程——
+    // SDK 的 query() 会 spawn 一个 [claude] CLI 子进程，若只 pkill sdk_exec 父进程，
+    // CLI 子进程会变孤儿（PPID→1）继续执行，导致停止后文档仍持续生成。
+    setSessionKillFn(sessionId, async () => {
+      const tmpScriptFile = sdkScriptInfo.tmpScriptFile;
+      logger.info({ sessionId, tmpScriptFile }, '[DockerExecutor] Killing container SDK process group on abort');
+      try {
+        // shell 单引号转义：单引号内 sh 不解释任何元字符（$ ` " \），嵌入的单引号需转义为 '\''
+        // 防御命令注入——tmpScriptFile 虽是 randomUUID 路径（无元字符），仍转义兜底
+        const safePattern = `'${String(tmpScriptFile).replace(/'/g, `'\\''`)}'`;
+        // 进程组 kill：sdk_exec 是进程组 leader（PGID=PID），kill -TERM -<pgid> 杀整组（sdk_exec + claude 子进程）。
+        // pgrep 定位 sdk_exec 的 PID（即 PGID），负号 -<pgid> 表示向整个进程组发 SIGTERM。
+        // 末尾 true 保证命令返回 0（无匹配/kill 失败也不抛错），避免 exec stream 异常。
+        const { stream: killStream } = await containerManager.execInContainer(
+          userId,
+          ['sh', '-c', `pgid=$(pgrep -f ${safePattern} | head -1); [ -n "$pgid" ] && kill -TERM -"$pgid" 2>/dev/null; true`],
+          { tty: false }
+        );
+        // 吞掉 kill exec stream 的 error，避免 unhandled；不读输出（只关心信号已发）
+        killStream?.on?.('error', () => {});
+      } catch (err) {
+        // 进程可能已自然退出 / 容器已停——kill 失败不阻断 abort，降级为只 destroy stream
+        logger.debug({ err: err?.message || err, sessionId }, '[DockerExecutor] process group kill failed (process may have exited)');
+      }
+    });
+
     const { PassThrough } = await import('stream');
     const stdout = new PassThrough();
     const stderr = new PassThrough();

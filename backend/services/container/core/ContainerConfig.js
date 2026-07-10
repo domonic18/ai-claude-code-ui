@@ -75,6 +75,10 @@ export class ContainerConfigBuilder {
       ReadonlyRootfs: false,
       Seccomp: this._loadSeccompProfile(),
       SecurityOpt: this._buildSecurityOptions(),
+      // 启用 docker-init(tini) 作为 PID 1：实时 reap 孤儿/僵尸进程。
+      // SDK query() spawn 的 [claude] 子进程在停止时被进程组 kill 杀掉后，
+      // 若无 tini 回收会变 <defunct> 僵尸堆积；tini 自动 wait 回收，保持容器干净。
+      Init: true,
       LogConfig: {
         Type: 'json-file',
         Config: {
