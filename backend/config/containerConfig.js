@@ -14,7 +14,7 @@ import { getResourceLimits } from './containerTierConfig.js';
  * 系统保留目录名（在 /workspace/ 下不应被识别为用户项目的目录）
  * DocumentService、ContainerProjectManager 等模块应引用此常量，避免硬编码不一致
  */
-export const RESERVED_DIR_NAMES = ['generated_docs', 'logs', '.claude', 'memory'];
+export const RESERVED_DIR_NAMES = ['generated_docs', 'logs', '.claude', 'user-prompt'];
 
 /**
  * AI 生成文档的目录名（相对于项目根目录）

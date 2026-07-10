@@ -141,7 +141,7 @@ export class ContainerConfigBuilder {
     const containerEnv = [
       // 设置 HOME 指向 /workspace，这样 ~/.claude/ = /workspace/.claude/
       // SDK 的 settingSources: ['user'] 会从 ~/.claude/ 加载配置
-      // 这样 SDK 可以正确读取用户级记忆文件：/workspace/.claude/memory/MEMORY.md
+      // 这样 SDK 可以正确读取用户级用户提示词文件：/workspace/.claude/user-prompt/user-prompt.md
       `HOME=/workspace`,
       `USER_ID=${userId}`,
       `NODE_ENV=production`,

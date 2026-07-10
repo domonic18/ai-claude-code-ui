@@ -1,19 +1,19 @@
 /**
- * MemoryController.js
+ * UserPromptController.js
  *
- * 记忆控制器
- * 处理记忆文件相关的请求
+ * 用户提示词控制器
+ * 处理用户提示词文件相关的请求
  *
- * @module controllers/MemoryController
+ * @module controllers/UserPromptController
  */
 
 import { BaseController } from '../core/BaseController.js';
-import { memoryService } from '../../services/memory/index.js';
+import { userPromptService } from '../../services/user-prompt/index.js';
 
 /**
- * 记忆控制器
+ * 用户提示词控制器
  */
-export class MemoryController extends BaseController {
+export class UserPromptController extends BaseController {
 // 处理业务逻辑，供路由层调用
   /**
    * 构造函数
@@ -25,16 +25,16 @@ export class MemoryController extends BaseController {
 
 // 处理业务逻辑，供路由层调用
   /**
-   * 读取记忆文件
+   * 读取用户提示词文件
    * @param {Object} req - Express 请求对象
    * @param {Object} res - Express 响应对象
    * @param {Function} next - 下一个中间件
    */
-  async readMemory(req, res, next) {
+  async readUserPrompt(req, res, next) {
     try {
       const userId = this._getUserId(req);
 
-      const result = await memoryService.readMemory(userId, {
+      const result = await userPromptService.readUserPrompt(userId, {
         containerMode: req.containerMode
       });
 
@@ -46,26 +46,25 @@ export class MemoryController extends BaseController {
 
 // 处理业务逻辑，供路由层调用
   /**
-   * 写入记忆文件
+   * 写入用户提示词文件
    * @param {Object} req - Express 请求对象
    * @param {Object} res - Express 响应对象
    * @param {Function} next - 下一个中间件
    */
-  async writeMemory(req, res, next) {
+  async writeUserPrompt(req, res, next) {
     try {
       const userId = this._getUserId(req);
       const { content } = req.body;
 
-      const result = await memoryService.writeMemory(userId, content, {
+      const result = await userPromptService.writeUserPrompt(userId, content, {
         containerMode: req.containerMode
       });
 
-      this._success(res, result, 'Memory saved successfully');
+      this._success(res, result, 'User prompt saved successfully');
     } catch (error) {
       this._handleError(error, req, res, next);
     }
   }
 }
 
-export default MemoryController;
-
+export default UserPromptController;

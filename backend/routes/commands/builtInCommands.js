@@ -9,7 +9,7 @@
  * - /clear   — 清空对话历史
  * - /model   — 切换或查看当前 AI 模型
  * - /cost    — 显示 token 用量和费用信息
- * - /memory  — 打开 CLAUDE.md 记忆文件
+ * - /memory  — 打开项目级 CLAUDE.md 指令文件（项目级，区别于用户级"用户提示词"）
  * - /config  — 打开设置面板
  * - /status  — 显示系统状态和版本信息
  * - /rewind  — 回退对话到之前的状态
@@ -58,7 +58,7 @@ export const builtInCommands = [
   },
   {
     name: '/memory',
-    description: 'Open CLAUDE.md memory file for editing',
+    description: 'Open the project CLAUDE.md instructions file',
     namespace: 'builtin',
     metadata: { type: 'builtin' }
   },

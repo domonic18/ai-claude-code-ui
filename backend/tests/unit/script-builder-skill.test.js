@@ -3,7 +3,7 @@
  *
  * 验证注入策略的端到端集成：
  * - skill 触发行：放回 command（用 <ccui-inject> 包裹，与用户原话同处以便指代），前端显示时剥掉
- * - 其它 ambient 上下文（cwd/索引/文件/记忆等）→ systemContextParts → systemPrompt.append，且不透传给 SDK
+ * - 其它 ambient 上下文（cwd/索引/文件/用户提示词等）→ systemContextParts → systemPrompt.append，且不透传给 SDK
  *
  * buildSDKScript 将 command、sdkOptions 各自 base64 编码后嵌入：
  *   command    → scriptContent 中的 `Buffer.from("${commandBase64}", "base64")`
