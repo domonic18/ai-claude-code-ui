@@ -35,6 +35,21 @@ export function setSessionStdin(sessionId, stdinWriter) {
 }
 
 /**
+ * 设置会话的进程 kill 函数
+ * abort 时调用，用于终止容器内 SDK 进程。
+ * 背景：容器非 TTY 模式下 destroy stream 只断 attach 连接、不发信号给容器内进程，
+ * 必须显式 kill，否则容器内 SDK 会继续执行后续 todo 直到任务自然完成（停止按钮失效）。
+ * @param {string} sessionId - 会话 ID
+ * @param {Function} killFn - 异步 kill 函数，终止容器内 SDK 进程
+ */
+export function setSessionKillFn(sessionId, killFn) {
+  const session = containerSessions.get(sessionId);
+  if (session) {
+    session.killFn = killFn;
+  }
+}
+
+/**
  * 获取会话的 stdin 写入函数（带会话所有权校验）
  *
  * 仅当请求者的 userId 与会话创建者一致时才返回 stdinWriter，
@@ -133,7 +148,23 @@ export async function abortSession(sessionId) {
   session.status = 'aborted';
   session.endTime = Date.now();
 
-  // 通过销毁 stream 来终止 Docker exec 进程。
+  // 1. 先 kill 容器内 SDK 进程。
+  // 容器用非 TTY 模式，destroy stream 只断 attach 连接、不发信号给容器内进程，
+  // 必须显式 kill，否则容器内 SDK 会继续执行后续 todo 直到任务自然完成（停止按钮失效）。
+  // fire-and-forget：不 await，不阻塞 abort 响应；失败降级为只 destroy stream（进程可能已退出）。
+  if (typeof session.killFn === 'function') {
+    // Promise.resolve 统一处理同步抛出与异步 reject，避免 unhandled rejection（fire-and-forget，不阻塞 abort）
+    Promise.resolve()
+      .then(() => session.killFn())
+      .then(() => {
+        logger.info({ sessionId }, '[SessionManager] Triggered container process kill on abort');
+      })
+      .catch(err => {
+        logger.debug({ err: err?.message || err, sessionId }, '[SessionManager] killFn failed (process may have exited)');
+      });
+  }
+
+  // 2. 销毁宿主机读取容器输出的流，触发 handleStreamProcessing settle。
   // 传 Error 对象确保触发 'error' 事件，使 handleStreamProcessing 的
   // Promise settle（resolve/reject），从而释放挂起的 queryClaudeSDKInContainer。
   // 仅 destroy() 不传 error 可能只触发 'close' 而不触发 'error'，导致空挂。
