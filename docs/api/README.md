@@ -21,7 +21,7 @@ Claude Code UI 提供 RESTful HTTP API 用于管理项目、会话、文件、Gi
 | Sessions | [sessions.md](sessions.md) | 会话查询、搜索、删除 |
 | Files | [files.md](files.md) | 文件读写、目录管理、上传 |
 | Git | [git.md](git.md) | 状态查询、提交、分支、远程操作 |
-| Memory | [memory.md](memory.md) | CLAUDE.md 记忆文件管理 |
+| User Prompt | [user-prompt.md](user-prompt.md) | 用户提示词文件管理 |
 | Integrations | [integrations.md](integrations.md) | Claude/Cursor/Codex/MCP/Agent/CLI/TaskMaster |
 | Tools & Commands | [tools.md](tools.md) | MCP 工具、扩展管理、命令执行 |
 | System & Uploads | [system.md](system.md) | 系统更新、文件浏览、音频转录、健康检查 |
@@ -111,7 +111,7 @@ Claude Code UI 提供 RESTful HTTP API 用于管理项目、会话、文件、Gi
 | Sessions | `backend/routes/api/sessions.js` |
 | Files | `backend/routes/api/files.js` |
 | Git | `backend/routes/api/git.js` |
-| Memory | `backend/routes/api/memory.js` |
+| User Prompt | `backend/routes/api/user-prompt.js` |
 | Claude | `backend/routes/integrations/claude.js` |
 | Cursor | `backend/routes/integrations/ai-providers/cursor.js` |
 | Codex | `backend/routes/integrations/ai-providers/codex.js` |

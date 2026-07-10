@@ -458,7 +458,7 @@ SDK 每次 `query()` 都执行 `node cli.js --model <model> --resume <sessionId>
 
 - ✅ **Provider 配置解析**：模型→provider→baseURL/authToken 映射无误
 - ✅ **环境变量传递**：`ANTHROPIC_BASE_URL` 和 `ANTHROPIC_AUTH_TOKEN` 随模型切换正确变化
-- ✅ **Memory 加载**：memory context 正确加载
+- ✅ **用户提示词加载**：user-prompt context 正确加载
 - ✅ **前端流程**：`session-created` 替换为真实 sessionId，生产环境正常
 
 #### 待办
