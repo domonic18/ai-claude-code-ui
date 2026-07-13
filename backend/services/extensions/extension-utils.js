@@ -95,7 +95,13 @@ export async function copyDirectory(source, target) {
  * @returns {Object} 解析后的 frontmatter 键值对
  */
 export function parseFrontmatter(content) {
-    const match = content.match(/^---\n([\s\S]+?)\n---/);
+    // 兼容外部文件常见的不规范：BOM 头、CRLF / CR 行尾。
+    // 若不规范化，下方 ^---\n 正则会整段匹配失败，导致 title 等字段全部丢失。
+    const normalized = content
+        .replace(/^\uFEFF/, '')
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n');
+    const match = normalized.match(/^---\n([\s\S]+?)\n---/);
     if (!match) return {};
 
     const frontmatter = {};
