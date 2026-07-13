@@ -6,7 +6,7 @@
  * - 会话结束（claude-complete）时刷新，同步 AI 对该文件的直接编辑；
  *   但用户有未保存编辑时跳过刷新，避免覆盖输入（Observer 回调用 ref 中转）。
  *
- * 仿 memoryService 范式（走 api.projectPrompt，PUT 保存），不复用已删除的 useMemoryEditor。
+ * 仿 userPromptService 范式（走 api.projectPrompt，PUT 保存），不复用已删除的 useUserPromptEditor。
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';

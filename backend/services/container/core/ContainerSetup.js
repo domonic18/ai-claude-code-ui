@@ -5,7 +5,7 @@
  * - 默认工作区目录创建
  * - 扩展文件同步
  * - Hooks 权限设置
- * - 记忆目录和文件创建
+ * - 用户提示词目录和文件创建
  * - README 文件创建
  *
  * 所有方法接收 Docker container 实例，不依赖 LifecycleManager 状态。
@@ -15,7 +15,7 @@
 
 import { syncExtensions } from '../../extensions/extension-sync.js';
 import { createExtensionTar } from '../../extensions/extension-tar.js';
-import { DEFAULT_MEMORY_TEMPLATE, MEMORY_SETUP_TIMEOUT } from '../../../shared/constants/memory.js';
+import { DEFAULT_USER_PROMPT_TEMPLATE, USER_PROMPT_SETUP_TIMEOUT } from '../../../shared/constants/user-prompt.js';
 import { createLogger, startTimer } from '../../../utils/logger.js';
 
 const logger = createLogger('container/core/ContainerSetup');
@@ -116,8 +116,8 @@ export async function syncExtensionsToContainer(container) {
     // 设置 hooks 脚本执行权限
     await setHooksPermissions(container);
 
-    // 创建记忆目录和文件
-    await createMemoryDirectoryAndFile(container);
+    // 创建用户提示词目录和文件
+    await createUserPromptDirectoryAndFile(container);
 
     syncTimer.end(logger, 'Extensions synced to container');
 }
@@ -139,40 +139,41 @@ export async function setHooksPermissions(container) {
     }
 }
 
-// 由 LifecycleManager 调用以初始化新容器的记忆功能
+// 由 LifecycleManager 调用以初始化新容器的用户提示词功能
 /**
- * 创建用户级记忆目录和默认记忆文件
+ * 创建用户级用户提示词目录和默认文件（新容器初始化）
+ * 文件已存在则跳过，不覆盖用户数据
  * @param {Object} container - Docker 容器实例
  * @returns {Promise<void>}
  */
-export async function createMemoryDirectoryAndFile(container) {
+export async function createUserPromptDirectoryAndFile(container) {
     try {
-        // 创建 /workspace/.claude/memory 目录
-        const mkdirResult = await execWithTimeout(container, 'mkdir -p /workspace/.claude/memory', MEMORY_SETUP_TIMEOUT);
+        // 创建 /workspace/.claude/user-prompt 目录
+        const mkdirResult = await execWithTimeout(container, 'mkdir -p /workspace/.claude/user-prompt', USER_PROMPT_SETUP_TIMEOUT);
         if (mkdirResult.success) {
-            logger.debug('Created memory directory: /workspace/.claude/memory');
+            logger.debug('Ensured user-prompt directory: /workspace/.claude/user-prompt');
         }
 
-        // 检查记忆文件是否存在
+        // 文件不存在时写入默认模板（新用户初始化）
         const checkResult = await execWithTimeout(
             container,
-            'test -f /workspace/.claude/memory/MEMORY.md && echo "EXISTS" || echo "NOT_EXISTS"',
-            MEMORY_SETUP_TIMEOUT
+            'test -f /workspace/.claude/user-prompt/user-prompt.md && echo "EXISTS" || echo "NOT_EXISTS"',
+            USER_PROMPT_SETUP_TIMEOUT
         );
 
         if (checkResult.success && checkResult.output && checkResult.output.includes('NOT_EXISTS')) {
-            // 使用 base64 编码创建文件，避免特殊字符问题
-            const base64Content = Buffer.from(DEFAULT_MEMORY_TEMPLATE, 'utf8').toString('base64');
+            // 使用 base64 编码创建默认模板，避免特殊字符问题
+            const base64Content = Buffer.from(DEFAULT_USER_PROMPT_TEMPLATE, 'utf8').toString('base64');
             const createResult = await execWithTimeout(
                 container,
-                `echo '${base64Content}' | base64 -d > /workspace/.claude/memory/MEMORY.md`,
-                MEMORY_SETUP_TIMEOUT
+                `echo '${base64Content}' | base64 -d > /workspace/.claude/user-prompt/user-prompt.md`,
+                USER_PROMPT_SETUP_TIMEOUT
             );
             if (createResult.success) {
-                logger.debug('Created default memory file: /workspace/.claude/memory/MEMORY.md');
+                logger.debug('Created default user-prompt file: /workspace/.claude/user-prompt/user-prompt.md');
             }
         }
     } catch (error) {
-        logger.warn({ err: error }, 'Failed to create memory directory/file');
+        logger.warn({ err: error }, 'Failed to create user-prompt directory/file');
     }
 }

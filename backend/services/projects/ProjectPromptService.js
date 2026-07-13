@@ -3,7 +3,7 @@
  *
  * 项目级提示词服务
  * 提供单个项目的提示词文件（.project-prompt.md）读取与写入。
- * 仿 MemoryService，作用域为单个项目：/workspace/<项目名>/.project-prompt.md
+ * 仿 UserPromptService，作用域为单个项目：/workspace/<项目名>/.project-prompt.md
  *
  * 设计要点：
  * - 文件优先，不入数据库

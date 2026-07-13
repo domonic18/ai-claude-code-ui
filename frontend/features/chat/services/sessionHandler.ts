@@ -1,7 +1,7 @@
 /**
  * Session & System Message Handlers
  *
- * Handlers for session lifecycle, token budget, memory context, and task messages.
+ * Handlers for session lifecycle, token budget, user prompt context, and task messages.
  */
 
 import { logger } from '@/shared/utils/logger';
@@ -53,20 +53,20 @@ export function handleTokenBudget(message: WebSocketMessage, callbacks: MessageH
 }
 
 /**
- * 处理内存上下文消息
+ * 处理用户提示词上下文消息
  *
- * 接收发送给 AI 的内存/记忆上下文内容，不展示在聊天界面中，
- * 仅记录日志用于调试。通过 onMemoryContext 回调传递给上层处理。
+ * 接收发送给 AI 的用户提示词上下文内容，不展示在聊天界面中，
+ * 仅记录日志用于调试。通过 onUserPromptContext 回调传递给上层处理。
  *
  * @param message - WebSocket 消息，包含 content 和 sessionId
  * @param callbacks - UI 状态更新回调集合
  * @returns 始终返回 true
  */
-export function handleMemoryContext(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
-  if (message.content && message.sessionId && callbacks.onMemoryContext) {
-    callbacks.onMemoryContext(message.content, message.sessionId);
+export function handleUserPromptContext(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
+  if (message.content && message.sessionId && callbacks.onUserPromptContext) {
+    callbacks.onUserPromptContext(message.content, message.sessionId);
   }
-  logger.info('[WS] Memory context received:', message.content?.length, 'chars');
+  logger.info('[WS] User prompt context received:', message.content?.length, 'chars');
   return true;
 }
 

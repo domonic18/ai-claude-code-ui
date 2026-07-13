@@ -1,18 +1,18 @@
 /**
- * Memory Constants
+ * User Prompt Constants
  *
- * 记忆文件相关的常量定义
+ * 用户提示词文件相关的常量定义
  *
- * @module shared/constants/memory
+ * @module shared/constants/user-prompt
  */
 
 /**
- * 默认记忆模板
- * 用于新用户初始化和记忆文件不存在时的兜底内容
+ * 默认用户提示词模板
+ * 用于新用户初始化和用户提示词文件不存在时的兜底内容
  *
  * @constant {string}
  */
-export const DEFAULT_MEMORY_TEMPLATE = `# Memory - 专利助手
+export const DEFAULT_USER_PROMPT_TEMPLATE = `# User Prompt - 专利助手
 
 ## 专业背景
 - 工作领域：[填写专业领域，如教育/电子/化工/生物医疗等]
@@ -49,9 +49,9 @@ export const DEFAULT_MEMORY_TEMPLATE = `# Memory - 专利助手
 `;
 
 /**
- * 记忆文件设置操作超时时间（毫秒）
- * 用于容器内创建记忆目录和文件的超时控制
+ * 用户提示词文件设置操作超时时间（毫秒）
+ * 用于容器内创建用户提示词目录和文件的超时控制
  *
  * @constant {number}
  */
-export const MEMORY_SETUP_TIMEOUT = 5000;
+export const USER_PROMPT_SETUP_TIMEOUT = 5000;

@@ -12,16 +12,16 @@ import { executeInContainer } from './DockerExecutor.js';
 import { createSession, updateSession } from './SessionManager.js';
 import { CONTAINER } from '../../../config/config.js';
 import { getModelProviderConfig } from '../../../config/modelConfig.js';
-import { memoryService } from '../../memory/index.js';
+import { userPromptService } from '../../user-prompt/index.js';
 import { projectPromptService } from '../../projects/index.js';
 import { createLogger, sanitizePreview, startTimer, withTimer } from '../../../utils/logger.js';
 const logger = createLogger('services/container/claude/ClaudeQuery');
 
-// 用于在 system prompt 中标记记忆上下文分节（仅做结构化，不再用于剥离用户消息）
-const MEMORY_START = '--- Memory Context ---';
-const MEMORY_END = '--- End Memory Context ---';
+// 用于在 system prompt 中标记用户提示词上下文分节（仅做结构化，不再用于剥离用户消息）
+const USER_PROMPT_START = '--- User Prompt Context ---';
+const USER_PROMPT_END = '--- End User Prompt Context ---';
 
-// 用于在 system prompt 中标记项目级提示词分节（与 memory 对称，不含路径）
+// 用于在 system prompt 中标记项目级提示词分节（与 user-prompt 对称，不含路径）
 const PROJECT_PROMPT_START = '--- Project Prompt ---';
 const PROJECT_PROMPT_END = '--- End Project Prompt ---';
 
@@ -51,26 +51,26 @@ function mapWorkingDirectory(isContainerProject, projectPath, cwd) {
   }
 }
 
-// 加载用户的记忆文件以作为 Claude 对话的上下文包含在内
+// 加载用户的用户提示词文件以作为 Claude 对话的上下文包含在内
 /**
- * 加载记忆内容
+ * 加载用户提示词内容
  * @param {number} userId - 用户 ID
  * @param {object} options - 选项
- * @returns {Promise<string|null>} 记忆内容，如果没有记忆则返回 null
+ * @returns {Promise<string|null>} 用户提示词内容，如果没有则返回 null
  */
-async function loadMemoryContext(userId, options) {
+async function loadUserPromptContext(userId, options) {
   try {
-    const memoryResult = await memoryService.readMemory(userId, {
+    const promptResult = await userPromptService.readUserPrompt(userId, {
       containerMode: options.containerMode
     });
 
-    if (memoryResult && memoryResult.content) {
-      // 返回原始记忆内容，不添加标记
-      return memoryResult.content;
+    if (promptResult && promptResult.content) {
+      // 返回原始用户提示词内容，不添加标记
+      return promptResult.content;
     }
   } catch (error) {
-    // 如果读取记忆失败，记录警告但继续执行
-    logger.warn({ err: error }, 'Failed to load memory context');
+    // 如果读取用户提示词失败，记录警告但继续执行
+    logger.warn({ err: error }, 'Failed to load user prompt context');
   }
   return null;
 }
@@ -100,27 +100,27 @@ async function loadProjectPromptContext(userId, projectName, options) {
 }
 
 /**
- * 构建系统上下文分片（工作目录提示 + 记忆上下文 + 项目级提示词）
+ * 构建系统上下文分片（工作目录提示 + 用户提示词 + 项目级提示词）
  *
  * 这些内容不再拼进用户命令，而是作为 systemContextParts 累积，最终由
  * systemPrompt.append 注入，使 SDK 的 user turn 保持为用户原始输入。
  *
- * @param {string|null} memoryContext - 记忆上下文
+ * @param {string|null} userPromptContext - 用户提示词
  * @param {string|null} projectPromptContext - 项目级提示词
  * @param {string} cwd - 当前工作目录（如 /workspace/我的工作区）
  * @returns {string[]} 系统上下文分片数组
  */
-function buildContextParts(memoryContext, projectPromptContext, cwd) {
+function buildContextParts(userPromptContext, projectPromptContext, cwd) {
   const parts = [];
 
   // 工作目录提示，确保 AI 将文件写入正确的项目目录
   parts.push(`【系统提示】当前工作目录：${cwd}。所有文件必须写入此目录或其子目录中，禁止使用 /workspace/ 作为文件路径前缀。`);
 
-  if (memoryContext) {
-    parts.push(`${MEMORY_START}\n${memoryContext}\n${MEMORY_END}`);
+  if (userPromptContext) {
+    parts.push(`${USER_PROMPT_START}\n${userPromptContext}\n${USER_PROMPT_END}`);
   }
 
-  // 项目级提示词置于记忆块之后（项目级更具体，后置）；空则不注入
+  // 项目级提示词置于用户提示词块之后（项目级更具体，后置）；空则不注入
   if (projectPromptContext) {
     parts.push(`${PROJECT_PROMPT_START}\n${projectPromptContext}\n${PROJECT_PROMPT_END}`);
   }
@@ -128,24 +128,24 @@ function buildContextParts(memoryContext, projectPromptContext, cwd) {
   return parts;
 }
 
-// 通知前端会话启动并在 UI 中包含记忆上下文
+// 通知前端会话启动并在 UI 中包含用户提示词
 /**
- * 发送会话启动和记忆上下文消息
+ * 发送会话启动和用户提示词消息
  * @param {object} writer - WebSocket 写入器
  * @param {string} sessionId - 会话 ID
  * @param {string} containerId - 容器 ID
- * @param {string|null} memoryContext - 记忆上下文
+ * @param {string|null} userPromptContext - 用户提示词
  */
-function sendSessionStart(writer, sessionId, containerId, memoryContext) {
+function sendSessionStart(writer, sessionId, containerId, userPromptContext) {
   if (!writer) return;
 
-  // 发送记忆上下文消息（如果有）
-  if (memoryContext) {
-    logger.debug({ sessionId, memoryLength: memoryContext.length }, '[ClaudeQuery] Sending memory-context');
+  // 发送用户提示词消息（如果有）
+  if (userPromptContext) {
+    logger.debug({ sessionId, promptLength: userPromptContext.length }, '[ClaudeQuery] Sending user-prompt-context');
     writer.send({
-      type: 'memory-context',
+      type: 'user-prompt-context',
       sessionId,
-      content: memoryContext
+      content: userPromptContext
     });
   }
 
@@ -225,12 +225,12 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
   logger.debug({ sessionId, isContainerProject, projectPath }, '[ClaudeQuery] Project context');
 
   try {
-    // 1. 加载记忆上下文
-    const memoryContext = await withTimer('claude/memory_load', logger,
-      () => loadMemoryContext(userId, { containerMode: options.containerMode }),
+    // 1. 加载用户提示词上下文
+    const userPromptContext = await withTimer('claude/user_prompt_load', logger,
+      () => loadUserPromptContext(userId, { containerMode: options.containerMode }),
       {
-        successMsg: 'Memory context loaded',
-        successExtra: (result) => ({ sessionId, memoryLength: result?.length || 0 }),
+        successMsg: 'User prompt context loaded',
+        successExtra: (result) => ({ sessionId, promptLength: result?.length || 0 }),
       }
     );
 
@@ -271,11 +271,11 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
     // 5. 创建会话
     setupSession(sessionId, container, command, mappedOptions);
 
-    // 6. 发送会话启动和记忆上下文消息
-    sendSessionStart(writer, sessionId, container.id, memoryContext);
+    // 6. 发送会话启动和用户提示词消息
+    sendSessionStart(writer, sessionId, container.id, userPromptContext);
 
     // 7. 累积系统上下文到选项（不再污染用户命令），并以原始命令执行
-    const contextParts = buildContextParts(memoryContext, projectPromptContext, workingDir);
+    const contextParts = buildContextParts(userPromptContext, projectPromptContext, workingDir);
     mappedOptions.systemContextParts = [
       ...(Array.isArray(mappedOptions.systemContextParts) ? mappedOptions.systemContextParts : []),
       ...contextParts,
@@ -299,4 +299,3 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
     throw error;
   }
 }
-

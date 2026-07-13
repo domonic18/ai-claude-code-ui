@@ -444,12 +444,12 @@
     "comingSoon": "Coming Soon",
     "opencodeDescription": "OpenCode integration is coming soon. This feature is currently under development and will be available in a future update."
   },
-  "memory": {
-    "title": "Memory",
+  "userPrompt": {
+    "title": "User Prompt",
     "save": "Save",
     "saving": "Saving...",
     "saved": "Saved",
-    "placeholder": "Long-term memory can record user's work habits, requirements, and guidelines..."
+    "placeholder": "User prompt records work habits, requirements, and guidelines..."
   },
   "projectPrompt": {
     "title": "Project Prompt",

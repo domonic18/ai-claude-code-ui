@@ -20,4 +20,4 @@ export { SettingsPage } from './settings';
 export { AdminPage } from './admin';
 
 // Feature pages
-export { MemoryPage } from '../features/memory';
+export { UserPromptPage } from '../features/user-prompt';

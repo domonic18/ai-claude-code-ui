@@ -2,7 +2,7 @@
  * JSONL 解析器
  *
  * 解析 JSONL 格式的 Claude Code 会话文件，
- * 合并了原 sessionParser.js 的功能（filterMemoryContext 集成）。
+ * 合并了原 sessionParser.js 的功能（filterUserPromptContext 集成）。
  *
  * @module core/utils/jsonl-parser
  */
@@ -11,7 +11,7 @@ import { createLogger } from '../../../utils/logger.js';
 import {
   createSession, extractTextFromEntry, _extractTextContent, processUserEntry, processAssistantEntry
 } from './jsonlHelpers.js';
-import { filterMemoryContext, filterProjectPrompt } from '../../../utils/memoryUtils.js';
+import { filterUserPromptContext, filterProjectPrompt } from '../../../utils/userPromptUtils.js';
 import {
   processSessionEntry, postProcessSessions, calculateStats
 } from './jsonlSessionHelpers.js';
@@ -103,10 +103,10 @@ export function parseJsonlContent(content) {
 }
 
 /**
- * 从条目中过滤敏感的内存上下文信息
+ * 从条目中过滤敏感的用户提示词上下文信息
  *
- * 对 user 角色的消息内容执行 filterMemoryContext 过滤，
- * 移除可能包含敏感信息的记忆上下文段落。
+ * 对 user 角色的消息内容执行 filterUserPromptContext 过滤，
+ * 移除可能包含敏感信息的用户提示词上下文段落。
  *
  * @param {Object} entry - JSONL 条目对象
  * @param {Object} entry.message - 消息对象
@@ -120,7 +120,7 @@ export function parseJsonlContent(content) {
  * 对 user 角色消息内容执行指定过滤函数；内容被修改时返回新 entry（避免无谓拷贝）。
  * 统一了 role 检查、文本提取、差异比较的模板，新增上下文类型只需传入 filterFn。
  *
- * @param {(text: string) => string} filterFn - 文本过滤函数（如 filterMemoryContext）
+ * @param {(text: string) => string} filterFn - 文本过滤函数（如 filterUserPromptContext）
  * @returns {(entry: Object) => Object} entry 过滤函数
  */
 function createContextFilter(filterFn) {
@@ -136,8 +136,8 @@ function createContextFilter(filterFn) {
   };
 }
 
-/** 从条目中剥离记忆上下文（--- Memory Context --- 块） */
-export const filterMemoryContextFromEntry = createContextFilter(filterMemoryContext);
+/** 从条目中剥离用户提示词上下文（--- User Prompt Context --- 块） */
+export const filterUserPromptContextFromEntry = createContextFilter(filterUserPromptContext);
 
 /** 从条目中剥离项目提示词上下文（--- Project Prompt --- 块） */
 export const filterProjectPromptFromEntry = createContextFilter(filterProjectPrompt);

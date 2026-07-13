@@ -40,8 +40,8 @@ export interface MessageHandlerCallbacks {
   updateStreamContent?: (content: string) => void;
   updateStreamThinking?: (thinking: string) => void;
 
-  // Memory context
-  onMemoryContext?: (content: string, sessionId: string) => void;
+  // User prompt context
+  onUserPromptContext?: (content: string, sessionId: string) => void;
 
   // Current state
   getCurrentSessionId: () => string | null;

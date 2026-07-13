@@ -8,7 +8,7 @@
  * - claudeHandler.ts  - Claude streaming/response/output/error
  * - cursorHandler.ts  - Cursor system/tool-use/error/result/output
  * - codexHandler.ts   - Codex response/complete
- * - sessionHandler.ts - Session lifecycle, token-budget, memory-context, TodoWrite
+ * - sessionHandler.ts - Session lifecycle, token-budget, user-prompt-context, TodoWrite
  *
  * 消息路由流程：
  * 1. 接收 WebSocket 消息
@@ -26,7 +26,7 @@ export type { MessageHandlerCallbacks } from './types';
 export { generateMessageId, decodeHtmlEntities, safeLocalStorage } from './wsUtils';
 
 // Import provider-specific handlers
-import { handleSessionCreated, handleTokenBudget, handleMemoryContext, handleTodoWrite, handleClaudeComplete, handleSessionAborted } from './sessionHandler';
+import { handleSessionCreated, handleTokenBudget, handleUserPromptContext, handleTodoWrite, handleClaudeComplete, handleSessionAborted } from './sessionHandler';
 import { handleClaudeResponse, handleClaudeOutput, handleClaudeInteractivePrompt, handleAgentQuestion, handleClaudeError } from './claudeHandler';
 import { handleCursorSystem, handleCursorToolUse, handleCursorError, handleCursorResult, handleCursorOutput } from './cursorHandler';
 import { handleCodexResponse, handleCodexComplete } from './codexHandler';
@@ -43,7 +43,7 @@ import type { MessageHandlerCallbacks } from './types';
  */
 const MESSAGE_HANDLERS: Record<string, (message: WebSocketMessage, callbacks: MessageHandlerCallbacks, currentSessionId: string | null) => boolean> = {
   'session-start': (msg) => { logger.info(`Session started:`, msg.sessionId); return true; },
-  'memory-context': (msg, cbs) => handleMemoryContext(msg, cbs),
+  'user-prompt-context': (msg, cbs) => handleUserPromptContext(msg, cbs),
   'session-created': (msg, cbs, sid) => handleSessionCreated(msg, cbs, sid),
   'token-budget': (msg, cbs) => handleTokenBudget(msg, cbs),
   'TodoWrite': (msg, cbs) => handleTodoWrite(msg, cbs),

@@ -90,7 +90,7 @@ const AUTONOMOUS_MODE_RULES = [
 ];
 
 /**
- * 装配 systemPrompt.append：合并系统上下文分片（cwd/memory/project-prompt/文档索引/文件读取/skill）
+ * 装配 systemPrompt.append：合并系统上下文分片（cwd/user-prompt/project-prompt/文档索引/文件读取/skill）
  * 与自主执行模式规则（bypassPermissions 时）。
  *
  * 使用 SDK 的 systemPrompt.append 机制，在默认 claude_code 提示词后追加指令。
@@ -181,7 +181,7 @@ export async function buildSDKScript(command, options, userId) {
 
   // 用户手动选择的 skill：触发行放回用户消息（需与用户原话同处，才能指代如"这个技能"）。
   // 用 <ccui-inject> 包裹，前端 extractUserContent 显示时剥掉，保持气泡干净。
-  // 注：skill 与 cwd/索引/记忆等 ambient 上下文不同——它是"本次请求用哪个技能"的直接指令，
+  // 注：skill 与 cwd/索引/用户提示词等 ambient 上下文不同——它是"本次请求用哪个技能"的直接指令，
   // 不能进 system prompt（否则与用户原话分离，模型无法解析指代）。
   if (options.skill) {
     // 校验 skill 名称：只允许字母、数字、连字符、下划线，防止注入
@@ -219,7 +219,7 @@ export async function buildSDKScript(command, options, userId) {
   }, '[ScriptBuilder] Prompt summary（command=用户原话；上下文经 systemPrompt.append 注入）');
   if (fullPromptDebug) {
     logger.info({ sessionId, prompt: command }, '[ScriptBuilder][FULL_PROMPT] user prompt（应为用户原话，不含任何注入）');
-    logger.info({ sessionId, systemPrompt: sdkOptions.systemPrompt }, '[ScriptBuilder][FULL_PROMPT] systemPrompt（preset + append，含 cwd/索引/文件/skill/memory/project-prompt）');
+    logger.info({ sessionId, systemPrompt: sdkOptions.systemPrompt }, '[ScriptBuilder][FULL_PROMPT] systemPrompt（preset + append，含 cwd/索引/文件/skill/user-prompt/project-prompt）');
   }
 
   const optionsBase64 = Buffer.from(JSON.stringify(sdkOptions)).toString('base64');

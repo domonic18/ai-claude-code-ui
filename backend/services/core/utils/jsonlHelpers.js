@@ -6,7 +6,7 @@
  * @module core/utils/jsonlHelpers
  */
 
-import { filterMemoryContext } from '../../../utils/memoryUtils.js';
+import { filterUserPromptContext } from '../../../utils/userPromptUtils.js';
 
 // ─── 过滤配置 ────────────────────────────────────────────
 
@@ -60,7 +60,7 @@ export function _isApiErrorMessage(text) {
 
 export function processUserEntry(session, entry) {
   const rawContent = extractTextFromEntry(entry.message);
-  const textContent = filterMemoryContext(rawContent);
+  const textContent = filterUserPromptContext(rawContent);
   if (textContent && !_isSystemMessage(textContent)) {
     session.lastUserMessage = textContent;
   }
