@@ -31,11 +31,16 @@ RUN apt-get update && apt-get install -y \
     fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
-# 预装 patent skills 所需的 Python 依赖（PCT DOCX 转换工具包）
+# 预装 patent skills 所需的 Python 依赖（PCT DOCX 转换工具包 / 专利申请 DOCX 组装）
+# - lxml 是 python-docx 的底层 XML 依赖，锁定 6.0.0 保证每个容器环境一致可复现、不自动升级
 # ⚠️ 版本约束必须加引号：未加引号时 shell(/bin/sh -c) 会把 '>=10' 解析为输出重定向
 # （> =10），在 WORKDIR(/workspace) 下生成名为 =10 的垃圾文件，进而被项目发现误识别为项目，
 # 导致 SDK chdir 到文件路径报 spawn ENOTDIR。
-RUN pip3 install --no-cache-dir --break-system-packages 'Pillow>=10'
+RUN pip3 install --no-cache-dir --break-system-packages 'Pillow>=10' 'lxml==6.0.0'
+
+# 预装 patent-docx-collaborative-review 技能所需的 OfficeCLI（原生处理 WordprocessingML 批注与修订痕迹）
+# 锁定技能已验证版本 1.0.132；全局装进系统 PATH，技能脚本按 OFFICECLI env → node_modules/.bin → PATH 查找
+RUN npm install -g @officecli/officecli@1.0.132
 
 # Create workspace and config directories
 RUN mkdir -p /workspace /app /workspace/.claude/projects && \
