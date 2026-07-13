@@ -141,8 +141,8 @@ export async function setHooksPermissions(container) {
 
 // 由 LifecycleManager 调用以初始化新容器的用户提示词功能
 /**
- * 创建用户级用户提示词目录和默认文件
- * 若存在旧版文件 /workspace/.claude/memory/MEMORY.md，则迁移（移动）到新路径（老用户数据原地复用）
+ * 创建用户级用户提示词目录和默认文件（新容器初始化）
+ * 文件已存在则跳过，不覆盖用户数据
  * @param {Object} container - Docker 容器实例
  * @returns {Promise<void>}
  */
@@ -151,10 +151,10 @@ export async function createUserPromptDirectoryAndFile(container) {
         // 创建 /workspace/.claude/user-prompt 目录
         const mkdirResult = await execWithTimeout(container, 'mkdir -p /workspace/.claude/user-prompt', USER_PROMPT_SETUP_TIMEOUT);
         if (mkdirResult.success) {
-            logger.debug('Created user-prompt directory: /workspace/.claude/user-prompt');
+            logger.debug('Ensured user-prompt directory: /workspace/.claude/user-prompt');
         }
 
-        // 检查用户提示词文件是否存在
+        // 文件不存在时写入默认模板（新用户初始化）
         const checkResult = await execWithTimeout(
             container,
             'test -f /workspace/.claude/user-prompt/user-prompt.md && echo "EXISTS" || echo "NOT_EXISTS"',
@@ -162,32 +162,15 @@ export async function createUserPromptDirectoryAndFile(container) {
         );
 
         if (checkResult.success && checkResult.output && checkResult.output.includes('NOT_EXISTS')) {
-            // 迁移：若旧版 MEMORY.md 存在，则移动到新路径（老用户数据原地复用）
-            const legacyCheck = await execWithTimeout(
+            // 使用 base64 编码创建默认模板，避免特殊字符问题
+            const base64Content = Buffer.from(DEFAULT_USER_PROMPT_TEMPLATE, 'utf8').toString('base64');
+            const createResult = await execWithTimeout(
                 container,
-                'test -f /workspace/.claude/memory/MEMORY.md && echo "LEGACY_EXISTS" || echo "NO_LEGACY"',
+                `echo '${base64Content}' | base64 -d > /workspace/.claude/user-prompt/user-prompt.md`,
                 USER_PROMPT_SETUP_TIMEOUT
             );
-            if (legacyCheck.success && legacyCheck.output && legacyCheck.output.includes('LEGACY_EXISTS')) {
-                const moveResult = await execWithTimeout(
-                    container,
-                    'mv /workspace/.claude/memory/MEMORY.md /workspace/.claude/user-prompt/user-prompt.md',
-                    USER_PROMPT_SETUP_TIMEOUT
-                );
-                if (moveResult.success) {
-                    logger.debug('Migrated legacy MEMORY.md to /workspace/.claude/user-prompt/user-prompt.md');
-                }
-            } else {
-                // 无旧文件：使用 base64 编码创建默认模板，避免特殊字符问题
-                const base64Content = Buffer.from(DEFAULT_USER_PROMPT_TEMPLATE, 'utf8').toString('base64');
-                const createResult = await execWithTimeout(
-                    container,
-                    `echo '${base64Content}' | base64 -d > /workspace/.claude/user-prompt/user-prompt.md`,
-                    USER_PROMPT_SETUP_TIMEOUT
-                );
-                if (createResult.success) {
-                    logger.debug('Created default user-prompt file: /workspace/.claude/user-prompt/user-prompt.md');
-                }
+            if (createResult.success) {
+                logger.debug('Created default user-prompt file: /workspace/.claude/user-prompt/user-prompt.md');
             }
         }
     } catch (error) {

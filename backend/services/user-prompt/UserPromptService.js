@@ -18,12 +18,6 @@ import { DEFAULT_USER_PROMPT_TEMPLATE } from '../../shared/constants/user-prompt
 export const USER_PROMPT_FILE_PATH = '/workspace/.claude/user-prompt/user-prompt.md';
 
 /**
- * 旧版文件路径（向后兼容：读取兜底，保障老用户数据不丢失）
- * 历史路径 /workspace/.claude/memory/MEMORY.md，新路径不存在时回退读取
- */
-const LEGACY_MEMORY_FILE_PATH = '/workspace/.claude/memory/MEMORY.md';
-
-/**
  * 用户提示词管理服务类
  */
 export class UserPromptService {
@@ -36,26 +30,17 @@ export class UserPromptService {
 
   /**
    * 读取用户提示词文件
-   * 读取兜底链：新路径 → 旧版 MEMORY.md 路径（老用户数据迁移保障）→ 默认模板
+   * 读取兜底：新路径 → 默认模板（文件不存在时，如新用户尚未初始化）
    * @param {number} userId - 用户 ID
    * @param {object} options - 选项
    * @returns {Promise<{content: string, path: string}>}
    */
   async readUserPrompt(userId, options = {}) {
     try {
-      const result = await readFileInContainer(userId, this.userPromptPath, options);
-      return result;
+      return await readFileInContainer(userId, this.userPromptPath, options);
     } catch (error) {
-      // 新路径文件不存在：先回退读旧版 MEMORY.md（老用户数据兜底），再退回默认模板
+      // 文件不存在：返回默认模板（新用户尚未初始化等场景）
       if (error.code === 'ENOENT' || error.message.includes('not found')) {
-        try {
-          const legacy = await readFileInContainer(userId, LEGACY_MEMORY_FILE_PATH, options);
-          if (legacy && legacy.content) {
-            return { content: legacy.content, path: this.userPromptPath };
-          }
-        } catch (legacyError) {
-          // 旧路径也不存在，忽略并继续返回默认模板
-        }
         return {
           content: DEFAULT_USER_PROMPT_TEMPLATE,
           path: this.userPromptPath
