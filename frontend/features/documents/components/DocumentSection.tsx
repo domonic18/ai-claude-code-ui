@@ -33,6 +33,8 @@ interface DocumentSectionProps {
   onDragToChat?: (doc: DocumentItemType) => void;
   /** 编辑摘要回调 */
   onEditSummary?: (fileName: string, summary: string) => Promise<void>;
+  /** 重新生成摘要回调（重调 AI） */
+  onRegenerateSummary?: (filePath: string, fileName: string, source: 'upload' | 'ai') => Promise<void>;
 }
 
 /**
@@ -49,6 +51,7 @@ export const DocumentSection: React.FC<DocumentSectionProps> = ({
   onNavigateToConversation,
   onDragToChat,
   onEditSummary,
+  onRegenerateSummary,
 }) => {
   const fullStorageKey = storageKey ? `doc-panel:section:${storageKey}` : null;
   const [collapsed, setCollapsed] = useState<boolean>(() =>
@@ -121,6 +124,7 @@ export const DocumentSection: React.FC<DocumentSectionProps> = ({
                 }
                 onDragToChat={onDragToChat ? () => onDragToChat(doc) : undefined}
                 onEditSummary={onEditSummary}
+                onRegenerateSummary={onRegenerateSummary}
               />
             ))}
           </div>

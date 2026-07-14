@@ -28,6 +28,7 @@ import {
   uploadDocument,
   deleteDocument as deleteDocApi,
   updateDocumentSummary,
+  regenerateDocumentSummary,
 } from '@/features/documents/services/documentService';
 import type { DocumentListResponse } from '@/features/documents/types/document.types';
 
@@ -163,6 +164,40 @@ export function useUpdateSummaryMutation() {
   return useMutation({
     mutationFn: ({ projectName, fileName, summary }: UpdateSummaryMutationParams) =>
       updateDocumentSummary(projectName, fileName, summary),
+
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: documentKeys.list(variables.projectName),
+      });
+    },
+  });
+}
+
+/** 重新生成摘要的 mutation 参数 */
+export interface RegenerateSummaryMutationParams {
+  projectName: string;
+  filePath: string;
+  fileName: string;
+  source?: 'upload' | 'ai';
+}
+
+/**
+ * 重新生成文档摘要的 TanStack Mutation Hook（重调 AI）
+ *
+ * 成功后自动 invalidate 对应项目的文档列表缓存（前端重新轮询 pending→ready/error）。
+ *
+ * @example
+ * ```typescript
+ * const regenerateMutation = useRegenerateSummaryMutation();
+ * await regenerateMutation.mutateAsync({ projectName, filePath, fileName, source: 'upload' });
+ * ```
+ */
+export function useRegenerateSummaryMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ projectName, filePath, fileName, source }: RegenerateSummaryMutationParams) =>
+      regenerateDocumentSummary(projectName, filePath, fileName, source),
 
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({

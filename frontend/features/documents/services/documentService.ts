@@ -132,3 +132,22 @@ export async function updateDocumentSummary(
   );
   if (!res.ok) throw new Error(`Failed to update summary: ${res.statusText}`);
 }
+
+/**
+ * 重新生成文档摘要（重调 AI）
+ */
+export async function regenerateDocumentSummary(
+  projectName: string,
+  filePath: string,
+  fileName: string,
+  source?: 'upload' | 'ai'
+): Promise<void> {
+  const res = await authenticatedFetch(
+    `${API_BASE}/${encodeURIComponent(projectName)}/documents/summary/regenerate`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ file_path: filePath, file_name: fileName, source })
+    }
+  );
+  if (!res.ok) throw new Error(`Failed to regenerate summary: ${res.statusText}`);
+}

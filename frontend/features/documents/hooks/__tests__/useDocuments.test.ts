@@ -21,12 +21,14 @@ const mockFetchDocuments = vi.fn();
 const mockUploadDocument = vi.fn();
 const mockDeleteDocument = vi.fn();
 const mockUpdateDocumentSummary = vi.fn();
+const mockRegenerateDocumentSummary = vi.fn();
 
 vi.mock('@/features/documents/services/documentService', () => ({
   fetchDocuments: (...args) => mockFetchDocuments(...args),
   uploadDocument: (...args) => mockUploadDocument(...args),
   deleteDocument: (...args) => mockDeleteDocument(...args),
   updateDocumentSummary: (...args) => mockUpdateDocumentSummary(...args),
+  regenerateDocumentSummary: (...args) => mockRegenerateDocumentSummary(...args),
 }));
 
 // documentEvents 事件总线：保存回调引用
@@ -91,6 +93,7 @@ describe('useDocuments', () => {
     mockUploadDocument.mockResolvedValue(undefined);
     mockDeleteDocument.mockResolvedValue(undefined);
     mockUpdateDocumentSummary.mockResolvedValue(undefined);
+    mockRegenerateDocumentSummary.mockResolvedValue(undefined);
     documentCreatedHandler = null;
   });
 
@@ -401,6 +404,84 @@ describe('useDocuments', () => {
       act(() => { vi.advanceTimersByTime(100); });
 
       expect(mockFetchDocuments).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── 本地 error 兜底 + regenerate ────────────────────
+
+  describe('本地 error 兜底 + regenerate', () => {
+    it('轮询超时后，仍 pending 的文档被标为本地 error', async () => {
+      const { wrapper } = createWrapper();
+      mockFetchDocuments.mockResolvedValue({
+        uploads: [makeDoc({
+          summary_status: 'pending',
+          file_path: '/p/stuck.pdf',
+          file_name: 'stuck.pdf',
+        })],
+        aiGenerated: [],
+      });
+
+      const { result } = renderHook(() => useDocuments('proj'), { wrapper });
+      await waitFor(() => expect(mockFetchDocuments).toHaveBeenCalledTimes(1));
+
+      // 推进过 60s 轮询上限（setInterval 间隔 4s，需推进到 64s 那次回调才进超时分支）：
+      // 超时兜底应把 pending 标为本地 error
+      act(() => { vi.advanceTimersByTime(65_000); });
+
+      await waitFor(() => {
+        expect(result.current.uploads[0].summary_status).toBe('error');
+      });
+    });
+
+    it('后端转 ready（手动刷新）后，本地 error 标记被清除', async () => {
+      const { wrapper } = createWrapper();
+      mockFetchDocuments.mockResolvedValue({
+        uploads: [makeDoc({
+          summary_status: 'pending',
+          file_path: '/p/x.pdf',
+          file_name: 'x.pdf',
+        })],
+        aiGenerated: [],
+      });
+      const { result } = renderHook(() => useDocuments('proj'), { wrapper });
+      await waitFor(() => expect(mockFetchDocuments).toHaveBeenCalledTimes(1));
+
+      act(() => { vi.advanceTimersByTime(65_000); });
+      await waitFor(() => expect(result.current.uploads[0].summary_status).toBe('error'));
+
+      // 后端转 ready，手动刷新触发 refetch
+      mockFetchDocuments.mockResolvedValue({
+        uploads: [makeDoc({
+          summary_status: 'ready',
+          file_path: '/p/x.pdf',
+          file_name: 'x.pdf',
+          summary: '好了',
+        })],
+        aiGenerated: [],
+      });
+      await act(async () => { await result.current.refresh(); });
+
+      await waitFor(() => expect(result.current.uploads[0].summary_status).toBe('ready'));
+    });
+
+    it('regenerateSummary 调用 regenerate 端点（参数正确）', async () => {
+      const { wrapper } = createWrapper();
+      mockFetchDocuments.mockResolvedValue({
+        uploads: [makeDoc({
+          summary_status: 'error',
+          file_path: '/p/bad.pdf',
+          file_name: 'bad.pdf',
+        })],
+        aiGenerated: [],
+      });
+      const { result } = renderHook(() => useDocuments('proj'), { wrapper });
+      await waitFor(() => expect(result.current.uploads[0].summary_status).toBe('error'));
+
+      await act(async () => {
+        await result.current.regenerateSummary('/p/bad.pdf', 'bad.pdf', 'upload');
+      });
+
+      expect(mockRegenerateDocumentSummary).toHaveBeenCalledWith('proj', '/p/bad.pdf', 'bad.pdf', 'upload');
     });
   });
 });

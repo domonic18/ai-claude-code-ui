@@ -36,6 +36,7 @@ export const DocumentPanel: React.FC<DocumentPanelProps> = ({
     upload,
     remove,
     updateSummary,
+    regenerateSummary,
   } = useDocuments(projectName);
 
   const {
@@ -140,6 +141,7 @@ export const DocumentPanel: React.FC<DocumentPanelProps> = ({
                 onPreview={handlePreview}
                 onDelete={(doc) => handleDelete(doc.file_path, 'upload')}
                 onEditSummary={updateSummary}
+                onRegenerateSummary={regenerateSummary}
               />
               <DocumentSection
                 title="AI 生成"
@@ -148,6 +150,7 @@ export const DocumentPanel: React.FC<DocumentPanelProps> = ({
                 onPreview={handlePreview}
                 onDelete={(doc) => handleDelete(doc.file_path, 'ai_generated')}
                 onEditSummary={updateSummary}
+                onRegenerateSummary={regenerateSummary}
               />
             </>
           )}
