@@ -214,3 +214,94 @@ describe('ReadmeService parseEntries', () => {
     assert.deepEqual(entries, []);
   });
 });
+
+// ─── 摘要状态行（error 持久化） ─────────────────────────
+
+describe('ReadmeService 摘要状态行（error 持久化）', () => {
+  it('appendEntry status=failed 写出 - 状态: 失败 行', async () => {
+    await svc.appendEntry(1, 'proj', {
+      fileName: 'bad.pdf',
+      fileSize: 100,
+      summary: '（摘要生成失败，请手动编辑）',
+      status: 'failed',
+    });
+    const content = await svc.readReadme(1, 'proj');
+    assert.ok(content.includes('- 状态: 失败'), '失败条目应含状态行');
+  });
+
+  it('appendEntry 成功（省略 status）不写状态行', async () => {
+    await svc.appendEntry(1, 'proj', { fileName: 'ok.pdf', fileSize: 100, summary: '正常摘要' });
+    const content = await svc.readReadme(1, 'proj');
+    assert.ok(!content.includes('- 状态:'), '成功条目不应有状态行');
+  });
+
+  it('parseEntries：失败条目 status=error，成功条目 status=ready', async () => {
+    await svc.appendEntry(1, 'proj', { fileName: 'bad.pdf', fileSize: 100, summary: '失败摘要', status: 'failed' });
+    await svc.appendEntry(1, 'proj', { fileName: 'ok.pdf', fileSize: 100, summary: '正常摘要' });
+    const entries = await svc.parseEntries(1, 'proj');
+    const bad = entries.find((e) => e.fileName === 'bad.pdf');
+    const ok = entries.find((e) => e.fileName === 'ok.pdf');
+    assert.equal(bad.status, 'error');
+    assert.equal(ok.status, 'ready');
+  });
+
+  it('parseEntries 向后兼容：旧格式（无状态行）视为 ready', async () => {
+    // 直接写旧格式 readme 到 fileStore（绕过 appendEntry）
+    fileStore['/workspace/legacy/readme.md'] = [
+      '# 项目文档索引',
+      '',
+      '## legacy.pdf',
+      '- 摘要: 旧条目无状态行',
+    ].join('\n');
+    const entries = await svc.parseEntries(1, 'legacy');
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].status, 'ready', '旧格式应视为 ready');
+  });
+
+  it('updateSummary 清除失败状态行（手动填写 → ready）', async () => {
+    await svc.appendEntry(1, 'proj', { fileName: 'bad.pdf', fileSize: 100, summary: '失败摘要', status: 'failed' });
+    await svc.updateSummary(1, 'proj', 'bad.pdf', '我手动填写的摘要');
+    const content = await svc.readReadme(1, 'proj');
+    assert.ok(content.includes('摘要: 我手动填写的摘要'), '摘要应更新');
+    assert.ok(!content.includes('- 状态: 失败'), '状态行应被清除');
+  });
+
+  it('updateSummary 对不存在的条目：append-if-missing 创建 ready 条目', async () => {
+    await svc.updateSummary(1, 'proj', 'newbie.pdf', '手动创建的摘要');
+    const content = await svc.readReadme(1, 'proj');
+    assert.ok(content.includes('## newbie.pdf'), '应创建条目');
+    assert.ok(content.includes('摘要: 手动创建的摘要'));
+    assert.ok(!content.includes('- 状态:'), '应为 ready 无状态行');
+  });
+});
+
+// ─── 并发写串行化（Bug 2: read-modify-write 覆盖） ────────
+
+describe('ReadmeService 并发写串行化（Bug 2）', () => {
+  it('并发 appendEntry 两个条目，两者都保留（不互相覆盖）', async () => {
+    await Promise.all([
+      svc.appendEntry(1, 'proj', { fileName: 'a.pdf', fileSize: 100, summary: '摘要A' }),
+      svc.appendEntry(1, 'proj', { fileName: 'b.pdf', fileSize: 100, summary: '摘要B' }),
+    ]);
+    const entries = await svc.parseEntries(1, 'proj');
+    const names = entries.map((e) => e.fileName);
+    assert.ok(names.includes('a.pdf'), 'a 应保留（不被并发写覆盖）');
+    assert.ok(names.includes('b.pdf'), 'b 应保留');
+  });
+
+  it('并发 appendEntry + removeEntry 不互相破坏', async () => {
+    await svc.appendEntry(1, 'proj', { fileName: 'a.pdf', fileSize: 100, summary: 'A' });
+    await svc.appendEntry(1, 'proj', { fileName: 'b.pdf', fileSize: 100, summary: 'B' });
+
+    // 并发：追加 c + 删除 a
+    await Promise.all([
+      svc.appendEntry(1, 'proj', { fileName: 'c.pdf', fileSize: 100, summary: 'C' }),
+      svc.removeEntry(1, 'proj', 'a.pdf'),
+    ]);
+    const entries = await svc.parseEntries(1, 'proj');
+    const names = entries.map((e) => e.fileName);
+    assert.ok(!names.includes('a.pdf'), 'a 应被删除');
+    assert.ok(names.includes('b.pdf'), 'b 应保留');
+    assert.ok(names.includes('c.pdf'), 'c 应保留');
+  });
+});

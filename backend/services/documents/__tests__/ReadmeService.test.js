@@ -182,3 +182,28 @@ describe('ReadmeService._formatSize', () => {
     assert.equal(svc._formatSize(2.3 * 1024 * 1024), '2.3MB');
   });
 });
+
+// ─── _hasSection ───────────────────────────────────────
+
+describe('ReadmeService._hasSection', () => {
+  const svc = createService();
+
+  it('存在指定文件名段落时返回 true', () => {
+    const content = '# 项目文档索引\n\n## a.pdf\n- 摘要: A';
+    assert.equal(svc._hasSection(content, 'a.pdf'), true);
+  });
+
+  it('不存在时返回 false', () => {
+    const content = '# 项目文档索引\n\n## a.pdf\n- 摘要: A';
+    assert.equal(svc._hasSection(content, 'b.pdf'), false);
+  });
+
+  it('文件名前缀匹配但不完全相等时不误判（如 a.pdf vs ab.pdf）', () => {
+    const content = '# 项目文档索引\n\n## a.pdf\n- 摘要: A';
+    assert.equal(svc._hasSection(content, 'ab.pdf'), false);
+  });
+
+  it('空内容返回 false', () => {
+    assert.equal(svc._hasSection('', 'a.pdf'), false);
+  });
+});

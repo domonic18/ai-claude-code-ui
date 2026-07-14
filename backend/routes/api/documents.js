@@ -11,6 +11,7 @@
  * - PUT    /api/projects/:name/documents/content - 保存文档内容（编辑）
  * - GET    /api/projects/:name/documents/content - 获取文档内容（预览）
  * - PUT    /api/projects/:name/documents/summary - 更新文档摘要
+ * - POST   /api/projects/:name/documents/summary/regenerate - 重新生成摘要（重调 AI）
  *
  * @module routes/api/documents
  */
@@ -129,5 +130,12 @@ router.get('/:name/documents/content', authenticate(), documentController._async
  * Body: { file_name: string, summary: string }
  */
 router.put('/:name/documents/summary', authenticate(), documentController._asyncHandler(documentController.updateSummary));
+
+/**
+ * POST /api/projects/:name/documents/summary/regenerate
+ * 重新生成文档摘要（重调 AI）
+ * Body: { file_path: string, file_name: string, source?: 'upload'|'ai' }
+ */
+router.post('/:name/documents/summary/regenerate', authenticate(), documentController._asyncHandler(documentController.regenerateSummary));
 
 export default router;

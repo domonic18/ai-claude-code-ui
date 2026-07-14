@@ -33,6 +33,9 @@ const AI_DOC_MAX_RETRIES = 3;
 /** 摘要生成失败时的占位文本 */
 const FALLBACK_SUMMARY = '（摘要生成失败，请手动编辑）';
 
+/** 图片 base64 流式读取超时（ms），与文本提取超时对齐，小于前端轮询 60s 上限。 */
+const IMAGE_STREAM_TIMEOUT_MS = 45_000;
+
 /** 图片扩展名集合 */
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg']);
 
@@ -132,11 +135,16 @@ export class SummaryService {
           summary = await this._generateImageSummary(userId, file_path, file_name);
         } else {
           const text = await documentTextExtractor.extractText(userId, file_path, file_name);
-          // 检测提取失败的标记文本，AI 文档需等待文件写入后重试
-          if (isAIDoc && _isExtractionFailure(text) && attempt < maxAttempts) {
-            logger.info({ userId, projectName, fileName: file_name, attempt }, '[SummaryService] 文件尚未就绪，等待重试');
-            await _delay(AI_DOC_RETRY_DELAY_MS);
-            continue;
+          // 提取失败（含超时返回的标记文本）：AI 文档在重试窗口内等待文件就绪；
+          // 否则对所有文档跳过 AI 调用，避免 AI 总结失败标记产生垃圾摘要（缺口 A）。
+          if (_isExtractionFailure(text)) {
+            if (isAIDoc && attempt < maxAttempts) {
+              logger.info({ userId, projectName, fileName: file_name, attempt }, '[SummaryService] 文件尚未就绪，等待重试');
+              await _delay(AI_DOC_RETRY_DELAY_MS);
+              continue;
+            }
+            logger.warn({ userId, projectName, fileName: file_name }, '[SummaryService] 文本提取失败，跳过 AI 调用');
+            break;
           }
           summary = await this._callTextAIAPI(text, file_name);
         }
@@ -156,10 +164,17 @@ export class SummaryService {
       }
     }
 
-    // 兜底：生成失败时写入占位摘要，避免前端永远停留在 pending
+    // 收敛保证：成功写 ready 条目；失败写带 failed 标记的 error 条目。
+    // 两者都落盘 readme，确保 summary_status 一定从 pending 转移（绝不永久 pending）。
     if (!summary) {
-      logger.warn({ userId, projectName, fileName: file_name }, '[SummaryService] 摘要生成失败，写入兜底摘要');
-      summary = FALLBACK_SUMMARY;
+      logger.warn({ userId, projectName, fileName: file_name }, '[SummaryService] 摘要生成失败，写入 error 条目');
+      await readmeService.appendEntry(userId, projectName, {
+        fileName: file_name,
+        fileSize: file_size,
+        summary: FALLBACK_SUMMARY,
+        status: 'failed',
+      });
+      return;
     }
 
     await readmeService.appendEntry(userId, projectName, {
@@ -175,7 +190,7 @@ export class SummaryService {
    * 从容器读取图片并转为 base64
    * @private
    */
-  async _readImageBase64(userId, filePath) {
+  async _readImageBase64(userId, filePath, timeoutMs = IMAGE_STREAM_TIMEOUT_MS) {
     await containerManager.getOrCreateContainer(userId);
     const { stream } = await containerManager.execInContainer(userId, ['base64', filePath]);
     return new Promise((resolve, reject) => {
@@ -184,8 +199,14 @@ export class SummaryService {
       containerManager.docker.modem.demuxStream(stream, stdout, stderr);
       const chunks = [];
       stdout.on('data', (chunk) => chunks.push(chunk));
-      stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8').trim()));
-      stream.on('error', reject);
+      stderr.on('data', () => {});
+      // 超时兜底：base64 读取大图挂死时 stream 永不 end，会让图片摘要永久 pending。
+      const timer = setTimeout(() => {
+        stream.destroy();
+        reject(new Error(`image base64 stream timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+      stream.on('end', () => { clearTimeout(timer); resolve(Buffer.concat(chunks).toString('utf-8').trim()); });
+      stream.on('error', (err) => { clearTimeout(timer); reject(err); });
     });
   }
 

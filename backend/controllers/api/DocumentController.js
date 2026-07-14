@@ -205,8 +205,39 @@ export class DocumentController extends BaseController {
 
       await readmeService.updateSummary(userId, projectName, fileName, summary);
       readmeService.invalidateCache(userId, projectName);
+      // 同步失效文档列表缓存：getProjectDocuments 的 5s 缓存会派生 summary_status，
+      // 不清则前端 refetch 拿到旧 error 数据，手动填写后仍显示红色（Bug 1）。
+      documentService.invalidateDocumentsCache(userId, projectName);
 
       this._success(res, null, 'Summary updated');
+    } catch (error) {
+      this._handleError(error, req, res, next);
+    }
+  }
+
+  /**
+   * 重新生成文档摘要（重调 AI）
+   * POST /api/projects/:name/documents/summary/regenerate
+   * Body: { file_path: string, file_name: string, source?: 'upload'|'ai' }
+   */
+  async regenerateSummary(req, res, next) {
+    try {
+      const userId = this._getUserId(req);
+      const projectName = this._requireProjectName(req);
+      const { file_path: filePath, file_name: fileName, source } = req.body;
+
+      if (!filePath || !fileName) {
+        throw new ValidationError('file_path and file_name are required');
+      }
+
+      const pathCheck = validateProjectFilePath(filePath, projectName);
+      if (!pathCheck.valid) {
+        throw new ValidationError(pathCheck.error);
+      }
+
+      const result = await documentService.regenerateSummary(userId, projectName, filePath, fileName, source);
+
+      this._success(res, result, 'Summary regeneration started');
     } catch (error) {
       this._handleError(error, req, res, next);
     }
