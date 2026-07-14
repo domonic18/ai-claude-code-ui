@@ -18,6 +18,7 @@ import { readmeService } from '../ReadmeService.js';
 describe('DocumentService.regenerateSummary 正常路径与去重', () => {
   let removeMock;
   let genMock;
+  let sizeMock;
   /** 收集 generateSummary mock 返回的 promise resolver */
   let resolvers;
   let svc;
@@ -29,12 +30,15 @@ describe('DocumentService.regenerateSummary 正常路径与去重', () => {
     genMock = mock.method(summaryService, 'generateSummary', () =>
       new Promise((resolve) => resolvers.push(resolve)));
     svc = new DocumentService();
+    // mock _getFileSize，避免测试连真实 Docker（regenerateSummary 会读取文件大小）
+    sizeMock = mock.method(svc, '_getFileSize', () => Promise.resolve(1024));
   });
 
   afterEach(() => {
     resolvers.forEach((r) => r());
     removeMock.mock.restore();
     genMock.mock.restore();
+    sizeMock.mock.restore();
   });
 
   it('调用一次：removeEntry + generateSummary 各一次，返回 pending', async () => {
@@ -44,9 +48,11 @@ describe('DocumentService.regenerateSummary 正常路径与去重', () => {
     assert.deepEqual(result, { summary_status: 'pending' });
     assert.equal(removeMock.mock.callCount(), 1);
     assert.equal(genMock.mock.callCount(), 1);
+    assert.equal(sizeMock.mock.callCount(), 1, '应读取一次文件大小');
     const arg = genMock.mock.calls[0].arguments[2];
     assert.equal(arg.file_name, 'a.pdf');
     assert.equal(arg.source, 'upload');
+    assert.equal(arg.file_size, 1024, '应传递实际文件大小（非 0，避免 readme 显示"未知"）');
   });
 
   it('生成完成前再调用：幂等返回 pending，不重复 removeEntry/generate', async () => {
