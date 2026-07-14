@@ -19,6 +19,7 @@ import {
   useUploadDocumentMutation,
   useDeleteDocumentMutation,
   useUpdateSummaryMutation,
+  useRegenerateSummaryMutation,
 } from '@/shared/libs/query/hooks';
 import { onDocumentCreated, onConversationComplete } from '../services/documentEvents';
 import { logger } from '../../../shared/utils/logger';
@@ -46,6 +47,8 @@ interface UseDocumentsReturn {
   remove: (filePath: string, docType: 'upload' | 'ai_generated') => Promise<void>;
   /** 更新文档摘要 */
   updateSummary: (fileName: string, summary: string) => Promise<void>;
+  /** 重新生成文档摘要（重调 AI） */
+  regenerateSummary: (filePath: string, fileName: string, source: 'upload' | 'ai') => Promise<void>;
   /** 添加 AI 文档（来自 WebSocket 事件） */
   addAIDocument: (doc: DocumentItem) => void;
 }
@@ -62,9 +65,15 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
   const uploadMutation = useUploadDocumentMutation();
   const deleteMutation = useDeleteDocumentMutation();
   const summaryMutation = useUpdateSummaryMutation();
+  const regenerateMutation = useRegenerateSummaryMutation();
 
   // Mutation 错误状态：mutation 失败时展示给用户，成功时清除
   const [mutationError, setMutationError] = useState<string | null>(null);
+
+  // 本地 error 兜底：轮询 60s 超时后仍 pending 的文档，本地标记为 error 展示，
+  // 处理后端极端挂死（extractText / readme 流均无响应）。非持久化：
+  // 后端一旦返回 ready/error 即覆盖清除；项目切换 / 刷新重置。
+  const [errorPaths, setErrorPaths] = useState<Set<string>>(new Set());
 
   // 乐观文档：来自 WebSocket document-created 事件、尚未被服务端确认的 AI 文档。
   // 存放在独立 state 而非 query 缓存，使其免疫任何 refetch 的整体替换（根治竞态）。
@@ -93,22 +102,57 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
   // 项目切换时清除残留的 mutation 错误 + 乐观文档及其兜底定时器，避免跨项目泄漏
   useEffect(() => {
     setMutationError(null);
+    setErrorPaths(new Set());
     clearAllOptimisticCleanups();
     setOptimisticDocs([]);
   }, [projectName, clearAllOptimisticCleanups]);
 
-  // 从缓存数据中解构 uploads / 服务端 aiGenerated
-  const uploads = data?.uploads ?? [];
+  // 从缓存数据中解构原始数据（未应用本地 error 标记）
+  const rawUploads = data?.uploads ?? [];
   const serverAiGenerated = data?.aiGenerated ?? EMPTY_AI_GENERATED;
 
   // 合并层：服务端 aiGenerated + 未被服务端确认的乐观文档（按 file_path 去重，服务端优先）。
   // 乐观文档不进 query 缓存，因此 refetch 只会刷新 serverAiGenerated，不会覆盖乐观文档。
-  const aiGenerated = useMemo(() => {
+  const mergedAiGenerated = useMemo(() => {
     if (optimisticDocs.length === 0) return serverAiGenerated;
     const confirmedPaths = new Set(serverAiGenerated.map(d => d.file_path));
     const pending = optimisticDocs.filter(d => !confirmedPaths.has(d.file_path));
     return pending.length === 0 ? serverAiGenerated : [...serverAiGenerated, ...pending];
   }, [serverAiGenerated, optimisticDocs]);
+
+  // 本地 error 兜底层：后端仍 pending 且 errorPaths 命中 → 展示 error。
+  // 后端非 pending（ready/error）严格胜出（自动覆盖本地标记）。
+  const applyLocalError = useCallback((docs: DocumentItem[]): DocumentItem[] =>
+    docs.map(d => (d.summary_status === 'pending' && errorPaths.has(d.file_path)
+      ? { ...d, summary_status: 'error' as const }
+      : d)),
+  [errorPaths]);
+
+  const uploads = useMemo(() => applyLocalError(rawUploads), [rawUploads, applyLocalError]);
+  const aiGenerated = useMemo(() => applyLocalError(mergedAiGenerated), [mergedAiGenerated, applyLocalError]);
+
+  // 后端一旦对某文档返回非 pending（ready/error），清除其本地 error 标记（后端态优先）。
+  useEffect(() => {
+    if (errorPaths.size === 0) return;
+    const resolved = new Set(
+      [...rawUploads, ...serverAiGenerated]
+        .filter(d => d.summary_status !== 'pending')
+        .map(d => d.file_path),
+    );
+    setErrorPaths(prev => {
+      if (prev.size === 0) return prev;
+      const next = new Set([...prev].filter(p => !resolved.has(p)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [rawUploads, serverAiGenerated, errorPaths]);
+
+  // 最新 pending 文档路径（每次渲染更新），供轮询超时闭包读取，避免 stale closure。
+  const pendingPathsRef = useRef<Set<string>>(new Set());
+  pendingPathsRef.current = new Set(
+    [...rawUploads, ...mergedAiGenerated]
+      .filter(d => d.summary_status === 'pending')
+      .map(d => d.file_path),
+  );
 
   // 服务端确认：当 refetch 返回的列表已包含某乐观文档的 file_path 时，视为已确认，移除乐观项。
   // functional update 内部判断，引用不变时返回原数组，避免无谓渲染。
@@ -206,6 +250,16 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
             clearInterval(pollingRef.current);
             pollingRef.current = null;
           }
+          // 兜底：轮询超时仍 pending 的文档标本地 error（处理后端极端挂死）。
+          // 用 ref 读取最新 pending 集合，避免 stale closure。
+          const stuck = pendingPathsRef.current;
+          if (stuck.size > 0) {
+            setErrorPaths(prev => {
+              const next = new Set(prev);
+              stuck.forEach(p => next.add(p));
+              return next;
+            });
+          }
           return;
         }
         refetch();
@@ -264,6 +318,26 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
     }
   }, [projectName, summaryMutation]);
 
+  // 重新生成文档摘要（重调 AI）
+  const regenerateSummaryFn = useCallback(async (filePath: string, fileName: string, source: 'upload' | 'ai') => {
+    if (!projectName) return;
+    try {
+      await regenerateMutation.mutateAsync({ projectName, filePath, fileName, source });
+      // 清本地 error 标记；后端会重新进入 pending→ready/error 流程，前端重新轮询
+      setErrorPaths(prev => {
+        if (!prev.has(filePath)) return prev;
+        const next = new Set(prev);
+        next.delete(filePath);
+        return next;
+      });
+      setMutationError(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Regenerate summary failed';
+      setMutationError(msg);
+      logger.error({ err, projectName, fileName }, 'Regenerate summary failed');
+    }
+  }, [projectName, regenerateMutation]);
+
   return {
     uploads,
     aiGenerated,
@@ -275,6 +349,7 @@ export function useDocuments(projectName: string | null): UseDocumentsReturn {
     upload,
     remove,
     updateSummary: updateSummaryFn,
+    regenerateSummary: regenerateSummaryFn,
     addAIDocument,
   };
 }

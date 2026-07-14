@@ -79,4 +79,11 @@ describe('DocumentService._recoverPendingAISummaries', () => {
     ]);
     assert.equal(genMock.mock.callCount(), 2);
   });
+
+  it('error 态文档不补触发（仅 pending 才补）', () => {
+    svc._recoverPendingAISummaries(1, 'proj', [
+      { file_name: 'a.md', file_path: '/x/a.md', file_size: 10, summary_status: 'error' },
+    ]);
+    assert.equal(genMock.mock.callCount(), 0, 'error 是终态，不应被补触发');
+  });
 });

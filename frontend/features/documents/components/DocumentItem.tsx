@@ -14,6 +14,7 @@ import {
   File,
   ExternalLink,
   Trash2,
+  AlertCircle,
 } from 'lucide-react';
 import type { DocumentItem as DocumentItemType } from '../types/document.types';
 
@@ -30,6 +31,8 @@ interface DocumentItemProps {
   onDragToChat?: () => void;
   /** 编辑摘要回调 */
   onEditSummary?: (fileName: string, summary: string) => Promise<void>;
+  /** 重新生成摘要回调（重调 AI） */
+  onRegenerateSummary?: (filePath: string, fileName: string, source: 'upload' | 'ai') => Promise<void>;
 }
 
 type IconType = React.ComponentType<{ className?: string }>;
@@ -65,6 +68,7 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({
   onNavigateToConversation,
   onDragToChat,
   onEditSummary,
+  onRegenerateSummary,
 }) => {
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -82,9 +86,10 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({
 
   const handleStartEdit = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    setEditText(doc.summary || '');
+    // error 态预填空串让用户从空白填写；ready 态沿用原摘要
+    setEditText(doc.summary_status === 'error' ? '' : (doc.summary || ''));
     setEditing(true);
-  }, [doc.summary]);
+  }, [doc.summary, doc.summary_status]);
 
   const handleCancelEdit = useCallback(() => {
     setEditing(false);
@@ -106,8 +111,10 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({
 
   const summaryText = doc.summary ?? '';
   const hasSummary = doc.summary_status === 'ready' && summaryText.length > 0;
+  const isError = doc.summary_status === 'error';
   const isLongSummary = summaryText.length > SUMMARY_COLLAPSE_THRESHOLD;
   const canEdit = !!onEditSummary;
+  const canRegenerate = !!onRegenerateSummary;
 
   return (
     <div className="group rounded-md hover:bg-accent/30 transition-colors">
@@ -178,6 +185,43 @@ export const DocumentItem: React.FC<DocumentItemProps> = ({
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* 摘要生成失败 — 红底卡片 + 重新生成 / 手动填写 */}
+      {isError && !editing && (
+        <div className="px-2 pb-1" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded px-2 py-1.5">
+            <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 mb-1">
+              <AlertCircle className="w-3 h-3 flex-shrink-0" />
+              <span>摘要生成失败</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {canRegenerate && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRegenerateSummary!(
+                      doc.file_path,
+                      doc.file_name,
+                      doc.type === 'ai_generated' ? 'ai' : 'upload',
+                    );
+                  }}
+                  className="text-[10px] text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 underline"
+                >
+                  重新生成
+                </button>
+              )}
+              {canEdit && (
+                <button
+                  onClick={handleStartEdit}
+                  className="text-[10px] text-primary hover:text-primary/80 underline"
+                >
+                  手动填写
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

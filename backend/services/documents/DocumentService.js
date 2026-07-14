@@ -26,7 +26,10 @@ const UPLOADS_SUBDIR = 'uploads';
 const GENERATED_DIR = GENERATED_DIR_NAME;
 const AI_MANIFEST_FILE = '.ai-documents.json';
 
-/** 文档列表内存缓存（避免短时间内重复全量扫描） */
+/**
+ * 文档列表内存缓存（避免短时间内重复全量扫描）。
+ * 进程内 Map，多进程部署下各进程独立缓存；当前单容器单进程无影响，改多进程需迁移 Redis。
+ */
 const DOC_CACHE_TTL_MS = 5_000;
 const DOC_CACHE_MAX_SIZE = 500;
 const documentCache = new Map();
@@ -36,8 +39,27 @@ const documentCache = new Map();
  * key 形如 `${userId}:${projectName}:${fileName}`。
  * readme.appendEntry 不去重，必须用此锁防止轮询期间对同一 pending 文档重复触发，
  * 否则会在 readme.md 写出多个重复条目。摘要生成结束（成功或兜底）后自动释放。
+ * 注：进程内 Set，多进程部署（PM2 cluster）下不共享、去重会失效，需改用 Redis 分布式锁。
  */
 const pendingSummaryKeys = new Set();
+
+/**
+ * 根据 readme 条目派生文档的摘要状态与文本。
+ * - 有条目且 status==='error' → 'error'
+ * - 有条目 → 'ready'
+ * - 无条目 → 'pending'
+ * @param {Object} doc - 目录扫描得到的文档项
+ * @param {Array<{fileName:string,summary:string|null,status:string}>} readmeEntries
+ * @returns {Object} 附加了 summary_status / summary 的文档项
+ */
+function enrichDoc(doc, readmeEntries) {
+  const entry = readmeEntries.find(e => e.fileName === doc.file_name);
+  return {
+    ...doc,
+    summary_status: entry ? (entry.status === 'error' ? 'error' : 'ready') : 'pending',
+    summary: entry?.summary || null,
+  };
+}
 
 /** 使指定项目的文档列表缓存失效 */
 function invalidateDocCache(userId, projectName) {
@@ -85,24 +107,10 @@ export class DocumentService {
     const aiGenerated = this._mergeDocuments(aiManifest, generatedFiles);
 
     // 为 uploads 附加摘要状态和内容
-    const enrichedUploads = uploads.map(upload => {
-      const entry = readmeEntries.find(e => e.fileName === upload.file_name);
-      return {
-        ...upload,
-        summary_status: entry ? 'ready' : 'pending',
-        summary: entry?.summary || null,
-      };
-    });
+    const enrichedUploads = uploads.map(upload => enrichDoc(upload, readmeEntries));
 
     // 为 AI 生成文档也附加摘要状态
-    const enrichedAiGenerated = aiGenerated.map(doc => {
-      const entry = readmeEntries.find(e => e.fileName === doc.file_name);
-      return {
-        ...doc,
-        summary_status: entry ? 'ready' : 'pending',
-        summary: entry?.summary || null,
-      };
-    });
+    const enrichedAiGenerated = aiGenerated.map(doc => enrichDoc(doc, readmeEntries));
 
     logger.info({
       projectName,
@@ -120,6 +128,17 @@ export class DocumentService {
     this._recoverPendingAISummaries(userId, projectName, enrichedAiGenerated);
 
     return result;
+  }
+
+  /**
+   * 失效文档列表缓存（供 Controller 在直接改 readme 后调用，如手动编辑摘要）。
+   * getProjectDocuments 有 5s 内存缓存（DOC_CACHE_TTL_MS），直接改 readme 而不清缓存，
+   * 会让前端 refetch 拿到旧 summary_status（手动填写 error 后仍显示红色，Bug 1）。
+   * @param {number} userId
+   * @param {string} projectName
+   */
+  invalidateDocumentsCache(userId, projectName) {
+    invalidateDocCache(userId, projectName);
   }
 
   /**
@@ -264,6 +283,72 @@ export class DocumentService {
 
     logger.info({ userId, projectName, filePath, docType }, '文档删除成功');
     return true;
+  }
+
+  /**
+   * 重新生成文档摘要（用户点击「重新生成」时调用）
+   *
+   * 复用 pendingSummaryKeys 做 in-flight 去重（与 _recoverPendingAISummaries 互补互斥）：
+   * regenerate 期间锁被持有，轮询触发的 recovery 看到 pending 但锁已占 → 跳过；连点幂等。
+   * 先 removeEntry 清旧段落（避免 appendEntry 写出重复段落），再 fire-and-forget 触发生成。
+   * removeEntry 失败则释放锁并抛错，不进入 generate —— 否则旧 failed 条目仍在，会产生重复段落。
+   *
+   * @param {number} userId
+   * @param {string} projectName
+   * @param {string} filePath - 容器内文件完整路径
+   * @param {string} fileName - 文件名
+   * @param {'upload'|'ai'} [source] - 文档来源，决定是否启用 AI 文档重试机制
+   * @returns {Promise<{summary_status: 'pending'}>}
+   */
+  async regenerateSummary(userId, projectName, filePath, fileName, source) {
+    const key = `${userId}:${projectName}:${fileName}`;
+    // 已在生成中（regenerate 或 recovery 补触发），幂等返回 pending
+    if (pendingSummaryKeys.has(key)) {
+      return { summary_status: 'pending' };
+    }
+    pendingSummaryKeys.add(key);
+
+    try {
+      await readmeService.removeEntry(userId, projectName, fileName);
+      invalidateDocCache(userId, projectName);
+    } catch (err) {
+      pendingSummaryKeys.delete(key);
+      throw err;
+    }
+
+    logger.info({ userId, projectName, fileName, source }, '[DocumentService] 重新生成摘要');
+
+    // 读取实际文件大小，保留 readme 条目的"大小"字段（避免重生成后显示"未知"）
+    const fileSize = await this._getFileSize(userId, filePath);
+
+    // fire-and-forget，锁在 .finally 释放（与 _recoverPendingAISummaries 同模式）
+    summaryService.generateSummary(userId, projectName, {
+      file_path: filePath,
+      file_name: fileName,
+      file_size: fileSize,
+      source: source || 'upload',
+    }).finally(() => pendingSummaryKeys.delete(key));
+
+    return { summary_status: 'pending' };
+  }
+
+  /**
+   * 读取容器内文件大小（字节数）。
+   * 供 regenerateSummary 保留 readme 条目的"大小"字段。失败返回 0（显示"未知"），不阻断重新生成。
+   * 通过 sh 位置参数 $1 传路径，避免文件名特殊字符被 shell 解释（同 _pathExists 模式）。
+   * @private
+   * @param {number} userId
+   * @param {string} filePath - 容器内完整路径
+   * @returns {Promise<number>}
+   */
+  async _getFileSize(userId, filePath) {
+    try {
+      const out = await this._execCommandOutput(userId, ['sh', '-c', 'wc -c < "$1"', '_', filePath]);
+      return parseInt(out.trim(), 10) || 0;
+    } catch (err) {
+      logger.warn({ err, userId, filePath }, '[DocumentService] 读取文件大小失败，按"未知"处理');
+      return 0;
+    }
   }
 
   /**

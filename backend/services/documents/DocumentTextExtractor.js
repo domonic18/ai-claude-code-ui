@@ -22,6 +22,11 @@ const logger = createLogger('services/documents/DocumentTextExtractor');
 /** 默认最大提取字符数，控制 token 成本 */
 const DEFAULT_MAX_CHARS = 4000;
 
+/** 单次容器提取命令的流式读取超时（ms）。
+ *  45s 略小于前端轮询 60s 上限：提取挂死时后端需在前端放弃前写入失败标记、
+ *  走 error 兜底，否则前端只能靠本地 errorPaths 兜底（非持久）。 */
+const EXTRACT_STREAM_TIMEOUT_MS = 45_000;
+
 /**
  * 根据文件扩展名选择提取命令
  * @param {string} filePath - 容器内文件路径
@@ -107,7 +112,7 @@ export class DocumentTextExtractor {
    * 读取 Docker stream
    * @private
    */
-  _readStream(stream) {
+  _readStream(stream, timeoutMs = EXTRACT_STREAM_TIMEOUT_MS) {
     return new Promise((resolve, reject) => {
       const stdout = new PassThrough();
       const stderr = new PassThrough();
@@ -117,10 +122,22 @@ export class DocumentTextExtractor {
       stdout.on('data', (chunk) => chunks.push(chunk));
       stderr.on('data', () => {});
 
+      // 超时兜底：docker exec 命令（pdftotext/pandoc 等）挂死时 stream 永不 end，
+      // 会导致整个摘要生成链路永久 pending。超时后销毁客户端 stream 并 reject，
+      // 由 extractText 的 catch 转成失败标记文本，最终收敛到 error 摘要条目。
+      const timer = setTimeout(() => {
+        stream.destroy();
+        reject(new Error(`extract stream timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
       stream.on('end', () => {
+        clearTimeout(timer);
         resolve(Buffer.concat(chunks).toString('utf-8'));
       });
-      stream.on('error', reject);
+      stream.on('error', (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
     });
   }
 }

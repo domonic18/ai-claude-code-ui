@@ -27,11 +27,13 @@ export {
   useUploadDocumentMutation,
   useDeleteDocumentMutation,
   useUpdateSummaryMutation,
+  useRegenerateSummaryMutation,
   useInvalidateDocuments,
 } from './useDocumentsQuery';
 export type {
   UploadDocumentMutationParams,
   DeleteDocumentMutationParams,
   UpdateSummaryMutationParams,
+  RegenerateSummaryMutationParams,
 } from './useDocumentsQuery';
 
