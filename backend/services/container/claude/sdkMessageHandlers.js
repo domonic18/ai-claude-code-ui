@@ -11,6 +11,7 @@ import { createLogger } from '../../../utils/logger.js';
 import { extractTokenBudget, extractMessageContext, isResultError, extractToolResults } from './messageParsingHelpers.js';
 import { aliasSessionId, getSession } from './SessionManager.js';
 import { documentService } from '../../documents/DocumentService.js';
+import { LOG_THINKING_PREVIEW_CHARS } from '../../../config/logConfig.js';
 
 const logger = createLogger('services/container/claude/sdkMessageHandlers');
 
@@ -101,7 +102,7 @@ export function handleAssistantMessage(sdkMessage, writer, sessionId, state) {
         blocks[t] = (blocks[t] || 0) + 1;
         if (t === 'thinking' && typeof p.thinking === 'string') {
           thinkingChars += p.thinking.length;
-          if (!thinkingPreview) thinkingPreview = p.thinking.slice(0, 200);
+          if (!thinkingPreview) thinkingPreview = p.thinking.slice(0, LOG_THINKING_PREVIEW_CHARS);
         }
       }
     }
@@ -120,11 +121,27 @@ export function handleAssistantMessage(sdkMessage, writer, sessionId, state) {
       thinkingChars,
       sinceLastMs,
     };
-    // 慢轮（>30s）dump thinking 摘要，定位是否长思考导致
+    // 慢轮标记（>30s）
     if (isSlow) {
       logPayload._slowTurn = true;
+    }
+    // 所有 turn 都记 thinking 预览（前 N 字，info 常开）：能看到"在想什么"又不爆量
+    // LOG_THINKING_PREVIEW_CHARS=0 可关闭；纯 tool_use turn 无 thinking 则不带此字段
+    if (thinkingPreview) {
       logPayload.thinkingPreview = thinkingPreview;
     }
+    // turn 级 delta 聚合（info 常开）：把这一轮的分片聚成 prefill/gen 两段
+    // prefillMs=开口前等待(大 input 处理主体)；genMs=生成阶段；genRateCps=生成速率
+    if (state.curTurnStats && state.curTurnStats.count > 0) {
+      const ts = state.curTurnStats;
+      const genMs = ts.lastTime - ts.firstTime;
+      const totalChars = ts.thinkChars + ts.textChars + (ts.toolUseChars || 0);
+      logPayload.prefillMs = ts.firstSinceLast; // turn#1 首片无上一片时为 null
+      logPayload.genMs = genMs;
+      logPayload.genRateCps = genMs > 0 ? Math.round(totalChars / (genMs / 1000)) : null;
+      logPayload.deltaCount = ts.count;
+    }
+    state.curTurnStats = null; // 重置，下个 turn
     logger.info(logPayload, `[API #${state.apiCallSeq}] assistant turn${isSlow ? ' [SLOW]' : ''}`);
   }
 
@@ -442,6 +459,10 @@ export function handleSdkMessage(sdkMessage, writer, sessionId, state) {
  * updateStreamContent 渲染逻辑；content_block_stop 触发 completeStream 收尾。
  * 同时在 state.deltas 累积到达时间戳，供流式节奏诊断（emitDeltaCadence）使用。
  *
+ * 逐片可观测：每片 text/thinking delta 额外输出 [DELTA/text] / [DELTA/thinking] 日志，
+ * 含 sinceTurnMs(距本轮起点)、sinceLastMs(距上一片)、文本与字符数，可还原生成速率与全文。
+ * message_start 作为 turn 起点(若 SDK 透传)，第一片 delta 的 sinceTurnMs ≈ prefill 时间。
+ *
  * 注：Anthropic SSE 的 delta 是 union 类型，单事件只携带 text 或 thinking 之一，
  * 故用 if/else if 互斥处理即可。
  *
@@ -450,21 +471,81 @@ export function handleSdkMessage(sdkMessage, writer, sessionId, state) {
  * @param {Object} state - 状态对象（含 deltas/textDeltaCount/thinkingDeltaCount）
  */
 export function handleStreamEvent(event, writer, state) {
+  // 每轮 API 推理起点：message_start 作为 turn 边界。
+  // 第一片 delta 的 sinceTurnMs ≈ prefill 时间（API 开始 → 首个 token），
+  // 补上 [API #seq] 无法拆分的 prefill/生成盲区。
+  if (event.type === 'message_start') {
+    state.turnStartTime = Date.now();
+    state.turnDeltaCount = 0;
+    return;
+  }
+
   if (event.type === 'content_block_delta' && event.delta) {
+    const now = Date.now();
+    // 注意：用独立的 lastDeltaTime，不碰 state.lastEventTime（供 [API #seq] 的 sinceLastMs）
+    const sinceLastMs = state.lastDeltaTime ? now - state.lastDeltaTime : null;
+    const sinceTurnMs = state.turnStartTime ? now - state.turnStartTime : null;
+    const turnSeq = (state.apiCallSeq || 0) + 1; // delta 在 turn 结束前到达，apiCallSeq 尚未递增
+
+    // 累积当前 turn 的 delta 统计，供 handleAssistantMessage 聚合成 prefill/gen（info 常开）
+    if (!state.curTurnStats) {
+      state.curTurnStats = { firstTime: null, firstSinceLast: null, lastTime: null, thinkChars: 0, textChars: 0, toolUseChars: 0, count: 0 };
+    }
+    const ts = state.curTurnStats;
+    if (ts.firstTime === null) { ts.firstTime = now; ts.firstSinceLast = sinceLastMs; } // 首片 sinceLastMs ≈ prefill
+    ts.lastTime = now;
+    ts.count++;
+
     if (typeof event.delta.text === 'string') {
-      if (Array.isArray(state.deltas)) state.deltas.push(Date.now());
+      if (Array.isArray(state.deltas)) state.deltas.push(now);
       state.textDeltaCount = (state.textDeltaCount || 0) + 1;
+      state.turnDeltaCount = (state.turnDeltaCount || 0) + 1;
+      state.lastDeltaTime = now;
+      ts.textChars += event.delta.text.length;
+      // 分片日志：debug 级（默认关），排查时设 LOG_LEVEL=debug 才输出
+      logger.debug({
+        deltaType: 'text',
+        seq: state.textDeltaCount,
+        turnSeq,
+        inTurn: state.turnDeltaCount,
+        chars: event.delta.text.length,
+        text: event.delta.text,
+        sinceTurnMs,
+        sinceLastMs,
+      }, `[DELTA/text] turn#${turnSeq} #${state.textDeltaCount} ${event.delta.text.length}c`);
       writer.send({
         type: 'claude-response',
         data: { type: 'content_block_delta', delta: { text: event.delta.text } }
       });
     } else if (typeof event.delta.thinking === 'string') {
-      if (Array.isArray(state.deltas)) state.deltas.push(Date.now());
+      if (Array.isArray(state.deltas)) state.deltas.push(now);
       state.thinkingDeltaCount = (state.thinkingDeltaCount || 0) + 1;
+      state.turnDeltaCount = (state.turnDeltaCount || 0) + 1;
+      state.lastDeltaTime = now;
+      ts.thinkChars += event.delta.thinking.length;
+      // 分片日志：debug 级（默认关），排查时设 LOG_LEVEL=debug 才输出
+      logger.debug({
+        deltaType: 'thinking',
+        seq: state.thinkingDeltaCount,
+        turnSeq,
+        inTurn: state.turnDeltaCount,
+        chars: event.delta.thinking.length,
+        text: event.delta.thinking,
+        sinceTurnMs,
+        sinceLastMs,
+      }, `[DELTA/thinking] turn#${turnSeq} #${state.thinkingDeltaCount} ${event.delta.thinking.length}c`);
       writer.send({
         type: 'claude-response',
         data: { type: 'content_block_delta', delta: { thinking: event.delta.thinking } }
       });
+    } else if (typeof event.delta.partial_json === 'string') {
+      // tool_use 参数生成(input_json_delta)：累积到 turn 统计，让 tool_use turn 也有 genMs
+      // 不转发前端（前端用完整 tool_use block）；lastDeltaTime 更新让下一 turn prefillMs 不含本段
+      if (Array.isArray(state.deltas)) state.deltas.push(now);
+      state.toolUseDeltaCount = (state.toolUseDeltaCount || 0) + 1;
+      state.turnDeltaCount = (state.turnDeltaCount || 0) + 1;
+      state.lastDeltaTime = now;
+      ts.toolUseChars += event.delta.partial_json.length;
     }
   } else if (event.type === 'content_block_stop') {
     writer.send({
