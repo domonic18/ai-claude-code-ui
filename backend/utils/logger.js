@@ -367,10 +367,9 @@ function resolveLogDir() {
  * 与本模块 multistream + 函数 formatters + AsyncLocalStorage traceId 注入冲突（worker 拿不到 ALS、
  * 无法跨线传递函数）。rotating-file-stream 直接接入 multistream、不碰 transport，是此架构下的标准轮转方案。
  *
+ * 轮转参数（size/maxFiles）取自模块级 LOG_FILE_SIZE / LOG_MAX_FILES（见 config/logConfig.js）。
+ *
  * @param {string} filePath - 日志文件绝对路径
- * @param {Object} opts
- * @param {number} opts.maxSizeMb - 单文件最大 MB
- * @param {number} opts.maxFiles - 保留份数
  * @returns {import('stream').Writable}
  */
 function createRotatingLogStream(filePath) {
