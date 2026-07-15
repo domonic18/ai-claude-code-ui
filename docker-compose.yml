@@ -37,6 +37,12 @@ services:
     environment:
       - NODE_ENV=development
       - TZ=Asia/Shanghai
+    # stdout 日志由 Docker json-file driver 轮转（应用文件路用 rotating-file-stream）
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     restart: unless-stopped
     networks:
       - claude-code-network

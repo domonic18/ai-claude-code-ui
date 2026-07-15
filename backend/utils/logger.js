@@ -18,16 +18,15 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { AsyncLocalStorage } from 'async_hooks';
+import { createStream as createRotatingFileStream } from 'rotating-file-stream';
+import { LOG_LEVEL, LOG_FILE_SIZE, LOG_MAX_FILES } from '../config/logConfig.js';
 
 // ---------------------------------------------------------------------------
 // 常量
 // ---------------------------------------------------------------------------
 
-/**
- * 日志级别，可通过 LOG_LEVEL 环境变量配置
- * 默认 info 级别（生产环境推荐 warn）
- */
-const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
+// 日志级别 / 文件轮转阈值 / 保留份数 → 统一在 config/logConfig.js
+// （纯配置模块，不 import logger，避免与本模块循环依赖；logger 是底层基础设施）
 
 /**
  * 日志预览截断长度（字符数）
@@ -362,6 +361,26 @@ function resolveLogDir() {
   return path.join(process.cwd(), 'logs');
 }
 
+/**
+ * 按大小滚动的日志文件流（rotating-file-stream）。
+ * 用成熟的 rotating-file-stream（纯 stream.Writable）替代 pino-roll——后者是 transport(worker 线程)，
+ * 与本模块 multistream + 函数 formatters + AsyncLocalStorage traceId 注入冲突（worker 拿不到 ALS、
+ * 无法跨线传递函数）。rotating-file-stream 直接接入 multistream、不碰 transport，是此架构下的标准轮转方案。
+ *
+ * 轮转参数（size/maxFiles）取自模块级 LOG_FILE_SIZE / LOG_MAX_FILES（见 config/logConfig.js）。
+ *
+ * @param {string} filePath - 日志文件绝对路径
+ * @returns {import('stream').Writable}
+ */
+function createRotatingLogStream(filePath) {
+  return createRotatingFileStream(path.basename(filePath), {
+    size: LOG_FILE_SIZE,
+    path: path.dirname(filePath),
+    maxFiles: Math.max(1, LOG_MAX_FILES),
+    compress: 'gzip', // 轮转文件用 Node 内置 gzip 压缩（v3 默认加 .gz 扩展名）
+  });
+}
+
 const LOG_DIR = resolveLogDir();
 
 // 测试环境（NODE_ENV=test，由 run-node-test.sh 注入）只保留 stdout：
@@ -376,7 +395,10 @@ if (!isTestEnv) {
   // （文件流仅在目录就绪时创建，避免指向不可写路径后写入静默失败）
   try {
     fs.mkdirSync(LOG_DIR, { recursive: true });
-    streams.push({ level: LOG_LEVEL, stream: pino.destination(path.join(LOG_DIR, 'app.log')) });
+    streams.push({
+      level: LOG_LEVEL,
+      stream: createRotatingLogStream(path.join(LOG_DIR, 'app.log')),
+    });
   } catch (err) {
     process.stderr.write(`[logger] 无法创建日志目录 ${LOG_DIR}: ${err.message}，文件日志不可用，已降级为仅 stdout\n`);
   }
