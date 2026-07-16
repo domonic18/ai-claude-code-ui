@@ -15,9 +15,17 @@ export { extractTokenBudget, isResultError } from './messageBudgetHelpers.js';
 
 const TOOL_INPUT_EXTRACTORS = {
   Bash: (input) => ({ command: truncate(input.command, 200) }),
-  Write: (input) => ({ file: input.file_path || input.path }),
+  Write: (input) => ({
+    file: input.file_path || input.path,
+    contentChars: input.content?.length ?? 0,
+    contentPreview: truncate(input.content, 200),
+  }),
   Read: (input) => ({ file: input.file_path || input.path }),
-  Edit: (input) => ({ file: input.file_path }),
+  Edit: (input) => ({
+    file: input.file_path,
+    newStringChars: input.new_string?.length ?? 0,
+    newStringPreview: truncate(input.new_string, 200),
+  }),
   MultiEdit: (input) => ({ file: input.file_path }),
   Glob: (input) => ({ pattern: input.pattern, path: input.path }),
   Grep: (input) => ({ pattern: input.pattern, glob: input.glob }),

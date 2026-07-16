@@ -140,6 +140,11 @@ export function handleAssistantMessage(sdkMessage, writer, sessionId, state) {
       logPayload.genMs = genMs;
       logPayload.genRateCps = genMs > 0 ? Math.round(totalChars / (genMs / 1000)) : null;
       logPayload.deltaCount = ts.count;
+      // 输出尺寸明细（诊断生成耗时归因）：本轮生成了多少字符、按 text/thinking/tool_use 拆分。
+      // outputTokens 来自 usage 对部分厂商(如 Kimi /anthropic)恒为 0，故以 delta 累积的字符数为准。
+      logPayload.textChars = ts.textChars;
+      logPayload.toolUseChars = ts.toolUseChars || 0;
+      logPayload.outputChars = totalChars;
     }
     state.curTurnStats = null; // 重置，下个 turn
     logger.info(logPayload, `[API #${state.apiCallSeq}] assistant turn${isSlow ? ' [SLOW]' : ''}`);
