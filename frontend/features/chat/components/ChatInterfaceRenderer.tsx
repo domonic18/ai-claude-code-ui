@@ -52,15 +52,19 @@ export function ChatInterfaceRenderer({
   sendMessage,
   chatInputProps,
 }: ChatInterfaceRendererProps) {
+  // 跨视图流式隔离：当前视图不是发起流式的视图时，屏蔽所有流式 UI（B 完全无提示）。
+  // 含新会话兜底（发送后 currentSessionId 暂为 null）。buffer 仍持续累积，切回发起视图即恢复完整显示。
+  const showStream = hook.showStreamingUI;
+
   return (
     <div className="flex flex-col h-full bg-background">
       {/* 主聊天区域 */}
       {/* 包含消息列表、思考过程和流式指示器 */}
       <ChatInterfaceMainArea
         messages={hook.messages}
-        isStreaming={hook.isStreaming}
-        streamingContent={hook.streamingContent}
-        streamingThinking={hook.streamingThinking}
+        isStreaming={showStream ? hook.isStreaming : false}
+        streamingContent={showStream ? hook.streamingContent : ''}
+        streamingThinking={showStream ? hook.streamingThinking : ''}
         autoExpandTools={autoExpandTools}
         showRawParameters={showRawParameters}
         showThinking={showThinking}
