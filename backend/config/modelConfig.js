@@ -207,3 +207,24 @@ export function getModelProviderConfig(modelName) {
   return fallback;
 }
 
+/**
+ * 解析摘要要使用的模型
+ *
+ * 优先使用前端传入的模型（须经 MODELS.available 白名单校验——前端值不可信），
+ * 校验失败或未提供时回退到列表第一个模型。保证非法/空模型名不会选中未配置的端点，
+ * 从而 token/baseURL 始终落在已注册的 provider 上。
+ *
+ * @param {string} [preferredModelName] - 前端 selected-model（模型 .name）
+ * @returns {{name: string, provider: string, description: string}|undefined} MODELS.available 中的条目
+ */
+export function getSummaryModel(preferredModelName) {
+  if (preferredModelName) {
+    const found = MODELS.available.find(m => m.name === preferredModelName);
+    if (found) {
+      return found;
+    }
+    logger.warn({ preferredModelName }, '[MODELS] 摘要模型不在白名单，回退到默认模型');
+  }
+  return MODELS.available[0];
+}
+

@@ -39,6 +39,12 @@ export async function uploadDocument(
   const formData = new FormData();
   formData.append('file', file);
 
+  // 纯跟随：把前端选的模型带给后端，摘要用该模型对应的端点/token（后端经白名单校验）
+  const selectedModel = typeof window !== 'undefined' ? localStorage.getItem('selected-model') : '';
+  if (selectedModel) {
+    formData.append('model', selectedModel);
+  }
+
   const url = `${API_BASE}/${encodeURIComponent(projectName)}/documents/upload`;
   debugLog('uploadDocument 请求', {
     url,
@@ -142,11 +148,14 @@ export async function regenerateDocumentSummary(
   fileName: string,
   source?: 'upload' | 'ai'
 ): Promise<void> {
+  // 纯跟随：带前端选的模型，让摘要走该模型对应的端点/token
+  const selectedModel = typeof window !== 'undefined' ? localStorage.getItem('selected-model') : '';
+
   const res = await authenticatedFetch(
     `${API_BASE}/${encodeURIComponent(projectName)}/documents/summary/regenerate`,
     {
       method: 'POST',
-      body: JSON.stringify({ file_path: filePath, file_name: fileName, source })
+      body: JSON.stringify({ file_path: filePath, file_name: fileName, source, model: selectedModel || undefined })
     }
   );
   if (!res.ok) throw new Error(`Failed to regenerate summary: ${res.statusText}`);
