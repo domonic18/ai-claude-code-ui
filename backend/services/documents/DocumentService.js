@@ -182,9 +182,10 @@ export class DocumentService {
    * @param {number} userId - 用户 ID
    * @param {string} projectName - 项目名称
    * @param {Object} file - multer 文件对象 { buffer, originalname, size, mimetype }
+   * @param {string} [model] - 前端选择的模型名，透传给摘要服务（纯跟随；undefined 则后端回退默认）
    * @returns {Promise<Object>} 上传结果
    */
-  async uploadDocument(userId, projectName, file) {
+  async uploadDocument(userId, projectName, file, model) {
     const uploadDir = `${DOCUMENTS_DIR}/${UPLOADS_SUBDIR}`;
     const containerBasePath = `/workspace/${projectName}`;
     const containerDir = `${containerBasePath}/${uploadDir}`;
@@ -228,6 +229,7 @@ export class DocumentService {
       file_name: safeName,
       file_size: file.size,
       source: 'upload',
+      model,
     });
 
     return {
@@ -298,9 +300,10 @@ export class DocumentService {
    * @param {string} filePath - 容器内文件完整路径
    * @param {string} fileName - 文件名
    * @param {'upload'|'ai'} [source] - 文档来源，决定是否启用 AI 文档重试机制
+   * @param {string} [model] - 前端选择的模型名，透传给摘要服务（纯跟随；undefined 则后端回退默认）
    * @returns {Promise<{summary_status: 'pending'}>}
    */
-  async regenerateSummary(userId, projectName, filePath, fileName, source) {
+  async regenerateSummary(userId, projectName, filePath, fileName, source, model) {
     const key = `${userId}:${projectName}:${fileName}`;
     // 已在生成中（regenerate 或 recovery 补触发），幂等返回 pending
     if (pendingSummaryKeys.has(key)) {
@@ -327,6 +330,7 @@ export class DocumentService {
       file_name: fileName,
       file_size: fileSize,
       source: source || 'upload',
+      model,
     }).finally(() => pendingSummaryKeys.delete(key));
 
     return { summary_status: 'pending' };

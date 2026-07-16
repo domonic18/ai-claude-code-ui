@@ -15,7 +15,7 @@
 
 import { documentTextExtractor } from './DocumentTextExtractor.js';
 import { readmeService } from './ReadmeService.js';
-import { MODELS, getModelProviderConfig } from '../../config/modelConfig.js';
+import { MODELS, getModelProviderConfig, getSummaryModel } from '../../config/modelConfig.js';
 import containerManager from '../container/core/index.js';
 import { PassThrough } from 'stream';
 import { createLogger } from '../../utils/logger.js';
@@ -29,6 +29,13 @@ const IMAGE_SUMMARY_PROMPT = '请用中文为这张图片生成约200字的描�
 /** AI 文档摘要重试配置 */
 const AI_DOC_RETRY_DELAY_MS = 3_000;
 const AI_DOC_MAX_RETRIES = 3;
+
+/**
+ * 摘要最大输出 token 数。
+ * 需容纳推理模型（如 MiniMax-M2.7 / claude-…-thinking）的 thinking 阶段 + ~200 字正文；
+ * 500 会卡在 thinking 用尽预算、不输出正文（stop_reason: max_tokens）。
+ */
+const SUMMARY_MAX_TOKENS = 4096;
 
 /** 摘要生成失败时的占位文本 */
 const FALLBACK_SUMMARY = '（摘要生成失败，请手动编辑）';
@@ -125,7 +132,7 @@ export class SummaryService {
     const isAIDoc = uploadResult.source === 'ai';
     const maxAttempts = isAIDoc ? AI_DOC_MAX_RETRIES : 1;
 
-    logger.info({ userId, projectName, fileName: file_name, isImage: isImageFile(file_name), isAIDoc }, '[SummaryService] 开始生成摘要');
+    logger.info({ userId, projectName, fileName: file_name, isImage: isImageFile(file_name), isAIDoc, preferredModel: uploadResult.model }, '[SummaryService] 开始生成摘要');
 
     let summary;
 
@@ -146,7 +153,7 @@ export class SummaryService {
             logger.warn({ userId, projectName, fileName: file_name }, '[SummaryService] 文本提取失败，跳过 AI 调用');
             break;
           }
-          summary = await this._callTextAIAPI(text, file_name);
+          summary = await this._callTextAIAPI(text, file_name, uploadResult.model);
         }
 
         if (summary) break;
@@ -288,7 +295,7 @@ export class SummaryService {
 
     const body = {
       model: model.name,
-      max_tokens: 500,
+      max_tokens: SUMMARY_MAX_TOKENS,
       messages,
     };
 
@@ -311,7 +318,12 @@ export class SummaryService {
       }
 
       const data = await response.json();
-      const content = data?.content?.[0]?.text;
+      // 推理模型返回 content=[{type:'thinking'},{type:'text',text:'...'}]，需取 text 块；
+      // 非推理模型 content[0] 即 text 块，find 同样命中。
+      const textBlock = Array.isArray(data?.content)
+        ? data.content.find(c => c.type === 'text')
+        : undefined;
+      const content = textBlock?.text;
 
       if (!content) {
         logger.warn({ data, fileName }, '[SummaryService] AI API 返回空内容');
@@ -326,11 +338,15 @@ export class SummaryService {
   }
 
   /**
-   * 文本摘要：调用默认文本模型
+   * 文本摘要：调用指定模型（前端 selected-model，经白名单校验；未提供/非法则回退默认）
+   * @param {string} text - 已提取的文档文本
+   * @param {string} fileName - 文件名（日志用）
+   * @param {string} [preferredModelName] - 前端选择的模型名；不传或不在白名单时回退 available[0]
+   * @returns {Promise<string|null>} 摘要文本，失败返回 null
    * @private
    */
-  async _callTextAIAPI(text, fileName) {
-    const model = MODELS.available[0];
+  async _callTextAIAPI(text, fileName, preferredModelName) {
+    const model = getSummaryModel(preferredModelName);
     if (!model) {
       logger.error('[SummaryService] 无可用模型');
       return null;

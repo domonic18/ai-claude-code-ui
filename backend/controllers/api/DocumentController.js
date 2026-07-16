@@ -94,7 +94,7 @@ export class DocumentController extends BaseController {
         mimeType: req.file.mimetype
       }, '[文档上传] 开始调用 DocumentService.uploadDocument');
 
-      const result = await documentService.uploadDocument(userId, projectName, req.file);
+      const result = await documentService.uploadDocument(userId, projectName, req.file, req.body?.model);
 
       logger.info({ userId, projectName, result }, '[文档上传] DocumentService 上传成功，返回响应');
       this._success(res, result, 'Document uploaded successfully', 201);
@@ -224,7 +224,7 @@ export class DocumentController extends BaseController {
     try {
       const userId = this._getUserId(req);
       const projectName = this._requireProjectName(req);
-      const { file_path: filePath, file_name: fileName, source } = req.body;
+      const { file_path: filePath, file_name: fileName, source, model } = req.body;
 
       if (!filePath || !fileName) {
         throw new ValidationError('file_path and file_name are required');
@@ -235,7 +235,7 @@ export class DocumentController extends BaseController {
         throw new ValidationError(pathCheck.error);
       }
 
-      const result = await documentService.regenerateSummary(userId, projectName, filePath, fileName, source);
+      const result = await documentService.regenerateSummary(userId, projectName, filePath, fileName, source, model);
 
       this._success(res, result, 'Summary regeneration started');
     } catch (error) {
