@@ -13,18 +13,23 @@ export function tryParseJSON(str) {
 
 export { extractTokenBudget, isResultError } from './messageBudgetHelpers.js';
 
+// 工具 input 预览截断长度（env 可调，诊断用）。默认 200；诊断上下文膨胀时可设
+// LOG_TOOL_INPUT_MAX=100000 等大数记录近乎完整的 content/new_string/command。
+// *Chars 始终记录完整字符数，不受此限制影响。与 TOOL_RESULT_PREVIEW_MAX 对称。
+const TOOL_INPUT_PREVIEW_MAX = Number(process.env.LOG_TOOL_INPUT_MAX) || 200;
+
 const TOOL_INPUT_EXTRACTORS = {
-  Bash: (input) => ({ command: truncate(input.command, 200) }),
+  Bash: (input) => ({ command: truncate(input.command, TOOL_INPUT_PREVIEW_MAX) }),
   Write: (input) => ({
     file: input.file_path || input.path,
     contentChars: input.content?.length ?? 0,
-    contentPreview: truncate(input.content, 200),
+    contentPreview: truncate(input.content, TOOL_INPUT_PREVIEW_MAX),
   }),
   Read: (input) => ({ file: input.file_path || input.path }),
   Edit: (input) => ({
     file: input.file_path,
     newStringChars: input.new_string?.length ?? 0,
-    newStringPreview: truncate(input.new_string, 200),
+    newStringPreview: truncate(input.new_string, TOOL_INPUT_PREVIEW_MAX),
   }),
   MultiEdit: (input) => ({ file: input.file_path }),
   Glob: (input) => ({ pattern: input.pattern, path: input.path }),

@@ -141,7 +141,9 @@ export function handleAssistantMessage(sdkMessage, writer, sessionId, state) {
       logPayload.genRateCps = genMs > 0 ? Math.round(totalChars / (genMs / 1000)) : null;
       logPayload.deltaCount = ts.count;
       // 输出尺寸明细（诊断生成耗时归因）：本轮生成了多少字符、按 text/thinking/tool_use 拆分。
-      // outputTokens 来自 usage 对部分厂商(如 Kimi /anthropic)恒为 0，故以 delta 累积的字符数为准。
+      // outputTokens 来自 usage 对部分厂商(如 Kimi/anthropic)恒为 0，故以 delta 累积的字符数为准。
+      // 注意：outputChars 含 thinking 字符，与厂商 usage.output_tokens 口径不同(thinking 在部分
+      // API 不计入 output_tokens)，仅供生成量/耗时诊断，勿与 usage 直接对账。
       logPayload.textChars = ts.textChars;
       logPayload.toolUseChars = ts.toolUseChars || 0;
       logPayload.outputChars = totalChars;
