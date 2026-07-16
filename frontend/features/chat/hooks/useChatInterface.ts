@@ -90,6 +90,10 @@ export interface UseChatInterfaceResult {
   setIsLoading: (loading: boolean) => void;
   currentSessionId: string | null;
   setCurrentSessionId: (id: string | null) => void;
+  /** Origin session id of the in-flight stream (null when no stream is active). Drives cross-view isolation in the renderer. */
+  activeStreamSessionId: string | null;
+  /** Whether streaming UI should render in the current view (cross-view isolation + new-session fallback). */
+  showStreamingUI: boolean;
   tasks: any[];
   setTasks: (tasks: any[]) => void;
   tokenBudget: any;
@@ -194,6 +198,28 @@ export function useChatInterface({
   const [isLoading, setIsLoading] = useState(false);
   // 当前会话 ID：用于关联同一对话的多轮消息
   const [currentSessionId, setCurrentSessionId] = useState(selectedSession?.id || null);
+
+  // ========== 活跃流式上下文（跨视图隔离） ==========
+  // 单一 ChatInterface 实例下，后端 claude-response 流式 chunk 不带 sessionId，
+  // 前端需自行追踪"当前流式属于哪个 session/project"，让流式渲染与状态写入按
+  // 归属路由、而非按"当前选中视图"路由，避免切到 B 时 A 的流式串到 B。
+  const [activeStreamSessionId, setActiveStreamSessionId] = useState<string | null>(null);
+  const activeStreamSessionIdRef = useRef<string | null>(null);
+  const activeStreamProjectRef = useRef<string | undefined>(undefined);
+  // 跟踪 currentSessionId 的 ref，供回调读取最新值，避免 stale closure。
+  // 与 useChatMessages 的 messagesRef 同模式：render 期间直接同步，比 effect 更即时。
+  const currentSessionIdRef = useRef<string | null>(currentSessionId);
+  currentSessionIdRef.current = currentSessionId;
+
+  /**
+   * 是否处于跨视图流式：活跃流式的归属 session 与当前选中视图不一致
+   * （即用户在项目 A 发起流式后，切到了项目 B）
+   * @returns true 表示当前视图不是发起流式的视图
+   */
+  const isCrossView = useCallback(() => {
+    return activeStreamSessionIdRef.current != null
+      && currentSessionIdRef.current !== activeStreamSessionIdRef.current;
+  }, []);
   // 任务列表：Agent 的 TodoWrite 工具生成的待办事项
   const [tasks, setTasks] = useState<any[]>([]);
   // Token 预算：记录当前会话的 Token 用量（已用/总量）
@@ -216,6 +242,49 @@ export function useChatInterface({
   const { messages, addMessage, updateMessage, setMessages } = useChatMessages({ projectName: selectedProject?.name, externalMessages });
   // 流式内容管理：处理 AI 响应的流式输出（打字机效果）
   const stream = useMessageStream();
+
+  /**
+   * 开始流式：reset buffer 并记录归属 project。sessionId 的归属在 handleSessionProcessing
+   * 中设置（此处 currentSessionId 可能为 null——新会话首次发送）。
+   * @returns void
+   */
+  const handleStartStream = useCallback(() => {
+    activeStreamProjectRef.current = selectedProject?.name;
+    stream.startStream();
+  }, [stream, selectedProject?.name]);
+
+  /**
+   * 标记会话进入处理态：记录本次流式归属的 sessionId/project。
+   * 在 onSessionProcessing（而非 onStartStream）中设置 activeStreamSessionId，因为它在
+   * sendWebSocketMessage 之后触发、已确定 real 或 temp sessionId，避免新会话
+   * （发送时 currentSessionId=null）归属标识为 null 而被守卫误判。
+   * @param sessionId - 本次请求的 session id（real 或 temp-xxx）
+   * @returns void
+   */
+  const handleSessionProcessing = useCallback((sessionId: string) => {
+    activeStreamSessionIdRef.current = sessionId;
+    activeStreamProjectRef.current = selectedProject?.name;
+    setActiveStreamSessionId(sessionId);
+    onSessionProcessing?.(sessionId);
+  }, [onSessionProcessing, selectedProject?.name]);
+
+  /**
+   * 临时 sessionId 替换为真实 sessionId 时，同步更新活跃流式归属，
+   * 避免 temp→real 后 activeStreamSessionId 仍为 temp 而被误判为跨视图
+   * @param tempId - 临时 session id
+   * @param realId - 后端返回的真实 session id
+   * @returns void
+   */
+  const handleReplaceTemporarySession = useCallback((tempId: string, realId: string) => {
+    const active = activeStreamSessionIdRef.current;
+    // 新会话首次发送时 currentSessionId 为 null，sessionStateManager 传入的 tempId 为空字符串，
+    // 无法与发送时生成的 temp-xxx 匹配；改用 activeStreamSessionId 的 temp- 前缀兜底匹配
+    if (active && (active === tempId || active.startsWith('temp-'))) {
+      activeStreamSessionIdRef.current = realId;
+      setActiveStreamSessionId(realId);
+    }
+    onReplaceTemporarySession?.(tempId, realId);
+  }, [onReplaceTemporarySession]);
   // 聊天服务单例：封装 API 请求（文件上传、命令执行等）
   const chatService = useRef(getChatService({ projectName: selectedProject?.name }));
   // 当项目名称变化时，更新聊天服务的配置
@@ -271,11 +340,18 @@ export function useChatInterface({
   const skillSelection = useSkillSelection(authenticatedFetch);
 
   useChatWebSocketProcessor({
-    wsMessages, currentSessionId, selectedProjectName: selectedProject?.name,
-    addMessage, updateMessage, setMessages, setIsLoading, setCurrentSessionId,
-    onReplaceTemporarySession, onSessionActive, onSessionInactive, onSessionProcessing, onSessionNotProcessing,
-    onSetTokenBudget: (b) => { setTokenBudget(b); onSetTokenBudget?.(b); }, setTasks,
-    setPendingQuestion,
+    wsMessages, currentSessionId,
+    // 跨视图时作用于发起项目，修复 clearChatMessagesCache 删错项目缓存
+    getSelectedProjectName: () => (isCrossView() ? activeStreamProjectRef.current : selectedProject?.name),
+    // 跨视图时跳过会污染当前视图(B)的回调——消息不会丢，切回 A 时由 useSessionLoader 从后端重新抓取
+    addMessage: (msg) => { if (isCrossView()) return; addMessage(msg); },
+    updateMessage, setMessages,
+    setIsLoading,
+    setCurrentSessionId,
+    onReplaceTemporarySession: handleReplaceTemporarySession, onSessionActive, onSessionInactive, onSessionProcessing, onSessionNotProcessing,
+    onSetTokenBudget: (b) => { if (isCrossView()) return; setTokenBudget(b); onSetTokenBudget?.(b); },
+    setTasks: (tasks: any[]) => { if (isCrossView()) return; setTasks(tasks); },
+    setPendingQuestion: (toolUseID: string, sessionId: string) => { if (isCrossView()) return; setPendingQuestion(toolUseID, sessionId); },
     onDocumentCreated,
     ...stream,
   });
@@ -283,8 +359,8 @@ export function useChatInterface({
   // ========== 消息发送处理 ==========
   const { handleSend } = useMessageSender({
     input, isLoading, currentSessionId, attachedFiles, selectedModel, selectedProject, ws, sendMessage,
-    onAddMessage: addMessage, onStartStream: stream.startStream, onSetLoading: setIsLoading,
-    onSetInput: setInput, onSetAttachedFiles: setAttachedFiles, onSessionActive, onSessionProcessing, permissionMode,
+    onAddMessage: addMessage, onStartStream: handleStartStream, onSetLoading: setIsLoading,
+    onSetInput: setInput, onSetAttachedFiles: setAttachedFiles, onSessionActive, onSessionProcessing: handleSessionProcessing, permissionMode,
     consumePendingQuestion,
     selectedSkill: skillSelection.selectedSkill,
     onClearSkillSelection: skillSelection.clearSelectedSkill,
@@ -295,9 +371,16 @@ export function useChatInterface({
     setAttachedFiles(prev => { const i = prev.findIndex(f => f.id === file.id); if (i >= 0) { const u = [...prev]; u[i] = file; return u; } return [...prev, file]; });
   }, []);
 
+  // 当前视图是否应渲染流式 UI：跨视图隔离 + 新会话兜底。
+  // 新会话首次发送后 currentSessionId 暂为 null（直到 session-created 到达），此时用发起 project
+  // 匹配，避免发送后到 session-created 之间流式不显示。
+  const showStreamingUI = activeStreamSessionId == null
+    || currentSessionId === activeStreamSessionId
+    || (currentSessionId == null && !!activeStreamProjectRef.current && selectedProject?.name === activeStreamProjectRef.current);
+
   // ========== 返回状态和处理函数 ==========
   return {
-    input, setInput, attachedFiles, setAttachedFiles, isLoading, setIsLoading, currentSessionId, setCurrentSessionId,
+    input, setInput, attachedFiles, setAttachedFiles, isLoading, setIsLoading, currentSessionId, setCurrentSessionId, activeStreamSessionId, showStreamingUI,
     tasks, setTasks, tokenBudget, setTokenBudget, permissionMode, setPermissionMode,
     availableModels, selectedModel, handleModelSelect, messages, setMessages,
     streamingContent: stream.streamingContent, streamingThinking: stream.streamingThinking, isStreaming: stream.isStreaming, resetStream: stream.resetStream,

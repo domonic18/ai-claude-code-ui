@@ -127,9 +127,11 @@ export function handleClaudeComplete(
 
   if (isCurrentSession) {
     logger.info('[WS] Completing stream for session:', completedSessionId, 'current:', currentSessionId);
-    callbacks.onSetLoading(false);
     callbacks.completeStream?.();
   }
+  // 无论是否当前视图，会话结束都应清 loading：跨视图时（用户已切到别的项目）isCurrentSession
+  // 为 false，若不清 loading 会导致输入框永久禁用。setIsLoading 不再被跨视图守卫拦截。
+  callbacks.onSetLoading(false);
 
   // Update session state
   updateSessionState(completedSessionId, currentSessionId, callbacks);

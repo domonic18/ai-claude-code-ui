@@ -19,8 +19,8 @@ interface UseChatWebSocketProcessorOptions {
   wsMessages: any[];
   /** Current session ID */
   currentSessionId: string | null;
-  /** Selected project name */
-  selectedProjectName?: string;
+  /** Get the project name that messages should act on (during cross-view streaming, returns the active stream's origin project so cache cleanup targets the right project) */
+  getSelectedProjectName?: () => string | undefined;
   /** Add message callback */
   addMessage: (msg: any) => void;
   /** Update message callback */
@@ -111,7 +111,7 @@ export function useChatWebSocketProcessor(options: UseChatWebSocketProcessorOpti
           logger.info('[ChatInterface] User prompt context received:', content?.length, 'chars for session:', sessionId);
         },
         getCurrentSessionId: () => options.currentSessionId,
-        getSelectedProjectName: () => options.selectedProjectName,
+        getSelectedProjectName: options.getSelectedProjectName ?? (() => undefined),
         setPendingQuestion: options.setPendingQuestion,
         onDocumentCreated: options.onDocumentCreated,
       });
