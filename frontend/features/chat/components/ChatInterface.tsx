@@ -123,6 +123,8 @@ interface ChatInterfaceProps {
   showRawParameters?: boolean;
   /** Show thinking process */
   showThinking?: boolean;
+  /** Enable model extended thinking (passed through to backend SDK) */
+  extendedThinking?: boolean;
   /** Auto-scroll to bottom */
   autoScrollToBottom?: boolean;
   /** Send with Ctrl+Enter */
@@ -165,6 +167,7 @@ export function ChatInterface({
   autoExpandTools = false,
   showRawParameters = false,
   showThinking = true,
+  extendedThinking = true,
   autoScrollToBottom = true,
   sendByCtrlEnter = false,
   externalMessageUpdate,
@@ -181,6 +184,7 @@ export function ChatInterface({
     onSessionActive, onSessionInactive, onSessionProcessing, onSessionNotProcessing, onReplaceTemporarySession,
     onShowAllTasks, onSetTokenBudget, externalMessageUpdate, onTaskClick, wsMessages, messages: externalMessages, ws, sendMessage,
     onDocumentCreated,
+    extendedThinking,
   });
 
   // Prepare ChatInput props

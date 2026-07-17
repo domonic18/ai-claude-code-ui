@@ -53,6 +53,7 @@ interface MainContentLayoutProps {
   autoExpandTools?: boolean;
   showRawParameters?: boolean;
   showThinking?: boolean;
+  extendedThinking?: boolean;
   autoScrollToBottom?: boolean;
   sendByCtrlEnter?: boolean;
   externalMessageUpdate?: number;
@@ -110,7 +111,7 @@ export function MainContentLayout(props: MainContentLayoutProps) {
     onInputFocusChange, onSessionActive, onSessionInactive,
     onSessionProcessing, onSessionNotProcessing, processingSessions,
     onReplaceTemporarySession, onShowSettings, autoExpandTools,
-    showRawParameters, showThinking, autoScrollToBottom,
+    showRawParameters, showThinking, extendedThinking, autoScrollToBottom,
     sendByCtrlEnter, externalMessageUpdate, authenticatedFetch,
     editingFile, editorExpanded,
   } = props;
@@ -142,6 +143,7 @@ export function MainContentLayout(props: MainContentLayoutProps) {
           onReplaceTemporarySession={onReplaceTemporarySession}
           onShowSettings={onShowSettings} autoExpandTools={autoExpandTools}
           showRawParameters={showRawParameters} showThinking={showThinking}
+          extendedThinking={extendedThinking}
           autoScrollToBottom={autoScrollToBottom} sendByCtrlEnter={sendByCtrlEnter}
           externalMessageUpdate={externalMessageUpdate}
           authenticatedFetch={authenticatedFetch}

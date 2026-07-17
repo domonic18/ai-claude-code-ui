@@ -48,6 +48,8 @@ export interface UseMessageSenderOptions {
   onSessionProcessing?: (sessionId: string) => void;
   /** Permission mode */
   permissionMode: PermissionMode;
+  /** Extended thinking toggle (passed through to backend SDK) */
+  extendedThinking: boolean;
   /** Check and consume pending agent question; returns true if message was handled as answer */
   consumePendingQuestion?: (answer: string) => boolean;
   /** Selected skill to invoke */
@@ -110,6 +112,7 @@ function sendWebSocketMessage(
   selectedProject?: { name: string },
   selectedModel?: string,
   permissionMode?: PermissionMode,
+  extendedThinking?: boolean,
   onSessionProcessing?: (sessionId: string) => void,
   skillName?: string,
 ) {
@@ -127,6 +130,7 @@ function sendWebSocketMessage(
       model: selectedModel,
       resume: !!currentSessionId,
       permissionMode,
+      extendedThinking,
       skill: skillName || undefined,
     },
   });
@@ -201,6 +205,7 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
     onSessionActive,
     onSessionProcessing,
     permissionMode,
+    extendedThinking,
     consumePendingQuestion,
     selectedSkill,
     onClearSkillSelection,
@@ -247,6 +252,7 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
         selectedProject,
         selectedModel,
         permissionMode,
+        extendedThinking,
         onSessionProcessing,
         selectedSkill?.name,
       );
@@ -271,6 +277,7 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
     onSessionActive,
     onSessionProcessing,
     permissionMode,
+    extendedThinking,
     consumePendingQuestion,
     selectedSkill,
     onClearSkillSelection,
