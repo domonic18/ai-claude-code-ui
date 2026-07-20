@@ -44,7 +44,24 @@ interface UseChatSessionManagementOptions {
  * @param options - Hook options
  */
 export function useChatSessionManagement(options: UseChatSessionManagementOptions) {
+  const prevProjectNameRef = useRef<string | undefined>(options.selectedProject?.name);
   const prevNewSessionCounterRef = useRef(0);
+
+  // 切换项目时最先重置会话状态：清空 currentSessionId，避免切到项目 B 后残留项目 A 的
+  // sessionId，导致下次发送以 projectPath=B、sessionId=A 的错配请求 resume（对话串到错误项目）。
+  // 放在 useSessionLoader/useSessionSync 之前执行：若切项目同时选中该项目的历史会话，
+  // useSessionSync 会随后把 sessionId 设回历史会话 id，不被本清理覆盖。
+  // 首次挂载（prevName === undefined）跳过，避免误清首屏恢复的会话。
+  useEffect(() => {
+    const prevName = prevProjectNameRef.current;
+    const nextName = options.selectedProject?.name;
+    prevProjectNameRef.current = nextName;
+    if (prevName !== undefined && prevName !== nextName) {
+      options.setCurrentSessionId(null);
+      options.setMessages([]);
+      options.setInput('');
+    }
+  }, [options.selectedProject?.name, options.setCurrentSessionId, options.setMessages, options.setInput]);
 
   // Load session data when selected session changes
   useSessionLoader({

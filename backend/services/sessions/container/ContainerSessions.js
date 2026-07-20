@@ -36,7 +36,7 @@ const logger = createLogger('services/sessions/container/ContainerSessions');
 export { encodeProjectName } from './containerPathEncoder.js';
 export { readFileFromContainer } from './containerFileReader.js';
 export { parseJsonlContent } from '../../core/utils/jsonl-parser.js';
-export { listSessionFiles, getProjectDir } from './sessionReader.js';
+export { listSessionFiles, getProjectDir, sessionExistsInProject } from './sessionReader.js';
 
 // ─── 公共 JSONL 工具函数 ────────────────────────────────
 
