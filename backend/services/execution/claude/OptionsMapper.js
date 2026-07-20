@@ -5,6 +5,10 @@
  * 处理 Claude SDK 选项的转换和验证
  *
  * @module execution/claude/OptionsMapper
+ *
+ * 注意：本路径（REST /api/claude/execute → ClaudeExecutor）不处理 extended thinking 控制。
+ * thinking 的 env/per-request 决策仅在容器路径 services/container/claude/ScriptBuilder.js 生效。
+ * 前端 chat WebSocket 走容器路径，故不受此差异影响。如需 integration 路径支持 thinking，需另行补齐。
  */
 
 import { CLAUDE_MODELS } from '../../../../shared/modelConstants.js';

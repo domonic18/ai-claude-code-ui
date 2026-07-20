@@ -5,6 +5,7 @@ import {
   Maximize2,  // 最大化图标，用于自动展开工具设置
   Eye,        // 眼睛图标，用于显示原始参数设置
   Brain,      // 大脑图标，用于显示思考过程设置
+  Zap,        // 闪电图标，用于扩展思考设置（模型行为，区别于上方的思考显示）
   ArrowDown,  // 向下箭头图标，用于自动滚动到底部设置
   Languages,  // 语言图标，用于 Ctrl+Enter 发送消息设置
   Moon,       // 月亮图标，表示暗色模式
@@ -28,6 +29,8 @@ import SettingToggle from './SettingToggle';
  * @param {Function} props.onShowRawParametersChange - 显示原始参数设置变更处理函数
  * @param {boolean} props.showThinking - 是否显示 AI 的思考过程（thinking 模式）
  * @param {Function} props.onShowThinkingChange - 显示思考过程设置变更处理函数
+ * @param {boolean} props.extendedThinking - 是否让模型启用 extended thinking（per-request 透传到后端 SDK）
+ * @param {Function} props.onExtendedThinkingChange - 扩展思考开关变更回调
  * @param {boolean} props.autoScrollToBottom - 是否自动滚动到消息底部
  * @param {Function} props.onAutoScrollChange - 自动滚动设置变更处理函数
  * @param {boolean} props.sendByCtrlEnter - 是否使用 Ctrl+Enter 发送消息
@@ -40,6 +43,8 @@ export interface SettingsContentProps {
   onShowRawParametersChange: (checked: boolean) => void;    // 显示原始参数变更回调
   showThinking: boolean;                                    // 是否显示思考过程
   onShowThinkingChange: (checked: boolean) => void;         // 显示思考过程变更回调
+  extendedThinking: boolean;                                // 是否启用模型 extended thinking（透传后端）
+  onExtendedThinkingChange: (checked: boolean) => void;     // 扩展思考变更回调
   autoScrollToBottom: boolean;                              // 是否自动滚动到底部
   onAutoScrollChange: (checked: boolean) => void;           // 自动滚动变更回调
   sendByCtrlEnter: boolean;                                 // 是否使用 Ctrl+Enter 发送
@@ -57,6 +62,8 @@ const SettingsContent = ({
   onShowRawParametersChange, // 显示原始参数变更处理函数
   showThinking,              // 显示思考过程设置值
   onShowThinkingChange,      // 显示思考过程变更处理函数
+  extendedThinking,          // 扩展思考设置值（模型行为，透传后端）
+  onExtendedThinkingChange,  // 扩展思考变更处理函数
   autoScrollToBottom,        // 自动滚动设置值
   onAutoScrollChange,        // 自动滚动变更处理函数
   sendByCtrlEnter,           // Ctrl+Enter 发送设置值
@@ -104,6 +111,22 @@ const SettingsContent = ({
           checked={showThinking}
           onChange={onShowThinkingChange}
         />
+      </div>
+
+      {/* 模型行为设置区域：控制模型扩展思考（与上方"显示思考气泡"语义不同） */}
+      <div className="space-y-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Model Behavior</h4>
+        {/* 启用/禁用模型 extended thinking（per-request 透传到后端 SDK；env DISABLE_THINKING=1 时强制关） */}
+        <SettingToggle
+          icon={Zap}  // 闪电图标，表示扩展思考能力
+          label="Extended thinking"
+          checked={extendedThinking}
+          onChange={onExtendedThinkingChange}
+        />
+        {/* 功能说明：与 Show thinking 显示开关的区别 */}
+        <p className="text-xs text-gray-500 dark:text-gray-400 ml-3">
+          Controls whether the model performs extended thinking before responding. This is independent of the "Show thinking" display toggle above.
+        </p>
       </div>
 
       {/* 视图选项设置区域 */}

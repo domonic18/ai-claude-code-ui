@@ -28,6 +28,9 @@ export function useAppLayout() {
   const [autoExpandTools, setAutoExpandTools] = useLocalStorage('autoExpandTools', false);
   const [showRawParameters, setShowRawParameters] = useLocalStorage('showRawParameters', false);
   const [showThinking, setShowThinking] = useLocalStorage('showThinking', true);
+  // 是否让模型启用 extended thinking（per-request 透传到后端 SDK，与上面的 showThinking
+  // 仅控制"显示思考气泡"不同）。默认开；后端 env DISABLE_THINKING=1 优先级最高会强制关。
+  const [extendedThinking, setExtendedThinking] = useLocalStorage('extendedThinking', true);
   const [autoScrollToBottom, setAutoScrollToBottom] = useLocalStorage('autoScrollToBottom', true);
   const [sendByCtrlEnter, setSendByCtrlEnter] = useLocalStorage('sendByCtrlEnter', false);
   const [autoRefreshInterval] = useLocalStorage('autoRefreshInterval', 0);
@@ -82,6 +85,7 @@ export function useAppLayout() {
     autoExpandTools, setAutoExpandTools,
     showRawParameters, setShowRawParameters,
     showThinking, setShowThinking,
+    extendedThinking, setExtendedThinking,
     autoScrollToBottom, setAutoScrollToBottom,
     sendByCtrlEnter, setSendByCtrlEnter,
     autoRefreshInterval,

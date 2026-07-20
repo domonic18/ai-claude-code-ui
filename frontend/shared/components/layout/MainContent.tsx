@@ -64,6 +64,7 @@ export interface MainContentProps {
   autoExpandTools?: boolean;
   showRawParameters?: boolean;
   showThinking?: boolean;
+  extendedThinking?: boolean;
   autoScrollToBottom?: boolean;
   sendByCtrlEnter?: boolean;
   externalMessageUpdate?: number;

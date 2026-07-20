@@ -47,6 +47,7 @@ interface MainContentAreaProps {
   autoExpandTools: boolean;
   showRawParameters: boolean;
   showThinking: boolean;
+  extendedThinking: boolean;
   autoScrollToBottom: boolean;
   sendByCtrlEnter: boolean;
   externalMessageUpdate?: number;
@@ -81,6 +82,7 @@ function renderChatTab(props: MainContentAreaProps, chatProject: any, chatSessio
           autoExpandTools={props.autoExpandTools}
           showRawParameters={props.showRawParameters}
           showThinking={props.showThinking}
+          extendedThinking={props.extendedThinking}
           autoScrollToBottom={props.autoScrollToBottom}
           sendByCtrlEnter={props.sendByCtrlEnter}
           externalMessageUpdate={props.externalMessageUpdate}

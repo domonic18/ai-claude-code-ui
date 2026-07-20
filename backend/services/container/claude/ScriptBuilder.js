@@ -156,11 +156,32 @@ async function filterSDKOptions(options, userId) {
   const userDisallowedTools = determinePermissionMode(sdkOptions, settings);
   cleanupSdkOptions(sdkOptions, options, userDisallowedTools);
 
-  // 关闭 extended thinking（env 开关）：诊断 kimi/minimax 慢轮是否 thinking 导致
-  if (process.env.DISABLE_THINKING === '1') {
+  // ── Extended thinking：env 优先级最高（运维刹车），其次 per-request ──
+  // 决策矩阵：
+  //   env DISABLE_THINKING=1                  → thinking={type:'disabled'}  source='env'        （前端无效）
+  //   env 未设 + req.extendedThinking===false → thinking={type:'disabled'}  source='req-off'
+  //   env 未设 + req.extendedThinking true|undefined → 不设字段（走模型默认） source='req-on'|'default'
+  const envDisable = process.env.DISABLE_THINKING === '1';
+  const reqThinking = options.extendedThinking;          // undefined | true | false
+  let thinkingSource;
+  if (envDisable) {
     sdkOptions.thinking = { type: 'disabled' };
-    logger.info({ sessionId: options.sessionId || '' }, '[ScriptBuilder] Extended thinking disabled (DISABLE_THINKING=1)');
+    thinkingSource = 'env';
+  } else if (reqThinking === false) {
+    sdkOptions.thinking = { type: 'disabled' };
+    thinkingSource = 'req-off';
+  } else {
+    delete sdkOptions.thinking;                           // 走模型默认（不传 thinking 字段）
+    thinkingSource = (reqThinking === true) ? 'req-on' : 'default';
   }
+  delete sdkOptions.extendedThinking;                     // meta 字段，不可泄漏进 SDK
+  logger.info({
+    sessionId: options.sessionId || '',
+    source: thinkingSource,
+    thinking: sdkOptions.thinking ?? null,
+    envDisable,
+    reqThinking: reqThinking ?? null,
+  }, '[ScriptBuilder] Extended thinking decision');
 
   // 装配 systemPrompt.append（系统上下文分片 + 自主模式规则）
   assembleSystemPrompt(sdkOptions, options, userId);
@@ -201,6 +222,7 @@ export async function buildSDKScript(command, options, userId) {
     model: sdkOptions.model,
     permissionMode: sdkOptions.permissionMode,
     allowDangerouslySkipPermissions: sdkOptions.allowDangerouslySkipPermissions,
+    thinking: sdkOptions.thinking ?? 'unset',
     optionsSize: JSON.stringify(sdkOptions).length,
   }, '[ScriptBuilder] SDK options summary');
 

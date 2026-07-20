@@ -76,6 +76,8 @@ export interface UseChatInterfaceOptions {
   ws?: WebSocket | null;
   /** Send message via WebSocket */
   sendMessage?: (message: any) => void;
+  /** Enable model extended thinking (passed through to backend SDK; undefined=default) */
+  extendedThinking?: boolean;
   /** Callback when AI creates a document via Write tool */
   onDocumentCreated?: (doc: { file_path: string; file_name: string; conversation_id: string; message_id: string; type: string }) => void;
 }
@@ -187,6 +189,7 @@ export function useChatInterface({
   ws,
   sendMessage,
   onDocumentCreated,
+  extendedThinking = true,
 }: UseChatInterfaceOptions): UseChatInterfaceResult {
   // 使用 useMemo 缓存 WebSocket 消息数组，避免不必要的重新渲染
   const wsMessages = useMemo(() => rawWsMessages ?? EMPTY_WS_MESSAGES, [rawWsMessages]);
@@ -361,6 +364,7 @@ export function useChatInterface({
     input, isLoading, currentSessionId, attachedFiles, selectedModel, selectedProject, ws, sendMessage,
     onAddMessage: addMessage, onStartStream: handleStartStream, onSetLoading: setIsLoading,
     onSetInput: setInput, onSetAttachedFiles: setAttachedFiles, onSessionActive, onSessionProcessing: handleSessionProcessing, permissionMode,
+    extendedThinking,
     consumePendingQuestion,
     selectedSkill: skillSelection.selectedSkill,
     onClearSkillSelection: skillSelection.clearSelectedSkill,
