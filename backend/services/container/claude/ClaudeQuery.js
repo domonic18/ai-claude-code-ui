@@ -14,6 +14,7 @@ import { CONTAINER } from '../../../config/config.js';
 import { getModelProviderConfig } from '../../../config/modelConfig.js';
 import { userPromptService } from '../../user-prompt/index.js';
 import { projectPromptService } from '../../projects/index.js';
+import { sessionExistsInProject } from '../../sessions/container/ContainerSessions.js';
 import { createLogger, sanitizePreview, startTimer, withTimer } from '../../../utils/logger.js';
 const logger = createLogger('services/container/claude/ClaudeQuery');
 
@@ -262,6 +263,20 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
       userId,
       cwd: workingDir
     };
+
+    // 3.5 安全校验：resume 前确认 sessionId 真实属于当前 project，防止跨项目串线
+    // 前端切项目时若 currentSessionId 残留，会发出 projectPath=B、sessionId=A 的错配请求；
+    // 后端在此兜底：session 不属于该 project 时降级为新会话（删 resume），由 SDK 在正确
+    // cwd 下开启全新会话，避免把对话内容写到错误项目目录。
+    if (mappedOptions.resume === true && isContainerProject && projectPath) {
+      const belongsToProject = await sessionExistsInProject(userId, projectPath, sessionId);
+      if (!belongsToProject) {
+        logger.warn({
+          userId, sessionId, projectPath, reason: 'session-not-in-project',
+        }, '[ClaudeQuery] Resume blocked: session does not belong to this project, downgrading to new session');
+        delete mappedOptions.resume;
+      }
+    }
 
     // 4. 根据模型获取 provider 端点配置
     const modelName = mappedOptions.model || '';

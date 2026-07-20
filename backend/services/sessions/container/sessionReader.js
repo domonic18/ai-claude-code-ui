@@ -93,6 +93,29 @@ export async function listSessionFiles(userId, projectName) {
 
 // sessionReader.js 功能函数
 /**
+ * 校验指定 sessionId 是否属于某项目（容器内是否存在其会话历史文件）
+ *
+ * 用于 resume 前的归属校验：防止前端切项目后残留的 sessionId 跨项目 resume，
+ * 导致对话串到错误项目。容器抖动等异常时 fail-open（返回 true），避免误伤正常 resume。
+ *
+ * @param {number} userId - 用户 ID
+ * @param {string} projectName - 项目名称
+ * @param {string} sessionId - 待校验的会话 ID
+ * @returns {Promise<boolean>} true 表示该 session 属于该项目（或校验异常时容错放行）
+ */
+export async function sessionExistsInProject(userId, projectName, sessionId) {
+  if (!projectName || !sessionId) return false;
+  try {
+    const files = await listSessionFiles(userId, projectName);
+    return files.includes(`${sessionId}.jsonl`);
+  } catch (error) {
+    logger.warn({ err: error, projectName, sessionId }, '[sessionReader] sessionExistsInProject check failed, fail-open');
+    return true;
+  }
+}
+
+// sessionReader.js 功能函数
+/**
  * Get project directory path
  * @param {string} projectName - Project name
  * @returns {string} Project directory path
