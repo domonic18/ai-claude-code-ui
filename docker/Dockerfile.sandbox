@@ -36,7 +36,11 @@ RUN apt-get update && apt-get install -y \
 # ⚠️ 版本约束必须加引号：未加引号时 shell(/bin/sh -c) 会把 '>=10' 解析为输出重定向
 # （> =10），在 WORKDIR(/workspace) 下生成名为 =10 的垃圾文件，进而被项目发现误识别为项目，
 # 导致 SDK chdir 到文件路径报 spawn ENOTDIR。
-RUN pip3 install --no-cache-dir --break-system-packages 'Pillow>=10' 'lxml==6.0.0'
+# ⚠️ 使用清华 PyPI 镜像：腾讯云访问 files.pythonhosted.org 速度极慢（~10 kB/s），
+# 不加镜像会导致 Pillow 6.9 MB 下载超时失败（ReadTimeoutError）。
+RUN pip3 install --no-cache-dir --break-system-packages \
+    -i https://pypi.tuna.tsinghua.edu.cn/simple \
+    'Pillow>=10' 'lxml==6.0.0'
 
 # 预装 patent-docx-collaborative-review 技能所需的 OfficeCLI（原生处理 WordprocessingML 批注与修订痕迹）
 # 锁定技能已验证版本 1.0.132；全局装进系统 PATH，技能脚本按 OFFICECLI env → node_modules/.bin → PATH 查找
