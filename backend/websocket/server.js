@@ -105,7 +105,7 @@ export function createWebSocketServer(server, connectedClients, ptySessionsMap) 
             if (ws.isAlive === false) {
                 logger.warn(
                     { userId: ws.user?.userId, username: ws.user?.username },
-                    'WebSocket 心跳超时，终止僵死连接'
+                    'WebSocket pingpong 超时，终止连接'
                 );
                 ws.terminate();
                 return;
