@@ -470,7 +470,8 @@
     "emptyFile": "（空）",
     "generate": "生成摘要",
     "generating": "生成中...",
-    "generateTitle": "为当前会话生成摘要"
+    "generateTitle": "为当前会话生成摘要",
+    "currentMatch": "当前会话"
   },
   "tour": {
     "title": "产品导览",

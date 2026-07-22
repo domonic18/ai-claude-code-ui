@@ -16,6 +16,7 @@ import { getSidebarService } from '../services';
 import { SESSION_PAGINATION } from '../constants/sidebar.constants';
 import type { Session, SessionProvider, PaginatedSessionsResponse } from '../types';
 import { logger } from '@/shared/utils/logger';
+import { emitConversationComplete } from '@/features/documents/services/documentEvents';
 
 /**
  * Hook return type
@@ -202,6 +203,9 @@ function useSessionCRUDOperations(
         ...prev,
         [projectName]: prev[projectName] ? filterSession(prev[projectName]) : [],
       }));
+
+      // 触发案件概览面板刷新：后端级联删了该会话摘要，面板需重新拉取（否则残留已删摘要）
+      emitConversationComplete();
     } catch (err) {
       logger.error(`Error deleting session ${sessionId}:`, err);
       throw err;

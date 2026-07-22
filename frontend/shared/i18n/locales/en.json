@@ -470,7 +470,8 @@
     "emptyFile": "(empty)",
     "generate": "Generate Summary",
     "generating": "Generating...",
-    "generateTitle": "Generate summary for current session"
+    "generateTitle": "Generate summary for current session",
+    "currentMatch": "Current"
   },
   "tour": {
     "title": "Product Tour",

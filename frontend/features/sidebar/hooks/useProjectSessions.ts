@@ -8,7 +8,6 @@ import { useState, useCallback, useEffect } from 'react';
 import { api } from '@/shared/services';
 import type { Project, Session } from '../types/sidebar.types';
 import { logger } from '@/shared/utils/logger';
-import { emitConversationComplete } from '@/features/documents/services/documentEvents';
 
 /**
  * Hook for project sessions
@@ -61,8 +60,6 @@ export function useProjectSessions(project: Project | null): UseProjectSessionsR
       const response = await api.projects.deleteSession(project.name, sessionId);
       if (response.ok) {
         setSessions(prev => prev.filter(s => s.id !== sessionId));
-        // 触发案件概览面板刷新：后端级联删了该会话摘要，面板需重新拉取（否则残留已删摘要）
-        emitConversationComplete();
       } else {
         throw new Error('Failed to delete session');
       }
