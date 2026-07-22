@@ -13,6 +13,7 @@
  * - 手动触发（用户点按钮），非自动
  * - 调模型生成（提示词控制内容/语言），复用 SummaryService 的 Messages 调用范式
  * - 异步、不阻塞 chat（generate 走后端独立调模型，不走 ClaudeQuery 管道）
+ * - 安全：所有入口校验 projectName（防路径穿越）+ sessionId（uuid 白名单）
  *
  * @module services/projects/ProjectOverviewService
  */
@@ -25,12 +26,15 @@ import { CONTAINER } from '../../config/config.js';
 import { createLogger } from '../../utils/logger.js';
 import { ValidationError } from '../../middleware/error-handler.middleware.js';
 import { getSummaryModel, getModelProviderConfig } from '../../config/modelConfig.js';
+import { PathValidator } from '../core/utils/path-utils.js';
 
 const logger = createLogger('services/projects/ProjectOverviewService');
 
 const OVERVIEW_DIR_NAME = 'project-overview';
 const SUMMARY_MAX_TOKENS = 2000;
 const SUMMARY_TIMEOUT_MS = 60_000;
+/** transcript 截断上限（防超 token，长会话保护） */
+const MAX_TRANSCRIPT_CHARS = 8000;
 
 /**
  * 摘要提示词（占位，后续替换为正式版）
@@ -46,15 +50,29 @@ const SESSION_ID_RE = /^[a-f0-9-]+$/i;
  */
 export class ProjectOverviewService {
   /**
+   * 校验案件名合法性（防路径穿越，仿 ProjectPromptService）
+   * @param {string} projectName
+   * @throws {ValidationError} 案件名非法
+   * @private
+   */
+  _assertProjectName(projectName) {
+    const { valid, error } = PathValidator.validateProjectName(projectName);
+    if (!valid) {
+      throw new ValidationError(error || 'Invalid project name');
+    }
+  }
+
+  /**
    * 手动生成/刷新某会话的摘要
    * @param {number} userId
    * @param {string} projectName
    * @param {string} sessionId
    * @returns {Promise<{success: boolean, sessionId: string}>}
-   * @throws {ValidationError} sessionId 非法
+   * @throws {ValidationError} sessionId/projectName 非法
    * @throws {Error} 无 transcript / 模型生成失败
    */
   async generateOverview(userId, projectName, sessionId) {
+    this._assertProjectName(projectName);
     if (!sessionId || !SESSION_ID_RE.test(sessionId)) {
       throw new ValidationError('Invalid sessionId');
     }
@@ -109,6 +127,11 @@ export class ProjectOverviewService {
       return null;
     }
 
+    // 截断 transcript 防超 token（长会话保护）
+    const trimmedTranscript = transcript.length > MAX_TRANSCRIPT_CHARS
+      ? transcript.slice(0, MAX_TRANSCRIPT_CHARS) + '\n...(内容过长，已截断)'
+      : transcript;
+
     const baseURL = config.baseURL.replace(/\/+$/, '');
     const url = `${baseURL}/v1/messages`;
     const body = {
@@ -116,7 +139,7 @@ export class ProjectOverviewService {
       max_tokens: SUMMARY_MAX_TOKENS,
       messages: [{
         role: 'user',
-        content: `${SUMMARY_PROMPT}\n\n=== 会话内容 ===\n${transcript}`,
+        content: `${SUMMARY_PROMPT}\n\n=== 会话内容 ===\n${trimmedTranscript}`,
       }],
     };
 
@@ -155,6 +178,7 @@ export class ProjectOverviewService {
    * @returns {Promise<boolean>} 是否删除（不存在返回 false，不报错）
    */
   async deleteOverview(userId, projectName, sessionId) {
+    this._assertProjectName(projectName);
     if (!sessionId || !SESSION_ID_RE.test(sessionId)) return false;
     const filePath = `${CONTAINER.paths.workspace}/${projectName}/${OVERVIEW_DIR_NAME}/${sessionId}.md`;
     try {
@@ -172,6 +196,7 @@ export class ProjectOverviewService {
    * @returns {Promise<Array<{sessionId: string, mtime: number}>>} 按 mtime 倒序
    */
   async listOverviews(userId, projectName) {
+    this._assertProjectName(projectName);
     const dir = `${CONTAINER.paths.workspace}/${projectName}/${OVERVIEW_DIR_NAME}`;
     let output;
     try {
@@ -193,9 +218,10 @@ export class ProjectOverviewService {
 
   /**
    * 读取单条会话概览（缓存全文，去 frontmatter 供展示）
-   * @throws {ValidationError} sessionId 非法
+   * @throws {ValidationError} sessionId/projectName 非法
    */
   async readOverview(userId, projectName, sessionId) {
+    this._assertProjectName(projectName);
     if (!sessionId || !SESSION_ID_RE.test(sessionId)) {
       throw new ValidationError('Invalid sessionId');
     }
@@ -275,14 +301,16 @@ ${summary}
 
 /** 读 docker exec 的 multiplexed stream 成字符串 */
 function readExecStream(stream) {
+  let settled = false;
   return new Promise((resolve, reject) => {
     const stdout = new PassThrough();
     const stderr = new PassThrough();
     containerManager.docker.modem.demuxStream(stream, stdout, stderr);
     let output = '';
     stdout.on('data', (chunk) => { output += chunk.toString(); });
-    stream.on('error', reject);
-    stream.on('end', () => resolve(output));
+    // 互斥：resolve/reject 只触发一次，避免 resolve 后 error 静默吞错 + 监听器泄漏
+    stream.on('error', (err) => { if (!settled) { settled = true; reject(err); } });
+    stream.on('end', () => { if (!settled) { settled = true; resolve(output); } });
   });
 }
 
