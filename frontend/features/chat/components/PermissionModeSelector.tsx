@@ -12,6 +12,7 @@
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { TOOLBAR_BUTTON_BASE } from './toolbarButtonStyles';
 
 export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
 
@@ -91,7 +92,7 @@ export function PermissionModeSelector({
       type="button"
       onClick={handleModeSwitch}
       disabled={disabled}
-      className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all duration-200 ${colorClass} ${
+      className={`${TOOLBAR_BUTTON_BASE} ${colorClass} ${
         disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
       }`}
       title={t(config.descriptionKey)}

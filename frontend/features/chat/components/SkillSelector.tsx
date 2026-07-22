@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { TOOLBAR_BUTTON_BASE } from './toolbarButtonStyles';
 
 // ─── 延迟关闭配置 ──────────────────────────────────────
 const CLOSE_DELAY_MS = 200;
@@ -46,7 +47,7 @@ function SkillSelectorButton({ selectedTitle, isOpen, onMouseEnter, onMouseLeave
       type="button"
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors
+      className={`${TOOLBAR_BUTTON_BASE}
         ${selectedTitle
           ? 'border-purple-300 dark:border-purple-600 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300'
           : 'border-border bg-card text-foreground hover:bg-accent'
