@@ -7,6 +7,8 @@
  * @module frontend/features/chat/components/modelSelectorStyles
  */
 
+import { TOOLBAR_BUTTON_BASE } from './toolbarButtonStyles';
+
 /**
  * Get color classes for token badge based on usage percentage
  * @param tokenPercentage - Token usage percentage
@@ -28,13 +30,11 @@ export function getTokenBadgeColorClasses(tokenPercentage: number): string {
  * @returns Tailwind CSS class string
  */
 export function getButtonClasses(disabled: boolean): string {
-  const baseClasses = 'flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors';
-
   if (disabled) {
-    return `${baseClasses} border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-600 cursor-not-allowed`;
+    return `${TOOLBAR_BUTTON_BASE} border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-600 cursor-not-allowed`;
   }
 
-  return `${baseClasses} border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-blue-500 dark:hover:border-blue-400 cursor-pointer`;
+  return `${TOOLBAR_BUTTON_BASE} border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-blue-500 dark:hover:border-blue-400 cursor-pointer`;
 }
 
 /**
