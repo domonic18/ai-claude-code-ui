@@ -12,3 +12,4 @@ export { McpServerController } from './McpServerController.js';
 export { UserPromptController } from './UserPromptController.js';
 export { DocumentController } from './DocumentController.js';
 export { ProjectPromptController } from './ProjectPromptController.js';
+export { ProjectOverviewController } from './ProjectOverviewController.js';

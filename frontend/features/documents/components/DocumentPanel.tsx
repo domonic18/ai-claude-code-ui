@@ -16,11 +16,14 @@ import { DocumentSection } from './DocumentSection';
 import { DocumentUploadZone } from './DocumentUploadZone';
 import { DocumentPreview } from './DocumentPreview';
 import { ProjectPromptSection } from './ProjectPromptSection';
+import { ProjectOverviewSection } from './ProjectOverviewSection';
 import type { DocumentItem } from '../types/document.types';
 
 interface DocumentPanelProps {
   /** 当前项目名称 */
   projectName: string | null;
+  /** 当前会话 ID（用于案件概览高亮联动） */
+  currentSessionId?: string | null;
 }
 
 /**
@@ -28,6 +31,7 @@ interface DocumentPanelProps {
  */
 export const DocumentPanel: React.FC<DocumentPanelProps> = ({
   projectName,
+  currentSessionId,
 }) => {
   const {
     uploads,
@@ -122,6 +126,9 @@ export const DocumentPanel: React.FC<DocumentPanelProps> = ({
       <div className="h-full flex flex-col bg-background border-l border-border overflow-hidden" style={{ width: `${panelWidth}px` }}>
         {/* 项目提示词（顶部独立块，项目级配置） */}
         <ProjectPromptSection projectName={projectName} />
+
+        {/* 案件概览（手动生成摘要，只读展示；命中当前会话则高亮） */}
+        <ProjectOverviewSection projectName={projectName} currentSessionId={currentSessionId} />
 
         {/* 文档列表（滚动区） */}
         <div className="flex-1 overflow-y-auto">

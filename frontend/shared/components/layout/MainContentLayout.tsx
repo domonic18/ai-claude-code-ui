@@ -153,6 +153,7 @@ export function MainContentLayout(props: MainContentLayoutProps) {
         {showDocPanel && (
           <DocumentPanel
             projectName={projectName}
+            currentSessionId={selectedSession?.id ?? null}
           />
         )}
         <CodeEditorSidebar {...getSidebarProps(props)} />

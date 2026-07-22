@@ -86,3 +86,4 @@ export {
 // ============================================================================
 
 export { ProjectPromptService, default as projectPromptService } from './ProjectPromptService.js';
+export { ProjectOverviewService, default as projectOverviewService } from './ProjectOverviewService.js';

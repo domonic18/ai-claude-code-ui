@@ -83,6 +83,7 @@ export function ChatInterfaceInputArea({
         categoryMeta={categoryMeta}
         skillsError={skillsError}
         onSkillsRetry={onSkillsRetry}
+        projectName={chatInputProps?.projectName}
       />
 
       {/* 消息输入区域 */}

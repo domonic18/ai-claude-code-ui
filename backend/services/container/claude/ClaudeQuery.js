@@ -13,7 +13,7 @@ import { createSession, updateSession } from './SessionManager.js';
 import { CONTAINER } from '../../../config/config.js';
 import { getModelProviderConfig } from '../../../config/modelConfig.js';
 import { userPromptService } from '../../user-prompt/index.js';
-import { projectPromptService } from '../../projects/index.js';
+import { projectPromptService, projectOverviewService } from '../../projects/index.js';
 import { sessionExistsInProject } from '../../sessions/container/ContainerSessions.js';
 import { createLogger, sanitizePreview, startTimer, withTimer } from '../../../utils/logger.js';
 const logger = createLogger('services/container/claude/ClaudeQuery');
@@ -25,6 +25,10 @@ const USER_PROMPT_END = '--- End User Prompt Context ---';
 // 用于在 system prompt 中标记项目级提示词分节（与 user-prompt 对称，不含路径）
 const PROJECT_PROMPT_START = '--- Project Prompt ---';
 const PROJECT_PROMPT_END = '--- End Project Prompt ---';
+
+// 用于在 system prompt 中标记案件概览分节（历史会话摘要，给 AI 跨会话上下文）
+const OVERVIEW_START = '--- Case Overview ---';
+const OVERVIEW_END = '--- End Case Overview ---';
 
 // 用于解析 SDK 执行的正确工作目录路径的辅助函数
 /**
@@ -101,6 +105,24 @@ async function loadProjectPromptContext(userId, projectName, options) {
 }
 
 /**
+ * 加载案件概览（历史会话摘要，给 AI 跨会话上下文）
+ * @param {number} userId - 用户 ID
+ * @param {string} projectName - 项目名称
+ * @param {object} options - 选项
+ * @returns {Promise<string|null>} 概览文本；为空或不存在则返回 null（不注入）
+ */
+async function loadOverviewContext(userId, projectName, options = {}) {
+  if (!projectName) return null;
+  try {
+    const content = await projectOverviewService.readAllForInjection(userId, projectName);
+    return content || null;
+  } catch (error) {
+    logger.warn({ err: error }, 'Failed to load overview context');
+    return null;
+  }
+}
+
+/**
  * 构建系统上下文分片（工作目录提示 + 用户提示词 + 项目级提示词）
  *
  * 这些内容不再拼进用户命令，而是作为 systemContextParts 累积，最终由
@@ -111,7 +133,7 @@ async function loadProjectPromptContext(userId, projectName, options) {
  * @param {string} cwd - 当前工作目录（如 /workspace/我的工作区）
  * @returns {string[]} 系统上下文分片数组
  */
-function buildContextParts(userPromptContext, projectPromptContext, cwd) {
+function buildContextParts(userPromptContext, projectPromptContext, overviewContext, cwd) {
   const parts = [];
 
   // 工作目录提示，确保 AI 将文件写入正确的项目目录
@@ -124,6 +146,11 @@ function buildContextParts(userPromptContext, projectPromptContext, cwd) {
   // 项目级提示词置于用户提示词块之后（项目级更具体，后置）；空则不注入
   if (projectPromptContext) {
     parts.push(`${PROJECT_PROMPT_START}\n${projectPromptContext}\n${PROJECT_PROMPT_END}`);
+  }
+
+  // 案件概览（历史会话摘要，给 AI 跨会话上下文）；空则不注入
+  if (overviewContext) {
+    parts.push(`${OVERVIEW_START}\n以下是本案件历史会话的摘要，供你了解之前聊过什么（仅作背景参考，不要复述）：\n${overviewContext}\n${OVERVIEW_END}`);
   }
 
   return parts;
@@ -241,6 +268,11 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
       ? await loadProjectPromptContext(userId, projectPromptProjectName, { containerMode: options.containerMode })
       : null;
 
+    // 1c. 加载案件概览（历史会话摘要，给 AI 跨会话上下文；无摘要则不注入）
+    const overviewContext = projectPromptProjectName
+      ? await loadOverviewContext(userId, projectPromptProjectName, { containerMode: options.containerMode })
+      : null;
+
     // 2. 获取或创建用户容器
     logger.debug({ sessionId, userId }, '[ClaudeQuery] Getting container for user');
     const container = await withTimer('claude/container_get', logger,
@@ -290,7 +322,7 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
     sendSessionStart(writer, sessionId, container.id, userPromptContext);
 
     // 7. 累积系统上下文到选项（不再污染用户命令），并以原始命令执行
-    const contextParts = buildContextParts(userPromptContext, projectPromptContext, workingDir);
+    const contextParts = buildContextParts(userPromptContext, projectPromptContext, overviewContext, workingDir);
     mappedOptions.systemContextParts = [
       ...(Array.isArray(mappedOptions.systemContextParts) ? mappedOptions.systemContextParts : []),
       ...contextParts,
