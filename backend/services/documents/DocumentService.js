@@ -472,6 +472,12 @@ export class DocumentService {
 
     // manifest 记录覆盖（优先，因为含 conversation_id 等元数据）
     for (const doc of manifestDocs) {
+      if (!doc.file_path) continue;
+      // 兜底过滤不应出现在 AI 生成区的条目（_trackAIDocument 历史漏排除遗留）：
+      // SDK 内部目录(.claude/) + 项目根系统配置/元文件(.project-prompt.md / readme.md)
+      if (doc.file_path.includes('/.claude/')) continue;
+      const _baseName = doc.file_path.split('/').pop();
+      if (_baseName === '.project-prompt.md' || _baseName === 'readme.md') continue;
       merged.set(doc.file_path, {
         ...merged.get(doc.file_path),
         ...doc,

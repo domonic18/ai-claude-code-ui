@@ -7,6 +7,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { ModelSelector, PermissionModeSelector, SkillSelector } from './index';
+import GenerateOverviewButton from './GenerateOverviewButton';
 import type { PermissionMode } from './PermissionModeSelector';
 import type { SkillOption } from './SkillSelector';
 import TokenUsagePie from '@/shared/components/ui/TokenUsagePie';
@@ -50,6 +51,8 @@ export interface ChatToolbarProps {
   skillsError?: string | null;
   /** Retry loading skills */
   onSkillsRetry?: () => void;
+  /** 当前案件名（生成摘要用） */
+  projectName?: string | null;
 }
 
 /**
@@ -77,6 +80,7 @@ export function ChatToolbar({
   categoryMeta,
   skillsError,
   onSkillsRetry,
+  projectName,
 }: ChatToolbarProps) {
   const { t } = useTranslation();
 
@@ -112,6 +116,9 @@ export function ChatToolbar({
           onModeChange={onPermissionModeChange}
         />
       )}
+
+      {/* 生成摘要（当前会话，调模型生成案件概览） */}
+      <GenerateOverviewButton projectName={projectName} sessionId={currentSessionId} />
 
       {/* Model Selector */}
       <div className="flex items-center gap-3">

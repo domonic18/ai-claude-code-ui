@@ -463,6 +463,15 @@
     "expand": "Expand",
     "collapse": "Collapse"
   },
+  "projectOverview": {
+    "title": "Case Overview",
+    "loading": "Loading...",
+    "empty": "No session overviews yet (click \"Generate\" to create one)",
+    "emptyFile": "(empty)",
+    "generate": "Generate Summary",
+    "generating": "Generating...",
+    "generateTitle": "Generate summary for current session"
+  },
   "tour": {
     "title": "Product Tour",
     "step1Title": "Conversations",

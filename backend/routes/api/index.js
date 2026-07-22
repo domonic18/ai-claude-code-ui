@@ -14,3 +14,4 @@ export { default as extensions } from './extensions.js';
 export { default as userPrompt } from './user-prompt.js';
 export { default as documents } from './documents.js';
 export { default as projectPrompt } from './project-prompt.js';
+export { default as projectOverview } from './project-overview.js';

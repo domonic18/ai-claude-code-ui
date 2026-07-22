@@ -97,6 +97,14 @@ export async function deleteSession(userId, projectName, sessionId) {
     throw new NotFoundError('Session', sessionId);
   }
 
+  // 级联删案件概览缓存（失败不阻塞删会话主流程）
+  try {
+    const { projectOverviewService } = await import('../../services/projects/index.js');
+    await projectOverviewService.deleteOverview(userId, projectName, sessionId);
+  } catch {
+    // 概览不存在/删除失败不影响删会话
+  }
+
   return success;
 }
 

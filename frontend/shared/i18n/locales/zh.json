@@ -463,6 +463,15 @@
     "expand": "展开",
     "collapse": "收起"
   },
+  "projectOverview": {
+    "title": "案件概览",
+    "loading": "加载中...",
+    "empty": "暂无会话概览（点「生成摘要」为会话生成）",
+    "emptyFile": "（空）",
+    "generate": "生成摘要",
+    "generating": "生成中...",
+    "generateTitle": "为当前会话生成摘要"
+  },
   "tour": {
     "title": "产品导览",
     "step1Title": "对话列表",

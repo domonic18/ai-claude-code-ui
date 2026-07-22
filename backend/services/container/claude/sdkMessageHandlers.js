@@ -327,6 +327,12 @@ function _trackAIDocument(tool, sessionId, writer) {
   // 只追踪工作区内的文件
   if (!absolutePath.startsWith('/workspace/')) return;
 
+  // 跳过不应记为 AI 生成文档的路径：SDK 内部目录(.claude/) + 项目根系统配置/元文件
+  // （.project-prompt.md 项目提示词 / readme.md 文档索引；与 DocumentService._mergeDocuments 过滤保持一致）
+  if (absolutePath.includes('/.claude/')) return;
+  const _baseName = absolutePath.split('/').pop();
+  if (_baseName === '.project-prompt.md' || _baseName === 'readme.md') return;
+
   // 立即通知前端有新文档（不等 recordAIDocument 完成）
   // recordAIDocument 涉及 Docker I/O（读/写 manifest），可能耗时数秒
   // 如果先等它完成再发事件，前端右侧面板看不到实时更新

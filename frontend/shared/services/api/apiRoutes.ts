@@ -299,4 +299,14 @@ export const api = {
         body: JSON.stringify({ content }),
       }),
   },
+
+  // Project overview endpoints（案件级会话概览，用户手动触发生成）
+  projectOverview: {
+    list: (projectName: string) =>
+      authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/overview`),
+    read: (projectName: string, sessionId: string) =>
+      authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/overview/${sessionId}`),
+    generate: (projectName: string, sessionId: string) =>
+      authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/overview/${sessionId}/generate`, { method: 'POST' }),
+  },
 };
