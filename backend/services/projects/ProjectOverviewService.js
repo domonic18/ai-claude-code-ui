@@ -89,9 +89,14 @@ export class ProjectOverviewService {
       throw new Error('Summary generation failed');
     }
 
-    // 3. 写缓存文件
+    // 3. 写缓存文件（失败明确报错：summary 已生成但缓存写入失败，避免裸抛 IO 错误让用户困惑）
     const cachePath = `${CONTAINER.paths.workspace}/${projectName}/${OVERVIEW_DIR_NAME}/${sessionId}.md`;
-    await writeFileInContainer(userId, cachePath, formatCache(sessionId, projectName, summary), {});
+    try {
+      await writeFileInContainer(userId, cachePath, formatCache(sessionId, projectName, summary), {});
+    } catch (writeErr) {
+      logger.error({ err: writeErr, sessionId, projectName }, '[Overview] summary generated but cache write failed');
+      throw new Error('摘要已生成，但缓存写入失败，请重试');
+    }
     logger.info({ sessionId, projectName, summaryLen: summary.length }, '[Overview] generated');
     return { success: true, sessionId };
   }
