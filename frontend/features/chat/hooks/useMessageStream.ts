@@ -108,13 +108,17 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
   // 而非直接读取 streamingContent state（它可能尚未刷新）。
   const flushBuffer = useCallback(() => {
     if (streamBufferRef.current.length > 0) {
-      streamingContentRef.current += streamBufferRef.current;
-      setStreamingContent(prev => prev + streamBufferRef.current);
+      // 先捕获 chunk 再清空 ref：setState 的函数式更新是异步的，
+      // 若直接引用 ref，清空后 React 执行更新时读到空串，导致 state 不更新（内容丢失）。
+      const contentChunk = streamBufferRef.current;
+      streamingContentRef.current += contentChunk;
+      setStreamingContent(prev => prev + contentChunk);
       streamBufferRef.current = '';
     }
     if (thinkingBufferRef.current.length > 0) {
-      streamingThinkingRef.current += thinkingBufferRef.current;
-      setStreamingThinking(prev => prev + thinkingBufferRef.current);
+      const thinkingChunk = thinkingBufferRef.current;
+      streamingThinkingRef.current += thinkingChunk;
+      setStreamingThinking(prev => prev + thinkingChunk);
       thinkingBufferRef.current = '';
     }
   }, []);

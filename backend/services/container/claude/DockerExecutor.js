@@ -6,7 +6,7 @@
 
 import containerManager from '../core/index.js';
 import { buildSDKScript } from './ScriptBuilder.js';
-import { setSessionStream, setSessionStdin, setSessionKillFn } from './SessionManager.js';
+import { setSessionStream, setSessionStdin, setSessionKillFn, setSessionWriter } from './SessionManager.js';
 import { writeFileViaPutArchive } from '../utils/containerFileWriter.js';
 import { createLogger, sanitizePreview, startTimer } from '../../../utils/logger.js';
 import { copyImagesToContainer } from './dockerImageHandler.js';
@@ -131,6 +131,10 @@ export async function executeInContainer(userId, command, options, writer, sessi
         logger.debug({ err: err?.message || err, sessionId }, '[DockerExecutor] process group kill failed (process may have exited)');
       }
     });
+
+    // 注册初始 writer：与 stream/stdin/killFn 一同跟踪，使刷新重连后可由
+    // subscribe-session 替换为新连接的 writer（dockerStreamHandler 每个 chunk 动态读取）。
+    setSessionWriter(sessionId, writer);
 
     const { PassThrough } = await import('stream');
     const stdout = new PassThrough();

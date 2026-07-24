@@ -78,7 +78,11 @@ function setupStdoutHandler(stdout, chunks, writer, sessionId, state, onChunk) {
 
       if (writer) {
         try {
-          processOutput(output, writer, sessionId, state);
+          // 动态解析 writer：刷新重连后 session.writer 已被新连接替换，
+          // 优先取 SessionManager 中的最新 writer，使后续 chunk 转发到新连接；
+          // 未注册时回退到闭包传入的 writer（ExecutionEngine 等旧路径兼容）。
+          const activeWriter = getSession(sessionId)?.writer ?? writer;
+          processOutput(output, activeWriter, sessionId, state);
         } catch (e) {
           logger.error({ sessionId, err: e, outputPreview: output.substring(0, 200) }, '[DockerExecutor] Error processing output');
         }

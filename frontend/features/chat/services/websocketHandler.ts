@@ -67,6 +67,10 @@ const MESSAGE_HANDLERS: Record<string, (message: WebSocketMessage, callbacks: Me
   'codex-response': (msg, cbs) => handleCodexResponse(msg, cbs),
   'codex-complete': (msg, cbs, sid) => handleCodexComplete(msg, cbs, sid),
   'session-aborted': (msg, cbs, sid) => handleSessionAborted(msg, cbs, sid),
+  // 刷新续传控制消息：由 useStreamingResume 独立读取 wsMessages 处理响应，
+  // 此处仅占位避免 "Unknown message type" 日志噪音
+  'session-resumed': (msg) => { logger.debug('[WS] session-resumed', msg.sessionId); return true; },
+  'session-status': (msg) => { logger.debug('[WS] session-status', msg.sessionId, msg.isProcessing); return true; },
   'document-created': (msg, cbs) => {
     if (cbs.onDocumentCreated && msg.data) {
       cbs.onDocumentCreated(msg.data);
@@ -87,7 +91,7 @@ const MESSAGE_HANDLERS: Record<string, (message: WebSocketMessage, callbacks: Me
  * @returns true if message should be filtered (skipped)
  */
 function shouldFilterBySession(message: WebSocketMessage, currentSessionId: string | null): boolean {
-  const globalMessageTypes = ['projects_updated', 'session-created', 'claude-complete', 'codex-complete'];
+  const globalMessageTypes = ['projects_updated', 'session-created', 'claude-complete', 'codex-complete', 'session-resumed', 'session-status'];
   const isGlobalMessage = globalMessageTypes.includes(message.type);
 
   // For new sessions (currentSessionId is null), allow messages through

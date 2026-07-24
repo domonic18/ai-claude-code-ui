@@ -50,6 +50,23 @@ export function setSessionKillFn(sessionId, killFn) {
 }
 
 /**
+ * 设置会话的 WebSocket writer（流式输出口）
+ *
+ * 刷新重连场景的关键：dockerStreamHandler 每个 stdout chunk 动态读取
+ * session.writer（见 dockerStreamHandler.setupStdoutHandler）。
+ * 新连接通过 subscribe-session 调用本函数替换 writer，使后续流式输出
+ * （思考/文本/工具调用 delta）转发到新连接，实现"刷新后续传"。
+ * @param {string} sessionId - 会话 ID
+ * @param {object} writer - WebSocketWriter 实例
+ */
+export function setSessionWriter(sessionId, writer) {
+  const session = containerSessions.get(sessionId);
+  if (session) {
+    session.writer = writer;
+  }
+}
+
+/**
  * 获取会话的 stdin 写入函数（带会话所有权校验）
  *
  * 仅当请求者的 userId 与会话创建者一致时才返回 stdinWriter，
@@ -126,6 +143,26 @@ export function getSession(sessionId) {
 }
 
 /**
+ * 获取会话信息（带所有权校验）
+ *
+ * 仅当请求者 userId 与会话创建者一致时返回会话，供 subscribe-session 鉴权，
+ * 防止 A 用户 subscribe B 的会话截获输出。校验模式参照 getSessionStdin。
+ * 失败时返回 null（不泄露会话存在性）。
+ * @param {string} sessionId - 会话 ID
+ * @param {number} userId - 请求者用户 ID
+ * @returns {object|null} 会话信息，或 null（不存在/非本人）
+ */
+export function getSessionForUser(sessionId, userId) {
+  const session = containerSessions.get(sessionId);
+  if (!session) return null;
+  if (userId !== undefined && session.userId !== undefined && session.userId !== userId) {
+    logger.warn({ sessionId, requestedBy: userId, ownedBy: session.userId }, '[SessionManager] Session ownership mismatch on subscribe');
+    return null;
+  }
+  return session;
+}
+
+/**
  * 删除会话
  * @param {string} sessionId - 会话 ID
  */
@@ -147,6 +184,12 @@ export async function abortSession(sessionId) {
 
   session.status = 'aborted';
   session.endTime = Date.now();
+
+  // 取消可能挂起的清理定时器（避免宽限期定时器在 abort 后重复触发）
+  if (session.cleanupTimer) {
+    clearTimeout(session.cleanupTimer);
+    session.cleanupTimer = null;
+  }
 
   // 1. 先 kill 容器内 SDK 进程。
   // 容器用非 TTY 模式，destroy stream 只断 attach 连接、不发信号给容器内进程，
@@ -180,6 +223,40 @@ export async function abortSession(sessionId) {
   containerSessions.delete(sessionId);
 
   return true;
+}
+
+/**
+ * 调度会话清理（延迟 abort）
+ *
+ * ws 断开后不再立即 abort 任务（支持刷新重连续传），改为启动宽限期定时器：
+ * 期间若有新连接 subscribe 则由 cancelSessionCleanup 取消；超时未重连则
+ * abortSession 释放容器资源并从 Map 删除，防止泄漏与资源占用。
+ * 每次调用重置定时器（取最新 delay）。幂等：无会话/no-op。
+ * @param {string} sessionId - 会话 ID
+ * @param {number} delayMs - 延迟毫秒数
+ */
+export function scheduleSessionCleanup(sessionId, delayMs) {
+  const session = containerSessions.get(sessionId);
+  if (!session) return;
+  if (session.cleanupTimer) {
+    clearTimeout(session.cleanupTimer);
+  }
+  session.cleanupTimer = setTimeout(() => {
+    logger.info({ sessionId }, '[SessionManager] Grace period elapsed, aborting session to release resources');
+    abortSession(sessionId);
+  }, delayMs);
+}
+
+/**
+ * 取消会话清理定时器（新连接 subscribe 命中活跃会话时调用）
+ * @param {string} sessionId - 会话 ID
+ */
+export function cancelSessionCleanup(sessionId) {
+  const session = containerSessions.get(sessionId);
+  if (session && session.cleanupTimer) {
+    clearTimeout(session.cleanupTimer);
+    session.cleanupTimer = null;
+  }
 }
 
 /**

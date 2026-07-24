@@ -27,6 +27,8 @@ import { calculateDiff } from '../utils/diffUtils';
 import { useChatWebSocketProcessor } from './useChatWebSocketProcessor';
 import { useChatMenuSystem } from './useChatMenuSystem';
 import { useChatSessionManagement } from './useChatSessionManagement';
+import { useStreamingResume, persistActiveStreamingSession, replaceActiveStreamingSession, clearActiveStreamingSession } from './useStreamingResume';
+import { logger } from '@/shared/utils/logger';
 
 // Stable empty array reference to prevent unnecessary effect triggers
 const EMPTY_WS_MESSAGES: any[] = [];
@@ -268,6 +270,9 @@ export function useChatInterface({
     activeStreamSessionIdRef.current = sessionId;
     activeStreamProjectRef.current = selectedProject?.name;
     setActiveStreamSessionId(sessionId);
+    // 持久化活跃 sessionId：刷新后由 useStreamingResume 据此 subscribe 续传
+    persistActiveStreamingSession(selectedProject?.name, sessionId);
+    logger.info('[resume] persist activeStreamingSession', { project: selectedProject?.name, sessionId });
     onSessionProcessing?.(sessionId);
   }, [onSessionProcessing, selectedProject?.name]);
 
@@ -285,9 +290,48 @@ export function useChatInterface({
     if (active && (active === tempId || active.startsWith('temp-'))) {
       activeStreamSessionIdRef.current = realId;
       setActiveStreamSessionId(realId);
+      // 同步刷新续传标记（temp→real），确保 session-created 后刷新也能用真实 id 订阅
+      replaceActiveStreamingSession(selectedProject?.name, active, realId);
     }
     onReplaceTemporarySession?.(tempId, realId);
-  }, [onReplaceTemporarySession]);
+  }, [onReplaceTemporarySession, selectedProject?.name]);
+
+  // ========== 刷新续传 ==========
+  // 任务真正结束（isLoading=false，即 claude-complete/abort/error）时清除刷新续传标记。
+  // 注意：不能用 stream.isStreaming——agentic 多轮（如 minimax）每个 turn 的 content_block_stop
+  // 都会 completeStream→isStreaming=false，但任务并未结束，此时误清会导致后续刷新无法 subscribe。
+  // isLoading 只在整轮会话结束时变 false，是"任务结束"的可靠信号。
+  const hasStreamedRef = useRef(false);
+  useEffect(() => {
+    if (isLoading) {
+      hasStreamedRef.current = true;
+    } else if (hasStreamedRef.current) {
+      clearActiveStreamingSession(selectedProject?.name);
+      hasStreamedRef.current = false;
+    }
+  }, [isLoading, selectedProject?.name]);
+
+  // 刷新续传恢复：任务仍在跑时由 useStreamingResume 回调，重建流式归属 + UI 态
+  const handleStreamingResumed = useCallback((sessionId: string) => {
+    logger.info('[resume] handleStreamingResumed, sessionId=', sessionId);
+    // 恢复场景：session-resumed 已由后端确认此 session 活跃且属于当前用户。
+    // 对齐 currentSessionId 到该 session，确保 showStreamingUI 判定为当前视图
+    // （恢复时序中 currentSessionId 可能尚未从 lastSessionId 就绪，导致流式区被门控为不渲染）。
+    setCurrentSessionId(sessionId);
+    handleSessionProcessing(sessionId); // 设 activeStreamSessionId/project 归属
+    setIsLoading(true);                 // 禁用输入框，直到本轮结束
+    // 刷新场景：isStreaming 已被 mount 重置为 false，需 startStream 开启渲染（buffer 本就空）；
+    // 抖动重连场景：isStreaming 仍 true、buffer 已有内容，跳过避免清空，仅靠 writer 替换续接。
+    if (!stream.isStreaming) {
+      stream.startStream();
+    }
+  }, [handleSessionProcessing, stream]);
+
+  // 刷新续传未命中：任务已结束/不存在，清除标记，交由 useSessionLoader 正常历史加载
+  const handleStreamingNotActive = useCallback((_sessionId: string) => {
+    clearActiveStreamingSession(selectedProject?.name);
+  }, [selectedProject?.name]);
+
   // 聊天服务单例：封装 API 请求（文件上传、命令执行等）
   const chatService = useRef(getChatService({ projectName: selectedProject?.name }));
   // 当项目名称变化时，更新聊天服务的配置
@@ -342,6 +386,15 @@ export function useChatInterface({
   // ========== Skill 选择 ==========
   const skillSelection = useSkillSelection(authenticatedFetch);
 
+  // 刷新续传：必须在 useChatWebSocketProcessor 之前装配，保证 session-resumed 先于
+  // delta 被 effect 处理（React effect 按声明顺序同步执行），避免 delta 进入尚未 startStream 的 buffer
+  useStreamingResume({
+    projectKey: selectedProject?.name,
+    wsMessages,
+    onResumed: handleStreamingResumed,
+    onNotActive: handleStreamingNotActive,
+  });
+
   useChatWebSocketProcessor({
     wsMessages, currentSessionId,
     // 跨视图时作用于发起项目，修复 clearChatMessagesCache 删错项目缓存
@@ -381,6 +434,21 @@ export function useChatInterface({
   const showStreamingUI = activeStreamSessionId == null
     || currentSessionId === activeStreamSessionId
     || (currentSessionId == null && !!activeStreamProjectRef.current && selectedProject?.name === activeStreamProjectRef.current);
+
+  // [临时诊断] 刷新续传排查：观察恢复期间 showStreamingUI 及相关变量、buffer 是否收到 delta
+  useEffect(() => {
+    if (activeStreamSessionId) {
+      logger.info('[resume-debug] showStreamingUI=', showStreamingUI, {
+        activeStreamSessionId,
+        currentSessionId,
+        activeStreamProject: activeStreamProjectRef.current,
+        selectedProject: selectedProject?.name,
+        isStreaming: stream.isStreaming,
+        streamingContentLen: (stream.streamingContent || '').length,
+        streamingThinkingLen: (stream.streamingThinking || '').length,
+      });
+    }
+  }, [showStreamingUI, activeStreamSessionId, currentSessionId, stream.isStreaming, stream.streamingContent, stream.streamingThinking, selectedProject?.name]);
 
   // ========== 返回状态和处理函数 ==========
   return {
