@@ -16,6 +16,10 @@ export {
   setSessionStream,
   setSessionStdin,
   getSessionStdin,
+  setSessionWriter,
+  getSessionForUser,
+  scheduleSessionCleanup,
+  cancelSessionCleanup,
   aliasSessionId
 } from './SessionManager.js';
 

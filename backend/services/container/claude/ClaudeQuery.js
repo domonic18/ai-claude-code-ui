@@ -9,7 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import containerManager from '../core/index.js';
 import { executeInContainer } from './DockerExecutor.js';
-import { createSession, updateSession } from './SessionManager.js';
+import { createSession, updateSession, scheduleSessionCleanup } from './SessionManager.js';
 import { CONTAINER } from '../../../config/config.js';
 import { getModelProviderConfig } from '../../../config/modelConfig.js';
 import { userPromptService } from '../../user-prompt/index.js';
@@ -17,6 +17,10 @@ import { projectPromptService, projectOverviewService } from '../../projects/ind
 import { sessionExistsInProject } from '../../sessions/container/ContainerSessions.js';
 import { createLogger, sanitizePreview, startTimer, withTimer } from '../../../utils/logger.js';
 const logger = createLogger('services/container/claude/ClaudeQuery');
+
+// 任务正常完成后，延迟清理 session 的窗口（毫秒）。
+// 不立即删除：给刷新重连留一个短窗口接续输出；超时后由 scheduleSessionCleanup→abortSession 清理，防 Map 泄漏。
+const COMPLETED_CLEANUP_MS = 10000;
 
 // 用于在 system prompt 中标记用户提示词上下文分节（仅做结构化，不再用于剥离用户消息）
 const USER_PROMPT_START = '--- User Prompt Context ---';
@@ -338,11 +342,16 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
       endTime: Date.now()
     });
 
+    // 延迟清理 session（修复完成后不删除导致的 Map 泄漏），并给刷新重连留短窗口
+    scheduleSessionCleanup(sessionId, COMPLETED_CLEANUP_MS);
+
     return sessionId;
 
   } catch (error) {
     queryTimer.endError(logger, 'Claude query failed', { sessionId });
     handleQueryError(writer, sessionId, error);
+    // 异常路径同样调度清理，防止 session 残留在 Map 导致泄漏
+    scheduleSessionCleanup(sessionId, COMPLETED_CLEANUP_MS);
     throw error;
   }
 }

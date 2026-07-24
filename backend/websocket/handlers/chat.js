@@ -17,7 +17,7 @@
  * @module websocket/handlers/chat
  */
 
-import { queryClaudeSDKInContainer, abortClaudeSDKSessionInContainer, isClaudeSDKSessionActiveInContainer, getSessionStdin } from '../../services/container/claude/index.js';
+import { queryClaudeSDKInContainer, abortClaudeSDKSessionInContainer, isClaudeSDKSessionActiveInContainer, getSessionStdin, scheduleSessionCleanup, cancelSessionCleanup, setSessionWriter, getSessionForUser } from '../../services/container/claude/index.js';
 import { spawnCursor, abortCursorSession, isCursorSessionActive, getActiveCursorSessions } from '../../services/execution/cursor/index.js';
 import { queryCodex, abortCodexSession, isCodexSessionActive, getActiveCodexSessions } from '../../services/execution/codex/index.js';
 import { WebSocketWriter } from '../writer.js';
@@ -29,6 +29,13 @@ import containerManager from '../../services/container/core/index.js';
 import { PassThrough } from 'stream';
 
 const logger = createLogger('websocket/handlers/chat');
+
+/**
+ * ws 断开后保留会话的宽限期（毫秒）。
+ * 刷新场景：旧连接断开后任务继续在容器内执行，给前端重连 + subscribe 一个时间窗口；
+ * 超时未重连则 scheduleSessionCleanup→abortSession 释放容器资源，防泄漏与占用。
+ */
+const CLAUDE_GRACE_MS = 120000;
 
 /** 图片扩展名集合，用于识别路径引用的图片附件 */
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp']);
@@ -308,6 +315,28 @@ const COMMAND_HANDLERS = {
   'check-session-status': async (data, ws, writer) => {
     writer.send(checkSessionStatus(data, writer));
   },
+  /**
+   * 刷新重连后订阅正在执行的会话：替换 writer 使后续流式输出转发到新连接
+   * 会话不存在 / 非本人 / 已结束 → 回 session-status:false，前端走历史加载
+   */
+  'subscribe-session': async (data, ws, writer) => {
+    const userId = ws.user?.userId;
+    recordActivity(userId);
+    const sessionId = data.sessionId;
+    // 所有权校验：仅会话创建者可订阅，防跨用户截获输出
+    // 不存在/非本人统一回 not-active，不泄露会话存在性
+    const session = getSessionForUser(sessionId, userId);
+    if (session && isClaudeSDKSessionActiveInContainer(sessionId)) {
+      // 任务仍在跑：替换为新连接的 writer，后续流式输出转发到新 ws；取消宽限期清理
+      cancelSessionCleanup(sessionId);
+      setSessionWriter(sessionId, writer);
+      logger.info({ sessionId, userId }, '[WebSocket] Client subscribed to active session, writer replaced');
+      writer.send({ type: 'session-resumed', sessionId, provider: 'claude', isProcessing: true });
+    } else {
+      logger.info({ sessionId, userId, active: !!session }, '[WebSocket] Subscribe target not active, client should load history');
+      writer.send({ type: 'session-status', sessionId, provider: 'claude', isProcessing: false });
+    }
+  },
   'get-active-sessions': async (data, ws, writer) => {
     writer.send({ type: 'active-sessions', sessions: { cursor: getActiveCursorSessions(), codex: getActiveCodexSessions() } });
   },
@@ -388,20 +417,21 @@ export function handleChatConnection(ws, connectedClients) {
   ws.on('close', () => {
     logger.info('Chat client disconnected');
     connectedClients.delete(ws);
-    // 中止进行中的查询，释放容器资源，避免 stream 空挂
+    // 不再立即 abort：改为启动宽限期清理，支持刷新重连续传。
+    // 期间若有新连接 subscribe 该会话则取消清理；超时未重连才 abort 释放资源。
     if (ws.activeSessionId) {
-      abortClaudeSDKSessionInContainer(ws.activeSessionId);
-      logger.info({ sessionId: ws.activeSessionId }, '[WebSocket] Auto-aborted active session on client disconnect');
+      scheduleSessionCleanup(ws.activeSessionId, CLAUDE_GRACE_MS);
+      logger.info({ sessionId: ws.activeSessionId, graceMs: CLAUDE_GRACE_MS }, '[WebSocket] Scheduled session cleanup on disconnect (grace period)');
     }
   });
 
   ws.on('error', (err) => {
     logger.error({ err }, '[WebSocket] Chat connection error');
     connectedClients.delete(ws);
-    // 连接出错时同样中止进行中的查询
+    // 连接出错同样进入宽限期（与 close 一致），保留重连续传可能
     if (ws.activeSessionId) {
-      abortClaudeSDKSessionInContainer(ws.activeSessionId);
-      logger.info({ sessionId: ws.activeSessionId }, '[WebSocket] Auto-aborted active session on connection error');
+      scheduleSessionCleanup(ws.activeSessionId, CLAUDE_GRACE_MS);
+      logger.info({ sessionId: ws.activeSessionId, graceMs: CLAUDE_GRACE_MS }, '[WebSocket] Scheduled session cleanup on error (grace period)');
     }
   });
 }
