@@ -4,7 +4,7 @@
  * Type definitions for project management functionality.
  */
 
-import type { Project } from '@/features/sidebar/types/sidebar.types';
+import type { Project, SessionProvider } from '@/features/sidebar/types/sidebar.types';
 
 // ApiSession 的类型定义
 /**
@@ -50,7 +50,7 @@ export interface ProjectManagementActions {
   handleSessionSelect: (session: Session, projectName?: string) => void;
   setSelectedSession: (session: Session | null) => void;
   handleNewSession: (projectName: string) => void;
-  handleSessionDelete: (deletedSessionId: string) => void;
+  handleSessionDelete: (projectName: string, sessionId: string, provider?: SessionProvider) => void;
   handleSidebarRefresh: () => Promise<void>;
   handleProjectDelete: (projectName: string) => void;
   updateProjectsFromWebSocket: (updatedProjects: Project[]) => void;

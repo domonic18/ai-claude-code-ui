@@ -90,5 +90,9 @@ export function syncSessionAfterRefresh(
         __provider: currentSession.__provider
       } as Session);
     }
+  } else {
+    // 会话在最新数据中已不存在（被删除）：清空选中态，避免残留 stale sessionId
+    // 触发 useSessionSync 清空 currentSessionId / messages。
+    deps.setSelectedSession(null);
   }
 }

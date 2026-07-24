@@ -93,21 +93,52 @@ export async function listSessionFiles(userId, projectName) {
 
 // sessionReader.js 功能函数
 /**
- * 校验指定 sessionId 是否属于某项目（容器内是否存在其会话历史文件）
+ * 读取单个会话文件并判断其是否包含有效（非空）的会话历史。
+ *
+ * 删除会话时 sessionWriter 只剥离消息条目、保留空文件，因此「文件存在」≠「会话可 resume」。
+ * 这里复用 forEachSessionFile 读取内容，只要存在任意一条归属该 sessionId 的有效条目即视为有效。
+ *
+ * @param {number} userId - 用户 ID
+ * @param {string} projectDir - 容器内项目目录
+ * @param {string} sessionId - 待校验的会话 ID
+ * @returns {Promise<boolean>} true 表示文件含有效历史
+ */
+async function sessionFileHasContent(userId, projectDir, sessionId) {
+  let hasContent = false;
+  await forEachSessionFile(userId, projectDir, [`${sessionId}.jsonl`], ({ entries }) => {
+    for (const entry of entries) {
+      if (!entry._raw && entry.sessionId === sessionId) {
+        hasContent = true;
+        return true; // 命中即终止遍历
+      }
+    }
+    return false;
+  });
+  return hasContent;
+}
+
+// sessionReader.js 功能函数
+/**
+ * 校验指定 sessionId 是否属于某项目且会话历史仍可 resume（容器内存在非空会话文件）
  *
  * 用于 resume 前的归属校验：防止前端切项目后残留的 sessionId 跨项目 resume，
- * 导致对话串到错误项目。容器抖动等异常时 fail-open（返回 true），避免误伤正常 resume。
+ * 或删除会话后 stale sessionId 被再次发出，导致对话串到错误项目 / 触发
+ * "No conversation found with session ID"。文件存在但为空（已删除）同样视为不存在，
+ * 以便 ClaudeQuery 自动降级为新会话。容器抖动等异常时 fail-open（返回 true），避免误伤正常 resume。
  *
  * @param {number} userId - 用户 ID
  * @param {string} projectName - 项目名称
  * @param {string} sessionId - 待校验的会话 ID
- * @returns {Promise<boolean>} true 表示该 session 属于该项目（或校验异常时容错放行）
+ * @returns {Promise<boolean>} true 表示该 session 属于该项目且历史非空（或校验异常时容错放行）
  */
 export async function sessionExistsInProject(userId, projectName, sessionId) {
   if (!projectName || !sessionId) return false;
   try {
     const files = await listSessionFiles(userId, projectName);
-    return files.includes(`${sessionId}.jsonl`);
+    if (!files.includes(`${sessionId}.jsonl`)) return false;
+    // 文件存在但可能已被清空（删除会话只剥条目不删文件）：空文件视为不存在，触发 resume 降级
+    const projectDir = getProjectDir(projectName);
+    return await sessionFileHasContent(userId, projectDir, sessionId);
   } catch (error) {
     logger.warn({ err: error, projectName, sessionId }, '[sessionReader] sessionExistsInProject check failed, fail-open');
     return true;
