@@ -66,6 +66,8 @@ interface UseStreamBufferReturn {
   resetBuffers: () => void;
   /** Reset all buffers, refs, and state */
   resetAll: () => void;
+  /** Reset content buffers/ref/state only, keep thinking（思考框会话期间持续累积） */
+  resetContent: () => void;
 }
 
 /**
@@ -171,6 +173,14 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
     setStreamingThinking('');
   }, []);
 
+  // 仅清空正文（buffer/ref/state），保留思考——agentic 多轮每轮 content_block_stop 触发
+  // completeStream 时只清正文（已变消息），思考持续累积，避免黄框每轮闪烁消失。
+  const resetContent = useCallback(() => {
+    streamBufferRef.current = '';
+    streamingContentRef.current = '';
+    setStreamingContent('');
+  }, []);
+
   return {
     streamingContent,
     streamingThinking,
@@ -181,6 +191,7 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
     getBufferContent,
     resetBuffers,
     resetAll,
+    resetContent,
   };
 }
 
@@ -230,6 +241,10 @@ export function useMessageStream(options: UseMessageStreamOptions = {}): UseMess
     if (hasContentRef.current) {
       onStreamComplete?.(finalContent.content, finalContent.thinking);
     }
+    // 正文 complete 后清空（已变消息）；思考保留——黄框在会话期间持续累积显示，
+    // 避免 agentic 多轮每轮 content_block_stop 清空导致思考框闪烁（仅 startStream/刷新清思考）
+    buffer.resetContent();
+    hasContentRef.current = false;
   }, [buffer, onStreamComplete]);
 
   // 重置流状态。注意：与 completeStream 不同，resetStream 不刷新缓冲区，

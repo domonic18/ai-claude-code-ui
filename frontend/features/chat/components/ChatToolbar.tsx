@@ -118,7 +118,7 @@ export function ChatToolbar({
       )}
 
       {/* 生成摘要（当前会话，调模型生成案件概览） */}
-      <GenerateOverviewButton projectName={projectName} sessionId={currentSessionId} />
+      <GenerateOverviewButton projectName={projectName} sessionId={currentSessionId} selectedModel={selectedModel} />
 
       {/* Model Selector */}
       <div className="flex items-center gap-3">

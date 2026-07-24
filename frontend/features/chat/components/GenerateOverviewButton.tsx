@@ -20,9 +20,11 @@ interface GenerateOverviewButtonProps {
   projectName: string | null;
   /** 当前会话 ID */
   sessionId: string | null;
+  /** 当前选中的模型（摘要跟随此模型，未传则用后端默认摘要模型） */
+  selectedModel?: string;
 }
 
-export const GenerateOverviewButton: React.FC<GenerateOverviewButtonProps> = ({ projectName, sessionId }) => {
+export const GenerateOverviewButton: React.FC<GenerateOverviewButtonProps> = ({ projectName, sessionId, selectedModel }) => {
   const { t } = useTranslation();
   const [generating, setGenerating] = useState(false);
 
@@ -30,7 +32,7 @@ export const GenerateOverviewButton: React.FC<GenerateOverviewButtonProps> = ({ 
     if (!projectName || !sessionId || generating) return;
     setGenerating(true);
     try {
-      const res = await api.projectOverview.generate(projectName, sessionId);
+      const res = await api.projectOverview.generate(projectName, sessionId, selectedModel);
       const result = await res.json();
       if (!result?.success) {
         throw new Error(result?.error || 'Failed to generate overview');
