@@ -224,8 +224,12 @@ export async function destroyContainer(docker, containerId, dataDir, userId, rem
         // 已停止则忽略
     }
 
-    // 删除容器
-    await container.remove();
+    // 删除容器（404 视为已删除，保持幂等，与 removeOrphanedContainer 一致）
+    try {
+        await container.remove();
+    } catch (err) {
+        if (err.statusCode !== 404) throw err;
+    }
 
     // 可选删除卷
     if (removeVolume) {
