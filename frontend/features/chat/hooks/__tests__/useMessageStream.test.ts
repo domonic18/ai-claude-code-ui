@@ -253,9 +253,8 @@ describe('useMessageStream', () => {
         vi.advanceTimersByTime(100);
       });
 
-      // '   ' is truthy so it passes the !content check and gets buffered
-      // but it's whitespace-only content
-      expect(result.current.streamingContent).toBe('');
+      // '' 被 !content 忽略；'   ' 是有效字符（流式空白/换行用于维持文本格式），保留进 state
+      expect(result.current.streamingContent).toBe('   ');
     });
   });
 

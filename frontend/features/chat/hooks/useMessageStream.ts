@@ -230,6 +230,10 @@ export function useMessageStream(options: UseMessageStreamOptions = {}): UseMess
     if (hasContentRef.current) {
       onStreamComplete?.(finalContent.content, finalContent.thinking);
     }
+    // 完成后清空流式 buffer/state：内容已通过 onStreamComplete 传出，
+    // 清空避免流式预览残留与完整消息重复显示，并重置 hasContent 标志
+    buffer.resetAll();
+    hasContentRef.current = false;
   }, [buffer, onStreamComplete]);
 
   // 重置流状态。注意：与 completeStream 不同，resetStream 不刷新缓冲区，
