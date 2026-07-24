@@ -7,7 +7,7 @@
 
 import React, { createContext, useContext } from 'react';
 import type { ReleaseInfo } from '@/features/system';
-import type { Project } from '@/features/sidebar/types/sidebar.types';
+import type { Project, SessionProvider } from '@/features/sidebar/types/sidebar.types';
 import type { Session, ApiSession } from '@/features/system/types/projectManagement.types';
 import type { SettingsTab } from '@/features/settings/types/settings.types';
 
@@ -92,7 +92,7 @@ export interface AppActions {
   handleProjectSelect: (project: Project, shouldNavigate?: boolean, preventAutoSession?: boolean) => void;
   handleSessionSelect: (session: Session, projectName?: string) => void;
   handleNewSession: (projectName: string) => void;
-  handleSessionDelete: (deletedSessionId: string) => void;
+  handleSessionDelete: (projectName: string, sessionId: string, provider?: SessionProvider) => void;
   handleSidebarRefresh: () => Promise<void>;
   handleProjectDelete: (projectName: string) => void;
 

@@ -7,7 +7,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { Sidebar } from '@/features/sidebar/components';
-import type { Project, Session as SidebarSession } from '@/features/sidebar/types/sidebar.types';
+import type { Project, Session as SidebarSession, SessionProvider } from '@/features/sidebar/types/sidebar.types';
 
 const MIN_SIDEBAR_WIDTH = 240;
 const MAX_SIDEBAR_WIDTH = 500;
@@ -25,7 +25,7 @@ interface DesktopSidebarProps {
   onProjectSelect: (project: Project) => void;
   onSessionSelect: (session: SidebarSession, projectName: string) => void;
   onNewSession: (projectName: string) => void;
-  onSessionDelete: (projectName: string, sessionId: string) => void;
+  onSessionDelete: (projectName: string, sessionId: string, provider?: SessionProvider) => void;
   onProjectDelete: (projectName: string) => void;
   onRefresh: () => void;
   onShowSettings: () => void;

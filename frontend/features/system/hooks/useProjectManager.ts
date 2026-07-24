@@ -245,11 +245,17 @@ function useProjectManagerHandlers(options: {
 
   /**
    * Handle session deletion
+   *
+   * 调用方 useDeleteConfirmation 传入 (projectName, sessionId, provider) 三参。
+   * 修复要点：必须用第二参 sessionId 与当前会话 id 比较。
+   * 历史签名只取首参当 id（实为 projectName），UUID 与项目名比较恒为 false，
+   * 导致删除当前会话时 setSelectedSession(null) 永不执行——对话内容残留，
+   * 且下一条消息会带着 stale sessionId 以 resume:true 发出，后端报 No conversation found。
    */
-  const handleSessionDelete = useCallback((deletedSessionId: string) => {
+  const handleSessionDelete = useCallback((projectName: string, sessionId: string) => {
     const currentSession = selectedSessionRef.current;
 
-    if (currentSession?.id === deletedSessionId) {
+    if (currentSession?.id === sessionId) {
       setSelectedSession(null);
       _clearSessionStorage();
     }

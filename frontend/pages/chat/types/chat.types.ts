@@ -4,7 +4,7 @@
  * Type definitions for chat page components.
  */
 
-import type { Project as SidebarProject, Session as SidebarSession } from '@/features/sidebar/types/sidebar.types';
+import type { Project as SidebarProject, Session as SidebarSession, SessionProvider } from '@/features/sidebar/types/sidebar.types';
 
 // Project 的类型定义
 /**
@@ -52,7 +52,7 @@ export interface ChatPageProps {
   onProjectSelect: (project: Project) => void;
   onSessionSelect: (session: Session) => void;
   onNewSession: (projectName: string) => void;
-  onSessionDelete: (sessionId: string) => void;
+  onSessionDelete: (projectName: string, sessionId: string, provider?: SessionProvider) => void;
   onProjectDelete: (projectName: string) => void;
   onSidebarRefresh: () => Promise<void>;
 

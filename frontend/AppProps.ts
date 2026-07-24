@@ -6,7 +6,7 @@
  */
 
 import { useMemo } from 'react';
-import type { Project, Session as SidebarSession } from '@/features/sidebar/types/sidebar.types';
+import type { Project, Session as SidebarSession, SessionProvider } from '@/features/sidebar/types/sidebar.types';
 import { authenticatedFetch } from '@/shared/services';
 
 type Session = { id: string; title?: string; created_at?: string; updated_at?: string; __provider?: 'claude' | 'cursor' | 'codex'; __projectName?: string; };
@@ -22,7 +22,7 @@ export function useSidebarCommonProps(
     onProjectSelect: (p: Project) => void;
     onSessionSelect: (s: Session) => void;
     onNewSession: (projectName?: string) => void;
-    onSessionDelete: (sessionId: string) => void;
+    onSessionDelete: (projectName: string, sessionId: string, provider?: SessionProvider) => void;
     onProjectDelete: (projectPath: string) => void;
     onRefresh: () => void;
   },
