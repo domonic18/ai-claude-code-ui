@@ -28,7 +28,6 @@ import { useChatWebSocketProcessor } from './useChatWebSocketProcessor';
 import { useChatMenuSystem } from './useChatMenuSystem';
 import { useChatSessionManagement } from './useChatSessionManagement';
 import { useStreamingResume, persistActiveStreamingSession, replaceActiveStreamingSession, clearActiveStreamingSession } from './useStreamingResume';
-import { logger } from '@/shared/utils/logger';
 
 // Stable empty array reference to prevent unnecessary effect triggers
 const EMPTY_WS_MESSAGES: any[] = [];
@@ -272,7 +271,6 @@ export function useChatInterface({
     setActiveStreamSessionId(sessionId);
     // 持久化活跃 sessionId：刷新后由 useStreamingResume 据此 subscribe 续传
     persistActiveStreamingSession(selectedProject?.name, sessionId);
-    logger.info('[resume] persist activeStreamingSession', { project: selectedProject?.name, sessionId });
     onSessionProcessing?.(sessionId);
   }, [onSessionProcessing, selectedProject?.name]);
 
@@ -313,7 +311,6 @@ export function useChatInterface({
 
   // 刷新续传恢复：任务仍在跑时由 useStreamingResume 回调，重建流式归属 + UI 态
   const handleStreamingResumed = useCallback((sessionId: string) => {
-    logger.info('[resume] handleStreamingResumed, sessionId=', sessionId);
     // 恢复场景：session-resumed 已由后端确认此 session 活跃且属于当前用户。
     // 对齐 currentSessionId 到该 session，确保 showStreamingUI 判定为当前视图
     // （恢复时序中 currentSessionId 可能尚未从 lastSessionId 就绪，导致流式区被门控为不渲染）。
@@ -434,21 +431,6 @@ export function useChatInterface({
   const showStreamingUI = activeStreamSessionId == null
     || currentSessionId === activeStreamSessionId
     || (currentSessionId == null && !!activeStreamProjectRef.current && selectedProject?.name === activeStreamProjectRef.current);
-
-  // [临时诊断] 刷新续传排查：观察恢复期间 showStreamingUI 及相关变量、buffer 是否收到 delta
-  useEffect(() => {
-    if (activeStreamSessionId) {
-      logger.info('[resume-debug] showStreamingUI=', showStreamingUI, {
-        activeStreamSessionId,
-        currentSessionId,
-        activeStreamProject: activeStreamProjectRef.current,
-        selectedProject: selectedProject?.name,
-        isStreaming: stream.isStreaming,
-        streamingContentLen: (stream.streamingContent || '').length,
-        streamingThinkingLen: (stream.streamingThinking || '').length,
-      });
-    }
-  }, [showStreamingUI, activeStreamSessionId, currentSessionId, stream.isStreaming, stream.streamingContent, stream.streamingThinking, selectedProject?.name]);
 
   // ========== 返回状态和处理函数 ==========
   return {

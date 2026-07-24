@@ -5,10 +5,9 @@
  */
 
 // 导入 React 核心依赖
-import React, { useEffect } from 'react';
+import React from 'react';
 // 导入聊天消息列表组件、流式指示器和思考过程组件
 import { ChatMessageList, StreamingIndicator, ThinkingProcess } from './index';
-import { logger } from '@/shared/utils/logger';
 
 interface ChatInterfaceMainAreaProps {
   // 聊天消息列表，包含用户消息、助手消息和工具调用消息
@@ -51,17 +50,6 @@ export function ChatInterfaceMainArea({
   createDiff,
   autoScrollToBottom,
 }: ChatInterfaceMainAreaProps) {
-  // [临时诊断] 黄框渲染条件：streamingThinking 是否真的有值、willRender 是否为 true
-  useEffect(() => {
-    logger.info('[yellow-box] render', {
-      showThinking,
-      thinkingLen: (streamingThinking || '').length,
-      willRender: !!(showThinking && streamingThinking),
-      isStreaming,
-      contentLen: (streamingContent || '').length,
-    });
-  });
-
   return (
     <>
       {/* 消息列表组件 */}

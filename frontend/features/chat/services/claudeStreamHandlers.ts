@@ -9,7 +9,6 @@
 
 import type { MessageHandlerCallbacks } from './types';
 import { generateMessageId, decodeHtmlEntities } from './wsUtils';
-import { logger } from '@/shared/utils/logger';
 
 /**
  * 处理流式内容增量（content_block_delta）和内容块结束（content_block_stop）
@@ -28,7 +27,6 @@ export function handleStreamingDelta(messageData: any, callbacks: MessageHandler
       return true;
     }
     if (messageData.delta.thinking) {
-      logger.info('[thinking-delta] 前端收到 thinking 增量', { len: messageData.delta.thinking.length, preview: String(messageData.delta.thinking).slice(0, 30) });
       callbacks.updateStreamThinking?.(decodeHtmlEntities(messageData.delta.thinking));
       return true;
     }

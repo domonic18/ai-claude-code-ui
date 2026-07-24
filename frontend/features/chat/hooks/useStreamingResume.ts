@@ -82,18 +82,14 @@ export function useStreamingResume({ projectKey, wsMessages, onResumed, onNotAct
 
   // 连接建立（含重连）后：若本地有活跃 session 标记，发 subscribe
   useEffect(() => {
-    const keyName = storageKey(projectKey);
-    const sessionId = safeLocalStorage.getItem(keyName);
-    logger.info('[useStreamingResume] effect tick', {
-      isConnected, projectKey, subscribed: subscribedRef.current,
-      keyName, hasKey: !!sessionId,
-    });
     if (!isConnected) {
       // 连接断开：重置订阅状态，等待下次重连重新订阅
       subscribedRef.current = false;
       return;
     }
     if (subscribedRef.current) return; // 本连接已订阅过
+
+    const sessionId = safeLocalStorage.getItem(storageKey(projectKey));
     if (!sessionId) return;
 
     subscribedRef.current = true;
