@@ -119,11 +119,30 @@ export function validateProjectName(
 }
 
 /**
+ * 项目创建失败错误
+ *
+ * 保留 HTTP status 与后端 code，便于上层按 409 / ALREADY_EXISTS 分流到友好提示。
+ */
+export class ProjectCreateError extends Error {
+  /** HTTP 状态码 */
+  status?: number;
+  /** 后端错误码（如 ALREADY_EXISTS） */
+  code?: string;
+
+  constructor(message: string, status?: number, code?: string) {
+    super(message);
+    this.name = 'ProjectCreateError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
+/**
  * Handle project creation API call
  *
  * @param {string} projectName - Project name
  * @returns {Promise<any>} Created project data
- * @throws {Error} If creation fails
+ * @throws {ProjectCreateError} If creation fails
  */
 export async function createProjectApi(projectName: string): Promise<any> {
   // Default workspace path for user projects
@@ -147,7 +166,11 @@ export async function createProjectApi(projectName: string): Promise<any> {
 
   if (!response.ok) {
     console.error('[createProjectApi] ④ 响应非 2xx, error:', data.error, data.message);
-    throw new Error(data.error || data.message || 'Failed to create project');
+    throw new ProjectCreateError(
+      data.error || data.message || 'Failed to create project',
+      response.status,
+      data.code
+    );
   }
 
   const result = data.data?.project || data.data || data;

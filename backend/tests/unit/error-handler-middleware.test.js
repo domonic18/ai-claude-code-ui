@@ -5,6 +5,7 @@
  * - AppError class
  * - ValidationError class
  * - NotFoundError class
+ * - ConflictError class
  * - UnauthorizedError class
  * - errorHandler middleware
  * - asyncHandler wrapper
@@ -48,7 +49,7 @@ function createMockRes() {
 
 describe('Error Handler Middleware', () => {
   let errorHandler, notFoundHandler, asyncHandler;
-  let AppError, ValidationError, NotFoundError, UnauthorizedError, ErrorCode;
+  let AppError, ValidationError, NotFoundError, ConflictError, UnauthorizedError, ErrorCode;
 
   beforeEach(async () => {
     const mod = await import('../../middleware/error-handler.middleware.js');
@@ -58,6 +59,7 @@ describe('Error Handler Middleware', () => {
     AppError = mod.AppError;
     ValidationError = mod.ValidationError;
     NotFoundError = mod.NotFoundError;
+    ConflictError = mod.ConflictError;
     UnauthorizedError = mod.UnauthorizedError;
     ErrorCode = mod.ErrorCode;
   });
@@ -69,6 +71,7 @@ describe('Error Handler Middleware', () => {
       assert.strictEqual(typeof AppError, 'function');
       assert.strictEqual(typeof ValidationError, 'function');
       assert.strictEqual(typeof NotFoundError, 'function');
+      assert.strictEqual(typeof ConflictError, 'function');
       assert.strictEqual(typeof UnauthorizedError, 'function');
     });
 
@@ -241,6 +244,18 @@ describe('Error Handler Middleware', () => {
 
       assert.strictEqual(res.statusCode, 404);
       assert.strictEqual(res.body.code, ErrorCode.NOT_FOUND);
+    });
+
+    it('should handle ConflictError with 409', () => {
+      const err = new ConflictError('Project', 'my-workspace');
+      const req = createMockReq();
+      const res = createMockRes();
+
+      errorHandler(err, req, res, () => {});
+
+      assert.strictEqual(res.statusCode, 409);
+      assert.strictEqual(res.body.code, ErrorCode.ALREADY_EXISTS);
+      assert.strictEqual(res.body.error, 'Project already configured: my-workspace');
     });
 
     it('should handle UnauthorizedError with 401', () => {

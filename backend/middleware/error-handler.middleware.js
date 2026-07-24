@@ -145,6 +145,25 @@ class NotFoundError extends AppError {
 }
 
 /**
+ * 冲突错误类（资源已存在，返回 409）
+ */
+class ConflictError extends AppError {
+// 中间件函数，在请求处理链中执行
+  /**
+   * 构造函数
+   * @param {string} resource - 资源名称
+   * @param {string} identifier - 资源标识
+   */
+  constructor(resource, identifier = '') {
+    const message = identifier
+      ? `${resource} already configured: ${identifier}`
+      : `${resource} already exists`;
+    super(message, ErrorCode.ALREADY_EXISTS, 409, { resource, identifier });
+    this.name = 'ConflictError';
+  }
+}
+
+/**
  * 未授权错误类
  */
 class UnauthorizedError extends AppError {
@@ -315,6 +334,7 @@ export {
   AppError,
   ValidationError,
   NotFoundError,
+  ConflictError,
   UnauthorizedError,
   errorHandler,
   notFoundHandler,

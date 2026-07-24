@@ -8,6 +8,7 @@ import { api } from '@/shared/services';
 import { getSidebarService } from '../services';
 import type { Project, ProjectFile, Session } from '../types/sidebar.types';
 import { logger } from '@/shared/utils/logger';
+import i18n from '@/shared/i18n';
 
 /**
  * Get project files
@@ -60,8 +61,13 @@ export async function createProjectOperation(
   try {
     return await getSidebarService().createProject(path);
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Failed to create project';
-    setError(errorMessage);
+    // 重名冲突（409）：复用 i18n 友好文案，避免展示后端原始 message
+    if ((err as { statusCode?: number }).statusCode === 409) {
+      setError(i18n.t('projectCreation.error.nameExists'));
+    } else {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create project';
+      setError(errorMessage);
+    }
     throw err;
   }
 }

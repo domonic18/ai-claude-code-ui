@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Check, AlertCircle, Loader2 } from 'lucide-react';
 import { logger } from '@/shared/utils/logger';
 import {
@@ -14,6 +15,7 @@ import {
   sanitizeProjectName,
   validateProjectName,
   createProjectApi,
+  ProjectCreateError,
 } from './projectNameValidation';
 import type { NameAvailabilityStatus } from '../utils/projectNameUtils';
 export interface UseProjectCreationWizardReturn {
@@ -52,6 +54,9 @@ export function useProjectCreationWizard(
   onProjectCreated?: (project: any) => void,
   onClose?: () => void
 ) {
+  // i18n：重名冲突时复用既有文案，避免直接展示后端原始 message
+  const { t } = useTranslation();
+
   // Form state
   const [projectName, setProjectName] = useState<string>(defaultProjectName);
 
@@ -120,9 +125,14 @@ export function useProjectCreationWizard(
         onClose();
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create project';
       console.error('[ProjectCreationWizard] ✖ createProjectApi 异常:', err);
-      setError(errorMessage);
+      // 重名冲突：复用 i18n 友好文案，而非展示后端原始 message
+      if (err instanceof ProjectCreateError && (err.status === 409 || err.code === 'ALREADY_EXISTS')) {
+        setError(t('projectCreation.error.nameExists'));
+      } else {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to create project';
+        setError(errorMessage);
+      }
     } finally {
       console.log('[ProjectCreationWizard] ⑥ finally — setIsCreating(false)');
       setIsCreating(false);

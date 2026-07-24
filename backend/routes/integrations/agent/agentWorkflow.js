@@ -24,6 +24,7 @@ import { queryClaudeSDK } from '../../../services/execution/claude/index.js';
 import { spawnCursor } from '../../../services/execution/cursor/index.js';
 import { queryCodex } from '../../../services/execution/codex/index.js';
 import { createLogger } from '../../../utils/logger.js';
+import { ConflictError } from '../../../middleware/error-handler.middleware.js';
 
 const logger = createLogger('routes/integrations/agent/workflow');
 const { GitHubToken } = repositories;
@@ -101,7 +102,8 @@ export async function registerProject(userId, projectPath) {
         const projectName = path.basename(projectPath);
         await addProjectManually(userId, projectName);
     } catch (error) {
-        if (!error.message?.includes('Project already configured')) throw error;
+        // 已配置属幂等场景：按错误码/类型判断，避免依赖易变的 message 文案
+        if (error.code !== 'ALREADY_EXISTS' && !(error instanceof ConflictError)) throw error;
     }
 }
 

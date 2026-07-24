@@ -17,6 +17,7 @@ import containerManager from '../../container/core/index.js';
 import { CONTAINER } from '../../../config/config.js';
 import { readStreamOutput } from '../../files/utils/file-utils.js';
 import { createLogger } from '../../../utils/logger.js';
+import { ConflictError } from '../../../middleware/error-handler.middleware.js';
 const logger = createLogger('services/projects/project-management/operations');
 
 // 由 PUT /api/projects/:id/rename 调用，更新项目显示名称
@@ -172,7 +173,7 @@ async function addProjectManually(userId, projectName, displayName = null) {
     const config = await loadProjectConfig(userId);
 
     if (config[projectName]) {
-      throw new Error(`Project already configured: ${projectName}`);
+      throw new ConflictError('Project', projectName);
     }
 
     config[projectName] = {
