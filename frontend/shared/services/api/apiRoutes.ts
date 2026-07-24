@@ -306,7 +306,11 @@ export const api = {
       authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/overview`),
     read: (projectName: string, sessionId: string) =>
       authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/overview/${sessionId}`),
-    generate: (projectName: string, sessionId: string) =>
-      authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/overview/${sessionId}/generate`, { method: 'POST' }),
+    generate: (projectName: string, sessionId: string, model?: string) =>
+      authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/overview/${sessionId}/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(model ? { model } : {}),
+      }),
   },
 };

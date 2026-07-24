@@ -73,8 +73,9 @@ export class ProjectOverviewController extends BaseController {
     try {
       const userId = this._getUserId(req);
       const { projectName, sessionId } = req.params;
+      const { model } = req.body || {};
 
-      const result = await projectOverviewService.generateOverview(userId, projectName, sessionId);
+      const result = await projectOverviewService.generateOverview(userId, projectName, sessionId, model);
 
       this._success(res, result, 'Overview generated successfully');
     } catch (error) {

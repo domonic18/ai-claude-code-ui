@@ -38,9 +38,17 @@ const OVERVIEW_DIR_NAME = 'project-overview';
  * 故由 2000 提升至 8192，避免正文尚未输出完整即被 max_tokens 截断。
  */
 const SUMMARY_MAX_TOKENS = 8192;
-const SUMMARY_TIMEOUT_MS = 60_000;
-/** transcript 截断上限（防超 token，长会话保护） */
-const MAX_TRANSCRIPT_CHARS = 8000;
+/**
+ * 摘要 API 调用超时（毫秒）。摘要模型多为推理模型 + 五段式输出（max_tokens=8192），
+ * 生成耗时较长，原 60s 在 glm-5.1 等推理模型上易超时，放宽到 180s。
+ */
+const SUMMARY_TIMEOUT_MS = 180_000;
+/**
+ * transcript 截断上限（字符）。摘要模型需覆盖完整技术讨论，
+ * 原 8000 会把长会话的实质讨论（通常在后半段）截掉、只剩开头的技能说明，
+ * 导致摘要失真。放宽到 50000（中文约 2.5 万 token，在主流摘要模型 128k 上下文内）。
+ */
+const MAX_TRANSCRIPT_CHARS = 50_000;
 
 /**
  * 会话沉淀提示词（正式版）
@@ -125,7 +133,7 @@ export class ProjectOverviewService {
    * @throws {ValidationError} sessionId/projectName 非法
    * @throws {Error} 无 transcript / 模型生成失败
    */
-  async generateOverview(userId, projectName, sessionId) {
+  async generateOverview(userId, projectName, sessionId, model) {
     this._assertProjectName(projectName);
     if (!sessionId || !SESSION_ID_RE.test(sessionId)) {
       throw new ValidationError('Invalid sessionId');
@@ -138,7 +146,7 @@ export class ProjectOverviewService {
     }
 
     // 2. 调模型生成摘要
-    const summary = await this._callSummaryModel(transcript);
+    const summary = await this._callSummaryModel(transcript, model);
     if (!summary) {
       throw new Error('Summary generation failed');
     }
@@ -178,17 +186,18 @@ export class ProjectOverviewService {
    * @returns {Promise<string|null>} 摘要文本，失败返回 null
    * @private
    */
-  async _callSummaryModel(transcript) {
-    const model = getSummaryModel();
+  async _callSummaryModel(transcript, preferredModelName) {
+    const model = getSummaryModel(preferredModelName);
     const config = getModelProviderConfig(model.name);
     if (!config.baseURL || !config.authToken) {
       logger.error({ model: model.name }, '[Overview] 模型缺少 API 配置');
       return null;
     }
 
-    // 截断 transcript 防超 token（长会话保护）
+    // 截断 transcript 防超 token：长会话时保留**最后**部分（最近的讨论/最终理解最重要，
+    // 开头常是技能说明与材料引用），避免截掉实质技术讨论导致摘要失真
     const trimmedTranscript = transcript.length > MAX_TRANSCRIPT_CHARS
-      ? transcript.slice(0, MAX_TRANSCRIPT_CHARS) + '\n...(内容过长，已截断)'
+      ? '...(前面较早的对话已省略，仅保留最近讨论)...\n\n' + transcript.slice(-MAX_TRANSCRIPT_CHARS)
       : transcript;
 
     const baseURL = config.baseURL.replace(/\/+$/, '');
