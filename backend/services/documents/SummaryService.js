@@ -23,8 +23,8 @@ import { createLogger } from '../../utils/logger.js';
 const logger = createLogger('services/documents/SummaryService');
 
 /** 摘要生成 prompt */
-const SUMMARY_PROMPT = '请用中文为以下文档生成约200字的摘要，概括文档的核心内容和关键信息。直接输出摘要文本，不要加任何前缀或标题：\n\n';
-const IMAGE_SUMMARY_PROMPT = '请用中文为这张图片生成约200字的描述，概括图片的核心内容和关键信息。直接输出描述文本，不要加任何前缀或标题。';
+const SUMMARY_PROMPT = '请用中文为以下文档生成一段简短摘要（200字左右即可，无需精确字数），概括核心内容和关键信息。直接输出摘要正文，不要加前缀、标题或思考过程：\n\n';
+const IMAGE_SUMMARY_PROMPT = '请用中文为这张图片生成一段简短描述（200字左右即可，无需精确字数），概括核心内容和关键信息。直接输出描述正文，不要加前缀或标题。';
 
 /** AI 文档摘要重试配置 */
 const AI_DOC_RETRY_DELAY_MS = 3_000;
@@ -32,10 +32,11 @@ const AI_DOC_MAX_RETRIES = 3;
 
 /**
  * 摘要最大输出 token 数。
- * 需容纳推理模型（如 MiniMax-M2.7 / claude-…-thinking）的 thinking 阶段 + ~200 字正文；
- * 500 会卡在 thinking 用尽预算、不输出正文（stop_reason: max_tokens）。
+ * 需容纳推理模型（如 MiniMax-M2.7）的 thinking 阶段 + ~200 字正文；
+ * 推理模型在"约200字"要求下会在 thinking 里反复数字数、消耗大量预算，
+ * 4096 会被 thinking 占满导致正文未输出即 max_tokens 截断，提升到 16384。
  */
-const SUMMARY_MAX_TOKENS = 4096;
+const SUMMARY_MAX_TOKENS = 16_384;
 
 /** 摘要生成失败时的占位文本 */
 const FALLBACK_SUMMARY = '（摘要生成失败，请手动编辑）';
@@ -308,7 +309,8 @@ export class SummaryService {
           'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(30_000),
+        // 文档摘要常调推理模型（如 MiniMax-M2.7），文档内容长、生成慢，原 30s 必超时；放宽到 180s
+        signal: AbortSignal.timeout(180_000),
       });
 
       if (!response.ok) {
