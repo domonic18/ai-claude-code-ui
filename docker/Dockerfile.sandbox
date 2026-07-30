@@ -45,7 +45,10 @@ RUN pip3 install --no-cache-dir --break-system-packages \
 
 # 预装 patent-docx-collaborative-review 技能所需的 OfficeCLI（原生处理 WordprocessingML 批注与修订痕迹）
 # 锁定技能已验证版本 1.0.132；全局装进系统 PATH，技能脚本按 OFFICECLI env → node_modules/.bin → PATH 查找
-RUN npm install -g @officecli/officecli@1.0.132
+# ⚠️ OfficeCLI 二进制内嵌 self-updater，即使 npm 锁版本，运行时会自动替换 vendor/officecli 二进制，
+# 导致次次漂移到 1.0.14x + .NET 程序集缓存失效（System.IO.Pipelines 找不到）。设为只读阻止原地替换。
+RUN npm install -g @officecli/officecli@1.0.132 && \
+    chmod 444 /usr/local/lib/node_modules/@officecli/officecli/vendor/officecli
 
 # Create workspace and config directories
 RUN mkdir -p /workspace /app /workspace/.claude/projects && \
