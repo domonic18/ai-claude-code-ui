@@ -191,7 +191,10 @@ export function useProjectCreationWizard(
       !projectName ||
       projectName.trim().length === 0 ||
       availabilityStatus === 'unavailable' ||
-      availabilityStatus === 'checking'
+      availabilityStatus === 'checking' ||
+      // 初始加载/自动取名未完成期间禁用：此时输入框可能是未去重的陈旧标题，
+      // 提交会触发重名 409（线上 user 8 连建 my-workspace-1..-22 的根因）
+      availabilityStatus === 'idle'
     );
   };
 
