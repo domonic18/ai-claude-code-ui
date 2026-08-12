@@ -153,8 +153,14 @@ export class BaseController {
       return next(error);
     }
 
-    // 记录错误
-    logger.error({ err: error }, `[${this.constructor.name}] Error: ${error.message}`);
+    // 记录错误：5xx 记 ERROR；4xx 业务/客户端错误(如 409 重名冲突)记 WARN，
+    // 与 error-handler 中间件分级一致，避免正常业务冲突污染 ERROR 日志。
+    const statusCode = error.statusCode || 500;
+    if (statusCode >= 500) {
+      logger.error({ err: error }, `[${this.constructor.name}] Error: ${error.message}`);
+    } else {
+      logger.warn({ err: error }, `[${this.constructor.name}] ${error.message}`);
+    }
 
     // 传递给错误处理中间件
     next(error);

@@ -9,6 +9,8 @@ export interface WebSocketContextValue {
   sendMessage: (message: any) => void;
   messages: WebSocketMessage[];
   isConnected: boolean;
+  /** 断线后正在自动重连中（首次连接前为 false） */
+  isReconnecting: boolean;
 }
 
 const WebSocketContext = createContext<WebSocketContextValue | undefined>(undefined);

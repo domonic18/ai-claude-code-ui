@@ -388,6 +388,11 @@ export function handleChatConnection(ws, connectedClients) {
   ws.on('message', async (message) => {
     try {
       const data = JSON.parse(message);
+      // 应用层心跳：浏览器无法用协议层 ping 主动探活，客户端发 {type:'ping'} 探测连接活性
+      if (data.type === 'ping') {
+        writer.send({ type: 'pong' });
+        return;
+      }
       // 根据 message.type 路由到对应处理器
       const handler = COMMAND_HANDLERS[data.type];
       if (!handler) return;

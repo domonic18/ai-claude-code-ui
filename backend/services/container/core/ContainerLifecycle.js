@@ -39,6 +39,8 @@ export class ContainerLifecycleManager {
     this.containers = new Map();
     this.stateMachines = new Map();
     this.healthMonitor = new ContainerHealthMonitor(this.docker);
+    /** @type {Map<number, Promise<void>>} Per-user creation locks to prevent concurrent container creation */
+    this._creationLocks = new Map();
   }
 
   // ─── 公共 API ──────────────────────────────────────
@@ -59,11 +61,10 @@ export class ContainerLifecycleManager {
         getTimer.endDebug(logger, 'Container obtained (hot path)', { userId, path: 'hot', readOnly });
         return existing;
       }
-      // 容器信息丢失但状态为 ready，先重置状态再重建
+      // 容器信息丢失但状态为 ready，先重置状态再走冷路径
       stateMachine.transitionTo(ContainerState.NON_EXISTENT);
       await containerStateStore.save(stateMachine);
-      getTimer.end(logger, 'Container obtained (cold path - re-create)', { userId, path: 'cold-recreate', readOnly });
-      return createContainerWithStateMachine(this.docker, userId, userConfig, stateMachine, this.containers, this.config);
+      // Fall through to cold path
     }
 
     // 创建中：等待或报错
@@ -74,14 +75,35 @@ export class ContainerLifecycleManager {
       return result;
     }
 
-    // 失败或不存在：重置后创建（冷路径）
+    // 失败状态：重置后走冷路径
     if (stateMachine.is(ContainerState.FAILED)) {
       stateMachine.transitionTo(ContainerState.NON_EXISTENT);
       await containerStateStore.save(stateMachine);
     }
 
-    getTimer.end(logger, 'Container obtained (cold path - new)', { userId, path: 'cold-new', readOnly });
-    return createContainerWithStateMachine(this.docker, userId, userConfig, stateMachine, this.containers, this.config);
+    // ── 冷路径：创建容器（per-user 互斥锁防并发创建）──
+
+    // 检查是否已有正在进行的创建操作
+    const existingLock = this._creationLocks.get(userId);
+    if (existingLock) {
+      getTimer.end(logger, 'Container obtained (waiting for existing creation)', { userId, path: 'wait-lock', readOnly });
+      await existingLock;
+      // 重入：如果上一轮创建成功则走热路径，失败则重试创建
+      return this.getOrCreateContainer(userId, userConfig, options);
+    }
+
+    // 获取创建锁（无 await 在 get/set 之间，Node.js 单线程保证原子性）
+    let resolveLock;
+    const lockPromise = new Promise(resolve => { resolveLock = resolve; });
+    this._creationLocks.set(userId, lockPromise);
+
+    try {
+      getTimer.end(logger, 'Container obtained (cold path)', { userId, path: 'cold', readOnly });
+      return await createContainerWithStateMachine(this.docker, userId, userConfig, stateMachine, this.containers, this.config);
+    } finally {
+      this._creationLocks.delete(userId);
+      resolveLock();
+    }
   }
 
   async stopContainer(userId) {

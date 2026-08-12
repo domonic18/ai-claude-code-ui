@@ -22,6 +22,7 @@ import { QueryClientProvider, queryClient } from '@/shared/libs/query';
 import { ProtectedRoute } from '@/router';
 import { useProductTour } from '@/shared/hooks/useProductTour';
 import { ProductTour } from '@/shared/components/tour';
+import { ConnectionBanner } from '@/shared/components/common/ConnectionBanner';
 import { APP_NAME } from '@/shared/constants/app.constants';
 import { Homepage, SettingsPage, AdminPage, UserPromptPage, NotFoundPage } from '@/pages';
 import { LoginForm, SetupForm } from '@/features/auth';
@@ -98,6 +99,7 @@ function AppContent() {
   return (
     <TourContext.Provider value={tourContextValue}>
       <div className="fixed inset-0 flex bg-background">
+        <ConnectionBanner />
         {!layout.isMobile && <DesktopSidebar {...layoutProps.desktopSidebar(sidebarCommonProps)} />}
         {layout.isMobile && <MobileSidebarOverlay {...layoutProps.mobileSidebar(sidebarCommonProps)} />}
         <div className={`flex-1 flex flex-col min-w-0 ${layout.isMobile && !layout.isInputFocused ? 'pb-mobile-nav' : ''}`}>
