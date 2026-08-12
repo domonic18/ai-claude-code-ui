@@ -184,7 +184,10 @@ export class ContainerStateMachine extends EventEmitter {
    */
   setFailed(error) {
     this.error = error;
-    this.transitionTo(ContainerState.FAILED, { error: error.message });
+    // 幂等：不重复转换到 FAILED（canTransitionTo 禁止自转换）
+    if (this.currentState !== ContainerState.FAILED) {
+      this.transitionTo(ContainerState.FAILED, { error: error.message });
+    }
   }
 
   /**

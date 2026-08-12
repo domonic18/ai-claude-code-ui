@@ -103,8 +103,10 @@ export const STABLE_STATES = new Set([
  * @returns {boolean} Whether transition is valid
  */
 export function canTransitionTo(currentState, targetState) {
+  // 不允许自转换：同一状态重复转换意味着并发创建 bug
+  // （状态机只应在真正发生状态变化时调用 transitionTo）
   if (currentState === targetState) {
-    return true; // Allow self-transition
+    return false;
   }
 
   const validTargets = VALID_TRANSITIONS[currentState];

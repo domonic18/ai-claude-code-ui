@@ -262,10 +262,46 @@ describe('ContainerStateMachine', () => {
       assert.strictEqual(sm.getState(), ContainerState.NON_EXISTENT);
     });
 
-    it('should allow self-transition', () => {
+    it('should reject self-transition as invalid', () => {
       const sm = new ContainerStateMachine({ initialState: ContainerState.READY });
-      sm.transitionTo(ContainerState.READY);
-      assert.strictEqual(sm.getState(), ContainerState.READY);
+      assert.throws(
+        () => sm.transitionTo(ContainerState.READY),
+        (err) => err.message.includes('Invalid state transition')
+      );
+    });
+  });
+
+  // ── setFailed 幂等性（P1: failed→failed 死循环回归）──
+  // 线上现象：容器创建连续失败时 setFailed 被反复调用；自转换被禁用后，
+  // 旧实现会抛 "Invalid state transition from failed to failed" 并陷入重试循环。setFailed 必须幂等。
+  describe('setFailed idempotency (failed→failed death-loop regression)', () => {
+    it('should transition to FAILED on first setFailed from a non-FAILED state', () => {
+      const sm = new ContainerStateMachine({ initialState: ContainerState.READY });
+      sm.setFailed(new Error('first failure'));
+      assert.strictEqual(sm.getState(), ContainerState.FAILED);
+      assert.strictEqual(sm.getError().message, 'first failure');
+    });
+
+    it('should be idempotent: repeated setFailed does not throw and stays FAILED', () => {
+      const sm = new ContainerStateMachine({ initialState: ContainerState.READY });
+      sm.setFailed(new Error('first failure'));
+      // 第二次/第 N 次 setFailed 不应抛出（死循环回归的核心）
+      assert.doesNotThrow(() => {
+        sm.setFailed(new Error('second failure'));
+        sm.setFailed(new Error('third failure'));
+      });
+      assert.strictEqual(sm.getState(), ContainerState.FAILED);
+      // error 字段仍更新为最新错误
+      assert.strictEqual(sm.getError().message, 'third failure');
+    });
+
+    it('should not append duplicate FAILED entries to stateHistory on repeated setFailed', () => {
+      const sm = new ContainerStateMachine({ initialState: ContainerState.READY });
+      sm.setFailed(new Error('a'));
+      const lenAfterFirst = sm.stateHistory.length;
+      sm.setFailed(new Error('b'));
+      sm.setFailed(new Error('c'));
+      assert.strictEqual(sm.stateHistory.length, lenAfterFirst);
     });
   });
 

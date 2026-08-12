@@ -34,6 +34,13 @@ const logger = createLogger('container/core/ContainerStateMachineHandler');
  */
 export async function createContainerWithStateMachine(docker, userId, userConfig, stateMachine, containers, config) {
   const coldStartTimer = startTimer('container/cold_start_full');
+
+  // 防御性检查：如果已有创建在进行中，拒绝重复创建
+  if (stateMachine.isCreating()) {
+    coldStartTimer.endError(logger, 'Container cold start rejected (already creating)', { userId });
+    throw new Error(`Container creation already in progress for user ${userId}`);
+  }
+
   stateMachine.beginCreation();
   try {
     // Step 1: CREATING
