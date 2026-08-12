@@ -197,7 +197,11 @@ async function addProjectManually(userId, projectName, displayName = null) {
       sessions: []
     };
   } catch (error) {
-    logger.error(`Error adding project "${projectName}":`, error);
+    // 业务冲突(409 ConflictError)交给 error-handler 中间件统一记 WARN；
+    // 这里只对非预期错误记 ERROR，避免正常重名冲突污染 ERROR 日志（线上 409 误报根因）。
+    if (!(error instanceof ConflictError)) {
+      logger.error({ err: error, projectName }, `Error adding project "${projectName}"`);
+    }
     throw error;
   }
 }
