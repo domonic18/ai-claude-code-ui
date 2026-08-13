@@ -45,11 +45,21 @@ RUN pip3 install --no-cache-dir --break-system-packages \
 
 # 预装 patent-docx-collaborative-review 技能所需的 OfficeCLI（原生处理 WordprocessingML 批注与修订痕迹）
 # 锁定技能已验证版本 1.0.132；全局装进系统 PATH，技能脚本按 OFFICECLI env → node_modules/.bin → PATH 查找
-# ⚠️ OfficeCLI 二进制内嵌 self-updater，即使 npm 锁版本，运行时会自动替换 vendor/officecli 二进制，
-# 导致次次漂移到 1.0.14x + .NET 程序集缓存失效（System.IO.Pipelines 找不到）。设为只读阻止原地替换。
+# OfficeCLI 的 vendor 原生二进制不在 npm 包里，由 postinstall(install.js → install-binary.js)
+# 从 d.officecli.ai/GitHub releases 下载（pinned v1.0.132）。二进制内嵌 self-updater，运行时会自动替换
+# vendor/officecli 导致漂移到 1.0.14x + .NET 程序集缓存失效（System.IO.Pipelines 找不到），
+# 故下载成功后 chmod 555 锁定（只读+可执行，防 self-updater 原地替换）。
+# 注意1：用 555（r-xr-xr-x）而非 444——444 去掉执行位会导致 EACCES、pct_selftest 失败、PCT 被自检门控卡死。
+# 注意2：生产要求确定性——vendor 二进制必须在 build 阶段就下好，不依赖运行时 lazy 下载
+#   （不可控，且失去 555 锁的漂移防护）。postinstall 下载失败是 non-fatal（install.js exit 0），
+#   故下面显式再调 ensureBinary 并用 test -f 门控：下载失败则 build 直接 fail，把网络问题在
+#   build 阶段暴露出来。若 build 环境访问不了 d.officecli.ai/GitHub，用 `docker build --network=host`
+#   走宿主网络（旧容器运行时下到过 1.0.142，证明宿主可达该源）。
 RUN npm install -g @officecli/officecli@1.0.132 && \
-    chmod 444 /usr/local/lib/node_modules/@officecli/officecli/vendor/officecli
-
+    PKG=/usr/local/lib/node_modules/@officecli/officecli && \                                                                                                         
+    node -e "require('$PKG/lib/install-binary.js').ensureBinary().catch(e=>{console.error('[officecli] '+e.message);process.exit(1)})" && \                           
+    test -f "$PKG/vendor/officecli" && \                                                                                                                              
+    chmod 555 "$PKG/vendor/officecli"    
 # Create workspace and config directories
 RUN mkdir -p /workspace /app /workspace/.claude/projects && \
     chown -R node:node /workspace /app
