@@ -80,6 +80,18 @@ export function generateCanUseToolCallback(autoAnswer = false) {
             console.error("[SDK] Received user answer for toolUseID:", msg.toolUseID);
             resolve(msg.answer || '');
             pendingAnswers.delete(msg.toolUseID);
+          } else {
+            // 该 toolUseID 没有等待中的 ask（会话已推进/结束/卡死，或用户回答了一个已失效的提问）。
+            // 此前这里直接静默丢弃，前端表现为"输入了却没反应"（连容器日志都没有）。
+            // 现在输出明确反馈，经主容器 MessageTransformer 转发前端，提示用户重新发送。
+            const pending = Array.from(pendingAnswers.keys());
+            console.error("[SDK] user-answer dropped: no pending ask for toolUseID:", msg.toolUseID, "(pending:", pending, ")");
+            console.log(JSON.stringify({
+              type: "agent-answer-dropped",
+              toolUseID: msg.toolUseID,
+              reason: pending.length === 0 ? "no_active_ask" : "toolUseID_mismatch",
+              pendingToolUseIDs: pending
+            }));
           }
         }
       } catch (e) {

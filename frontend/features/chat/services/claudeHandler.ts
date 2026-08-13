@@ -121,3 +121,27 @@ export function handleClaudeError(message: WebSocketMessage, callbacks: MessageH
   });
   return true;
 }
+
+/**
+ * 处理"用户回答被丢弃"消息
+ *
+ * 当用户的回答找不到等待中的提问时（会话已推进/结束/卡死，或回答了一个已失效的旧提问），
+ * SDK 端原本静默丢弃，前端表现为"输入了却没反应"。此处接收后端转发的 agent-answer-dropped，
+ * 明确提示用户重新发送，关闭 UX 死角。
+ *
+ * @param message - 含 data.reason 的 WebSocket 消息
+ * @returns 始终返回 true
+ */
+export function handleAgentAnswerDropped(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
+  const reason = message.data?.reason || 'no_active_ask';
+  const hint = reason === 'toolUseID_mismatch'
+    ? '该提问已失效（会话已推进到新的提问）。请回答当前最新的提问，或直接重新发送你的输入。'
+    : '当前会话未在等待输入（可能已结束或卡住）。请重新发送你的消息以发起新的对话。';
+  callbacks.onAddMessage({
+    id: generateMessageId('error'),
+    type: 'error',
+    content: `⚠ 你的上一条输入未被处理：${hint}`,
+    timestamp: Date.now(),
+  });
+  return true;
+}
