@@ -82,6 +82,24 @@ export function processOutputLine(line, writer, sessionId, state) {
       '[MessageTransformer] Agent question auto-answered (bypassPermissions mode)'
     );
   }
+
+  // 用户回答了一个没有等待中 ask 的提问（会话已推进/结束/卡死，或回答了已失效的旧提问）。
+  // 此前 SDK 端静默丢弃、前端表现为"输入了没反应"。这里转发前端，让用户看到"该输入已失效、需重新发送"。
+  if (jsonData.type === 'agent-answer-dropped') {
+    const effectiveSessionId = state.realSessionId || sessionId;
+    logger.warn(
+      { sessionId: effectiveSessionId, toolUseID: jsonData.toolUseID, reason: jsonData.reason },
+      '[MessageTransformer] user-answer dropped (no pending ask); notifying client'
+    );
+    writer.send({
+      type: 'agent-answer-dropped',
+      sessionId: effectiveSessionId,
+      data: {
+        toolUseID: jsonData.toolUseID,
+        reason: jsonData.reason || 'no_active_ask'
+      }
+    });
+  }
 }
 
 /**

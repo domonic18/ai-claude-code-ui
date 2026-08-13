@@ -27,7 +27,7 @@ export { generateMessageId, decodeHtmlEntities, safeLocalStorage } from './wsUti
 
 // Import provider-specific handlers
 import { handleSessionCreated, handleTokenBudget, handleUserPromptContext, handleTodoWrite, handleClaudeComplete, handleSessionAborted } from './sessionHandler';
-import { handleClaudeResponse, handleClaudeOutput, handleClaudeInteractivePrompt, handleAgentQuestion, handleClaudeError } from './claudeHandler';
+import { handleClaudeResponse, handleClaudeOutput, handleClaudeInteractivePrompt, handleAgentQuestion, handleClaudeError, handleAgentAnswerDropped } from './claudeHandler';
 import { handleCursorSystem, handleCursorToolUse, handleCursorError, handleCursorResult, handleCursorOutput } from './cursorHandler';
 import { handleCodexResponse, handleCodexComplete } from './codexHandler';
 import { emitConversationComplete } from '@/features/documents/services/documentEvents';
@@ -51,6 +51,7 @@ const MESSAGE_HANDLERS: Record<string, (message: WebSocketMessage, callbacks: Me
   'claude-output': (msg, cbs) => handleClaudeOutput(msg, cbs),
   'claude-interactive-prompt': (msg, cbs) => handleClaudeInteractivePrompt(msg, cbs),
   'agent-question': (msg, cbs) => handleAgentQuestion(msg, cbs),
+  'agent-answer-dropped': (msg, cbs) => handleAgentAnswerDropped(msg, cbs),
   'claude-error': (msg, cbs) => handleClaudeError(msg, cbs),
   'cursor-system': (msg, cbs, sid) => handleCursorSystem(msg, cbs, sid),
   'cursor-user': () => false, // Don't add user messages as they're already shown from input
