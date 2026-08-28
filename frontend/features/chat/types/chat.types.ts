@@ -10,6 +10,36 @@
 export type MessageType = 'user' | 'assistant' | 'tool' | 'error' | 'system';
 
 /**
+ * Task list item status (unified for Task* tools and legacy TodoWrite)
+ */
+export type TaskItemStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+
+/**
+ * Aggregated task list item
+ *
+ * Unified internal model for both the new Task* tools
+ * (TaskCreate/TaskUpdate) and legacy TodoWrite snapshots.
+ */
+export interface TaskItem {
+  /** Stable key (e.g. 'task-3' for Task* tools, 'todo-0' for TodoWrite) */
+  id: string;
+  /** Task title (TaskCreate subject / TodoWrite content) */
+  title: string;
+  /** Task status */
+  status: TaskItemStatus;
+}
+
+/**
+ * Raw task tool event kept for the collapsed "raw calls" view
+ */
+export interface TaskListRawEvent {
+  /** Tool name (TaskCreate/TaskUpdate/TaskList/TaskGet/TodoWrite) */
+  toolName: string;
+  /** Raw JSON input string */
+  toolInput?: string;
+}
+
+/**
  * Chat message structure
  */
 export interface ChatMessage {
@@ -90,6 +120,10 @@ export interface ChatMessage {
   toolResultTimestamp?: Date;
   /** Whether to minimize tool display */
   minimizeTool?: boolean;
+  /** Aggregated task list snapshot (synthetic message injected by taskListAggregator) */
+  taskListSnapshot?: TaskItem[];
+  /** Raw task tool events backing the snapshot (for collapsed raw-calls view) */
+  taskListRawEvents?: TaskListRawEvent[];
   /** Exit code for command execution */
   exitCode?: number;
 }
