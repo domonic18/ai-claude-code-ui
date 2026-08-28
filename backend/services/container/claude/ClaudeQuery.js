@@ -182,9 +182,9 @@ function sendSessionStart(writer, sessionId, containerId, userPromptContext) {
   }
 
   // 发送初始消息
-  logger.debug({ sessionId }, '[ClaudeQuery] Sending session_start');
+  logger.debug({ sessionId }, '[ClaudeQuery] Sending session-start');
   writer.send({
-    type: 'session_start',
+    type: 'session-start', // 前端注册的是连字符版本（websocketHandler.ts），此前下划线变体只会产生 Unknown message type 噪音
     sessionId,
     containerId: containerId,
     message: 'Starting containerized Claude session...'

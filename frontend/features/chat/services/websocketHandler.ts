@@ -27,7 +27,7 @@ export { generateMessageId, decodeHtmlEntities, safeLocalStorage } from './wsUti
 
 // Import provider-specific handlers
 import { handleSessionCreated, handleTokenBudget, handleUserPromptContext, handleTodoWrite, handleClaudeComplete, handleSessionAborted } from './sessionHandler';
-import { handleClaudeResponse, handleClaudeOutput, handleClaudeInteractivePrompt, handleAgentQuestion, handleClaudeError, handleAgentAnswerDropped } from './claudeHandler';
+import { handleClaudeResponse, handleClaudeOutput, handleClaudeInteractivePrompt, handleAgentQuestion, handleClaudeError, handleAgentAnswerDropped, handleBackendError } from './claudeHandler';
 import { handleCursorSystem, handleCursorToolUse, handleCursorError, handleCursorResult, handleCursorOutput } from './cursorHandler';
 import { handleCodexResponse, handleCodexComplete } from './codexHandler';
 import { emitConversationComplete } from '@/features/documents/services/documentEvents';
@@ -53,6 +53,9 @@ const MESSAGE_HANDLERS: Record<string, (message: WebSocketMessage, callbacks: Me
   'agent-question': (msg, cbs) => handleAgentQuestion(msg, cbs),
   'agent-answer-dropped': (msg, cbs) => handleAgentAnswerDropped(msg, cbs),
   'claude-error': (msg, cbs) => handleClaudeError(msg, cbs),
+  // 后端通用错误（handler 兜底异常、查询失败、user-answer 会话缺失等）：
+  // 未注册时此类失败被静默丢弃，表现为"发了消息没反应"
+  'error': (msg, cbs) => handleBackendError(msg, cbs),
   'cursor-system': (msg, cbs, sid) => handleCursorSystem(msg, cbs, sid),
   'cursor-user': () => false, // Don't add user messages as they're already shown from input
   'cursor-tool-use': (msg, cbs) => handleCursorToolUse(msg, cbs),

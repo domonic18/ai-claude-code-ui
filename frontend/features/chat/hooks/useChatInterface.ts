@@ -147,6 +147,7 @@ export interface UseChatInterfaceResult {
   authenticatedFetch: (url: string, options?: RequestInit) => Promise<Response>;
   consumePendingQuestion: (answer: string) => boolean;
   setPendingQuestion: (toolUseID: string, sessionId: string) => void;
+  clearPendingQuestion: (sessionId: string) => void;
   // Skill selection
   selectedSkill: { name: string; title: string } | null;
   setSelectedSkill: (skill: { name: string; title: string } | null) => void;
@@ -365,12 +366,18 @@ export function useChatInterface({
 
   // 检查并消费 pendingQuestion：如果有等待中的提问，将用户消息作为回答发送
   // 返回 true 表示已作为回答处理，调用方不应再发送 claude-command
+  // 守卫：仅当提问属于当前会话时才消费；会话不匹配说明是残留的陈旧提问
+  // （提问未答就停止/出错/切换会话导致），此时清空并按普通消息发送
   const consumePendingQuestion = useCallback((answer: string): boolean => {
     const pending = pendingQuestionRef.current;
-    if (pending && answer.trim()) {
+    if (pending && pending.sessionId === currentSessionIdRef.current && answer.trim()) {
       sendUserAnswer(pending.toolUseID, pending.sessionId, answer.trim());
       pendingQuestionRef.current = null;
       return true;
+    }
+    if (pending && pending.sessionId !== currentSessionIdRef.current) {
+      logger.info('[ChatInterface] Discarding stale pending question from session:', pending.sessionId);
+      pendingQuestionRef.current = null;
     }
     return false;
   }, [sendUserAnswer]);
@@ -378,6 +385,17 @@ export function useChatInterface({
   // 记录 Agent 的交互提问
   const setPendingQuestion = useCallback((toolUseID: string, sessionId: string) => {
     pendingQuestionRef.current = { toolUseID, sessionId };
+  }, []);
+
+  // 清除指定会话的待回答提问：会话结束/中断/出错时调用。
+  // 若不清除，残留的提问会把用户下一条消息误路由为 user-answer 发给已死的会话，
+  // 表现为"消息发出去没反应，再发一次才被处理"。
+  const clearPendingQuestion = useCallback((sessionId: string) => {
+    const pending = pendingQuestionRef.current;
+    if (pending && pending.sessionId === sessionId) {
+      logger.info('[ChatInterface] Clearing pending question for ended session:', sessionId);
+      pendingQuestionRef.current = null;
+    }
   }, []);
 
   // ========== Skill 选择 ==========
@@ -405,6 +423,7 @@ export function useChatInterface({
     onSetTokenBudget: (b) => { if (isCrossView()) return; setTokenBudget(b); onSetTokenBudget?.(b); },
     setTasks: (tasks: any[]) => { if (isCrossView()) return; setTasks(tasks); },
     setPendingQuestion: (toolUseID: string, sessionId: string) => { if (isCrossView()) return; setPendingQuestion(toolUseID, sessionId); },
+    clearPendingQuestion,
     onDocumentCreated,
     ...stream,
   });
@@ -444,6 +463,7 @@ export function useChatInterface({
     createDiff: useCallback((o: string, n: string) => calculateDiff(o, n), []), authenticatedFetch,
     consumePendingQuestion,
     setPendingQuestion,
+    clearPendingQuestion,
     selectedSkill: skillSelection.selectedSkill,
     setSelectedSkill: skillSelection.setSelectedSkill,
     groupedSkills: skillSelection.groupedSkills,

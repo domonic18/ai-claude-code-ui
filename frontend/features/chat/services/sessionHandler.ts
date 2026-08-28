@@ -133,6 +133,12 @@ export function handleClaudeComplete(
   // 为 false，若不清 loading 会导致输入框永久禁用。setIsLoading 不再被跨视图守卫拦截。
   callbacks.onSetLoading(false);
 
+  // 会话结束意味着等待中的提问已失效：清掉 pendingQuestion，
+  // 否则用户下一条消息会被误路由为 user-answer 发给已结束的会话（表现为消息静默丢失）
+  if (completedSessionId) {
+    callbacks.clearPendingQuestion?.(completedSessionId);
+  }
+
   // Update session state
   updateSessionState(completedSessionId, currentSessionId, callbacks);
 
@@ -171,6 +177,8 @@ export function handleSessionAborted(
   if (abortedSessionId) {
     callbacks.onSessionInactive?.(abortedSessionId);
     callbacks.onSessionNotProcessing?.(abortedSessionId);
+    // 中断同样使等待中的提问失效，清掉防止下一条消息被误路由为 user-answer
+    callbacks.clearPendingQuestion?.(abortedSessionId);
   }
 
   return true;

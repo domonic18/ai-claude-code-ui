@@ -55,7 +55,8 @@ export function processOutputLine(line, writer, sessionId, state) {
 
   if (jsonData.type === 'error') {
     logger.error({ sessionId, error: jsonData.error }, '[MessageTransformer] Sending claude-error');
-    writer.send({ type: 'claude-error', error: jsonData.error });
+    // 附带 sessionId：前端按会话匹配清空 pendingQuestion 并复位 loading
+    writer.send({ type: 'claude-error', sessionId: state.realSessionId || sessionId, error: jsonData.error });
     return;
   }
 

@@ -114,6 +114,14 @@ export function aliasSessionId(aliasId, originalId) {
  * @param {object} sessionInfo.options - 其他选项
  */
 export function createSession(sessionId, sessionInfo) {
+  // 覆盖同 key 旧会话前取消其清理定时器：上一轮完成时调度的 10s 定时器闭包捕获的是
+  // sessionId，若不取消，到点 abortSession 会拿到 Map 中新一轮的会话并 kill 其进程，
+  // 表现为"AI 回复后 10 秒内发下一条消息，新一轮对话被中途击杀"
+  const previous = containerSessions.get(sessionId);
+  if (previous && previous.cleanupTimer) {
+    clearTimeout(previous.cleanupTimer);
+    previous.cleanupTimer = null;
+  }
   containerSessions.set(sessionId, {
     ...sessionInfo,
     startTime: Date.now(),
