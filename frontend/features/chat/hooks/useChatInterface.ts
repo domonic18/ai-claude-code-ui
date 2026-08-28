@@ -375,6 +375,9 @@ export function useChatInterface({
         });
       }
       pendingQuestionRef.current = null;
+      // 提交后模型继续推理，恢复 loading 态（输入框转圈禁用），
+      // 直到 claude-complete/claude-error/session-aborted 复位
+      setIsLoading(true);
       // 对应卡片置 answered 终态
       setMessages(prev => prev.map(m => (m.interactiveQuestion?.toolUseID === pending.toolUseID)
         ? { ...m, interactiveQuestion: { ...m.interactiveQuestion, status: 'answered', answerSummary: answer.trim() } }
@@ -386,7 +389,7 @@ export function useChatInterface({
       pendingQuestionRef.current = null;
     }
     return false;
-  }, [sendMessage, setMessages]);
+  }, [sendMessage, setMessages, setIsLoading]);
 
   // 记录 Agent 的交互提问
   const setPendingQuestion = useCallback((toolUseID: string, sessionId: string) => {
@@ -422,13 +425,17 @@ export function useChatInterface({
         });
       }
       pendingQuestionRef.current = null;
+      // 提交后模型继续推理（思考/生成），恢复 loading 态：输入框转圈禁用，
+      // 直到 claude-complete/claude-error/session-aborted 复位。skip 同样如此
+      //（deny 后模型仍会继续决策）。
+      setIsLoading(true);
       // 卡片置终态（answered/skipped 由 summary 与 mode 区分展示）
       setMessages(prev => prev.map(m => (m.interactiveQuestion?.toolUseID === toolUseID)
         ? { ...m, interactiveQuestion: { ...m.interactiveQuestion, status: payload.mode === 'skip' ? 'skipped' : 'answered', answerSummary: summary } }
         : m));
     });
     return unregisterQuestionSubmit;
-  }, [sendMessage, setMessages]);
+  }, [sendMessage, setMessages, setIsLoading]);
 
   // ========== Skill 选择 ==========
   const skillSelection = useSkillSelection(authenticatedFetch);
