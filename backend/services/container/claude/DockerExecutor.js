@@ -96,7 +96,12 @@ export async function executeInContainer(userId, command, options, writer, sessi
           ANTHROPIC_API_KEY: resolvedConfig.apiKey,
           // Claude CLI 拒绝在 root 用户下使用 bypassPermissions，
           // 设置 IS_SANDBOX=1 告知 CLI 当前运行在沙箱容器中（参考 cli.js:11106430）
-          IS_SANDBOX: '1'
+          IS_SANDBOX: '1',
+          // AskUserQuestion 空闲超时：CLI 默认 60s 太短（专利场景读选项常超时，
+          // 超时后模型拿到 afk_timeout 自行决策，高风险确认不适用）。放宽到 5 分钟；
+          // 倒计时提示设在最后 60s（CLI 默认 20s 会过早显示压迫感）
+          CLAUDE_AFK_TIMEOUT_MS: '300000',
+          CLAUDE_AFK_COUNTDOWN_MS: '60000'
         }
       }
     );
