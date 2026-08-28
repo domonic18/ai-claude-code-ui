@@ -27,6 +27,7 @@ import { calculateDiff } from '../utils/diffUtils';
 import { useChatWebSocketProcessor } from './useChatWebSocketProcessor';
 import { useChatMenuSystem } from './useChatMenuSystem';
 import { useChatSessionManagement } from './useChatSessionManagement';
+import { registerQuestionSubmit, unregisterQuestionSubmit } from '../services/questionEvents';
 import { useStreamingResume, persistActiveStreamingSession, replaceActiveStreamingSession, clearActiveStreamingSession } from './useStreamingResume';
 
 // Stable empty array reference to prevent unnecessary effect triggers
@@ -352,17 +353,8 @@ export function useChatInterface({
 
   // ========== Agent 交互提问状态管理 ==========
   // 注意：此部分必须在 useChatWebSocketProcessor / useMessageSender 之前定义
-  // 处理用户回答 Agent 交互提问：发送 user-answer 消息
-  const sendUserAnswer = useCallback((toolUseID: string, sessionId: string, answer: string) => {
-    if (sendMessage) {
-      sendMessage({
-        type: 'user-answer',
-        sessionId,
-        toolUseID,
-        answer,
-      });
-    }
-  }, [sendMessage]);
+  // （user-answer 的发送统一在此：输入框文本回答见 consumePendingQuestion，
+  //   QuestionCard 卡片提交见下方 questionEvents 桥接注册）
 
   // 检查并消费 pendingQuestion：如果有等待中的提问，将用户消息作为回答发送
   // 返回 true 表示已作为回答处理，调用方不应再发送 claude-command
@@ -371,8 +363,22 @@ export function useChatInterface({
   const consumePendingQuestion = useCallback((answer: string): boolean => {
     const pending = pendingQuestionRef.current;
     if (pending && pending.sessionId === currentSessionIdRef.current && answer.trim()) {
-      sendUserAnswer(pending.toolUseID, pending.sessionId, answer.trim());
+      // 新协议：自由文本回答走 mode:'text' + response（CLI 识别 response 字段）
+      if (sendMessage) {
+        sendMessage({
+          type: 'user-answer',
+          sessionId: pending.sessionId,
+          toolUseID: pending.toolUseID,
+          mode: 'text',
+          response: answer.trim(),
+          answer: answer.trim(), // 兼容旧后端部署窗口
+        });
+      }
       pendingQuestionRef.current = null;
+      // 对应卡片置 answered 终态
+      setMessages(prev => prev.map(m => (m.interactiveQuestion?.toolUseID === pending.toolUseID)
+        ? { ...m, interactiveQuestion: { ...m.interactiveQuestion, status: 'answered', answerSummary: answer.trim() } }
+        : m));
       return true;
     }
     if (pending && pending.sessionId !== currentSessionIdRef.current) {
@@ -380,7 +386,7 @@ export function useChatInterface({
       pendingQuestionRef.current = null;
     }
     return false;
-  }, [sendUserAnswer]);
+  }, [sendMessage, setMessages]);
 
   // 记录 Agent 的交互提问
   const setPendingQuestion = useCallback((toolUseID: string, sessionId: string) => {
@@ -395,8 +401,34 @@ export function useChatInterface({
     if (pending && pending.sessionId === sessionId) {
       logger.info('[ChatInterface] Clearing pending question for ended session:', sessionId);
       pendingQuestionRef.current = null;
+      // 该会话所有 pending 提问卡片置失效（只读灰化）
+      setMessages(prev => prev.map(m => (m.interactiveQuestion?.status === 'pending' && m.toolCallId === sessionId)
+        ? { ...m, interactiveQuestion: { ...m.interactiveQuestion, status: 'invalid' } }
+        : m));
     }
-  }, []);
+  }, [setMessages]);
+
+  // ========== QuestionCard 提交桥接 ==========
+  // 卡片在消息渲染树深处，经 questionEvents 桥接派发到这里统一发送：
+  // 发送 user-answer（新协议 mode/response/answers）+ 置卡片终态 + 清 pendingQuestion
+  useEffect(() => {
+    registerQuestionSubmit((toolUseID, sessionId, payload, summary) => {
+      if (sendMessage) {
+        sendMessage({
+          type: 'user-answer',
+          sessionId,
+          toolUseID,
+          ...payload,
+        });
+      }
+      pendingQuestionRef.current = null;
+      // 卡片置终态（answered/skipped 由 summary 与 mode 区分展示）
+      setMessages(prev => prev.map(m => (m.interactiveQuestion?.toolUseID === toolUseID)
+        ? { ...m, interactiveQuestion: { ...m.interactiveQuestion, status: payload.mode === 'skip' ? 'skipped' : 'answered', answerSummary: summary } }
+        : m));
+    });
+    return unregisterQuestionSubmit;
+  }, [sendMessage, setMessages]);
 
   // ========== Skill 选择 ==========
   const skillSelection = useSkillSelection(authenticatedFetch);

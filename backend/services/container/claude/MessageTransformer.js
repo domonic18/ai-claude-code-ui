@@ -65,6 +65,8 @@ export function processOutputLine(line, writer, sessionId, state) {
     // 优先使用 SDK 返回的真实 session ID（前端已经替换了临时 ID）
     const effectiveSessionId = state.realSessionId || sessionId;
     logger.info({ sessionId: effectiveSessionId, toolUseID: jsonData.toolUseID }, '[MessageTransformer] Sending agent-question');
+    // questions 原文透传（CLI 的每项含 question/header/options[{label,description}]/multiSelect），
+    // 前端 QuestionCard 按结构渲染选项卡
     writer.send({
       type: 'agent-question',
       sessionId: effectiveSessionId,

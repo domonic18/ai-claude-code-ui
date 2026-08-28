@@ -5,6 +5,14 @@
  * in the container SDK script. Communicates with the main container
  * via stdout (questions) and stdin (answers).
  *
+ * 回答注入协议（反编译 Claude CLI 0.3.206 确认，字段名必须精确匹配）：
+ * - 自由文本回答：updatedInput.response = 文本 → tool_result "The user responded: ..."
+ * - 选项回答：updatedInput.answers = { [问题文本]: 选项label（多选逗号分隔） }
+ *   → tool_result "Your questions have been answered: ..."
+ * - 跳过：返回 { behavior: 'deny', message: 'User declined to answer questions' }
+ *   → tool_result "User declined to answer questions"，任务继续由模型自行决策
+ * 注意：顶层 answer 字段不在 CLI 协议中（历史 bug：注入后 CLI 判定"没人回答"）。
+ *
  * In bypassPermissions mode, AskUserQuestion is auto-answered with "继续"
  * to prevent the AI from pausing long-running tasks to ask the user.
  *
@@ -13,6 +21,9 @@
 
 /** bypassPermissions 模式下自动回答的内容 */
 const AUTO_ANSWER_TEXT = '继续';
+
+/** 跳过提问时 CLI 渲染的语义文案（deny message 会进入 tool_result） */
+const DECLINED_MESSAGE = 'User declined to answer questions';
 
 /**
  * Generate canUseTool callback code for intercepting AskUserQuestion
@@ -46,7 +57,7 @@ export function generateCanUseToolCallback(autoAnswer = false) {
 
           return {
             behavior: 'allow',
-            updatedInput: { ...(input || {}), answer: "${AUTO_ANSWER_TEXT}" },
+            updatedInput: { ...(input || {}), response: "${AUTO_ANSWER_TEXT}" },
             toolUseID: toolUseID
           };
         }
@@ -64,6 +75,32 @@ export function generateCanUseToolCallback(autoAnswer = false) {
     // 通过 stdout/stdin 与主容器通信，实现 Agent 向用户提问并等待回答
     const pendingAnswers = new Map();
 
+    // 将 stdin 消息解析为 canUseTool 的 PermissionResult。
+    // 协议（与 CLI 0.3.206 对齐）：
+    //   { mode:'text',    response } → allow + updatedInput.response（自由文本回答）
+    //   { mode:'options', answers  } → allow + updatedInput.answers（{问题文本:选项label}）
+    //   { mode:'skip' }             → deny（用户跳过，任务继续）
+    //   { answer }（旧协议）        → 等价 text 模式，部署窗口期兼容
+    function resolvePermissionResult(input, payload) {
+      const mode = payload.mode || (payload.answer !== undefined ? 'text' : payload.response !== undefined ? 'text' : payload.answers !== undefined ? 'options' : 'skip');
+      if (mode === 'options') {
+        return {
+          behavior: 'allow',
+          updatedInput: { ...(input || {}), answers: payload.answers || {} },
+          toolUseID: payload._toolUseID
+        };
+      }
+      if (mode === 'skip') {
+        return { behavior: 'deny', message: ${JSON.stringify(DECLINED_MESSAGE)}, toolUseID: payload._toolUseID };
+      }
+      const text = payload.response !== undefined ? payload.response : payload.answer;
+      return {
+        behavior: 'allow',
+        updatedInput: { ...(input || {}), response: String(text || '') },
+        toolUseID: payload._toolUseID
+      };
+    }
+
     // 从 stdin 读取主容器转发过来的用户回答
     const readline = await import('readline');
     // 非 TTY 模式下 stdin 默认处于暂停状态，必须显式 resume 才能 read line
@@ -77,8 +114,8 @@ export function generateCanUseToolCallback(autoAnswer = false) {
         if (msg.type === 'user-answer' && msg.toolUseID) {
           const resolve = pendingAnswers.get(msg.toolUseID);
           if (resolve) {
-            console.error("[SDK] Received user answer for toolUseID:", msg.toolUseID);
-            resolve(msg.answer || '');
+            console.error("[SDK] Received user answer for toolUseID:", msg.toolUseID, "mode:", msg.mode || 'legacy-text');
+            resolve({ ...msg, _toolUseID: msg.toolUseID });
             pendingAnswers.delete(msg.toolUseID);
           } else {
             // 该 toolUseID 没有等待中的 ask（会话已推进/结束/卡死，或用户回答了一个已失效的提问）。
@@ -114,14 +151,15 @@ export function generateCanUseToolCallback(autoAnswer = false) {
             prompt: input?.prompt || ''
           }));
 
-          // 等待用户通过 stdin 回答（主容器会写入）
+          // 等待用户通过 stdin 回答（主容器会写入），按协议注入 response/answers 或 deny
           return new Promise((resolve) => {
-            pendingAnswers.set(toolUseID, (answer) => {
-              resolve({
-                behavior: 'allow',
-                updatedInput: { ...(input || {}), answer: answer },
-                toolUseID: toolUseID
-              });
+            pendingAnswers.set(toolUseID, (payload) => {
+              try {
+                resolve(resolvePermissionResult(input, payload));
+              } catch (err) {
+                console.error("[SDK] resolve answer error:", err.message);
+                resolve({ behavior: 'allow', updatedInput: input, toolUseID: toolUseID });
+              }
             });
           });
         }

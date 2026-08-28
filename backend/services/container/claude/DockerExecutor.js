@@ -142,14 +142,11 @@ export async function executeInContainer(userId, command, options, writer, sessi
     docker.modem.demuxStream(stream, stdout, stderr);
 
     // 保存 stdin 写入函数（用于向前端用户的回答写入容器 stdin）
-    // Docker exec stream 在非 TTY 模式下需要使用多路复用协议写入 stdin
-    // header: [streamType(1byte), padding(3bytes), size(4bytes)] + payload
+    // 注意：exec.start({hijack:true}) 返回裸双向 Socket，客户端→daemon 方向直接写裸数据；
+    // 8 字节多路复用头只适用于 daemon→客户端的响应解复用方向（demuxStream），
+    // 写入方向带头会污染容器内进程收到的字节流（SDK 的 JSON.parse 失败）
     const stdinWriter = (data) => {
-      const header = Buffer.alloc(8);
-      header[0] = 0; // stdin stream type = 0
-      const payload = Buffer.from(data);
-      header.writeUInt32BE(payload.length, 4);
-      stream.write(Buffer.concat([header, payload]));
+      stream.write(Buffer.from(data));
     };
     setSessionStdin(sessionId, stdinWriter);
 

@@ -12,6 +12,7 @@ import { AssistantMessage } from './AssistantMessage';
 import { FullToolMessage } from './FullToolMessage';
 import { MinimizedToolMessage } from './MinimizedToolMessage';
 import { SimplifiedToolIndicator } from './SimplifiedToolIndicator';
+import { QuestionCard } from './QuestionCard';
 import { MINIMIZED_TOOLS } from '../constants';
 
 /**
@@ -36,6 +37,11 @@ export function renderToolContent(
   onShowSettings?: () => void,
   showThinking = true
 ): JSX.Element {
+  // AskUserQuestion 结构化提问：渲染交互卡片（选项/自由文本/跳过），
+  // 提交动作经 questionEvents 桥接由 useChatInterface 处理（无需跨层 props）
+  if (message.interactiveQuestion) {
+    return <QuestionCard message={message} sessionId={message.toolCallId || ''} />;
+  }
   if (!message.isToolUse || !message.toolName) {
     return <AssistantMessage content={message.content} showThinking={showThinking} thinking={message.thinking} />;
   }

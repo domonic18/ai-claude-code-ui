@@ -92,10 +92,20 @@ export function handleAgentQuestion(message: WebSocketMessage, callbacks: Messag
     return true;
   }
 
+  // 结构化提问卡片消息：QuestionCard 按 questions（question/header/options/multiSelect）
+  // 渲染选项卡 + 自由文本 + 跳过（对齐 CLI 原生交互）。
+  // toolCallId 携带 sessionId 供卡片提交时路由
   callbacks.onAddMessage({
     id: generateMessageId('assistant'),
     type: 'assistant',
-    content: buildQuestionText(prompt, questions),
+    content: prompt || '',
+    toolCallId: sessionId,
+    interactiveQuestion: {
+      toolUseID,
+      questions,
+      prompt,
+      status: 'pending',
+    },
     timestamp: Date.now(),
   });
 

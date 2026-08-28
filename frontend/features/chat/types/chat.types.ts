@@ -61,14 +61,22 @@ export interface ChatMessage {
     questions: Array<{
       /** Question text */
       question: string;
+      /** Short chip/tag label (CLI header, max 12 chars) */
+      header?: string;
       /** Available options for selection */
       options?: Array<{
         label: string;
         description?: string;
       }>;
+      /** Whether multiple options can be selected */
+      multiSelect?: boolean;
     }>;
     /** Optional prompt text */
     prompt?: string;
+    /** Card lifecycle: pending → answered/skipped, or invalid (session ended) */
+    status?: 'pending' | 'answered' | 'skipped' | 'invalid';
+    /** Display summary after answering (selected options / response text) */
+    answerSummary?: string;
   };
   /** Whether user has answered this interactive question */
   isAnswered?: boolean;
