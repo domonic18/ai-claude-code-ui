@@ -21,9 +21,10 @@ const READLINE_IMPORT = "const readline = await import('readline');";
 /**
  * 构造沙盒：执行生成的回调代码，返回可观测句柄
  * @param {string} code - generateCanUseToolCallback 输出的代码串
+ * @param {object} [env] - 沙盒 process.env（默认带 AFK 超时，与容器一致）
  * @returns {object} {canUseTool, pendingAnswers, pushLine, logged}
  */
-async function buildSandbox(code) {
+async function buildSandbox(code, env = { CLAUDE_AFK_TIMEOUT_MS: '300000' }) {
   const patched = code.replace(
     READLINE_IMPORT,
     'const readline = { createInterface: ({ input }) => ({ on: (ev, cb) => { input._lineCb = cb; } }) };'
@@ -43,7 +44,7 @@ async function buildSandbox(code) {
     'process', 'console',
     patched + '\nreturn { canUseTool, ...(typeof pendingAnswers !== "undefined" ? { pendingAnswers } : {}) };'
   );
-  const handle = await fn({ stdin: fakeStdin }, fakeConsole);
+  const handle = await fn({ stdin: fakeStdin, env }, fakeConsole);
 
   return {
     handle,
@@ -150,6 +151,32 @@ describe('canUseToolTemplate - 交互模式（回答协议）', () => {
     const result = await sandbox.handle.canUseTool('Read', { file_path: '/tmp/x' }, { toolUseID: 'tu_6' });
     assert.strictEqual(result.behavior, 'allow');
     assert.deepStrictEqual(result.updatedInput, { file_path: '/tmp/x' });
+  });
+
+  it('agent-question 携带 timeoutMs（读容器 env，与 CLI AFK 超时同源）', async () => {
+    sandbox.handle.canUseTool('AskUserQuestion', { questions: [] }, { toolUseID: 'tu_env' });
+
+    const q = sandbox.logged.find((m) => m && m.type === 'agent-question');
+    assert.ok(q, '应输出 agent-question 消息');
+    assert.strictEqual(q.timeoutMs, 300000);
+  });
+
+  it('env 未配置 CLAUDE_AFK_TIMEOUT_MS 时不输出 timeoutMs 字段（前端不显示倒计时）', async () => {
+    const bare = await buildSandbox(generateCanUseToolCallback(false), {});
+    bare.handle.canUseTool('AskUserQuestion', { questions: [] }, { toolUseID: 'tu_noenv' });
+
+    const q = bare.logged.find((m) => m && m.type === 'agent-question');
+    assert.ok(q, '应输出 agent-question 消息');
+    assert.strictEqual('timeoutMs' in q, false);
+  });
+
+  it('env 配置非法值（非数字）时同样不输出 timeoutMs 字段', async () => {
+    const bad = await buildSandbox(generateCanUseToolCallback(false), { CLAUDE_AFK_TIMEOUT_MS: 'abc' });
+    bad.handle.canUseTool('AskUserQuestion', { questions: [] }, { toolUseID: 'tu_badenv' });
+
+    const q = bad.logged.find((m) => m && m.type === 'agent-question');
+    assert.ok(q, '应输出 agent-question 消息');
+    assert.strictEqual('timeoutMs' in q, false);
   });
 });
 

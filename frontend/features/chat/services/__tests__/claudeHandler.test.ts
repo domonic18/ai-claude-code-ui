@@ -117,6 +117,32 @@ describe('claudeHandler - handleAgentQuestion', () => {
     expect(callbacks.onAddMessage).toHaveBeenCalledTimes(1);
   });
 
+  it('携带 timeoutMs 时透传到 interactiveQuestion（倒计时渲染依据）', () => {
+    const message = {
+      type: 'agent-question',
+      sessionId: 'session-A',
+      data: { toolUseID: 'toolu_1', questions: [], prompt: '选哪个方案？', timeoutMs: 300000 },
+    };
+
+    handleAgentQuestion(message as any, callbacks);
+
+    const added = (callbacks.onAddMessage as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(added.interactiveQuestion.timeoutMs).toBe(300000);
+  });
+
+  it('未携带 timeoutMs 时字段缺省（不显示倒计时）', () => {
+    const message = {
+      type: 'agent-question',
+      sessionId: 'session-A',
+      data: { toolUseID: 'toolu_1', questions: [], prompt: '选哪个方案？' },
+    };
+
+    handleAgentQuestion(message as any, callbacks);
+
+    const added = (callbacks.onAddMessage as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(added.interactiveQuestion.timeoutMs).toBeUndefined();
+  });
+
   it('缺少 toolUseID 或 sessionId 时展示无法回答的错误提示，不置位 pendingQuestion', () => {
     const message = {
       type: 'agent-question',

@@ -23,7 +23,7 @@ function isLowPriorityPath(url) {
   if (path.startsWith('/.well-known/')) return true;
   // 静态资源
   if (path.startsWith('/assets/') || path.startsWith('/icons/')) return true;
-  if (path === '/favicon.ico' || path === '/manifest.json' || path === '/robots.txt') return true;
+  if (path === '/favicon.ico' || path === '/robots.txt') return true;
   if (path.endsWith('.map') || path.endsWith('.js') || path.endsWith('.css')) return true;
   return false;
 }

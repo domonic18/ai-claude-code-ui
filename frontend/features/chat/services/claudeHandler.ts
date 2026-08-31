@@ -76,7 +76,7 @@ export function handleClaudeInteractivePrompt(message: WebSocketMessage, callbac
  * @returns 始终返回 true
  */
 export function handleAgentQuestion(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
-  const { toolUseID, questions, prompt } = message.data || {};
+  const { toolUseID, questions, prompt, timeoutMs } = message.data || {};
   const sessionId = message.sessionId;
 
   callbacks.onSetLoading(false);
@@ -104,6 +104,7 @@ export function handleAgentQuestion(message: WebSocketMessage, callbacks: Messag
       toolUseID,
       questions,
       prompt,
+      ...(typeof timeoutMs === 'number' && timeoutMs > 0 && { timeoutMs }),
       status: 'pending',
     },
     timestamp: Date.now(),

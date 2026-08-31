@@ -16,6 +16,15 @@ import { CONTAINER } from '../../../config/config.js';
 const logger = createLogger('services/container/claude/DockerExecutor');
 
 /**
+ * AskUserQuestion 空闲超时（AFK）配置，注入容器 env 后由两部分消费：
+ * - CLI 内部：超时触发后模型拿到 afk_timeout 自行决策
+ * - canUseTool 回调：读同一 env 把 timeoutMs 随 agent-question 输出，前端渲染倒计时
+ */
+export const QUESTION_AFK_TIMEOUT_MS = 300000;
+/** 倒计时提示阈值：前端进度条低于该剩余时间变琥珀色（与 CLI 倒计时提示对齐） */
+export const QUESTION_AFK_COUNTDOWN_MS = 60000;
+
+/**
  * 准备容器并构建 SDK 脚本
  * @param {string} userId - 用户 ID
  * @param {string} command - 用户命令
@@ -100,8 +109,8 @@ export async function executeInContainer(userId, command, options, writer, sessi
           // AskUserQuestion 空闲超时：CLI 默认 60s 太短（专利场景读选项常超时，
           // 超时后模型拿到 afk_timeout 自行决策，高风险确认不适用）。放宽到 5 分钟；
           // 倒计时提示设在最后 60s（CLI 默认 20s 会过早显示压迫感）
-          CLAUDE_AFK_TIMEOUT_MS: '300000',
-          CLAUDE_AFK_COUNTDOWN_MS: '60000'
+          CLAUDE_AFK_TIMEOUT_MS: String(QUESTION_AFK_TIMEOUT_MS),
+          CLAUDE_AFK_COUNTDOWN_MS: String(QUESTION_AFK_COUNTDOWN_MS)
         }
       }
     );
