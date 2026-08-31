@@ -1,15 +1,17 @@
 /**
  * SimplifiedToolIndicator Component
  *
- * Renders simplified indicators for frequently used tools (Read, TodoWrite).
+ * Renders simplified indicators for frequently used tools (Read, Skill).
  */
 
 import React from 'react';
-import { extractFilename } from './toolUtils';
+import { extractFilename, getToolResultData, parseToolInput } from './toolUtils';
 
 export interface SimplifiedToolIndicatorProps {
   toolName: string;
   toolInput: string | null;
+  /** 工具结果（Skill 失败时显示 ⚠） */
+  toolResult?: any;
   onFileOpen?: (filePath: string) => void;
 }
 
@@ -18,12 +20,12 @@ export interface SimplifiedToolIndicatorProps {
  *
  * Displays compact indicators for tools that don't need full rendering.
  */
-export function SimplifiedToolIndicator({ toolName, toolInput, onFileOpen }: SimplifiedToolIndicatorProps) {
+export function SimplifiedToolIndicator({ toolName, toolInput, toolResult, onFileOpen }: SimplifiedToolIndicatorProps) {
   switch (toolName) {
     case 'Read':
       return <ReadIndicator toolInput={toolInput} onFileOpen={onFileOpen} />;
-    case 'TodoWrite':
-      return <TodoWriteIndicator toolInput={toolInput} />;
+    case 'Skill':
+      return <SkillIndicator toolInput={toolInput} toolResult={toolResult} />;
     default:
       return null;
   }
@@ -38,14 +40,7 @@ function ReadIndicator({ toolInput, onFileOpen }: { toolInput: string | null; on
   if (!toolInput) return null;
 
   // 解析 JSON 格式的工具输入
-  let input;
-  try {
-    input = JSON.parse(toolInput);
-  } catch {
-    return null;
-  }
-
-  // 验证必须包含 file_path 字段
+  const input = parseToolInput(toolInput);
   if (!input?.file_path) return null;
 
   // 从完整路径中提取文件名（去除目录部分）
@@ -73,86 +68,31 @@ function ReadIndicator({ toolInput, onFileOpen }: { toolInput: string | null; on
 }
 
 /**
- * Render simplified TodoWrite indicator
+ * Render simplified Skill tool indicator
+ * 一行展示技能加载：技能名 + 失败 ⚠，无需点击展开
  */
-function TodoWriteIndicator({ toolInput }: { toolInput: string | null }) {
+function SkillIndicator({ toolInput, toolResult }: { toolInput: string | null; toolResult?: any }) {
   if (!toolInput) return null;
 
-  let input;
-  try {
-    input = JSON.parse(toolInput);
-  } catch {
-    return null;
-  }
+  const input = parseToolInput(toolInput);
+  if (!input?.skill || typeof input.skill !== 'string') return null;
 
-  if (!input?.todos || !Array.isArray(input.todos)) {
-    return null;
-  }
+  const { isError } = getToolResultData(toolResult);
 
   return (
     <div className="bg-muted/30 border-l-2 border-border pl-3 py-2 my-2">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-        <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        {/* 闪电图标：表示技能加载 */}
+        <svg className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
         </svg>
-        <span className="font-medium">Update todo list</span>
+        <span className="font-medium">{isError ? '技能加载失败' : '已加载技能'}</span>
+        <span className={`font-mono truncate ${isError ? 'text-red-500 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}>
+          {input.skill}
+        </span>
+        {isError && <span className="text-red-500 dark:text-red-400 flex-shrink-0">⚠</span>}
       </div>
-      <TodoList todos={input.todos} />
     </div>
-  );
-}
-
-/**
- * Simple TodoList component
- */
-interface Todo {
-  id?: string;
-  content: string;
-  status: 'pending' | 'completed' | 'in_progress' | 'cancelled';
-}
-
-interface TodoListProps {
-  todos: Todo[];
-}
-
-function TodoList({ todos }: TodoListProps) {
-  return (
-    <ul className="space-y-1 text-xs">
-      {todos.map((todo, index) => {
-        // Generate a stable key - prefer id, fallback to index-based key
-        const key = todo.id || `todo-${index}-${todo.content?.slice(0, 20) || 'empty'}`;
-        return (
-          <li key={key} className="flex items-start gap-2">
-            <span className={`mt-0.5 w-3 h-3 rounded border flex-shrink-0 ${
-              todo.status === 'completed'
-                ? 'bg-green-500 border-green-500'
-                : todo.status === 'in_progress'
-                ? 'bg-blue-500 border-blue-500'
-                : todo.status === 'cancelled'
-                ? 'bg-muted-foreground border-muted-foreground'
-                : 'border-border'
-            }`}>
-              {todo.status === 'completed' && (
-                <svg className="w-full h-full text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-              {todo.status === 'in_progress' && (
-                <svg className="w-full h-full text-white animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              )}
-            </span>
-            <span className={
-              todo.status === 'completed' ? 'line-through text-muted-foreground' :
-              todo.status === 'cancelled' ? 'line-through text-muted-foreground' : ''
-            }>
-              {todo.content}
-            </span>
-          </li>
-        );
-      })}
-    </ul>
   );
 }
 

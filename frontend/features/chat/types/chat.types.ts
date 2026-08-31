@@ -10,6 +10,36 @@
 export type MessageType = 'user' | 'assistant' | 'tool' | 'error' | 'system';
 
 /**
+ * Task list item status (unified for Task* tools and legacy TodoWrite)
+ */
+export type TaskItemStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+
+/**
+ * Aggregated task list item
+ *
+ * Unified internal model for both the new Task* tools
+ * (TaskCreate/TaskUpdate) and legacy TodoWrite snapshots.
+ */
+export interface TaskItem {
+  /** Stable key (e.g. 'task-3' for Task* tools, 'todo-0' for TodoWrite) */
+  id: string;
+  /** Task title (TaskCreate subject / TodoWrite content) */
+  title: string;
+  /** Task status */
+  status: TaskItemStatus;
+}
+
+/**
+ * Raw task tool event kept for the collapsed "raw calls" view
+ */
+export interface TaskListRawEvent {
+  /** Tool name (TaskCreate/TaskUpdate/TaskList/TaskGet/TodoWrite) */
+  toolName: string;
+  /** Raw JSON input string */
+  toolInput?: string;
+}
+
+/**
  * Chat message structure
  */
 export interface ChatMessage {
@@ -61,14 +91,22 @@ export interface ChatMessage {
     questions: Array<{
       /** Question text */
       question: string;
+      /** Short chip/tag label (CLI header, max 12 chars) */
+      header?: string;
       /** Available options for selection */
       options?: Array<{
         label: string;
         description?: string;
       }>;
+      /** Whether multiple options can be selected */
+      multiSelect?: boolean;
     }>;
     /** Optional prompt text */
     prompt?: string;
+    /** Card lifecycle: pending → answered/skipped, or invalid (session ended) */
+    status?: 'pending' | 'answered' | 'skipped' | 'invalid';
+    /** Display summary after answering (selected options / response text) */
+    answerSummary?: string;
   };
   /** Whether user has answered this interactive question */
   isAnswered?: boolean;
@@ -82,6 +120,10 @@ export interface ChatMessage {
   toolResultTimestamp?: Date;
   /** Whether to minimize tool display */
   minimizeTool?: boolean;
+  /** Aggregated task list snapshot (synthetic message injected by taskListAggregator) */
+  taskListSnapshot?: TaskItem[];
+  /** Raw task tool events backing the snapshot (for collapsed raw-calls view) */
+  taskListRawEvents?: TaskListRawEvent[];
   /** Exit code for command execution */
   exitCode?: number;
 }

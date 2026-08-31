@@ -1,7 +1,8 @@
 /**
  * 工具消息内容渲染器
  *
- * 根据工具名称判断渲染方式：简化工具指示器、最小化工具消息或完整工具消息。
+ * 根据工具名称判断渲染方式：任务清单聚合卡、简化工具指示器、
+ * 最小化工具消息或完整工具消息。
  * 非工具调用的消息回退为 AssistantMessage 渲染。
  *
  * @module chat/components/ToolContentRenderer
@@ -12,13 +13,16 @@ import { AssistantMessage } from './AssistantMessage';
 import { FullToolMessage } from './FullToolMessage';
 import { MinimizedToolMessage } from './MinimizedToolMessage';
 import { SimplifiedToolIndicator } from './SimplifiedToolIndicator';
+import { QuestionCard } from './QuestionCard';
+import { TaskListCard, TaskToolFallback } from './TaskListCard';
+import { isTaskTool } from '../utils/taskListAggregator';
 import { MINIMIZED_TOOLS } from '../constants';
 
 /**
  * 判断是否为简化显示的工具
  */
 function isSimplifiedTool(toolName: string): boolean {
-  return toolName === 'Read' || toolName === 'TodoWrite';
+  return toolName === 'Read' || toolName === 'Skill';
 }
 
 /**
@@ -36,6 +40,15 @@ export function renderToolContent(
   onShowSettings?: () => void,
   showThinking = true
 ): JSX.Element {
+  // AskUserQuestion 结构化提问：渲染交互卡片（选项/自由文本/跳过），
+  // 提交动作经 questionEvents 桥接由 useChatInterface 处理（无需跨层 props）
+  if (message.interactiveQuestion) {
+    return <QuestionCard message={message} sessionId={message.toolCallId || ''} />;
+  }
+  // 任务清单聚合卡：由 taskListAggregator 注入的合成消息（携带最新快照）
+  if (message.taskListSnapshot) {
+    return <TaskListCard items={message.taskListSnapshot} rawEvents={message.taskListRawEvents} />;
+  }
   if (!message.isToolUse || !message.toolName) {
     return <AssistantMessage content={message.content} showThinking={showThinking} thinking={message.thinking} />;
   }
@@ -43,7 +56,19 @@ export function renderToolContent(
     return <MinimizedToolMessage message={message} />;
   }
   if (isSimplifiedTool(message.toolName)) {
-    return <SimplifiedToolIndicator toolName={message.toolName} toolInput={message.toolInput} onFileOpen={onFileOpen} />;
+    return (
+      <SimplifiedToolIndicator
+        toolName={message.toolName}
+        toolInput={message.toolInput}
+        toolResult={message.toolResult}
+        onFileOpen={onFileOpen}
+      />
+    );
+  }
+  // 任务工具兜底：未被聚合吸收的任务工具消息（如历史截断导致未知 taskId）
+  // 以紧凑单行显示，绝不落回需点击展开的 JSON 卡片
+  if (isTaskTool(message.toolName)) {
+    return <TaskToolFallback message={message} />;
   }
   return <FullToolMessage message={message} onFileOpen={onFileOpen} onShowSettings={onShowSettings} />;
 }

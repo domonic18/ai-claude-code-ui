@@ -55,7 +55,8 @@ export function processOutputLine(line, writer, sessionId, state) {
 
   if (jsonData.type === 'error') {
     logger.error({ sessionId, error: jsonData.error }, '[MessageTransformer] Sending claude-error');
-    writer.send({ type: 'claude-error', error: jsonData.error });
+    // 附带 sessionId：前端按会话匹配清空 pendingQuestion 并复位 loading
+    writer.send({ type: 'claude-error', sessionId: state.realSessionId || sessionId, error: jsonData.error });
     return;
   }
 
@@ -64,6 +65,8 @@ export function processOutputLine(line, writer, sessionId, state) {
     // 优先使用 SDK 返回的真实 session ID（前端已经替换了临时 ID）
     const effectiveSessionId = state.realSessionId || sessionId;
     logger.info({ sessionId: effectiveSessionId, toolUseID: jsonData.toolUseID }, '[MessageTransformer] Sending agent-question');
+    // questions 原文透传（CLI 的每项含 question/header/options[{label,description}]/multiSelect），
+    // 前端 QuestionCard 按结构渲染选项卡
     writer.send({
       type: 'agent-question',
       sessionId: effectiveSessionId,

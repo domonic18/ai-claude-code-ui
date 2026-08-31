@@ -56,10 +56,10 @@ function TokenBadge({ tokenPercentage, title }: TokenBadgeProps) {
  * 点击后打开/关闭模型选择下拉菜单
  */
 interface ModelSelectorButtonProps {
-  // 模型列表是否已加载完成
-  isModelsLoaded: boolean;
   // 当前选中的模型对象
   currentModel: import('./ModelSelector').ModelOption | null;
+  // 当前选中的模型 ID（列表未加载时作为按钮文案兜底，避免闪烁 Loading）
+  selectedModel?: string;
   // 下拉菜单是否打开
   isOpen: boolean;
   // 按钮是否禁用（加载中或不可用）
@@ -68,7 +68,7 @@ interface ModelSelectorButtonProps {
   onClick: () => void;
 }
 
-function ModelSelectorButton({ isModelsLoaded, currentModel, isOpen, disabled, onClick }: ModelSelectorButtonProps) {
+function ModelSelectorButton({ currentModel, selectedModel, isOpen, disabled, onClick }: ModelSelectorButtonProps) {
   // 获取按钮的样式类名（包含禁用状态样式）
   const buttonClasses = getButtonClasses(disabled);
 
@@ -83,9 +83,9 @@ function ModelSelectorButton({ isModelsLoaded, currentModel, isOpen, disabled, o
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
       </svg>
-      {/* 显示当前模型名称或加载状态 */}
+      {/* 显示当前模型名称或加载状态：列表未到时优先显示已选模型 ID（来自 localStorage），避免闪烁 */}
       <span className="text-sm font-medium">
-        {isModelsLoaded ? (currentModel?.name || 'Loading...') : 'Loading models...'}
+        {currentModel?.name || selectedModel || 'Loading models...'}
       </span>
       {/* 下拉箭头图标（禁用状态不显示，打开时旋转 180 度） */}
       {!disabled && (
@@ -255,8 +255,8 @@ export function ModelSelector({
   return (
     <div className="relative flex items-center gap-3" ref={dropdownRef}>
       <ModelSelectorButton
-        isModelsLoaded={isModelsLoaded}
         currentModel={currentModel}
+        selectedModel={selectedModel}
         isOpen={isOpen}
         disabled={disabled}
         onClick={() => !disabled && setIsOpen(!isOpen)}

@@ -41,6 +41,7 @@ export const STORAGE_KEYS = {
   SEND_BY_CTRL_ENTER: 'sendByCtrlEnter',
   AUTO_REFRESH_INTERVAL: 'autoRefreshInterval',
   SELECTED_PROVIDER: 'selected-provider',
+  AVAILABLE_MODELS: 'available-models',
 } as const;
 
 // Provider 的类型别名定义

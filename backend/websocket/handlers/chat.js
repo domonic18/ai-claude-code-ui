@@ -343,10 +343,15 @@ const COMMAND_HANDLERS = {
   /**
    * 处理前端用户对 Agent 提问的回答
    * 将用户回答通过 stdin 写入容器，让 SDK 的 canUseTool 回调继续执行
+   * 载荷协议（与 canUseToolTemplate.js 对齐）：
+   * - mode:'text' + response：自由文本回答
+   * - mode:'options' + answers：{问题文本: 选项label} 映射
+   * - mode:'skip'：跳过提问（CLI 收到 deny，任务继续）
+   * - answer（旧字段）：部署窗口期兼容，等价 text 模式
    */
   'user-answer': async (data, ws, writer) => {
-    const { sessionId, toolUseID, answer } = data;
-    logger.info({ sessionId, toolUseID }, '[WebSocket] Received user-answer');
+    const { sessionId, toolUseID, answer, mode, response, answers } = data;
+    logger.info({ sessionId, toolUseID, mode: mode || (answer !== undefined ? 'legacy-text' : 'unknown') }, '[WebSocket] Received user-answer');
 
     // 用户回复也算活跃操作（续期使用会话）
     recordActivity(ws.user?.userId);
@@ -358,10 +363,13 @@ const COMMAND_HANDLERS = {
       return;
     }
 
-    // 写入 JSON 行协议到容器 stdin
+    // 写入 JSON 行协议到容器 stdin（透传新协议字段，保留 answer 兼容旧前端）
     const answerMessage = JSON.stringify({
       type: 'user-answer',
       toolUseID,
+      ...(mode !== undefined && { mode }),
+      ...(response !== undefined && { response }),
+      ...(answers !== undefined && { answers }),
       answer: answer || ''
     }) + '\n';
 

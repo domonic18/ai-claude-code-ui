@@ -16,7 +16,7 @@ vi.mock('@/shared/utils/logger', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
 
-import { handleClaudeComplete } from '../sessionHandler';
+import { handleClaudeComplete, handleSessionAborted } from '../sessionHandler';
 import type { MessageHandlerCallbacks } from '../types';
 
 /** 构造满足 MessageHandlerCallbacks 必需字段的 mock 回调集合 */
@@ -30,6 +30,7 @@ function makeCallbacks(): MessageHandlerCallbacks {
     onSessionInactive: vi.fn(),
     onSessionNotProcessing: vi.fn(),
     completeStream: vi.fn(),
+    clearPendingQuestion: vi.fn(),
     getCurrentSessionId: vi.fn().mockReturnValue('session-A'),
     getSelectedProjectName: vi.fn().mockReturnValue('project-A'),
   } as unknown as MessageHandlerCallbacks;
@@ -97,5 +98,48 @@ describe('sessionHandler - handleClaudeComplete', () => {
   it('始终返回 true', () => {
     const message = { type: 'claude-complete', sessionId: 'session-A', exitCode: 0 };
     expect(handleClaudeComplete(message as any, callbacks, 'session-A')).toBe(true);
+  });
+
+  it('会话结束时清空该会话的 pendingQuestion（防止残留提问把下一条消息误路由为 user-answer）', () => {
+    const message = { type: 'claude-complete', sessionId: 'session-A', exitCode: 0 };
+
+    handleClaudeComplete(message as any, callbacks, 'session-A');
+
+    expect(callbacks.clearPendingQuestion).toHaveBeenCalledWith('session-A');
+  });
+
+  it('跨视图结束时同样清空结束会话的 pendingQuestion', () => {
+    const message = { type: 'claude-complete', sessionId: 'session-A', exitCode: 0 };
+
+    handleClaudeComplete(message as any, callbacks, 'session-B');
+
+    expect(callbacks.clearPendingQuestion).toHaveBeenCalledWith('session-A');
+  });
+});
+
+describe('sessionHandler - handleSessionAborted', () => {
+  let callbacks: MessageHandlerCallbacks;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    callbacks = makeCallbacks();
+  });
+
+  it('中断当前会话时停止加载并清空该会话的 pendingQuestion', () => {
+    const message = { type: 'session-aborted', sessionId: 'session-A' };
+
+    const result = handleSessionAborted(message as any, callbacks, 'session-A');
+
+    expect(result).toBe(true);
+    expect(callbacks.onSetLoading).toHaveBeenCalledWith(false);
+    expect(callbacks.clearPendingQuestion).toHaveBeenCalledWith('session-A');
+  });
+
+  it('中断的会话与当前视图不一致时仍清空该中断会话的 pendingQuestion', () => {
+    const message = { type: 'session-aborted', sessionId: 'session-B' };
+
+    handleSessionAborted(message as any, callbacks, 'session-A');
+
+    expect(callbacks.clearPendingQuestion).toHaveBeenCalledWith('session-B');
   });
 });

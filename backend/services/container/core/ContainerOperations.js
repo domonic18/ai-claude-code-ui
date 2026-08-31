@@ -252,9 +252,16 @@ export async function execInContainer(docker, containerId, command, options = {}
     const execConfig = configBuilder.buildExecConfig(command, options);
 
     const exec = await docker.getContainer(containerId).exec(execConfig);
-    // stdin: true 告知 docker-modem 返回 HttpDuplex（可写流），而非只读的 IncomingMessage
-    // 这是容器内 SDK 通过 AskUserQuestion 向用户提问后接收 stdin 回答的前提
-    const stream = await exec.start({ Detach: false, Tty: execConfig.Tty, stdin: !!options.stdin });
+    // stdin + hijack：dockerode 4.x / docker-modem 5.x 下仅传 stdin 时返回 HttpDuplex（chunked HTTP），
+    // daemon 不把请求体转发到 exec stdin——写入字节发出但容器内进程永远收不到（AskUserQuestion 回答黑洞）。
+    // hijack: true 触发 Connection: Upgrade 双向 TCP，写方向才真正可达；返回裸 Socket，
+    // demuxStream（非 TTY 多路解复用）与 stdin 多路复用写入逻辑对 Socket 同样适用。
+    const stream = await exec.start({
+        Detach: false,
+        Tty: execConfig.Tty,
+        stdin: !!options.stdin,
+        hijack: !!options.stdin
+    });
 
     return { exec, stream };
 }

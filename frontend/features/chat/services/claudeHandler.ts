@@ -92,10 +92,20 @@ export function handleAgentQuestion(message: WebSocketMessage, callbacks: Messag
     return true;
   }
 
+  // 结构化提问卡片消息：QuestionCard 按 questions（question/header/options/multiSelect）
+  // 渲染选项卡 + 自由文本 + 跳过（对齐 CLI 原生交互）。
+  // toolCallId 携带 sessionId 供卡片提交时路由
   callbacks.onAddMessage({
     id: generateMessageId('assistant'),
     type: 'assistant',
-    content: buildQuestionText(prompt, questions),
+    content: prompt || '',
+    toolCallId: sessionId,
+    interactiveQuestion: {
+      toolUseID,
+      questions,
+      prompt,
+      status: 'pending',
+    },
     timestamp: Date.now(),
   });
 
@@ -115,8 +125,34 @@ export function handleAgentQuestion(message: WebSocketMessage, callbacks: Messag
 export function handleClaudeError(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
   callbacks.onSetLoading(false);
   callbacks.completeStream?.();
+  // 出错的会话不会再等待回答，清掉 pendingQuestion 防止下一条消息被误路由为 user-answer
+  if (message.sessionId) {
+    callbacks.clearPendingQuestion?.(message.sessionId);
+  }
   callbacks.onAddMessage({
     id: generateMessageId('error'), type: 'error', content: `Error: ${message.error}`,
+    timestamp: Date.now(),
+  });
+  return true;
+}
+
+/**
+ * 处理后端通用 type:'error' 消息
+ *
+ * 来源：WebSocket handler 兜底异常、查询失败（handleQueryError）、
+ * user-answer 找不到会话等。此前前端未注册该类型，所有后端失败
+ * 都被静默丢弃（表现为"发了消息没反应"）。此处统一停止加载并提示。
+ *
+ * @param message - 含 error 字段的 WebSocket 消息
+ * @returns 始终返回 true
+ */
+export function handleBackendError(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
+  callbacks.onSetLoading(false);
+  callbacks.completeStream?.();
+  callbacks.onAddMessage({
+    id: generateMessageId('error'),
+    type: 'error',
+    content: `Error: ${message.error || '后端处理请求失败，请重试'}`,
     timestamp: Date.now(),
   });
   return true;
