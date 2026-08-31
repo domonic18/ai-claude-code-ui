@@ -103,6 +103,8 @@ export interface ChatMessage {
     }>;
     /** Optional prompt text */
     prompt?: string;
+    /** AFK timeout in ms (from CLAUDE_AFK_TIMEOUT_MS, same source as CLI); absent = no countdown */
+    timeoutMs?: number;
     /** Card lifecycle: pending → answered/skipped, or invalid (session ended) */
     status?: 'pending' | 'answered' | 'skipped' | 'invalid';
     /** Display summary after answering (selected options / response text) */

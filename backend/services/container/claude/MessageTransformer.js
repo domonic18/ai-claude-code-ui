@@ -66,14 +66,15 @@ export function processOutputLine(line, writer, sessionId, state) {
     const effectiveSessionId = state.realSessionId || sessionId;
     logger.info({ sessionId: effectiveSessionId, toolUseID: jsonData.toolUseID }, '[MessageTransformer] Sending agent-question');
     // questions 原文透传（CLI 的每项含 question/header/options[{label,description}]/multiSelect），
-    // 前端 QuestionCard 按结构渲染选项卡
+    // 前端 QuestionCard 按结构渲染选项卡；timeoutMs 为 AFK 超时（前端渲染倒计时进度线）
     writer.send({
       type: 'agent-question',
       sessionId: effectiveSessionId,
       data: {
         toolUseID: jsonData.toolUseID,
         questions: jsonData.questions || [],
-        prompt: jsonData.prompt || ''
+        prompt: jsonData.prompt || '',
+        ...(jsonData.timeoutMs > 0 && { timeoutMs: jsonData.timeoutMs })
       }
     });
   }

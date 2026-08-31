@@ -6,9 +6,10 @@
  * - 自由文本输入框（可选填，作为回答补充）
  * - 提交按钮（Enter 触发）+ 跳过按钮（CLI 语义：任务继续，模型自行决策）
  *
- * 状态机：pending（可交互）→ answered（显示所选摘要，只读）
+ * 状态机：pending（可交互，携带 timeoutMs 时显示 AFK 倒计时进度线）→ answered（显示所选摘要，只读）
  *                      → skipped（显示"已跳过"）
  *                      → invalid（会话结束/中断，灰化不可交互）
+ *                      → expired（倒计时归零，本地禁用：CLI 已按 afk_timeout 让模型自行决策）
  *
  * 回答协议（与后端 canUseToolTemplate.js 对齐）：
  * - 有选项选中 → mode:'options', answers: { [问题文本]: label（多选逗号join） }
@@ -19,6 +20,7 @@
 import { useState, useMemo } from 'react';
 import type { ChatMessage } from '../types';
 import { dispatchQuestionAnswer } from '../services/questionEvents';
+import { useQuestionCountdown, formatRemaining } from '../hooks/useQuestionCountdown';
 
 /** QuestionCard 组件属性 */
 export interface QuestionCardProps {
@@ -41,6 +43,13 @@ function optionClasses(selected: boolean): string {
 export function QuestionCard({ message, sessionId }: QuestionCardProps) {
   const { toolUseID, questions, prompt, status } = message.interactiveQuestion!;
   const isPending = (status || 'pending') === 'pending' && !message.isAnswered;
+
+  // AFK 倒计时：与容器内 CLI 同一超时时长（timeoutMs 由后端随消息下发）。
+  // 归零后 CLI 已按 afk_timeout 让模型自行决策，回答不再被采纳 → 卡片本地转超时态
+  const timeoutMs = message.interactiveQuestion!.timeoutMs;
+  const startedAt = Number(message.timestamp) || 0;
+  const countdown = useQuestionCountdown(startedAt, timeoutMs || 0, isPending);
+  const isExpired = isPending && countdown.isExpired;
 
   // 每个问题的选中项：question 文本 → label 数组（multiSelect 可多项）
   const [selected, setSelected] = useState<Record<string, string[]>>({});
@@ -65,7 +74,7 @@ export function QuestionCard({ message, sessionId }: QuestionCardProps) {
 
   /** 提交：有选项选中走 options 模式，否则文本走 text 模式；都空则不响应 */
   const handleSubmit = () => {
-    if (!isPending) return;
+    if (!isPending || isExpired) return;
     if (hasSelection) {
       // 按问题文本构造映射（多选逗号 join，与 CLI 协议一致）
       const answers: Record<string, string> = {};
@@ -86,7 +95,7 @@ export function QuestionCard({ message, sessionId }: QuestionCardProps) {
 
   /** 跳过：CLI 语义，deny 后任务继续，模型自行决策 */
   const handleSkip = () => {
-    if (!isPending) return;
+    if (!isPending || isExpired) return;
     dispatchQuestionAnswer(toolUseID, sessionId, { mode: 'skip' }, '已跳过');
   };
 
@@ -133,7 +142,7 @@ export function QuestionCard({ message, sessionId }: QuestionCardProps) {
                 <button
                   key={opt.label}
                   type="button"
-                  disabled={!isPending}
+                  disabled={!isPending || isExpired}
                   onClick={() => toggleOption(q.question, opt.label, !!q.multiSelect)}
                   className={optionClasses(isSelected)}
                 >
@@ -167,15 +176,39 @@ export function QuestionCard({ message, sessionId }: QuestionCardProps) {
       {status === 'invalid' && (
         <div className="text-xs text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-2">该提问已失效（会话已结束或中断）</div>
       )}
+      {isExpired && (
+        <div className="text-xs text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-2" data-testid="question-expired">
+          已超时，模型将自行决策；如需干预请直接发消息
+        </div>
+      )}
 
-      {isPending && (
+      {isPending && !isExpired && (
         <div className="space-y-2 border-t border-blue-200 dark:border-blue-800 pt-3">
+          {/* AFK 倒计时进度线：满格起步线性递减；剩余 <60s 变琥珀色提醒 */}
+          {!!timeoutMs && (
+            <div data-testid="question-countdown">
+              <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+                <span>等待回答</span>
+                <span className={countdown.isWarning ? 'text-amber-500 font-medium' : ''} data-testid="question-countdown-remaining">
+                  {formatRemaining(countdown.remainingMs)}
+                </span>
+              </div>
+              <div className="h-1 w-full rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-[width] duration-250 ease-linear ${countdown.isWarning ? 'bg-amber-500' : 'bg-blue-400'}`}
+                  style={{ width: `${countdown.progress * 100}%` }}
+                  data-testid="question-countdown-bar"
+                />
+              </div>
+            </div>
+          )}
           {/* 自由文本输入（可选） */}
           <input
             type="text"
             value={text}
             onChange={e => setText(e.target.value)}
             onKeyDown={handleKeyDown}
+            disabled={isExpired}
             placeholder="或输入自定义回答（可选）"
             className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
             data-testid="question-free-text"
@@ -193,7 +226,8 @@ export function QuestionCard({ message, sessionId }: QuestionCardProps) {
             <button
               type="button"
               onClick={handleSkip}
-              className="px-4 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+              disabled={isExpired}
+              className="px-4 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
               data-testid="question-skip"
             >
               跳过

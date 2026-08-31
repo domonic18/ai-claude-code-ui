@@ -143,12 +143,16 @@ export function generateCanUseToolCallback(autoAnswer = false) {
           const toolUseID = canUseToolOptions.toolUseID;
           console.error("[SDK] canUseTool intercepted: AskUserQuestion, toolUseID:", toolUseID);
 
-          // 通过 stdout 输出问题消息，主容器会转发给前端
+          // 通过 stdout 输出问题消息，主容器会转发给前端。
+          // timeoutMs 取容器 env CLAUDE_AFK_TIMEOUT_MS（与 CLI AFK 超时同源），
+          // 前端据此渲染倒计时进度线；env 缺省时不输出该字段，前端不显示倒计时
+          const afkTimeoutMs = Number(process.env.CLAUDE_AFK_TIMEOUT_MS) || 0;
           console.log(JSON.stringify({
             type: "agent-question",
             toolUseID: toolUseID,
             questions: input?.questions || [],
-            prompt: input?.prompt || ''
+            prompt: input?.prompt || '',
+            ...(afkTimeoutMs > 0 && { timeoutMs: afkTimeoutMs })
           }));
 
           // 等待用户通过 stdin 回答（主容器会写入），按协议注入 response/answers 或 deny

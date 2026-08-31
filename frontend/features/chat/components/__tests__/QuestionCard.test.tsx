@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import React from 'react';
 
 // Mock 桥接模块：捕获派发载荷。
@@ -199,5 +199,68 @@ describe('QuestionCard - 终态只读', () => {
     render(<QuestionCard message={msg} sessionId="session-A" />);
 
     expect(screen.queryByTestId('question-submit')).toBeNull();
+  });
+});
+
+describe('QuestionCard - AFK 倒计时', () => {
+  beforeEach(() => {
+    dispatchMock.mockClear();
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    cleanup();
+  });
+
+  /** 构造带 timeoutMs 的消息（timestamp 用假时钟当前时刻，避免真实漂移） */
+  const makeTimedMessage = (timeoutMs: number, startedAt = Date.now()): ChatMessage =>
+    ({ ...makeQuestionMessage({ timeoutMs }), timestamp: startedAt });
+
+  it('下发 timeoutMs 时渲染倒计时线（满格起步）', () => {
+    render(<QuestionCard message={makeTimedMessage(300000)} sessionId="session-A" />);
+
+    expect(screen.getByTestId('question-countdown')).toBeTruthy();
+    expect(screen.getByTestId('question-countdown-remaining').textContent).toBe('5:00');
+    const bar = screen.getByTestId('question-countdown-bar') as HTMLElement;
+    expect(bar.style.width).toBe('100%');
+  });
+
+  it('未下发 timeoutMs（旧后端兼容）：不渲染倒计时，卡片正常可交互', () => {
+    render(<QuestionCard message={makeQuestionMessage()} sessionId="session-A" />);
+
+    expect(screen.queryByTestId('question-countdown')).toBeNull();
+    expect(screen.getByTestId('question-submit')).toBeTruthy();
+  });
+
+  it('剩余时间随 tick 递减，进度条宽度线性下降', () => {
+    render(<QuestionCard message={makeTimedMessage(300000)} sessionId="session-A" />);
+
+    act(() => { vi.advanceTimersByTime(150000); });
+    expect(screen.getByTestId('question-countdown-remaining').textContent).toBe('2:30');
+    const bar = screen.getByTestId('question-countdown-bar') as HTMLElement;
+    expect(bar.style.width).toBe('50%');
+  });
+
+  it('归零后：卡片禁用并提示已超时，点击选项不再派发', () => {
+    render(<QuestionCard message={makeTimedMessage(1000)} sessionId="session-A" />);
+
+    act(() => { vi.advanceTimersByTime(1100); });
+
+    expect(screen.getByTestId('question-expired')).toBeTruthy();
+    // 交互控件整体隐藏（pending 区让位于超时提示）
+    expect(screen.queryByTestId('question-submit')).toBeNull();
+    expect(screen.queryByTestId('question-skip')).toBeNull();
+    // 选项按钮 disabled：超时后回答不被采纳，不允许再选
+    const optButton = screen.getByText('授权优先版（推荐）').closest('button') as HTMLButtonElement;
+    expect(optButton.disabled).toBe(true);
+    expect(dispatchMock).not.toHaveBeenCalled();
+  });
+
+  it('终态（answered）：不渲染倒计时', () => {
+    const msg = makeTimedMessage(300000);
+    render(<QuestionCard message={makeQuestionMessage({ timeoutMs: 300000, status: 'answered', answerSummary: 'x' })} sessionId="session-A" />);
+
+    expect(screen.queryByTestId('question-countdown')).toBeNull();
+    expect(msg.interactiveQuestion!.timeoutMs).toBe(300000);
   });
 });
