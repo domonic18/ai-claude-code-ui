@@ -1,7 +1,7 @@
 /**
  * canUseToolTemplate 行为测试
  *
- * 核心回归保护：AskUserQuestion 回答注入协议（与 Claude CLI 0.3.206 对齐）。
+ * 核心回归保护：AskUserQuestion 回答注入协议（与 Claude CLI 0.3.252 对齐）。
  * 历史缺陷：注入顶层 answer 字段，CLI 不识别 → 模型收到 "did not answer" 重问一遍。
  *
  * 测法：把生成的回调代码串放进沙盒执行（动态 import 替换为 mock readline），

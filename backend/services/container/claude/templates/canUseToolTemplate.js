@@ -5,7 +5,8 @@
  * in the container SDK script. Communicates with the main container
  * via stdout (questions) and stdin (answers).
  *
- * 回答注入协议（反编译 Claude CLI 0.3.206 确认，字段名必须精确匹配）：
+ * 回答注入协议（反编译 Claude CLI 0.3.206 确认，字段名必须精确匹配；
+ * 0.3.207 起 allow+updatedInput 成为官方文档化契约，当前锁定 0.3.252）：
  * - 自由文本回答：updatedInput.response = 文本 → tool_result "The user responded: ..."
  * - 选项回答：updatedInput.answers = { [问题文本]: 选项label（多选逗号分隔） }
  *   → tool_result "Your questions have been answered: ..."
@@ -76,7 +77,7 @@ export function generateCanUseToolCallback(autoAnswer = false) {
     const pendingAnswers = new Map();
 
     // 将 stdin 消息解析为 canUseTool 的 PermissionResult。
-    // 协议（与 CLI 0.3.206 对齐）：
+    // 协议（与 CLI 0.3.252 对齐）：
     //   { mode:'text',    response } → allow + updatedInput.response（自由文本回答）
     //   { mode:'options', answers  } → allow + updatedInput.answers（{问题文本:选项label}）
     //   { mode:'skip' }             → deny（用户跳过，任务继续）
