@@ -411,6 +411,21 @@ export function useChatInterface({
     }
   }, [setMessages]);
 
+  // AFK 超时自动采用：后端已在容器侧自动选用推荐选项回答（任务继续）。
+  // 前端把对应卡片置 auto-answered 终态并清 pendingQuestion（防下一条输入被
+  // 误路由为 user-answer 打到已消费的 toolUseID），随后恢复 loading 态
+  const autoAnswerQuestion = useCallback((toolUseID: string, summary: string) => {
+    // 仅当仍是当前挂起的提问才清空：陈旧的 auto-answer 不应误清更新的 pending
+    if (pendingQuestionRef.current?.toolUseID === toolUseID) {
+      pendingQuestionRef.current = null;
+    }
+    // 自动采用后模型继续推理（思考/生成），恢复 loading 态直到 claude-complete/claude-error 复位
+    setIsLoading(true);
+    setMessages(prev => prev.map(m => (m.interactiveQuestion?.toolUseID === toolUseID && m.interactiveQuestion?.status === 'pending')
+      ? { ...m, interactiveQuestion: { ...m.interactiveQuestion, status: 'auto-answered', answerSummary: summary } }
+      : m));
+  }, [setMessages, setIsLoading]);
+
   // ========== QuestionCard 提交桥接 ==========
   // 卡片在消息渲染树深处，经 questionEvents 桥接派发到这里统一发送：
   // 发送 user-answer（新协议 mode/response/answers）+ 置卡片终态 + 清 pendingQuestion
@@ -463,6 +478,7 @@ export function useChatInterface({
     setTasks: (tasks: any[]) => { if (isCrossView()) return; setTasks(tasks); },
     setPendingQuestion: (toolUseID: string, sessionId: string) => { if (isCrossView()) return; setPendingQuestion(toolUseID, sessionId); },
     clearPendingQuestion,
+    onAutoAnswerQuestion: (toolUseID: string, summary: string) => { if (isCrossView()) return; autoAnswerQuestion(toolUseID, summary); },
     onDocumentCreated,
     ...stream,
   });

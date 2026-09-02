@@ -16,11 +16,18 @@ import { CONTAINER } from '../../../config/config.js';
 const logger = createLogger('services/container/claude/DockerExecutor');
 
 /**
- * AskUserQuestion 空闲超时（AFK）配置，注入容器 env 后由两部分消费：
- * - CLI 内部：超时触发后模型拿到 afk_timeout 自行决策
- * - canUseTool 回调：读同一 env 把 timeoutMs 随 agent-question 输出，前端渲染倒计时
+ * AskUserQuestion 用户回答窗口：超过该时长未回复，容器内 SDK 脚本自动采用
+ * 推荐选项（label 含"推荐/Recommended"，无则第一个选项）作为回答注入，
+ * 任务继续执行（canUseToolTemplate.js 内 setTimeout 消费，前端倒计时同源）。
  */
-export const QUESTION_AFK_TIMEOUT_MS = 300000;
+export const QUESTION_AUTO_ANSWER_MS = 300000;
+/** 自动采用后 CLI 仍无 control_response 时的兜底缓冲：保证脚本定时器必先于 CLI AFK 触发 */
+export const QUESTION_AFK_BACKSTOP_BUFFER_MS = 60000;
+/**
+ * CLI 内部 AFK 兜底线（= 回答窗口 + 缓冲）：正常永不应触发——脚本定时器会先
+ * 注入自动回答；仅在 env 缺失/定时器异常时由 CLI 按 afk_timeout 让模型自行决策
+ */
+export const QUESTION_AFK_TIMEOUT_MS = QUESTION_AUTO_ANSWER_MS + QUESTION_AFK_BACKSTOP_BUFFER_MS;
 /** 倒计时提示阈值：前端进度条低于该剩余时间变琥珀色（与 CLI 倒计时提示对齐） */
 export const QUESTION_AFK_COUNTDOWN_MS = 60000;
 
@@ -106,9 +113,11 @@ export async function executeInContainer(userId, command, options, writer, sessi
           // Claude CLI 拒绝在 root 用户下使用 bypassPermissions，
           // 设置 IS_SANDBOX=1 告知 CLI 当前运行在沙箱容器中（参考 cli.js:11106430）
           IS_SANDBOX: '1',
-          // AskUserQuestion 空闲超时：CLI 默认 60s 太短（专利场景读选项常超时，
-          // 超时后模型拿到 afk_timeout 自行决策，高风险确认不适用）。放宽到 5 分钟；
+          // AskUserQuestion 两段式超时：用户 5 分钟（QUESTION_AUTO_ANSWER_MS）未回复时，
+          // SDK 脚本自动采用推荐选项继续执行（专利场景读选项常超时，直接停止任务代价高）；
+          // CLI AFK 线放宽到 6 分钟兜底（默认 60s 太短），正常永不应触发。
           // 倒计时提示设在最后 60s（CLI 默认 20s 会过早显示压迫感）
+          QUESTION_AUTO_ANSWER_MS: String(QUESTION_AUTO_ANSWER_MS),
           CLAUDE_AFK_TIMEOUT_MS: String(QUESTION_AFK_TIMEOUT_MS),
           CLAUDE_AFK_COUNTDOWN_MS: String(QUESTION_AFK_COUNTDOWN_MS)
         }

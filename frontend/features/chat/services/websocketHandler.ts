@@ -27,7 +27,7 @@ export { generateMessageId, decodeHtmlEntities, safeLocalStorage } from './wsUti
 
 // Import provider-specific handlers
 import { handleSessionCreated, handleTokenBudget, handleUserPromptContext, handleTodoWrite, handleClaudeComplete, handleSessionAborted } from './sessionHandler';
-import { handleClaudeResponse, handleClaudeOutput, handleClaudeInteractivePrompt, handleAgentQuestion, handleClaudeError, handleAgentAnswerDropped, handleBackendError } from './claudeHandler';
+import { handleClaudeResponse, handleClaudeOutput, handleClaudeInteractivePrompt, handleAgentQuestion, handleClaudeError, handleAgentAnswerDropped, handleAgentQuestionAutoAnswered, handleBackendError } from './claudeHandler';
 import { handleCursorSystem, handleCursorToolUse, handleCursorError, handleCursorResult, handleCursorOutput } from './cursorHandler';
 import { handleCodexResponse, handleCodexComplete } from './codexHandler';
 import { emitConversationComplete } from '@/features/documents/services/documentEvents';
@@ -52,6 +52,8 @@ const MESSAGE_HANDLERS: Record<string, (message: WebSocketMessage, callbacks: Me
   'claude-interactive-prompt': (msg, cbs) => handleClaudeInteractivePrompt(msg, cbs),
   'agent-question': (msg, cbs) => handleAgentQuestion(msg, cbs),
   'agent-answer-dropped': (msg, cbs) => handleAgentAnswerDropped(msg, cbs),
+  // AFK 超时自动采用推荐选项：卡片置 auto-answered 终态并恢复 loading（模型继续推理）
+  'agent-question-auto-answered': (msg, cbs) => handleAgentQuestionAutoAnswered(msg, cbs),
   'claude-error': (msg, cbs) => handleClaudeError(msg, cbs),
   // 后端通用错误（handler 兜底异常、查询失败、user-answer 会话缺失等）：
   // 未注册时此类失败被静默丢弃，表现为"发了消息没反应"

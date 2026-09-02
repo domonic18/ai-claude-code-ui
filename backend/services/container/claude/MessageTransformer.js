@@ -79,12 +79,33 @@ export function processOutputLine(line, writer, sessionId, state) {
     });
   }
 
-  // bypassPermissions 模式下 AI 尝试提问但已被自动回答（仅日志记录，不转发前端）
+  // agent-question-auto-answered 有两个来源，按 reason 区分：
+  // - reason:'afk_timeout'（交互模式）：AFK 超时已自动采用推荐选项，转发前端
+  //   把卡片置 auto-answered 终态并显示自动采用的选项
+  // - 无 reason（bypassPermissions 模式）：提问已被即时自动回答，仅日志记录
   if (jsonData.type === 'agent-question-auto-answered') {
-    logger.info(
-      { sessionId, toolUseID: jsonData.toolUseID, autoAnswer: jsonData.autoAnswer },
-      '[MessageTransformer] Agent question auto-answered (bypassPermissions mode)'
-    );
+    if (jsonData.reason === 'afk_timeout') {
+      const effectiveSessionId = state.realSessionId || sessionId;
+      logger.info(
+        { sessionId: effectiveSessionId, toolUseID: jsonData.toolUseID },
+        '[MessageTransformer] Question auto-answered (afk timeout); notifying client'
+      );
+      writer.send({
+        type: 'agent-question-auto-answered',
+        sessionId: effectiveSessionId,
+        data: {
+          toolUseID: jsonData.toolUseID,
+          answers: jsonData.answers || {},
+          response: jsonData.response || '',
+          reason: 'afk_timeout'
+        }
+      });
+    } else {
+      logger.info(
+        { sessionId, toolUseID: jsonData.toolUseID, autoAnswer: jsonData.autoAnswer },
+        '[MessageTransformer] Agent question auto-answered (bypassPermissions mode)'
+      );
+    }
   }
 
   // 用户回答了一个没有等待中 ask 的提问（会话已推进/结束/卡死，或回答了已失效的旧提问）。

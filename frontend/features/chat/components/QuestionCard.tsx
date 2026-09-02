@@ -8,8 +8,9 @@
  *
  * 状态机：pending（可交互，携带 timeoutMs 时显示 AFK 倒计时进度线）→ answered（显示所选摘要，只读）
  *                      → skipped（显示"已跳过"）
+ *                      → auto-answered（AFK 超时，后端已自动采用推荐选项，显示自动采用的选项）
  *                      → invalid（会话结束/中断，灰化不可交互）
- *                      → expired（倒计时归零，本地禁用：CLI 已按 afk_timeout 让模型自行决策）
+ *                      → expired（本地倒计时归零的过渡态：后端自动采用确认到达前的短暂窗口）
  *
  * 回答协议（与后端 canUseToolTemplate.js 对齐）：
  * - 有选项选中 → mode:'options', answers: { [问题文本]: label（多选逗号join） }
@@ -44,8 +45,9 @@ export function QuestionCard({ message, sessionId }: QuestionCardProps) {
   const { toolUseID, questions, prompt, status } = message.interactiveQuestion!;
   const isPending = (status || 'pending') === 'pending' && !message.isAnswered;
 
-  // AFK 倒计时：与容器内 CLI 同一超时时长（timeoutMs 由后端随消息下发）。
-  // 归零后 CLI 已按 afk_timeout 让模型自行决策，回答不再被采纳 → 卡片本地转超时态
+  // AFK 倒计时：与容器内 SDK 脚本同一回答窗口（timeoutMs 由后端随消息下发）。
+  // 归零后容器侧自动采用推荐选项并推送 auto-answered 确认；归零到确认到达的
+  // 短暂窗口内本地转过渡态（回答不再被采纳）
   const timeoutMs = message.interactiveQuestion!.timeoutMs;
   const startedAt = Number(message.timestamp) || 0;
   const countdown = useQuestionCountdown(startedAt, timeoutMs || 0, isPending);
@@ -176,9 +178,14 @@ export function QuestionCard({ message, sessionId }: QuestionCardProps) {
       {status === 'invalid' && (
         <div className="text-xs text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-2">该提问已失效（会话已结束或中断）</div>
       )}
+      {status === 'auto-answered' && (
+        <div className="text-xs text-amber-600 dark:text-amber-400 border-t border-gray-200 dark:border-gray-700 pt-2" data-testid="question-auto-answered">
+          已超时，自动采用：{message.interactiveQuestion!.answerSummary}
+        </div>
+      )}
       {isExpired && (
         <div className="text-xs text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-2" data-testid="question-expired">
-          已超时，模型将自行决策；如需干预请直接发消息
+          已超时，将自动采用推荐选项继续…
         </div>
       )}
 
