@@ -52,6 +52,8 @@ export interface MessageHandlerCallbacks {
   setPendingQuestion?: (toolUseID: string, sessionId: string) => void;
   /** Clear the pending question belonging to the given session (fired on complete/abort/error to prevent stale misrouting) */
   clearPendingQuestion?: (sessionId: string) => void;
+  /** AFK timeout hit: backend auto-answered with the recommended option; flip the card to its terminal state and resume loading */
+  onAutoAnswerQuestion?: (toolUseID: string, summary: string) => void;
 
   // Document panel
   onDocumentCreated?: (doc: { file_path: string; file_name: string; conversation_id: string; message_id: string; type: string }) => void;

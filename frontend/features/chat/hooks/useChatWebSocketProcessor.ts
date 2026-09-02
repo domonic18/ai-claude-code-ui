@@ -59,6 +59,8 @@ interface UseChatWebSocketProcessorOptions {
   setPendingQuestion?: (toolUseID: string, sessionId: string) => void;
   /** Clear pending question when its session ends/aborts/errors (stale question would misroute the next user message) */
   clearPendingQuestion?: (sessionId: string) => void;
+  /** AFK timeout hit: backend auto-answered with the recommended option; flip the card to its terminal state and resume loading */
+  onAutoAnswerQuestion?: (toolUseID: string, summary: string) => void;
   /** Document created by AI Write tool */
   onDocumentCreated?: (doc: { file_path: string; file_name: string; conversation_id: string; message_id: string; type: string }) => void;
 }
@@ -116,6 +118,7 @@ export function useChatWebSocketProcessor(options: UseChatWebSocketProcessorOpti
         getSelectedProjectName: options.getSelectedProjectName ?? (() => undefined),
         setPendingQuestion: options.setPendingQuestion,
         clearPendingQuestion: options.clearPendingQuestion,
+        onAutoAnswerQuestion: options.onAutoAnswerQuestion,
         onDocumentCreated: options.onDocumentCreated,
       });
     }

@@ -103,10 +103,10 @@ export interface ChatMessage {
     }>;
     /** Optional prompt text */
     prompt?: string;
-    /** AFK timeout in ms (from CLAUDE_AFK_TIMEOUT_MS, same source as CLI); absent = no countdown */
+    /** AFK timeout in ms (from QUESTION_AUTO_ANSWER_MS, fallback CLAUDE_AFK_TIMEOUT_MS); absent = no countdown. On expiry the backend auto-answers with the recommended option */
     timeoutMs?: number;
-    /** Card lifecycle: pending → answered/skipped, or invalid (session ended) */
-    status?: 'pending' | 'answered' | 'skipped' | 'invalid';
+    /** Card lifecycle: pending → answered/skipped/auto-answered (AFK timeout, recommended option auto-picked), or invalid (session ended) */
+    status?: 'pending' | 'answered' | 'skipped' | 'auto-answered' | 'invalid';
     /** Display summary after answering (selected options / response text) */
     answerSummary?: string;
   };

@@ -194,6 +194,17 @@ describe('QuestionCard - 终态只读', () => {
     expect(optButton.disabled).toBe(true);
   });
 
+  it('auto-answered 态（AFK 超时自动采用）：显示自动采用的选项，不渲染交互控件', () => {
+    render(<QuestionCard message={makeQuestionMessage({ status: 'auto-answered', answerSummary: '授权优先版（推荐）' })} sessionId="session-A" />);
+
+    expect(screen.getByTestId('question-auto-answered')).toBeTruthy();
+    expect(screen.getByText(/已超时，自动采用：授权优先版（推荐）/)).toBeTruthy();
+    expect(screen.queryByTestId('question-submit')).toBeNull();
+    expect(screen.queryByTestId('question-skip')).toBeNull();
+    // 终态下不再渲染倒计时
+    expect(screen.queryByTestId('question-countdown')).toBeNull();
+  });
+
   it('isAnswered 旧标记同样进入只读态（兼容历史消息）', () => {
     const msg = { ...makeQuestionMessage(), isAnswered: true };
     render(<QuestionCard message={msg} sessionId="session-A" />);

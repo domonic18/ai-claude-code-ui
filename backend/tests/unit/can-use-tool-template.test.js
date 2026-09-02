@@ -10,7 +10,7 @@
  * @module tests/unit/can-use-tool-template
  */
 
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, beforeEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { generateCanUseToolCallback } from '../../services/container/claude/templates/canUseToolTemplate.js';
@@ -153,7 +153,7 @@ describe('canUseToolTemplate - 交互模式（回答协议）', () => {
     assert.deepStrictEqual(result.updatedInput, { file_path: '/tmp/x' });
   });
 
-  it('agent-question 携带 timeoutMs（读容器 env，与 CLI AFK 超时同源）', async () => {
+  it('agent-question 携带 timeoutMs（优先 QUESTION_AUTO_ANSWER_MS，兜底 CLAUDE_AFK env）', async () => {
     sandbox.handle.canUseTool('AskUserQuestion', { questions: [] }, { toolUseID: 'tu_env' });
 
     const q = sandbox.logged.find((m) => m && m.type === 'agent-question');
@@ -177,6 +177,155 @@ describe('canUseToolTemplate - 交互模式（回答协议）', () => {
     const q = bad.logged.find((m) => m && m.type === 'agent-question');
     assert.ok(q, '应输出 agent-question 消息');
     assert.strictEqual('timeoutMs' in q, false);
+  });
+});
+
+describe('canUseToolTemplate - AFK 超时自动采用推荐选项', () => {
+  /** 构造带自动采用 env 的沙盒（mock.timers 需在 canUseTool 调用前启用） */
+  async function buildAutoSandbox() {
+    return buildSandbox(generateCanUseToolCallback(false), {
+      QUESTION_AUTO_ANSWER_MS: '300000',
+      CLAUDE_AFK_TIMEOUT_MS: '360000'
+    });
+  }
+
+  it('超时触发：自动采用推荐选项并输出 agent-question-auto-answered（reason:afk_timeout）', async (t) => {
+    t.after(() => mock.timers.reset());
+    mock.timers.enable({ apis: ['setTimeout'] });
+    const sandbox = await buildAutoSandbox();
+    const promise = sandbox.handle.canUseTool('AskUserQuestion', {
+      questions: [{ question: '整体策略?', options: [
+        { label: '授权优先版（推荐）' }, { label: '保守版' }
+      ] }]
+    }, { toolUseID: 'tu_afk_1' });
+
+    mock.timers.tick(300000);
+    const result = await promise;
+
+    assert.strictEqual(result.behavior, 'allow');
+    assert.deepStrictEqual(result.updatedInput.answers, { '整体策略?': '授权优先版（推荐）' });
+    assert.strictEqual(result.toolUseID, 'tu_afk_1');
+    const auto = sandbox.logged.find((m) => m && m.type === 'agent-question-auto-answered');
+    assert.ok(auto, '应输出 agent-question-auto-answered');
+    assert.strictEqual(auto.reason, 'afk_timeout');
+    assert.deepStrictEqual(auto.answers, { '整体策略?': '授权优先版（推荐）' });
+
+    // 自动采用后 pending 已消费：迟到的用户回答走 dropped 反馈，不再被误路由
+    sandbox.pushLine({ type: 'user-answer', toolUseID: 'tu_afk_1', mode: 'text', response: 'x' });
+    assert.ok(sandbox.logged.some((m) => m && m.type === 'agent-answer-dropped'), '超时后到达的回答应被 dropped');
+  });
+
+  it('label 无"推荐"标注时取第一个选项', async (t) => {
+    t.after(() => mock.timers.reset());
+    mock.timers.enable({ apis: ['setTimeout'] });
+    const sandbox = await buildAutoSandbox();
+    const promise = sandbox.handle.canUseTool('AskUserQuestion', {
+      questions: [{ question: '选哪个方案?', options: [{ label: '方案A' }, { label: '方案B' }] }]
+    }, { toolUseID: 'tu_afk_2' });
+
+    mock.timers.tick(300000);
+    const result = await promise;
+
+    assert.deepStrictEqual(result.updatedInput.answers, { '选哪个方案?': '方案A' });
+  });
+
+  it('multiSelect 多个推荐项全部采用（逗号 join，与手动多选协议一致）', async (t) => {
+    t.after(() => mock.timers.reset());
+    mock.timers.enable({ apis: ['setTimeout'] });
+    const sandbox = await buildAutoSandbox();
+    const promise = sandbox.handle.canUseTool('AskUserQuestion', {
+      questions: [{ question: '启用哪些功能?', multiSelect: true, options: [
+        { label: '检索（推荐）' }, { label: '导出（推荐）' }, { label: '统计' }
+      ] }]
+    }, { toolUseID: 'tu_afk_3' });
+
+    mock.timers.tick(300000);
+    const result = await promise;
+
+    assert.strictEqual(result.updatedInput.answers['启用哪些功能?'], '检索（推荐）, 导出（推荐）');
+  });
+
+  it('回答窗口内用户先回答：定时器被清除，不触发自动采用', async (t) => {
+    t.after(() => mock.timers.reset());
+    mock.timers.enable({ apis: ['setTimeout'] });
+    const sandbox = await buildAutoSandbox();
+    const promise = sandbox.handle.canUseTool('AskUserQuestion', {
+      questions: [{ question: '整体策略?', options: [{ label: '授权优先版（推荐）' }] }]
+    }, { toolUseID: 'tu_afk_4' });
+
+    mock.timers.tick(299999);
+    sandbox.pushLine({ type: 'user-answer', toolUseID: 'tu_afk_4', mode: 'text', response: '手动回答' });
+    const result = await promise;
+
+    assert.strictEqual(result.updatedInput.response, '手动回答');
+    // 定时器已清除：越过窗口后不再输出自动采用消息
+    mock.timers.tick(600000);
+    assert.strictEqual(
+      sandbox.logged.find((m) => m && m.type === 'agent-question-auto-answered'),
+      undefined,
+      '用户已回答时不应自动采用'
+    );
+  });
+
+  it('全部问题均无选项：降级 text 通道回复固定文案，保持任务连续性', async (t) => {
+    t.after(() => mock.timers.reset());
+    mock.timers.enable({ apis: ['setTimeout'] });
+    const sandbox = await buildAutoSandbox();
+    const promise = sandbox.handle.canUseTool('AskUserQuestion', {
+      questions: [{ question: '继续吗?' }]
+    }, { toolUseID: 'tu_afk_5' });
+
+    mock.timers.tick(300000);
+    const result = await promise;
+
+    assert.strictEqual(result.behavior, 'allow');
+    assert.strictEqual(result.updatedInput.response, '继续');
+    assert.strictEqual(result.updatedInput.answers, undefined);
+    const auto = sandbox.logged.find((m) => m && m.type === 'agent-question-auto-answered');
+    assert.ok(auto);
+    assert.strictEqual(auto.response, '继续');
+  });
+
+  it('question 非字符串/为空的题被跳过（不产生 CLI 不识别的非法 key）', async (t) => {
+    t.after(() => mock.timers.reset());
+    mock.timers.enable({ apis: ['setTimeout'] });
+    const sandbox = await buildAutoSandbox();
+    const promise = sandbox.handle.canUseTool('AskUserQuestion', {
+      questions: [
+        { question: '', options: [{ label: 'A（推荐）' }] },
+        { question: '有效问题?', options: [{ label: 'B（推荐）' }] }
+      ]
+    }, { toolUseID: 'tu_afk_6' });
+
+    mock.timers.tick(300000);
+    const result = await promise;
+
+    assert.deepStrictEqual(result.updatedInput.answers, { '有效问题?': 'B（推荐）' });
+  });
+
+  it('env 缺失 QUESTION_AUTO_ANSWER_MS：不 arm 定时器（退化现状），timeoutMs 兜底 CLAUDE_AFK', async (t) => {
+    t.after(() => mock.timers.reset());
+    mock.timers.enable({ apis: ['setTimeout'] });
+    const sandbox = await buildSandbox(generateCanUseToolCallback(false), { CLAUDE_AFK_TIMEOUT_MS: '360000' });
+    const promise = sandbox.handle.canUseTool('AskUserQuestion', {
+      questions: [{ question: 'x?', options: [{ label: 'A（推荐）' }] }]
+    }, { toolUseID: 'tu_noauto' });
+
+    // 兜底链：无 AUTO env 时 timeoutMs 取 CLAUDE_AFK 值
+    const q = sandbox.logged.find((m) => m && m.type === 'agent-question');
+    assert.strictEqual(q.timeoutMs, 360000);
+
+    mock.timers.tick(600000);
+    // 未 arm 定时器：promise 应仍挂起（setImmediate 未被 mock，可作真实异步探针）
+    const stillPending = await Promise.race([
+      promise.then(() => false, () => false),
+      new Promise((resolve) => setImmediate(() => resolve(true))),
+    ]);
+    assert.ok(stillPending, '无 QUESTION_AUTO_ANSWER_MS 时不应自动结算');
+    assert.strictEqual(
+      sandbox.logged.find((m) => m && m.type === 'agent-question-auto-answered'),
+      undefined
+    );
   });
 });
 

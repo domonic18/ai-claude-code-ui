@@ -182,3 +182,29 @@ export function handleAgentAnswerDropped(message: WebSocketMessage, callbacks: M
   });
   return true;
 }
+
+/**
+ * 处理"AFK 超时自动采用推荐选项"消息
+ *
+ * 用户在回答窗口内未回复时，容器内 SDK 脚本已自动采用推荐选项作为回答并
+ * 继续执行任务。此处接收后端转发的 agent-question-auto-answered（reason:'afk_timeout'），
+ * 恢复 loading 态（模型继续推理，直到 claude-complete/claude-error 复位），
+ * 并经 onAutoAnswerQuestion 把卡片置 auto-answered 终态、展示自动采用的选项。
+ *
+ * @param message - 含 data.{toolUseID, answers, response} 的 WebSocket 消息
+ * @param callbacks - UI 状态更新回调集合
+ * @returns 始终返回 true
+ */
+export function handleAgentQuestionAutoAnswered(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
+  const { toolUseID } = message.data || {};
+  if (!toolUseID) return true;
+
+  const answers: Record<string, string> = message.data?.answers || {};
+  const summary = Object.keys(answers).length > 0
+    ? Object.values(answers).join('；')
+    : String(message.data?.response || '');
+
+  callbacks.onSetLoading(true);
+  callbacks.onAutoAnswerQuestion?.(toolUseID, summary);
+  return true;
+}

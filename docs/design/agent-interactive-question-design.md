@@ -525,4 +525,36 @@ interface ChatToolbarProps {
 - **`/btw` 旁聊**：允许用户在 pending 状态下发送新命令，需要队列机制
 - **Rewind / Checkpoint**：回退到之前的状态，需要 SDK 层面的检查点支持
 - **多问题并行**：同时存在多个未回答的 AskUserQuestion
-- **超时提示**：Agent 等待回答过久时的用户提示
+
+---
+
+## 11. AFK 超时自动采用推荐选项（已实现）
+
+用户在回答窗口内未回复时，不再让 CLI 按 `afk_timeout` 让模型自行收尾（表现为"已超时，任务停止"），而是由容器内 SDK 脚本自动采用**推荐选项**作为回答注入，任务继续执行。
+
+### 两段式超时
+
+| 配置 | 值 | 消费方 |
+|------|-----|--------|
+| `QUESTION_AUTO_ANSWER_MS`（`DockerExecutor.js`） | 300000 | SDK 脚本 `setTimeout`：到点自动采用；`timeoutMs` 随 agent-question 下发，前端倒计时同源 |
+| `CLAUDE_AFK_TIMEOUT_MS` | 360000（= 回答窗口 + 60s 缓冲） | CLI 兜底线，正常永不应触发（脚本定时器先注入 control_response） |
+
+定时器与 `pendingAnswers` 同进程同 owner（容器内），独立于前端/后端存活——标签页关闭、后端重启都不影响自动采用。
+
+### 推荐选项构造（`canUseToolTemplate.js` `pickRecommendedAnswers`）
+
+- 每题取 label 匹配 `/推荐|recommended/i` 的选项；multiSelect 取全部匹配项逗号 join；无匹配取 `options[0]`（AskUserQuestion 惯例推荐项放首位/标注）
+- 无 options 的题跳过；全部题无选项时降级 text 通道回复固定文案 `继续`
+- 构造/输出异常时按 skip（deny 语义）兜底，任务仍继续
+- env 缺失 `QUESTION_AUTO_ANSWER_MS`（旧镜像）时不 arm 定时器，退化为旧行为
+
+### 消息协议
+
+容器 stdout `{type:'agent-question-auto-answered', reason:'afk_timeout', toolUseID, answers|response}`
+→ `MessageTransformer` 仅转发 `reason === 'afk_timeout'` 的（bypassPermissions 模式同类型消息无 reason，保持仅日志）
+→ 前端 `handleAgentQuestionAutoAnswered`：`onSetLoading(true)` + `onAutoAnswerQuestion(toolUseID, summary)`
+→ `useChatInterface.autoAnswerQuestion`：清 pendingQuestion（防误路由）、卡片置 `auto-answered` 终态显示「已超时，自动采用：X」
+
+### 状态机补充
+
+`pending → auto-answered`（AFK 超时自动采用）；本地倒计时归零到后端确认到达之间的短暂窗口为 `expired` 过渡态（文案「已超时，将自动采用推荐选项继续…」，回答不再被采纳）。

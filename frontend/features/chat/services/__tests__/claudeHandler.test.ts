@@ -14,7 +14,7 @@ vi.mock('@/shared/utils/logger', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
 
-import { handleBackendError, handleClaudeError, handleAgentQuestion } from '../claudeHandler';
+import { handleBackendError, handleClaudeError, handleAgentQuestion, handleAgentQuestionAutoAnswered } from '../claudeHandler';
 import type { MessageHandlerCallbacks } from '../types';
 
 /** 构造满足 MessageHandlerCallbacks 必需字段的 mock 回调集合 */
@@ -28,6 +28,7 @@ function makeCallbacks(): MessageHandlerCallbacks {
     completeStream: vi.fn(),
     clearPendingQuestion: vi.fn(),
     setPendingQuestion: vi.fn(),
+    onAutoAnswerQuestion: vi.fn(),
     getCurrentSessionId: vi.fn().mockReturnValue('session-A'),
     getSelectedProjectName: vi.fn().mockReturnValue('project-A'),
   } as unknown as MessageHandlerCallbacks;
@@ -91,6 +92,57 @@ describe('claudeHandler - handleClaudeError', () => {
     handleClaudeError(message as any, callbacks);
 
     expect(callbacks.clearPendingQuestion).not.toHaveBeenCalled();
+  });
+});
+
+describe('claudeHandler - handleAgentQuestionAutoAnswered', () => {
+  let callbacks: MessageHandlerCallbacks;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    callbacks = makeCallbacks();
+  });
+
+  it('恢复 loading（模型继续推理）并把摘要交给 onAutoAnswerQuestion（卡片置终态）', () => {
+    const message = {
+      type: 'agent-question-auto-answered',
+      sessionId: 'session-A',
+      data: {
+        toolUseID: 'toolu_1',
+        answers: { '整体策略?': '授权优先版（推荐）', '启用哪些功能?': '检索（推荐）' },
+        response: '',
+        reason: 'afk_timeout',
+      },
+    };
+
+    const result = handleAgentQuestionAutoAnswered(message as any, callbacks);
+
+    expect(result).toBe(true);
+    // 自动采用后模型继续推理：loading 置 true（与用户手动提交语义一致）
+    expect(callbacks.onSetLoading).toHaveBeenCalledWith(true);
+    expect(callbacks.onAutoAnswerQuestion).toHaveBeenCalledWith('toolu_1', '授权优先版（推荐）；检索（推荐）');
+  });
+
+  it('text 降级通道：摘要取 response 字段', () => {
+    const message = {
+      type: 'agent-question-auto-answered',
+      sessionId: 'session-A',
+      data: { toolUseID: 'toolu_2', answers: {}, response: '继续', reason: 'afk_timeout' },
+    };
+
+    handleAgentQuestionAutoAnswered(message as any, callbacks);
+
+    expect(callbacks.onAutoAnswerQuestion).toHaveBeenCalledWith('toolu_2', '继续');
+  });
+
+  it('缺少 toolUseID 时容错跳过（不触发回调）', () => {
+    const message = { type: 'agent-question-auto-answered', sessionId: 'session-A', data: { answers: {} } };
+
+    const result = handleAgentQuestionAutoAnswered(message as any, callbacks);
+
+    expect(result).toBe(true);
+    expect(callbacks.onSetLoading).not.toHaveBeenCalled();
+    expect(callbacks.onAutoAnswerQuestion).not.toHaveBeenCalled();
   });
 });
 
