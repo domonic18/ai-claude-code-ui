@@ -286,6 +286,23 @@ describe('canUseToolTemplate - AFK 超时自动采用推荐选项', () => {
     assert.strictEqual(auto.response, '继续');
   });
 
+  it('question 非字符串/为空的题被跳过（不产生 CLI 不识别的非法 key）', async (t) => {
+    t.after(() => mock.timers.reset());
+    mock.timers.enable({ apis: ['setTimeout'] });
+    const sandbox = await buildAutoSandbox();
+    const promise = sandbox.handle.canUseTool('AskUserQuestion', {
+      questions: [
+        { question: '', options: [{ label: 'A（推荐）' }] },
+        { question: '有效问题?', options: [{ label: 'B（推荐）' }] }
+      ]
+    }, { toolUseID: 'tu_afk_6' });
+
+    mock.timers.tick(300000);
+    const result = await promise;
+
+    assert.deepStrictEqual(result.updatedInput.answers, { '有效问题?': 'B（推荐）' });
+  });
+
   it('env 缺失 QUESTION_AUTO_ANSWER_MS：不 arm 定时器（退化现状），timeoutMs 兜底 CLAUDE_AFK', async (t) => {
     t.after(() => mock.timers.reset());
     mock.timers.enable({ apis: ['setTimeout'] });

@@ -114,9 +114,17 @@ export function generateCanUseToolCallback(autoAnswer = false) {
     function pickRecommendedAnswers(questions) {
       const answers = {};
       for (const q of (questions || [])) {
+        // 防御：question 非字符串/为空时跳过——answers 的 key 必须与问题文本
+        // 逐字一致才被 CLI 识别，非法 key 会判定"没人回答"导致模型重问
+        if (!q || typeof q.question !== 'string' || !q.question) continue;
         const opts = (q.options || []).filter((o) => o && typeof o.label === 'string' && o.label);
         if (opts.length === 0) continue;
         const recommended = opts.filter((o) => /推荐|recommended/i.test(o.label));
+        if (recommended.length === 0) {
+          // 漏匹配近义标注（"建议/首选"等）时退化为第一项（CLI 惯例推荐项放首位），
+          // 记日志便于运维识别哪些会话触发了 fallback
+          console.error("[SDK] auto-answer: no recommended label for question:", q.question, "; falling back to first option");
+        }
         answers[q.question] = (q.multiSelect && recommended.length > 1)
           ? recommended.map((o) => o.label).join(', ')
           : (recommended[0] || opts[0]).label;
