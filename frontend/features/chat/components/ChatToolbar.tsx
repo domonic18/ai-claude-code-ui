@@ -10,7 +10,6 @@ import { ModelSelector, PermissionModeSelector, SkillSelector } from './index';
 import GenerateOverviewButton from './GenerateOverviewButton';
 import type { PermissionMode } from './PermissionModeSelector';
 import type { SkillOption } from './SkillSelector';
-import TokenUsagePie from '@/shared/components/ui/TokenUsagePie';
 
 export interface ChatToolbarProps {
   /** Selected model */
@@ -19,8 +18,6 @@ export interface ChatToolbarProps {
   models?: Array<{ name: string; provider: string }>;
   /** Handle model selection */
   onModelSelect: (modelId: string) => void;
-  /** Token budget */
-  tokenBudget?: any;
   /** Is loading state */
   isLoading: boolean;
   /** WebSocket connection */
@@ -64,7 +61,6 @@ export function ChatToolbar({
   selectedModel,
   models,
   onModelSelect,
-  tokenBudget,
   isLoading,
   ws,
   currentSessionId,
@@ -126,13 +122,6 @@ export function ChatToolbar({
           selectedModel={selectedModel}
           models={models}
           onModelSelect={onModelSelect}
-          tokenBudget={tokenBudget}
-        />
-
-        {/* Token usage pie chart */}
-        <TokenUsagePie
-          used={tokenBudget?.used ?? 0}
-          total={tokenBudget?.total ?? 160000}
         />
 
         {/* Cancel button when loading */}

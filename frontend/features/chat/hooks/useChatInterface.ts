@@ -64,8 +64,6 @@ export interface UseChatInterfaceOptions {
   onReplaceTemporarySession?: (tempId: string, realSessionId: string) => void;
   /** Callback to show all tasks */
   onShowAllTasks?: () => void;
-  /** Set token budget */
-  onSetTokenBudget?: (budget: any) => void;
   /** External message update */
   externalMessageUpdate?: number;
   /** Callback for task click */
@@ -100,8 +98,6 @@ export interface UseChatInterfaceResult {
   showStreamingUI: boolean;
   tasks: any[];
   setTasks: (tasks: any[]) => void;
-  tokenBudget: any;
-  setTokenBudget: (budget: any) => void;
   permissionMode: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
   setPermissionMode: (mode: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan') => void;
   selectedModel: any;
@@ -184,7 +180,6 @@ export function useChatInterface({
   onSessionNotProcessing,
   onReplaceTemporarySession,
   onShowAllTasks,
-  onSetTokenBudget,
   externalMessageUpdate,
   onTaskClick,
   wsMessages: rawWsMessages,
@@ -228,8 +223,6 @@ export function useChatInterface({
   }, []);
   // 任务列表：Agent 的 TodoWrite 工具生成的待办事项
   const [tasks, setTasks] = useState<any[]>([]);
-  // Token 预算：记录当前会话的 Token 用量（已用/总量）
-  const [tokenBudget, setTokenBudget] = useState<any>(null);
   // 权限模式：控制工具执行的权限策略（默认/接受编辑/绕过权限/计划模式）
   const [permissionMode, setPermissionMode] = useState<'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'>('default');
 
@@ -474,7 +467,6 @@ export function useChatInterface({
     setIsLoading,
     setCurrentSessionId,
     onReplaceTemporarySession: handleReplaceTemporarySession, onSessionActive, onSessionInactive, onSessionProcessing, onSessionNotProcessing,
-    onSetTokenBudget: (b) => { if (isCrossView()) return; setTokenBudget(b); onSetTokenBudget?.(b); },
     setTasks: (tasks: any[]) => { if (isCrossView()) return; setTasks(tasks); },
     setPendingQuestion: (toolUseID: string, sessionId: string) => { if (isCrossView()) return; setPendingQuestion(toolUseID, sessionId); },
     clearPendingQuestion,
@@ -509,7 +501,7 @@ export function useChatInterface({
   // ========== 返回状态和处理函数 ==========
   return {
     input, setInput, attachedFiles, setAttachedFiles, isLoading, setIsLoading, currentSessionId, setCurrentSessionId, activeStreamSessionId, showStreamingUI,
-    tasks, setTasks, tokenBudget, setTokenBudget, permissionMode, setPermissionMode,
+    tasks, setTasks, permissionMode, setPermissionMode,
     availableModels, selectedModel, handleModelSelect, messages, setMessages,
     streamingContent: stream.streamingContent, streamingThinking: stream.streamingThinking, isStreaming: stream.isStreaming, resetStream: stream.resetStream,
     modelSwitchNotification, ...menu, handleSend, handleInputChangeWithCommands: menu.handleInputChangeWithCommands,

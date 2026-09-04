@@ -8,7 +8,7 @@
  * - claudeHandler.ts  - Claude streaming/response/output/error
  * - cursorHandler.ts  - Cursor system/tool-use/error/result/output
  * - codexHandler.ts   - Codex response/complete
- * - sessionHandler.ts - Session lifecycle, token-budget, user-prompt-context, TodoWrite
+ * - sessionHandler.ts - Session lifecycle, user-prompt-context, TodoWrite
  *
  * 消息路由流程：
  * 1. 接收 WebSocket 消息
@@ -26,7 +26,7 @@ export type { MessageHandlerCallbacks } from './types';
 export { generateMessageId, decodeHtmlEntities, safeLocalStorage } from './wsUtils';
 
 // Import provider-specific handlers
-import { handleSessionCreated, handleTokenBudget, handleUserPromptContext, handleTodoWrite, handleClaudeComplete, handleSessionAborted } from './sessionHandler';
+import { handleSessionCreated, handleUserPromptContext, handleTodoWrite, handleClaudeComplete, handleSessionAborted } from './sessionHandler';
 import { handleClaudeResponse, handleClaudeOutput, handleClaudeInteractivePrompt, handleAgentQuestion, handleClaudeError, handleAgentAnswerDropped, handleAgentQuestionAutoAnswered, handleBackendError } from './claudeHandler';
 import { handleCursorSystem, handleCursorToolUse, handleCursorError, handleCursorResult, handleCursorOutput } from './cursorHandler';
 import { handleCodexResponse, handleCodexComplete } from './codexHandler';
@@ -45,7 +45,9 @@ const MESSAGE_HANDLERS: Record<string, (message: WebSocketMessage, callbacks: Me
   'session-start': (msg) => { logger.info(`Session started:`, msg.sessionId); return true; },
   'user-prompt-context': (msg, cbs) => handleUserPromptContext(msg, cbs),
   'session-created': (msg, cbs, sid) => handleSessionCreated(msg, cbs, sid),
-  'token-budget': (msg, cbs) => handleTokenBudget(msg, cbs),
+  // 后端仍会推送 token-budget（后端日志留作可观测）；前端已删除用量显示，
+  // 此处静默消费，避免落入 "Unknown message type" 日志噪音
+  'token-budget': (msg) => { logger.debug('[WS] token-budget ignored (UI removed)', msg.sessionId); return true; },
   'TodoWrite': (msg, cbs) => handleTodoWrite(msg, cbs),
   'claude-response': (msg, cbs) => handleClaudeResponse(msg, cbs),
   'claude-output': (msg, cbs) => handleClaudeOutput(msg, cbs),

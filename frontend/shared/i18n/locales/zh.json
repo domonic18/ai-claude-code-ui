@@ -127,7 +127,6 @@
     "or": "或",
     "forFiles": "引用文件",
     "stop": "停止",
-    "tokenUsage": "令牌使用: {{percentage}}%",
     "streaming": {
       "responding": "AI 正在响应",
       "complete": "响应完成"
@@ -252,13 +251,6 @@
     },
     "or": "或",
     "ssoSignIn": "SSO 登录"
-  },
-  "tokenDisplay": {
-    "title": "令牌使用",
-    "notAvailable": "不可用",
-    "used": "已使用",
-    "remaining": "剩余",
-    "total": "总计"
   },
   "fileExplorer": {
     "title": "文件",

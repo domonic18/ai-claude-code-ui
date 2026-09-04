@@ -135,8 +135,6 @@ interface ChatInterfaceProps {
   onTaskClick?: (taskId: string) => void;
   /** Callback to show all tasks */
   onShowAllTasks?: () => void;
-  /** Set token budget */
-  onSetTokenBudget?: (budget: any) => void;
   /** Callback when AI creates a document via Write tool */
   onDocumentCreated?: (doc: { file_path: string; file_name: string; conversation_id: string; message_id: string; type: string }) => void;
 }
@@ -173,7 +171,6 @@ export function ChatInterface({
   externalMessageUpdate,
   onTaskClick,
   onShowAllTasks,
-  onSetTokenBudget,
   onDocumentCreated,
 }: ChatInterfaceProps) {
   const { t } = useTranslation();
@@ -182,7 +179,7 @@ export function ChatInterface({
   const hook = useChatInterface({
     selectedProject, selectedSession, newSessionCounter, onFileOpen, onShowSettings, onInputFocusChange,
     onSessionActive, onSessionInactive, onSessionProcessing, onSessionNotProcessing, onReplaceTemporarySession,
-    onShowAllTasks, onSetTokenBudget, externalMessageUpdate, onTaskClick, wsMessages, messages: externalMessages, ws, sendMessage,
+    onShowAllTasks, externalMessageUpdate, onTaskClick, wsMessages, messages: externalMessages, ws, sendMessage,
     onDocumentCreated,
     extendedThinking,
   });

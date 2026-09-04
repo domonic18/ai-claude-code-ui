@@ -41,8 +41,6 @@ interface UseChatWebSocketProcessorOptions {
   onSessionProcessing?: (id: string) => void;
   /** Session not processing callback */
   onSessionNotProcessing?: (id: string) => void;
-  /** Set token budget callback */
-  onSetTokenBudget: (budget: any) => void;
   /** Set tasks callback */
   setTasks: (tasks: any[]) => void;
   /** Start stream callback */
@@ -94,7 +92,6 @@ export function useChatWebSocketProcessor(options: UseChatWebSocketProcessorOpti
         onSessionInactive: options.onSessionInactive,
         onSessionProcessing: options.onSessionProcessing,
         onSessionNotProcessing: options.onSessionNotProcessing,
-        onSetTokenBudget: options.onSetTokenBudget,
         onSetTasks: options.setTasks,
         // Streaming callbacks
         completeStream: () => {

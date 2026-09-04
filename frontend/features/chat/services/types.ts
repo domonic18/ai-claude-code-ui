@@ -27,9 +27,6 @@ export interface MessageHandlerCallbacks {
   onSessionProcessing?: (sessionId: string) => void;
   onSessionNotProcessing?: (sessionId: string) => void;
 
-  // Token budget
-  onSetTokenBudget?: (budget: any) => void;
-
   // Task system
   onSetTasks?: (tasks: any[]) => void;
   onUpdateTask?: (taskId: string, updates: any) => void;

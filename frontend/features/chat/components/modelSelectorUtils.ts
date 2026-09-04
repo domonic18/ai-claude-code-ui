@@ -31,21 +31,6 @@ export function groupModelsByProvider(models: ModelOption[]): Record<string, Mod
 }
 
 /**
- * Calculate token usage percentage from budget data
- * @param tokenBudget - Token budget data
- * @returns Percentage or null if not available
- */
-export function calculateTokenPercentage(tokenBudget: { percentage?: number; total?: number; used?: number } | null | undefined): number | null {
-  if (tokenBudget?.percentage !== undefined) {
-    return tokenBudget.percentage;
-  }
-  if (tokenBudget?.total && tokenBudget?.used !== undefined) {
-    return Math.round((tokenBudget.used / tokenBudget.total) * 100);
-  }
-  return null;
-}
-
-/**
  * Find current model from models list
  * @param models - Array of model options
  * @param selectedModel - Selected model name

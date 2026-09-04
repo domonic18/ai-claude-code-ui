@@ -9,8 +9,7 @@
 
 import { useCallback, useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { TokenBudget } from './TokenDisplay';
-import { groupModelsByProvider, calculateTokenPercentage, findCurrentModel } from './modelSelectorUtils';
+import { groupModelsByProvider, findCurrentModel } from './modelSelectorUtils';
 
 /**
  * Model option interface (re-declared to avoid circular dependency with ModelSelector.tsx)
@@ -35,8 +34,7 @@ export interface ModelOption {
 export function useModelSelectorState(
   selectedModel: string | undefined,
   models: ModelOption[] | undefined,
-  onModelSelect: ((modelId: string) => void) | undefined,
-  tokenBudget: TokenBudget | null | undefined
+  onModelSelect: ((modelId: string) => void) | undefined
 ) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
@@ -45,9 +43,6 @@ export function useModelSelectorState(
   const currentModels = models || [];
   const isModelsLoaded = currentModels.length > 0;
   const currentModel = findCurrentModel(currentModels, selectedModel);
-
-  // Compute token percentage
-  const tokenPercentage = calculateTokenPercentage(tokenBudget);
 
   // Group models by provider
   const groupedModels = groupModelsByProvider(currentModels);
@@ -78,7 +73,6 @@ export function useModelSelectorState(
     currentModels,
     isModelsLoaded,
     currentModel,
-    tokenPercentage,
     groupedModels,
     handleSelect,
     isOpen,
