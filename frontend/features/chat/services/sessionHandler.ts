@@ -37,22 +37,6 @@ export function handleSessionCreated(
 }
 
 /**
- * 处理 token 预算更新消息
- *
- * 接收后端推送的 token 用量信息（已用/总量），通过回调更新前端 token 显示。
- *
- * @param message - WebSocket 消息，data 包含 token 用量信息
- * @param callbacks - UI 状态更新回调集合
- * @returns 始终返回 true
- */
-export function handleTokenBudget(message: WebSocketMessage, callbacks: MessageHandlerCallbacks): boolean {
-  if (message.data && callbacks.onSetTokenBudget) {
-    callbacks.onSetTokenBudget(message.data);
-  }
-  return true;
-}
-
-/**
  * 处理用户提示词上下文消息
  *
  * 接收发送给 AI 的用户提示词上下文内容，不展示在聊天界面中，

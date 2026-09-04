@@ -127,7 +127,6 @@
     "or": "or",
     "forFiles": "for files",
     "stop": "Stop",
-    "tokenUsage": "Token usage: {{percentage}}%",
     "streaming": {
       "responding": "AI is responding",
       "complete": "Response complete"
@@ -252,13 +251,6 @@
     },
     "or": "Or",
     "ssoSignIn": "SSO Sign In"
-  },
-  "tokenDisplay": {
-    "title": "Token Usage",
-    "notAvailable": "N/A",
-    "used": "used",
-    "remaining": "remaining",
-    "total": "total"
   },
   "fileExplorer": {
     "title": "Files",

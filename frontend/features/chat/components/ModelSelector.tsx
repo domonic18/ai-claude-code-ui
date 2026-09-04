@@ -13,41 +13,10 @@
 
 // 导入 React 核心依赖
 import React from 'react';
-// 导入 Token 预算类型定义
-import type { TokenBudget } from './TokenDisplay';
 // 导入模型选择器状态管理 Hook，处理下拉菜单逻辑
 import { useModelSelectorState } from './modelSelectorCallbacks';
 // 导入样式工具函数，用于动态生成 CSS 类名
-import { getTokenBadgeColorClasses, getButtonClasses, getModelItemClasses, getModelNameClasses } from './modelSelectorStyles';
-
-/**
- * TokenBadge 组件 - 显示 Token 使用率百分比
- *
- * 根据使用率显示不同颜色：
- * - 绿色：< 50%
- * - 黄色：50% - 80%
- * - 红色：> 80%
- */
-interface TokenBadgeProps {
-  // Token 使用率百分比（0-100）
-  tokenPercentage: number;
-  // 鼠标悬停提示文本
-  title: string;
-}
-
-function TokenBadge({ tokenPercentage, title }: TokenBadgeProps) {
-  // 根据使用率获取对应的颜色类名
-  const colorClasses = getTokenBadgeColorClasses(tokenPercentage);
-
-  return (
-    <div
-      className={`flex items-center justify-center w-10 h-10 rounded-full border-2 text-xs font-bold transition-colors ${colorClasses}`}
-      title={title}
-    >
-      {tokenPercentage}%
-    </div>
-  );
-}
+import { getButtonClasses, getModelItemClasses, getModelNameClasses } from './modelSelectorStyles';
 
 /**
  * ModelSelectorButton 组件 - 模型选择器主按钮
@@ -209,8 +178,6 @@ interface ModelSelectorProps {
   disabled?: boolean;
   /** Compact display */
   compact?: boolean;
-  /** Token budget data for badge display */
-  tokenBudget?: TokenBudget | null;
 }
 
 // 由父组件调用，React 组件或常量：ModelSelector
@@ -223,19 +190,17 @@ export function ModelSelector({
   onModelSelect,
   disabled = false,
   compact = false,
-  tokenBudget,
 }: ModelSelectorProps) {
   const {
     isModelsLoaded,
     currentModel,
-    tokenPercentage,
     groupedModels,
     handleSelect,
     isOpen,
     setIsOpen,
     dropdownRef,
     t
-  } = useModelSelectorState(selectedModel, models, onModelSelect, tokenBudget);
+  } = useModelSelectorState(selectedModel, models, onModelSelect);
 
   // 检测是否需要向上弹出
   const dropUp = React.useMemo(() => {
@@ -261,13 +226,6 @@ export function ModelSelector({
         disabled={disabled}
         onClick={() => !disabled && setIsOpen(!isOpen)}
       />
-
-      {tokenPercentage !== null && (
-        <TokenBadge
-          tokenPercentage={tokenPercentage}
-          title={t('chat.tokenUsage', { percentage: tokenPercentage })}
-        />
-      )}
 
       <ModelDropdown
         isOpen={isOpen}

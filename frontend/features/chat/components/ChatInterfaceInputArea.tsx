@@ -13,7 +13,6 @@ interface ChatInterfaceInputAreaProps {
   selectedModel: any;
   models?: Array<{ name: string; provider: string }>;
   onModelSelect: (model: any) => void;
-  tokenBudget: any;
   isLoading: boolean;
   ws?: WebSocket | null;
   currentSessionId: string | null;
@@ -43,7 +42,6 @@ export function ChatInterfaceInputArea({
   selectedModel,
   models,
   onModelSelect,
-  tokenBudget,
   isLoading,
   ws,
   currentSessionId,
@@ -67,7 +65,6 @@ export function ChatInterfaceInputArea({
         selectedModel={selectedModel}
         models={models}
         onModelSelect={onModelSelect}
-        tokenBudget={tokenBudget}
         isLoading={isLoading}
         ws={ws}
         currentSessionId={currentSessionId}

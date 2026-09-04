@@ -10,21 +10,6 @@
 import { TOOLBAR_BUTTON_BASE } from './toolbarButtonStyles';
 
 /**
- * Get color classes for token badge based on usage percentage
- * @param tokenPercentage - Token usage percentage
- * @returns Tailwind CSS class string
- */
-export function getTokenBadgeColorClasses(tokenPercentage: number): string {
-  if (tokenPercentage >= 90) {
-    return 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400';
-  }
-  if (tokenPercentage >= 70) {
-    return 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400';
-  }
-  return 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400';
-}
-
-/**
  * Get button style classes based on state
  * @param disabled - Whether button is disabled
  * @returns Tailwind CSS class string

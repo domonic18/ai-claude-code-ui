@@ -88,7 +88,6 @@ export function ChatInterfaceRenderer({
         selectedModel={hook.selectedModel}
         models={hook.availableModels}
         onModelSelect={hook.handleModelSelect}
-        tokenBudget={hook.tokenBudget}
         isLoading={hook.isLoading}
         ws={ws}
         currentSessionId={hook.currentSessionId}
