@@ -70,9 +70,20 @@ interface UseChatWebSocketProcessorOptions {
  * @param options - Hook options
  */
 export function useChatWebSocketProcessor(options: UseChatWebSocketProcessorOptions) {
-  const processedCountRef = useRef(0);
+  // null = 尚未初始化（首次 effect 时定位到缓冲末尾）
+  const processedCountRef = useRef<number | null>(null);
 
   useEffect(() => {
+    // 首次挂载：从缓冲末尾开始消费，跳过挂载前的积压。
+    // wsMessages 是 App 级共享缓冲（WebSocketContext，只增不清），而点 + 会经
+    // key={newSessionCounter} 重挂载本组件——新实例游标若从 0 开始，会把挂载前
+    // 旧会话的消息（含全局不过滤的 session-created，会把旧会话 ID 认领进空白
+    // 新界面并写回 lastSessionId）全量重放。挂载后新到达的消息不受影响。
+    if (processedCountRef.current === null) {
+      processedCountRef.current = options.wsMessages.length;
+      return;
+    }
+
     if (options.wsMessages.length === 0) return;
 
     // Process all new messages since last render

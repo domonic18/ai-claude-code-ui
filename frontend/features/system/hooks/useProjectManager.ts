@@ -149,20 +149,45 @@ function _findFirstSession(project: Project): Session | null {
  * Determine provider for a session
  * @param project - Project object
  * @param session - Session object
- * @returns Provider name ('claude' | 'cursor' | 'codex')
+ * @returns Provider name ('claude' | 'direct' | 'cursor' | 'codex')。
+ *   直连会话与 Claude 会话同在 project.sessions（jsonl 同目录自动发现），
+ *   靠后端透传的 session.provider 字段区分。
  */
-function _determineSessionProvider(project: Project, session: Session): 'claude' | 'cursor' | 'codex' {
-  if (project.sessions?.some(s => s.id === session.id)) return 'claude';
+function _determineSessionProvider(project: Project, session: Session): 'claude' | 'direct' | 'cursor' | 'codex' {
   if ((project as any).cursorSessions?.some((s: Session) => s.id === session.id)) return 'cursor';
-  return 'codex';
+  if ((project as any).codexSessions?.some((s: Session) => s.id === session.id)) return 'codex';
+  const inSessions = project.sessions?.find(s => s.id === session.id);
+  if (inSessions?.provider === 'direct') return 'direct';
+  return 'claude';
 }
 
 /**
  * Clear session storage
+ * 全量清理会话残留标记：lastSessionId/lastProjectName（恢复用）、
+ * pendingSessionId（session-created 暂存）、activeStreamingSession*（流式续传标记）。
+ * 新建会话时必须全清——任何一个残留都可能在后续 effect 里把旧 sessionId 写回
+ * currentSessionId，导致新会话首条消息带着旧会话 ID 发出（跨 provider resume 事故根源）。
  */
 function _clearSessionStorage() {
   localStorage.removeItem('lastSessionId');
   localStorage.removeItem('lastProjectName');
+  localStorage.removeItem('pendingSessionId');
+  // 流式续传标记按项目隔离（activeStreamingSession_<project>），前缀匹配全清；
+  // 项目级消息缓存（chat_messages_<project>）一并清除——它是"刷新后消息快速显示"
+  // 的缓存（会话级数据随后由 useSessionLoader 从后端拉取覆盖），新建会话时若不清，
+  // ChatInterface 重挂载会从 createInitialMessages 读回旧会话消息，污染空白新界面
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('activeStreamingSession') || key.startsWith('chat_messages_'))) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+  } catch {
+    // localStorage 不可用时跳过（其余 removeItem 同理静默）
+  }
 }
 
 /**
@@ -231,17 +256,35 @@ function useProjectManagerHandlers(options: {
 
   /**
    * Handle new session creation
+   * mode 决定新会话引擎归属（'claude' | 'direct'），在创建时刻写入一次性标记
+   * new-session-mode（供刷新恢复消费，消费即清除），会话从出生即单模式
+   * （此后模式由所选会话决定，不再有运行时切换）
    */
-  const handleNewSession = useCallback((projectName: string) => {
+  const handleNewSession = useCallback((projectName: string, mode?: 'claude' | 'direct') => {
     const project = projects.find(p => p.name === projectName);
     if (!project) return;
 
+    try {
+      const m = mode === 'direct' ? 'direct' : 'claude';
+      // direct-mode：直连模式持久标记（发送分流/工具栏形态用）
+      if (m === 'direct') localStorage.setItem('direct-mode', 'true');
+      else localStorage.removeItem('direct-mode');
+      // new-session-mode：一次性"新建未聊"标记（刷新后恢复为对应模式的空白新会话，
+      // 恢复消费时清除；用户点开任一会话也会清除）
+      localStorage.setItem('new-session-mode', m);
+    } catch {
+      // localStorage 不可用时保持现状（模式仅影响发送分流）
+    }
+
     setSelectedProject(project);
     setSelectedSession(null);
+    // ref 同步清空（不等 useEffect）：防止轮询 fetch 的初始选中保护读到旧 ref
+    //（selectedSessionRef 由 useEffect 异步更新，点 + 后瞬间仍是旧会话）
+    if (selectedSessionRef.current) selectedSessionRef.current = null;
     setNewSessionCounter(prev => prev + 1);
     _clearSessionStorage();
     config.onProjectSelect?.(project);
-  }, [projects, config, setSelectedProject, setSelectedSession, setNewSessionCounter]);
+  }, [projects, config, setSelectedProject, setSelectedSession, setNewSessionCounter, selectedSessionRef]);
 
   /**
    * Handle session deletion

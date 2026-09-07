@@ -24,9 +24,40 @@ export function performInitialSessionSelection(
     setNewSessionCounter: React.Dispatch<React.SetStateAction<number>>;
   }
 ) {
+  // 新建会话保护：用户已选中项目但会话为空（点 + 新建、等待首条消息）时，
+  // 跳过自动恢复/兜底选中——否则轮询 fetch 返回会把用户刚清掉的旧会话
+  //（lastSessionId 恢复或"第一个会话"兜底）重新选回来，覆盖新建意图
+  if (deps.selectedProjectRef.current && !deps.selectedSessionRef.current) {
+    return;
+  }
+
   const restored = deps.restoreLastSession(data, deps.setSelectedProject);
 
   if (!restored) {
+    // 一次性"新建未聊"标记（点 + 后未聊任何消息就刷新）：恢复为对应模式的空白新会话，
+    // 不兜底选中第一个会话。消费即清除——下次无标记时恢复默认冷启动行为
+    //（选中第一个会话），避免用户永久困在空白新建界面
+    let newSessionMode: string | null = null;
+    try {
+      newSessionMode = localStorage.getItem('new-session-mode');
+      if (newSessionMode) localStorage.removeItem('new-session-mode');
+    } catch {
+      // localStorage 不可用时按默认逻辑
+    }
+    if (newSessionMode === 'direct' || newSessionMode === 'claude') {
+      try {
+        // 直连模式标记与一次性标记同步（direct-mode 供 ChatInterface 挂载时读取）
+        if (newSessionMode === 'direct') localStorage.setItem('direct-mode', 'true');
+        else localStorage.removeItem('direct-mode');
+      } catch {
+        // 静默
+      }
+      deps.setSelectedProject(data[0]);
+      deps.setSelectedSession(null);
+      deps.setNewSessionCounter(prev => prev + 1);
+      return;
+    }
+
     const firstProject = data[0];
     const firstSession = firstProject.sessions?.[0] ||
                         (firstProject as any).cursorSessions?.[0] ||
@@ -35,8 +66,11 @@ export function performInitialSessionSelection(
     deps.setSelectedProject(firstProject);
 
     if (firstSession) {
-      const provider = firstProject.sessions?.some(s => s.id === firstSession.id) ? 'claude' :
-                      (firstProject as any).cursorSessions?.some((s: any) => s.id === firstSession.id) ? 'cursor' : 'codex';
+      // 直连会话与 Claude 会话同数组，靠后端透传的 provider 字段区分
+      const inClaudeArray = firstProject.sessions?.find(s => s.id === firstSession.id);
+      const provider = inClaudeArray
+        ? ((inClaudeArray as any).provider === 'direct' ? 'direct' : 'claude')
+        : (firstProject as any).cursorSessions?.some((s: any) => s.id === firstSession.id) ? 'cursor' : 'codex';
       deps.setSelectedSession({
         ...firstSession,
         __projectName: firstProject.name,

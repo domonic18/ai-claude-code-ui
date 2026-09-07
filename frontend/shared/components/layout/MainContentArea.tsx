@@ -63,7 +63,11 @@ function renderChatTab(props: MainContentAreaProps, chatProject: any, chatSessio
   return (
     <div className={`h-full ${props.activeTab === 'chat' ? 'block' : 'hidden'}`}>
       <ErrorBoundary showDetails={true}>
+        {/* key=newSessionCounter：点 + 新建会话时强制重挂载，彻底重置内部状态
+            （messages/currentSessionId/isDirectMode 全新），保证"干净新界面"。
+            直连模式在挂载时由 useDirectMode 从 direct-mode localStorage 初始化。 */}
         <ChatInterface
+          key={`session-${props.newSessionCounter}`}
           selectedProject={chatProject}
           selectedSession={chatSession}
           newSessionCounter={props.newSessionCounter}

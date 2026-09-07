@@ -119,6 +119,8 @@ export function handleSessionIdStorage(
 
     safeLocalStorage.setItem('pendingSessionId', sessionId);
     safeLocalStorage.setItem('lastSessionId', sessionId);
+    // 新会话已落地：一次性"新建未聊"标记使命完成（刷新恢复走 lastSessionId）
+    safeLocalStorage.removeItem('new-session-mode');
 
     callbacks.onSetSessionId(sessionId);
 
