@@ -18,6 +18,7 @@ import { formatTimeAgo, getAllSessions } from '../utils/timeFormatters';
 import type { ProjectListProps, Project, Session, SessionProvider } from '../types/sidebar.types';
 import { cn } from '../../../lib/utils';
 import SessionList from './SessionList';
+import { NewSessionMenu } from './NewSessionMenu';
 import { SKELETON_COUNT } from '../constants/sidebar.constants';
 import { ChevronDown, ChevronRight, Plus, MoreVertical, Edit3, Trash2, Folder } from 'lucide-react';
 
@@ -67,7 +68,7 @@ interface ProjectListItemProps {
   onSetEditingName: (name: string) => void;
   onToggleStar: (projectName: string) => void;
   onDeleteProject: (projectName: string, displayName: string) => Promise<void>;
-  onNewSession: (projectName: string) => void;
+  onNewSession: (projectName: string, mode?: 'claude' | 'direct') => void;
   onSessionClick: (session: Session, projectName: string) => void;
   onSessionDelete: (projectName: string, sessionId: string, provider?: SessionProvider) => Promise<void>;
   onSessionRename: (projectName: string, sessionId: string, summary: string) => Promise<void>;
@@ -121,7 +122,9 @@ const ProjectListItem = memo(function ProjectListItem({
 }: ProjectListItemProps) {
   const { t } = useTranslation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isNewSessionMenuOpen, setIsNewSessionMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const newSessionButtonRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const allSessions = getAllSessions(project);
   const sessionCount = allSessions.length;
@@ -131,6 +134,7 @@ const ProjectListItem = memo(function ProjectListItem({
 
   const closeMenu = useCallback(() => setIsMenuOpen(false), []);
   useClickOutside(menuRef, isMenuOpen, closeMenu);
+  const closeNewSessionMenu = useCallback(() => setIsNewSessionMenuOpen(false), []);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -224,18 +228,31 @@ const ProjectListItem = memo(function ProjectListItem({
         {/* Action buttons (visible on hover) */}
         {!isEditing && (
           <div className="flex items-center gap-0.5 flex-shrink-0">
-            {/* New session button */}
-            <button
-              className="w-5 h-5 opacity-0 group-hover/project:opacity-100 transition-opacity hover:bg-accent flex items-center justify-center rounded"
-              onClick={(e) => {
-                e.stopPropagation();
-                onNewSession(project.name);
-                if (!isExpanded) onToggleExpand();
-              }}
-              title={t('sidebar.newSession')}
-            >
-              <Plus className="w-3 h-3" />
-            </button>
+            {/* New session button（二选一：Claude Agent / 直连模型） */}
+            <div className="relative">
+              <button
+                ref={newSessionButtonRef}
+                className="w-5 h-5 opacity-0 group-hover/project:opacity-100 transition-opacity hover:bg-accent flex items-center justify-center rounded"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsNewSessionMenuOpen((prev) => !prev);
+                }}
+                title={t('sidebar.newSession')}
+              >
+                <Plus className="w-3 h-3" />
+              </button>
+              {isNewSessionMenuOpen && (
+                <NewSessionMenu
+                  anchorRef={newSessionButtonRef}
+                  onSelect={(mode) => {
+                    setIsNewSessionMenuOpen(false);
+                    onNewSession(project.name, mode);
+                    if (!isExpanded) onToggleExpand();
+                  }}
+                  onClose={closeNewSessionMenu}
+                />
+              )}
+            </div>
 
             {/* Three-dot menu */}
             <div ref={menuRef} className="relative">

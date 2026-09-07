@@ -240,7 +240,11 @@
     "youHave": "you have",
     "noConversations": "No conversations yet",
     "startANewConversation": "Start chatting with AI",
-    "refreshConversations": "Refresh conversations"
+    "refreshConversations": "Refresh conversations",
+    "newSessionClaude": "Claude Agent",
+    "newSessionClaudeDesc": "Full agent with skills & tools",
+    "newSessionDirect": "Direct Model",
+    "newSessionDirectDesc": "Chat directly with a model, instant"
   },
   "auth": {
     "error": {

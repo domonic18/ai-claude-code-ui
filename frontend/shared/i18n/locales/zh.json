@@ -240,7 +240,11 @@
     "youHave": "当前版本",
     "noConversations": "暂无会话",
     "startANewConversation": "开始与 AI 对话",
-    "refreshConversations": "刷新会话列表"
+    "refreshConversations": "刷新会话列表",
+    "newSessionClaude": "Claude Agent",
+    "newSessionClaudeDesc": "全功能 Agent，可调技能和工具",
+    "newSessionDirect": "直连模型",
+    "newSessionDirectDesc": "选择模型直接对话，秒速响应"
   },
   "auth": {
     "error": {

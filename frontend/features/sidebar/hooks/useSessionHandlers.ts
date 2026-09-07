@@ -21,8 +21,8 @@ interface UseSessionHandlersOptions {
   selectedProject?: { name: string } | null;
   /** Optional session select callback */
   onSessionSelect?: (session: Session, projectName: string) => void;
-  /** Optional new session callback */
-  onNewSession?: (projectName: string) => void;
+  /** Optional new session callback. mode: 'claude' | 'direct' 决定新会话引擎归属 */
+  onNewSession?: (projectName: string, mode?: 'claude' | 'direct') => void;
   /** Update session summary function */
   updateSessionSummary: (projectName: string, sessionId: string, summary: string) => void;
   /** Rename session function */
@@ -137,7 +137,7 @@ export function useSessionHandlers(options: UseSessionHandlersOptions): UseSessi
   }, [options.displayProjects, options.additionalSessions, options.hasMore, options.loadMoreSessions]);
 
   /**
-   * Handle new session button click
+   * Handle new session button click（移动端顶栏入口，无二选一菜单，默认 Claude 模式）
    * Calls onNewSession callback if provided and project is selected
    */
   const handleNewSession = useCallback(() => {
@@ -150,7 +150,7 @@ export function useSessionHandlers(options: UseSessionHandlersOptions): UseSessi
         __projectName: projectName,
       };
       options.setPlaceholderSession(placeholder);
-      options.onNewSession(projectName);
+      options.onNewSession(projectName, 'claude');
     }
   }, [options.onNewSession, options.selectedProject, options.setPlaceholderSession]);
 

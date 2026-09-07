@@ -147,8 +147,8 @@ export interface SidebarCallbacks {
   onProjectSelect: (project: Project) => void;
   /** Called when a session is selected */
   onSessionSelect: (session: Session, projectName: string) => void;
-  /** Called to create a new session (optional - reserved for future use) */
-  onNewSession?: (projectName: string) => void;
+  /** Called to create a new session (optional - reserved for future use). mode: 'claude' | 'direct' 决定新会话引擎归属 */
+  onNewSession?: (projectName: string, mode?: 'claude' | 'direct') => void;
   /** Called when a session is deleted */
   onSessionDelete: (projectName: string, sessionId: string, provider?: SessionProvider) => void;
   /** Called when a project is deleted */
@@ -392,6 +392,6 @@ export interface ProjectListProps {
   editingSession: Session | null;
   /** Current editing session name */
   editingSessionName: string;
-  /** New session callback (optional) */
-  onNewSession?: (projectName: string) => void;
+  /** New session callback (optional). mode: 'claude' | 'direct' 决定新会话引擎归属 */
+  onNewSession?: (projectName: string, mode?: 'claude' | 'direct') => void;
 }
