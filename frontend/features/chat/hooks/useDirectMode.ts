@@ -1,16 +1,18 @@
 /**
  * useDirectMode Hook
  *
- * 直连模式开关状态管理：跳过 Agent SDK，直接调用所选模型 API。
- * 独立 localStorage key（DIRECT_MODE）持久化，不与 selected-provider 冲突
+ * 直连模式状态管理：会话归属属性，不是运行时开关。
+ * - 新建会话时由侧栏 + 号二选一写入（direct-mode localStorage key）
+ * - 选中历史会话时按其 provider 对齐（直连会话→true，其他→false）
+ * 独立 key（DIRECT_MODE），不与 selected-provider 冲突
  * （后者已被模型厂商值与会话 provider 值双向共用）。
  */
 
 import { useCallback, useState } from 'react';
 import { STORAGE_KEYS } from '../constants';
 
-/** 读取持久化的直连模式开关（异常容错返回 false） */
-function readStoredDirectMode(): boolean {
+/** 读取持久化的直连模式标记（异常容错返回 false）。供新建会话场景读取二选一结果 */
+export function readStoredDirectModeFlag(): boolean {
   try {
     return localStorage.getItem(STORAGE_KEYS.DIRECT_MODE) === 'true';
   } catch {
@@ -19,23 +21,21 @@ function readStoredDirectMode(): boolean {
 }
 
 export interface UseDirectModeResult {
-  /** 直连模式是否开启 */
+  /** 直连模式是否开启（当前会话归属） */
   isDirectMode: boolean;
-  /** 切换直连模式 */
-  toggleDirectMode: () => void;
-  /** 显式设置直连模式（选中直连会话时联动用） */
+  /** 显式设置直连模式（会话切换/新建时由 useChatInterface 联动调用） */
   setDirectMode: (enabled: boolean) => void;
 }
 
 /**
- * Hook for direct model mode state
+ * Hook for direct mode state (session-scoped, not a runtime toggle)
  *
  * @param initial - 初始值（默认从 localStorage 恢复）
- * @returns Direct mode state and handlers
+ * @returns Direct mode state and setter
  */
 export function useDirectMode(initial?: boolean): UseDirectModeResult {
   const [isDirectMode, setIsDirectMode] = useState<boolean>(
-    initial ?? readStoredDirectMode()
+    initial ?? readStoredDirectModeFlag()
   );
 
   const setDirectMode = useCallback((enabled: boolean) => {
@@ -48,11 +48,7 @@ export function useDirectMode(initial?: boolean): UseDirectModeResult {
     }
   }, []);
 
-  const toggleDirectMode = useCallback(() => {
-    setDirectMode(!isDirectMode);
-  }, [isDirectMode, setDirectMode]);
-
-  return { isDirectMode, toggleDirectMode, setDirectMode };
+  return { isDirectMode, setDirectMode };
 }
 
 export default useDirectMode;

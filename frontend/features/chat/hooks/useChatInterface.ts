@@ -21,7 +21,7 @@ import {
 } from './index';
 import { useModelsLoader } from './useModelsLoader';
 import { useModelSwitchNotification } from './useModelSwitchNotification';
-import { useDirectMode } from './useDirectMode';
+import { useDirectMode, readStoredDirectModeFlag } from './useDirectMode';
 import { getChatService } from '../services';
 import type { ChatMessage, FileAttachment } from '../types';
 import { calculateDiff } from '../utils/diffUtils';
@@ -101,9 +101,8 @@ export interface UseChatInterfaceResult {
   setTasks: (tasks: any[]) => void;
   permissionMode: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
   setPermissionMode: (mode: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan') => void;
-  /** 直连模式开关（跳过 Agent 分析直接调用模型 API） */
+  /** 直连模式标识（会话归属，只读——由新建会话二选一或所选会话 provider 决定） */
   isDirectMode: boolean;
-  toggleDirectMode: () => void;
   setDirectMode: (enabled: boolean) => void;
   selectedModel: any;
   availableModels: Array<{ name: string; provider: string }>;
@@ -217,6 +216,14 @@ export function useChatInterface({
   const currentSessionIdRef = useRef<string | null>(currentSessionId);
   currentSessionIdRef.current = currentSessionId;
 
+  // 跟踪 currentSessionId 的 provider 归属（'claude' | 'direct'）。
+  // 发送口校验用：模式与归属不符时丢弃 sessionId 按新会话发（temp-*），
+  // 防止跨 provider resume（如直连会话 ID 被带进 claude-command）。
+  // session-created(direct)/会话切换时更新。
+  const currentSessionProviderRef = useRef<'claude' | 'direct'>(
+    selectedSession?.__provider === 'direct' ? 'direct' : 'claude'
+  );
+
   /**
    * 是否处于跨视图流式：活跃流式的归属 session 与当前选中视图不一致
    * （即用户在项目 A 发起流式后，切到了项目 B）
@@ -242,8 +249,11 @@ export function useChatInterface({
   const modelSwitchNotification = useModelSwitchNotification();
   // 模型选择逻辑：根据是否有图片附件自动选择支持图片的模型
   const { selectedModel, handleModelSelect } = useModelSelection({ availableModels, hasImageAttachment: attachedFiles.some(f => f.type?.startsWith('image/')) });
-  // 直连模式：跳过 Agent 分析直接调用所选模型 API（独立 localStorage key 持久化）
-  const { isDirectMode, toggleDirectMode, setDirectMode } = useDirectMode();
+  // 直连模式：会话归属属性（+ 号二选一定死 / 选中会话对齐），运行时不可切换
+  const { isDirectMode, setDirectMode } = useDirectMode();
+  // isDirectMode 的 ref 中转：回调内读取最新值，避免 stale closure（Hooks 规范）
+  const directModeRef = useRef(isDirectMode);
+  directModeRef.current = isDirectMode;
   // 消息管理：加载、添加、更新、删除聊天消息，支持 LocalStorage 持久化
   const { messages, addMessage, updateMessage, setMessages } = useChatMessages({ projectName: selectedProject?.name, externalMessages });
   // 流式内容管理：处理 AI 响应的流式输出（打字机效果）
@@ -293,6 +303,8 @@ export function useChatInterface({
       // 同步刷新续传标记（temp→real），确保 session-created 后刷新也能用真实 id 订阅
       replaceActiveStreamingSession(selectedProject?.name, active, realId);
     }
+    // 记录新会话的 provider 归属（当前模式即创建模式），供发送口校验
+    currentSessionProviderRef.current = directModeRef.current ? 'direct' : 'claude';
     onReplaceTemporarySession?.(tempId, realId);
   }, [onReplaceTemporarySession, selectedProject?.name]);
 
@@ -351,11 +363,17 @@ export function useChatInterface({
   // 会话管理：加载历史会话、创建新会话、切换会话时的状态重置
   useChatSessionManagement({ selectedProject, selectedSession, newSessionCounter, currentSessionId, authenticatedFetch, setCurrentSessionId, setMessages, setInput });
 
-  // 直连模式联动：选中直连会话自动开启开关，选中其他会话关闭（新会话保持用户当前选择）
+  // 直连模式联动：选中会话时对齐其 provider（直连会话→direct，其他→claude）；
+  // 新建会话（newSessionCounter 变化、selectedSession 为空）时读取 + 号二选一写入的 direct-mode
   useEffect(() => {
-    if (selectedSession?.__provider === 'direct') setDirectMode(true);
-    else if (selectedSession?.id) setDirectMode(false);
-  }, [selectedSession?.id, selectedSession?.__provider, setDirectMode]);
+    if (selectedSession?.id) {
+      setDirectMode(selectedSession.__provider === 'direct');
+    } else {
+      setDirectMode(readStoredDirectModeFlag());
+    }
+    // 同步 provider 归属：供发送口校验（模式与归属不符则按新会话发）
+    currentSessionProviderRef.current = selectedSession?.__provider === 'direct' ? 'direct' : 'claude';
+  }, [selectedSession?.id, selectedSession?.__provider, newSessionCounter, setDirectMode]);
 
   // ========== Agent 交互提问状态管理 ==========
   // 注意：此部分必须在 useChatWebSocketProcessor / useMessageSender 之前定义
@@ -498,6 +516,7 @@ export function useChatInterface({
     selectedSkill: skillSelection.selectedSkill,
     onClearSkillSelection: skillSelection.clearSelectedSkill,
     isDirectMode,
+    currentSessionProvider: currentSessionProviderRef.current,
   });
 
   // 附件处理：添加或更新附件（如果已存在则更新，否则添加）
@@ -516,7 +535,7 @@ export function useChatInterface({
   return {
     input, setInput, attachedFiles, setAttachedFiles, isLoading, setIsLoading, currentSessionId, setCurrentSessionId, activeStreamSessionId, showStreamingUI,
     tasks, setTasks, permissionMode, setPermissionMode,
-    isDirectMode, toggleDirectMode, setDirectMode,
+    isDirectMode, setDirectMode,
     availableModels, selectedModel, handleModelSelect, messages, setMessages,
     streamingContent: stream.streamingContent, streamingThinking: stream.streamingThinking, isStreaming: stream.isStreaming, resetStream: stream.resetStream,
     modelSwitchNotification, ...menu, handleSend, handleInputChangeWithCommands: menu.handleInputChangeWithCommands,

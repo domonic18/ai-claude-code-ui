@@ -6,7 +6,6 @@
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Zap } from 'lucide-react';
 import { ModelSelector, PermissionModeSelector, SkillSelector } from './index';
 import GenerateOverviewButton from './GenerateOverviewButton';
 import type { PermissionMode } from './PermissionModeSelector';
@@ -51,10 +50,8 @@ export interface ChatToolbarProps {
   onSkillsRetry?: () => void;
   /** 当前案件名（生成摘要用） */
   projectName?: string | null;
-  /** 直连模式开关（跳过 Agent 分析直接调用模型 API） */
+  /** 直连模式标识（会话归属，只读——由新建会话时的二选一决定，运行时不可切换） */
   isDirectMode?: boolean;
-  /** 直连模式切换回调 */
-  onToggleDirectMode?: () => void;
 }
 
 /**
@@ -83,7 +80,6 @@ export function ChatToolbar({
   onSkillsRetry,
   projectName,
   isDirectMode = false,
-  onToggleDirectMode,
 }: ChatToolbarProps) {
   const { t } = useTranslation();
 
@@ -99,8 +95,8 @@ export function ChatToolbar({
 
   return (
     <div className="flex items-center justify-center gap-3 max-w-4xl mx-auto px-4 py-3">
-      {/* Skill Selector */}
-      {onSkillSelect && groupedSkills && (
+      {/* Skill Selector（直连模式无 agent/技能能力，隐藏） */}
+      {!isDirectMode && onSkillSelect && groupedSkills && (
         <SkillSelector
           selectedSkill={selectedSkill || null}
           onSkillSelect={onSkillSelect}
@@ -120,22 +116,8 @@ export function ChatToolbar({
         />
       )}
 
-      {/* 直连模式开关：跳过 Agent 分析直接调用所选模型 */}
-      {onToggleDirectMode && (
-        <button
-          type="button"
-          onClick={onToggleDirectMode}
-          title={t('chat.directModeDescription')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-            isDirectMode
-              ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-              : 'bg-gray-200 hover:bg-gray-300 text-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300'
-          }`}
-        >
-          <Zap className="w-3 h-3" />
-          <span className="hidden sm:inline">{t('chat.directMode')}</span>
-        </button>
-      )}
+      {/* 直连模式工具栏 = 生成摘要 + 模型选择（+加载时停止按钮）。
+          会话归属标识由侧栏闪电 logo 承担，工具栏不再放徽标 */}
 
       {/* 生成摘要（当前会话，调模型生成案件概览） */}
       <GenerateOverviewButton projectName={projectName} sessionId={currentSessionId} selectedModel={selectedModel} />
