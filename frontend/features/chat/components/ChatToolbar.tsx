@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { Zap } from 'lucide-react';
 import { ModelSelector, PermissionModeSelector, SkillSelector } from './index';
 import GenerateOverviewButton from './GenerateOverviewButton';
 import type { PermissionMode } from './PermissionModeSelector';
@@ -50,6 +51,10 @@ export interface ChatToolbarProps {
   onSkillsRetry?: () => void;
   /** 当前案件名（生成摘要用） */
   projectName?: string | null;
+  /** 直连模式开关（跳过 Agent 分析直接调用模型 API） */
+  isDirectMode?: boolean;
+  /** 直连模式切换回调 */
+  onToggleDirectMode?: () => void;
 }
 
 /**
@@ -77,6 +82,8 @@ export function ChatToolbar({
   skillsError,
   onSkillsRetry,
   projectName,
+  isDirectMode = false,
+  onToggleDirectMode,
 }: ChatToolbarProps) {
   const { t } = useTranslation();
 
@@ -84,7 +91,7 @@ export function ChatToolbar({
     sendMessage?.({
       type: 'abort-session',
       sessionId: currentSessionId,
-      provider: 'claude',
+      provider: isDirectMode ? 'direct' : 'claude',
     });
     onSetLoading(false);
     onResetStream();
@@ -105,12 +112,29 @@ export function ChatToolbar({
         />
       )}
 
-      {/* Permission Mode Selector */}
-      {onPermissionModeChange && (
+      {/* Permission Mode Selector（直连模式无 agent 能力，隐藏） */}
+      {!isDirectMode && onPermissionModeChange && (
         <PermissionModeSelector
           mode={permissionMode}
           onModeChange={onPermissionModeChange}
         />
+      )}
+
+      {/* 直连模式开关：跳过 Agent 分析直接调用所选模型 */}
+      {onToggleDirectMode && (
+        <button
+          type="button"
+          onClick={onToggleDirectMode}
+          title={t('chat.directModeDescription')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+            isDirectMode
+              ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+              : 'bg-gray-200 hover:bg-gray-300 text-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300'
+          }`}
+        >
+          <Zap className="w-3 h-3" />
+          <span className="hidden sm:inline">{t('chat.directMode')}</span>
+        </button>
       )}
 
       {/* 生成摘要（当前会话，调模型生成案件概览） */}

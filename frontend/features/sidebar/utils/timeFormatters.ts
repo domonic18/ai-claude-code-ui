@@ -95,7 +95,12 @@ export function getAllSessions(project: {
   cursorSessions?: Session[];
   codexSessions?: Session[];
 }): Session[] {
-  const claudeSessions = (project.sessions || []).map(s => ({ ...s, __provider: 'claude' as const }));
+  // 直连会话与 Claude 会话同在 sessions 数组（jsonl 同目录自动发现），
+  // 靠后端透传的 session.provider 字段区分
+  const claudeSessions = (project.sessions || []).map(s => ({
+    ...s,
+    __provider: s.provider === 'direct' ? ('direct' as const) : ('claude' as const),
+  }));
   const cursorSessions = (project.cursorSessions || []).map(s => ({ ...s, __provider: 'cursor' as const }));
   const codexSessions = (project.codexSessions || []).map(s => ({ ...s, __provider: 'codex' as const }));
 

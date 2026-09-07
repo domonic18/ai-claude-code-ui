@@ -38,6 +38,11 @@ export const SESSION_PROVIDERS: Record<SessionProvider, {
     logoComponent: 'CodexLogo',
     bgColor: 'bg-gray-500',
   },
+  direct: {
+    label: '直连',
+    logoComponent: 'DirectLogo',
+    bgColor: 'bg-emerald-500',
+  },
 } as const;
 
 /**

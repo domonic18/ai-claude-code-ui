@@ -127,6 +127,8 @@
     "or": "或",
     "forFiles": "引用文件",
     "stop": "停止",
+    "directMode": "直连模式",
+    "directModeDescription": "跳过 Agent 分析，直接调用所选模型",
     "streaming": {
       "responding": "AI 正在响应",
       "complete": "响应完成"

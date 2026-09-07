@@ -19,6 +19,9 @@ function processSessionEntry(sessions, entry, pendingSummaries, options) {
   }
   const session = sessions.get(entry.sessionId);
 
+  // 透传条目自有 provider 标记（如直连会话的 provider:'direct'），供列表 API 区分会话来源
+  if (entry.provider && !session.provider) session.provider = entry.provider;
+
   resolveSessionSummary(session, entry, pendingSummaries);
   processEntryByRole(session, entry, options.includeApiErrors);
 

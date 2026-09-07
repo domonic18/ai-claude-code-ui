@@ -56,6 +56,8 @@ export interface UseMessageSenderOptions {
   selectedSkill?: { name: string; title: string } | null;
   /** Clear skill selection after send */
   onClearSkillSelection?: () => void;
+  /** Direct model mode (send direct-command instead of claude-command) */
+  isDirectMode?: boolean;
 }
 
 export interface UseMessageSenderResult {
@@ -103,6 +105,7 @@ function buildUserMessage(content: string, files: FileAttachment[]): ChatMessage
  * @param permissionMode - Permission mode
  * @param onSessionProcessing - Session processing callback
  * @param skillName - Selected skill name (optional)
+ * @param isDirectMode - Direct model mode (bypass agent SDK)
  */
 function sendWebSocketMessage(
   sendMessage: (message: any) => void,
@@ -115,9 +118,28 @@ function sendWebSocketMessage(
   extendedThinking?: boolean,
   onSessionProcessing?: (sessionId: string) => void,
   skillName?: string,
+  isDirectMode?: boolean,
 ) {
   // Create temporary session ID if needed
   const sessionId = currentSessionId || `temp-${Date.now()}`;
+
+  // 直连模式：发送 direct-command，仅携带直连语义的选项
+  //（无 agent 能力——permissionMode/extendedThinking/skill 不适用）
+  if (isDirectMode) {
+    sendMessage({
+      type: 'direct-command',
+      command: content,
+      attachments: files.length > 0 ? files : undefined,
+      options: {
+        projectPath: selectedProject?.name,
+        sessionId,
+        model: selectedModel,
+        resume: !!currentSessionId,
+      },
+    });
+    onSessionProcessing?.(sessionId);
+    return;
+  }
 
   // Send message in the format expected by the backend
   sendMessage({
@@ -209,6 +231,7 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
     consumePendingQuestion,
     selectedSkill,
     onClearSkillSelection,
+    isDirectMode,
   } = options;
 
   // 消息发送处理器：处理用户点击发送按钮或按 Ctrl+Enter 的逻辑
@@ -241,7 +264,7 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
     prepareMessageSending(currentSessionId, onSessionActive, onSetLoading, onStartStream);
 
     // 第五步：通过 WebSocket 发送消息到后端
-    // 消息类型：claude-command
+    // 消息类型：claude-command（直连模式下为 direct-command）
     // 携带内容：命令文本、附件、会话 ID、模型名称、权限模式等
     if (sendMessage && ws) {
       sendWebSocketMessage(
@@ -255,6 +278,7 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
         extendedThinking,
         onSessionProcessing,
         selectedSkill?.name,
+        isDirectMode,
       );
 
       // 发送成功后清除 skill 选择（一次性）；发送失败（ws 不存在）时保留以便重试
@@ -281,6 +305,7 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
     consumePendingQuestion,
     selectedSkill,
     onClearSkillSelection,
+    isDirectMode,
   ]);
 
   return { handleSend };

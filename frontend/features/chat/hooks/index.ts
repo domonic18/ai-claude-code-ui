@@ -31,3 +31,4 @@ export * from './useChatInputMenus';
 export * from './useChatInputSetup';
 export * from './useSkillSelection';
 export * from './skillCategories';
+export * from './useDirectMode';

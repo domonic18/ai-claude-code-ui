@@ -17,7 +17,7 @@ export type ProjectStatus = 'active' | 'archived' | 'deleted';
 /**
  * Session provider type
  */
-export type SessionProvider = 'claude' | 'cursor' | 'codex';
+export type SessionProvider = 'claude' | 'cursor' | 'codex' | 'direct';
 
 /**
  * Project sort order type
@@ -39,6 +39,8 @@ export interface Session {
   __provider?: SessionProvider;
   __projectName?: string;
   messageCount?: number;
+  /** 条目自有 provider 标记（后端 jsonl 透传，'direct' 表示直连会话） */
+  provider?: string;
 }
 
 /**

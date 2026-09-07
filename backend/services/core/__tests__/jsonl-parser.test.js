@@ -63,6 +63,23 @@ describe('JsonlParser', () => {
       const result = JsonlParser.parse(content);
       assert.equal(result.sessions[0].lastUserMessage, 'Array message');
     });
+
+    it('should pass through entry provider marker to session (direct sessions)', () => {
+      const content = `{"parentUuid":null,"sessionId":"s1","type":"user","provider":"direct","uuid":"u1","message":{"role":"user","content":"直连消息"}}`;
+
+      const result = JsonlParser.parse(content);
+      assert.equal(result.sessions[0].provider, 'direct');
+    });
+
+    it('should not overwrite session provider from later entries', () => {
+      const content = [
+        '{"sessionId":"s1","type":"user","provider":"direct","uuid":"u1","message":{"role":"user","content":"a"}}',
+        '{"sessionId":"s1","type":"assistant","uuid":"u2","message":{"role":"assistant","content":"b"}}',
+      ].join('\n');
+
+      const result = JsonlParser.parse(content);
+      assert.equal(result.sessions[0].provider, 'direct');
+    });
   });
 
   describe('serialize', () => {

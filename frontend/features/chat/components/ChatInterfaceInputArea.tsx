@@ -36,6 +36,10 @@ interface ChatInterfaceInputAreaProps {
   skillsError?: string | null;
   /** Retry loading skills */
   onSkillsRetry?: () => void;
+  /** 直连模式开关状态 */
+  isDirectMode?: boolean;
+  /** 直连模式切换回调 */
+  onToggleDirectMode?: () => void;
 }
 
 export function ChatInterfaceInputArea({
@@ -58,6 +62,8 @@ export function ChatInterfaceInputArea({
   categoryMeta,
   skillsError,
   onSkillsRetry,
+  isDirectMode,
+  onToggleDirectMode,
 }: ChatInterfaceInputAreaProps) {
   return (
     <div className="flex-shrink-0 border-t border-border">
@@ -81,6 +87,8 @@ export function ChatInterfaceInputArea({
         skillsError={skillsError}
         onSkillsRetry={onSkillsRetry}
         projectName={chatInputProps?.projectName}
+        isDirectMode={isDirectMode}
+        onToggleDirectMode={onToggleDirectMode}
       />
 
       {/* 消息输入区域 */}

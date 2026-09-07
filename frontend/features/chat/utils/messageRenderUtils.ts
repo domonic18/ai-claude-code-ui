@@ -40,6 +40,7 @@ export function getDisplayName(
   if (type === 'tool') return 'Tool';
   if (provider === 'cursor') return 'Cursor';
   if (provider === 'codex') return 'Codex';
+  if (provider === 'direct') return '直连';
   return 'Claude';
 }
 

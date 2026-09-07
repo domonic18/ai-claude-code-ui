@@ -127,6 +127,8 @@
     "or": "or",
     "forFiles": "for files",
     "stop": "Stop",
+    "directMode": "Direct Mode",
+    "directModeDescription": "Skip agent analysis, call the selected model directly",
     "streaming": {
       "responding": "AI is responding",
       "complete": "Response complete"

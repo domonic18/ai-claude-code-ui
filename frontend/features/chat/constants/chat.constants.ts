@@ -49,6 +49,8 @@ export const STORAGE_KEYS = {
   SHOW_RAW_PARAMETERS: 'show_raw_parameters',
   /** Show thinking process */
   SHOW_THINKING: 'show_thinking',
+  /** Direct model mode (独立于 selected-provider——该 key 已被模型厂商值与会话值共用污染) */
+  DIRECT_MODE: 'direct-mode',
   /** Command history */
   COMMAND_HISTORY: (projectName: string) => `command_history_${projectName}`,
 } as const;

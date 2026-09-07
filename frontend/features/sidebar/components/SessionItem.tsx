@@ -14,7 +14,7 @@
  */
 
 import React, { memo, useState, useCallback, useEffect, KeyboardEvent } from 'react';
-import { ClaudeLogo, CursorLogo, CodexLogo } from '@/shared/assets/icons';
+import { ClaudeLogo, CursorLogo, CodexLogo, DirectLogo } from '@/shared/assets/icons';
 import { Check, X, Clock } from 'lucide-react';
 import { Badge } from '@/shared/components/ui/Badge';
 import type { SessionItemProps } from '../types/sidebar.types';
@@ -29,6 +29,8 @@ function getSessionLogo(provider?: string) {
       return CursorLogo;
     case 'codex':
       return CodexLogo;
+    case 'direct':
+      return DirectLogo;
     default:
       return ClaudeLogo;
   }

@@ -21,6 +21,7 @@ import {
 } from './index';
 import { useModelsLoader } from './useModelsLoader';
 import { useModelSwitchNotification } from './useModelSwitchNotification';
+import { useDirectMode } from './useDirectMode';
 import { getChatService } from '../services';
 import type { ChatMessage, FileAttachment } from '../types';
 import { calculateDiff } from '../utils/diffUtils';
@@ -100,6 +101,10 @@ export interface UseChatInterfaceResult {
   setTasks: (tasks: any[]) => void;
   permissionMode: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
   setPermissionMode: (mode: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan') => void;
+  /** 直连模式开关（跳过 Agent 分析直接调用模型 API） */
+  isDirectMode: boolean;
+  toggleDirectMode: () => void;
+  setDirectMode: (enabled: boolean) => void;
   selectedModel: any;
   availableModels: Array<{ name: string; provider: string }>;
   handleModelSelect: (model: any) => void;
@@ -237,6 +242,8 @@ export function useChatInterface({
   const modelSwitchNotification = useModelSwitchNotification();
   // 模型选择逻辑：根据是否有图片附件自动选择支持图片的模型
   const { selectedModel, handleModelSelect } = useModelSelection({ availableModels, hasImageAttachment: attachedFiles.some(f => f.type?.startsWith('image/')) });
+  // 直连模式：跳过 Agent 分析直接调用所选模型 API（独立 localStorage key 持久化）
+  const { isDirectMode, toggleDirectMode, setDirectMode } = useDirectMode();
   // 消息管理：加载、添加、更新、删除聊天消息，支持 LocalStorage 持久化
   const { messages, addMessage, updateMessage, setMessages } = useChatMessages({ projectName: selectedProject?.name, externalMessages });
   // 流式内容管理：处理 AI 响应的流式输出（打字机效果）
@@ -343,6 +350,12 @@ export function useChatInterface({
   // ========== 会话管理 ==========
   // 会话管理：加载历史会话、创建新会话、切换会话时的状态重置
   useChatSessionManagement({ selectedProject, selectedSession, newSessionCounter, currentSessionId, authenticatedFetch, setCurrentSessionId, setMessages, setInput });
+
+  // 直连模式联动：选中直连会话自动开启开关，选中其他会话关闭（新会话保持用户当前选择）
+  useEffect(() => {
+    if (selectedSession?.__provider === 'direct') setDirectMode(true);
+    else if (selectedSession?.id) setDirectMode(false);
+  }, [selectedSession?.id, selectedSession?.__provider, setDirectMode]);
 
   // ========== Agent 交互提问状态管理 ==========
   // 注意：此部分必须在 useChatWebSocketProcessor / useMessageSender 之前定义
@@ -484,6 +497,7 @@ export function useChatInterface({
     consumePendingQuestion,
     selectedSkill: skillSelection.selectedSkill,
     onClearSkillSelection: skillSelection.clearSelectedSkill,
+    isDirectMode,
   });
 
   // 附件处理：添加或更新附件（如果已存在则更新，否则添加）
@@ -502,6 +516,7 @@ export function useChatInterface({
   return {
     input, setInput, attachedFiles, setAttachedFiles, isLoading, setIsLoading, currentSessionId, setCurrentSessionId, activeStreamSessionId, showStreamingUI,
     tasks, setTasks, permissionMode, setPermissionMode,
+    isDirectMode, toggleDirectMode, setDirectMode,
     availableModels, selectedModel, handleModelSelect, messages, setMessages,
     streamingContent: stream.streamingContent, streamingThinking: stream.streamingThinking, isStreaming: stream.isStreaming, resetStream: stream.resetStream,
     modelSwitchNotification, ...menu, handleSend, handleInputChangeWithCommands: menu.handleInputChangeWithCommands,
