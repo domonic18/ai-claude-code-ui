@@ -227,3 +227,38 @@ export async function getSessionFilesInfo(userId, projectName) {
 
   return output;
 }
+
+// sessionReader.js 功能函数
+/**
+ * 判断会话文件是否含直连（provider:'direct'）条目
+ *
+ * 跨 provider resume 守卫用：SDK resume 进含 direct 条目的文件会把外部写入的
+ * 条目读进上下文重建（双写竞争 / 上下文串台，见直连方案决策三）；直连 resume
+ * 进 SDK 会话同理反向污染。校验异常时 fail-closed 返回 true（宁可降级新会话，
+ * 不可混写——与 sessionExistsInProject 的 fail-open 相反，因为混写不可逆）。
+ *
+ * @param {number} userId - 用户 ID
+ * @param {string} projectName - 项目名
+ * @param {string} sessionId - 会话 ID
+ * @returns {Promise<boolean>} true 表示含 direct 条目（或校验失败，按含处理）
+ */
+export async function sessionHasDirectEntries(userId, projectName, sessionId) {
+  if (!projectName || !sessionId) return false;
+  const projectDir = getProjectDir(projectName);
+  let hasDirect = false;
+  try {
+    await forEachSessionFile(userId, projectDir, [`${sessionId}.jsonl`], ({ entries }) => {
+      for (const entry of entries) {
+        if (entry.provider === 'direct') {
+          hasDirect = true;
+          return true; // 命中即终止遍历
+        }
+      }
+      return false;
+    });
+    return hasDirect;
+  } catch (error) {
+    logger.warn({ err: error, projectName, sessionId }, '[sessionReader] direct-entry check failed, fail-closed');
+    return true;
+  }
+}

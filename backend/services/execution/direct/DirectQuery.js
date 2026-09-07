@@ -103,10 +103,31 @@ export async function queryDirect(command, options = {}, attachments = [], write
   const incomingSessionId = options.sessionId || '';
   const isNewSession = !incomingSessionId || incomingSessionId.startsWith('temp-');
 
-  // 新会话：后端生成真实 sessionId 并立即下发（先于任何 delta，消除前端会话过滤竞态；
-  // 复用 session-created → handleSessionIdStorage 的 temp→real 替换机制）
-  const sessionId = isNewSession ? randomUUID() : incomingSessionId;
-  if (isNewSession) {
+  // jsonl 读写依赖容器存活（写会话通道是 Docker API），先拉起。
+  // 提前到 sessionId 分配前：跨 provider 守卫需要读文件判定归属。
+  await containerManager.getOrCreateContainer(userId);
+
+  // 跨 provider 守卫：续聊目标若不是直连创建的会话（首条无 provider:'direct' 标记），
+  // 重新分配新 sessionId 独立成会——直连 resume 进 SDK 会话会造成反向混写（决策三：
+  // 两套会话完全独立）。守卫读文件异常时 fail-open 放行 resume（读失败会在后续
+  // readDirectSessionEntries 再降级，不影响正确性）。
+  let sessionId = incomingSessionId;
+  let mustStartFresh = isNewSession;
+  /** 守卫阶段读到的既有条目（resume 时复用，避免二次读容器文件） */
+  let existingEntries = [];
+  if (!isNewSession) {
+    existingEntries = await readDirectSessionEntries(userId, projectName, incomingSessionId);
+    if (existingEntries.length > 0 && existingEntries[0].provider !== 'direct') {
+      logger.warn({
+        userId, sessionId: incomingSessionId, projectName, reason: 'session-not-direct',
+      }, '[DirectQuery] Resume blocked: session was not created by direct provider, starting fresh session');
+      mustStartFresh = true;
+      existingEntries = [];
+    }
+  }
+  if (mustStartFresh) {
+    sessionId = randomUUID();
+    // 下发新 sessionId（前端 temp→real 替换机制同样适用于 real→real 换绑）
     send(writer, { type: 'session-created', sessionId, provider: 'direct' });
   }
 
@@ -123,9 +144,6 @@ export async function queryDirect(command, options = {}, attachments = [], write
     return;
   }
 
-  // jsonl 读写依赖容器存活（写会话通道是 Docker API），先拉起
-  await containerManager.getOrCreateContainer(userId);
-
   const startedAt = new Date().toISOString();
   const controller = new AbortController();
   const sessionRecord = { controller, status: 'running', model, startedAt, userAborted: false };
@@ -134,12 +152,14 @@ export async function queryDirect(command, options = {}, attachments = [], write
   try {
     logger.info({
       userId, sessionId, model, preview: sanitizePreview(command),
-      resume: !isNewSession, attachments: attachments?.length || 0,
+      resume: !mustStartFresh, attachments: attachments?.length || 0,
     }, '[DirectQuery] 直连请求开始');
 
-    // 上下文重建 + 本轮用户 content
-    const entries = isNewSession ? [] : await readDirectSessionEntries(userId, projectName, sessionId);
-    const messages = buildMessagesFromEntries(entries);
+    // 上下文重建 + 本轮用户 content（existingEntries 来自守卫阶段，无二次读；
+    // 兜底 filter 确保仅 direct 条目进上下文）
+    const contextEntries = existingEntries.filter(e => e.provider === 'direct');
+
+    const messages = buildMessagesFromEntries(contextEntries);
     const userContent = await buildDirectUserContent(userId, attachments, command);
     messages.push({ role: 'user', content: userContent });
 
@@ -178,7 +198,8 @@ export async function queryDirect(command, options = {}, attachments = [], write
     }
 
     // 落盘本轮 user + assistant 两条（中断不落盘——中断走 catch 分支）
-    const parentUuid = getLastEntryUuid(entries);
+    // 守卫命中时 sessionId 已是新 ID、contextEntries 为空 → parentUuid=null 独立成会
+    const parentUuid = getLastEntryUuid(contextEntries);
     const userEntry = buildUserEntry({ sessionId, parentUuid, content: userContent, projectName });
     const assistantEntry = buildAssistantEntry({
       sessionId,

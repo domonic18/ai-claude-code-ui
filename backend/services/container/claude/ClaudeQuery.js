@@ -14,7 +14,7 @@ import { CONTAINER } from '../../../config/config.js';
 import { getModelProviderConfig } from '../../../config/modelConfig.js';
 import { userPromptService } from '../../user-prompt/index.js';
 import { projectPromptService, projectOverviewService } from '../../projects/index.js';
-import { sessionExistsInProject } from '../../sessions/container/ContainerSessions.js';
+import { sessionExistsInProject, sessionHasDirectEntries } from '../../sessions/container/ContainerSessions.js';
 import { createLogger, sanitizePreview, startTimer, withTimer } from '../../../utils/logger.js';
 const logger = createLogger('services/container/claude/ClaudeQuery');
 
@@ -241,15 +241,16 @@ function setupSession(sessionId, container, command, mappedOptions) {
  * @returns {Promise<string>} 会话 ID
  */
 export async function queryClaudeSDKInContainer(command, options = {}, writer) {
+  // sessionId 用 let：跨 provider 守卫命中时会替换为 temp- 新 ID（降级新会话）
   const {
     userId,
-    sessionId = uuidv4(),
     cwd,
     userTier = 'free',
     isContainerProject = false,
     projectPath = '',
     ...sdkOptions
   } = options;
+  let sessionId = options.sessionId || uuidv4();
 
   const queryTimer = startTimer('claude/query');
   logger.info({ sessionId, userId }, '[ClaudeQuery] Query started');
@@ -311,6 +312,25 @@ export async function queryClaudeSDKInContainer(command, options = {}, writer) {
           userId, sessionId, projectPath, reason: 'session-not-in-project',
         }, '[ClaudeQuery] Resume blocked: session does not belong to this project, downgrading to new session');
         delete mappedOptions.resume;
+      }
+    }
+
+    // 3.6 跨 provider 守卫：SDK 不得 resume 含直连条目（provider:'direct'）的会话文件。
+    // 直连条目由后端写入，SDK 读进上下文重建会造成双写竞争与上下文串台（直连方案决策三：
+    // 两套会话完全独立）。命中时降级新会话——宁可开新会话，不可混写（混写不可逆）。
+    // sessionId 同时替换为 temp- 前缀：让既有的 session-created 下发机制自然接管
+    // （sendSessionCreated 仅对 temp- 会话下发新 ID），前端得以认领降级后的新会话，
+    // 否则前端仍指向旧直连会话，新会话文件永远不出现在列表。
+    if (mappedOptions.resume === true && isContainerProject && projectPath) {
+      const hasDirectEntries = await sessionHasDirectEntries(userId, projectPath, sessionId);
+      if (hasDirectEntries) {
+        const freshTempId = `temp-${uuidv4()}`;
+        logger.warn({
+          userId, sessionId, freshTempId, projectPath, reason: 'session-has-direct-entries',
+        }, '[ClaudeQuery] Resume blocked: session contains direct entries, downgrading to new session');
+        delete mappedOptions.resume;
+        mappedOptions.sessionId = freshTempId;
+        sessionId = freshTempId;
       }
     }
 
