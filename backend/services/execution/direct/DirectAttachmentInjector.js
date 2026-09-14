@@ -80,12 +80,20 @@ export function buildImageBlock(dataUrl) {
 }
 
 /**
- * 文件名转义：文件名是用户输入，拼入 prompt 前去除换行/反引号/路径分隔符（防 prompt 注入）
+ * 文件名转义：文件名是用户输入，拼入 prompt 前去除换行/反引号/路径分隔符（防 prompt 注入）；
+ * 同时剔除不可见 Unicode（零宽/RTL 覆盖/BOM）——肉眼不可见但模型可读，
+ * 防文件名视觉欺骗（人审看到的显示顺序 ≠ 模型读到的字节顺序）
  * @param {string} name - 原始文件名
  * @returns {string} 转义后文件名
  */
 export function escapeFileName(name) {
-  return String(name || '').replace(/[\r\n`<>/\\]/g, ' ').trim() || 'unnamed';
+  return String(name || '')
+    // 可见危险字符与 C0/DEL 控制字符替换为空格
+    .replace(/[\u0000-\u001F\u007F`<>\/\\]/g, ' ')
+    // 零宽字符/RTL 覆盖符/BOM 整体剔除：肉眼不可见但模型可读，防文件名视觉欺骗
+    // （人审看到的显示顺序与模型读到的字节顺序不一致）
+    .replace(/[\u200B-\u200F\u202A-\u202E\uFEFF]/g, '')
+    .trim() || 'unnamed';
 }
 
 /**

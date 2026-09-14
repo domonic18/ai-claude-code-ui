@@ -61,6 +61,23 @@ describe('parseSSEBuffer', () => {
     assert.equal(events[0].type, 'message_stop');
   });
 
+  it('should report sawData=true for heartbeat (non-JSON) data lines', () => {
+    // 心跳虽被丢弃，但证明连接与服务端活跃——首 token 超时判定依据
+    const { events, sawData } = parseSSEBuffer('data: [DONE]\n\n');
+    assert.equal(events.length, 0);
+    assert.equal(sawData, true);
+  });
+
+  it('should report sawData=false for comments-only or incomplete buffers', () => {
+    assert.equal(parseSSEBuffer(': keepalive\n\n').sawData, false);
+    assert.equal(parseSSEBuffer('data: {"type":"mess').sawData, false);
+    assert.equal(parseSSEBuffer('').sawData, false);
+  });
+
+  it('should report sawData=true for parsed JSON events', () => {
+    assert.equal(parseSSEBuffer('data: {"type":"ping"}\n\n').sawData, true);
+  });
+
   it('should join multi-line data payloads', () => {
     const buffer = 'data: {"type":"a",\ndata: "x":1}\n\n';
     const { events } = parseSSEBuffer(buffer);

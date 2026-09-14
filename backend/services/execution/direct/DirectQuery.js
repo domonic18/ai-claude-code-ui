@@ -38,6 +38,22 @@ const DIRECT_MAX_TOKENS = 8192;
 const activeDirectSessions = new Map();
 
 /**
+ * 合法直连 sessionId 形态：真实会话为 UUID；新会话为 temp- 前缀
+ * （前端 temp-时间戳 / 跨 provider 守卫降级 temp-UUID）。
+ * sessionId 直接拼进容器 jsonl 路径（read/write 两处），必须白名单防路径遍历。
+ */
+const DIRECT_SESSION_ID_PATTERN = /^(?:temp-[A-Za-z0-9-]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+
+/**
+ * 校验直连 sessionId 是否为合法形态（边界校验，防 jsonl 路径遍历）
+ * @param {string} sessionId - 待校验的会话 ID
+ * @returns {boolean}
+ */
+export function isValidDirectSessionId(sessionId) {
+  return typeof sessionId === 'string' && DIRECT_SESSION_ID_PATTERN.test(sessionId);
+}
+
+/**
  * 发送 WS 消息（writer 未连接时静默丢弃，与 codexStreamProcessor.sendMessage 语义一致）
  * @param {Object} writer - WebSocketWriter
  * @param {Object} payload - 消息对象
@@ -102,6 +118,13 @@ export async function queryDirect(command, options = {}, attachments = [], write
   const { userId, projectPath: projectName, model } = options;
   const incomingSessionId = options.sessionId || '';
   const isNewSession = !incomingSessionId || incomingSessionId.startsWith('temp-');
+
+  // sessionId 白名单（边界校验）：伪造消息可借 ../ 越界读写容器内任意 *.jsonl
+  if (incomingSessionId && !isValidDirectSessionId(incomingSessionId)) {
+    logger.warn({ userId, sessionId: incomingSessionId }, '[DirectQuery] 非法 sessionId，拒绝请求');
+    send(writer, { type: 'direct-error', sessionId: incomingSessionId, error: '非法会话 ID' });
+    return;
+  }
 
   // jsonl 读写依赖容器存活（写会话通道是 Docker API），先拉起。
   // 提前到 sessionId 分配前：跨 provider 守卫需要读文件判定归属。

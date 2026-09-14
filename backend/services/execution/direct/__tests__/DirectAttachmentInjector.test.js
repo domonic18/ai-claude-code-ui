@@ -54,6 +54,20 @@ describe('escapeFileName', () => {
     assert.equal(escapeFileName(''), 'unnamed');
     assert.equal(escapeFileName(null), 'unnamed');
   });
+
+  it('should remove zero-width and RTL override characters entirely', () => {
+    // \u200B 零宽空格 / \u202E RTL 覆盖符：肉眼不可见但模型可读，必须剔除
+    assert.equal(escapeFileName('a\u200Bb\u202Ec'), 'abc');
+    assert.equal(escapeFileName('report\u202Efdp.exe'), 'reportfdp.exe');
+  });
+
+  it('should remove BOM and directional marks', () => {
+    assert.equal(escapeFileName('\uFEFF报告\u200F.pdf'), '报告.pdf');
+  });
+
+  it('should replace C0/DEL control characters with space', () => {
+    assert.equal(escapeFileName('a\u0000b\u007Fcd'), 'a b cd');
+  });
 });
 
 describe('buildDocumentSection', () => {

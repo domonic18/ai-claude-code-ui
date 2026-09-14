@@ -37,10 +37,13 @@ export const MAX_SSE_BUFFER_LENGTH = 8 * 1024 * 1024;
  * 非 JSON 的 data 行丢弃（SSE 注释/心跳容错）；未以空行结尾的残片留在 rest 里等下个 chunk。
  *
  * @param {string} buffer - 累积的原始文本（可能含不完整尾部）
- * @returns {{ events: Object[], rest: string }} 已完成事件的对象数组与剩余缓冲
+ * @returns {{ events: Object[], rest: string, sawData: boolean }} 已完成事件的对象数组、
+ *   剩余缓冲、是否出现过完整 data 行（含被丢弃的非 JSON/超限行——首 token 判定依据，
+ *   心跳等非 JSON 事件同样证明连接与服务端活跃）
  */
 export function parseSSEBuffer(buffer) {
   const events = [];
+  let sawData = false;
   const normalized = buffer.replace(/\r\n/g, '\n');
   // 以空行分界切事件块；最后一块若非空行结尾则是不完整事件，留在 rest
   const blocks = normalized.split('\n\n');
@@ -52,6 +55,7 @@ export function parseSSEBuffer(buffer) {
       if (line.startsWith('data:')) dataLines.push(line.slice(5).replace(/^ /, ''));
     }
     if (dataLines.length === 0) continue;
+    sawData = true;
     const payload = dataLines.join('\n');
     if (!payload || payload.length > MAX_SSE_DATA_LENGTH) continue;
     try {
@@ -60,7 +64,7 @@ export function parseSSEBuffer(buffer) {
       // 非 JSON data（如 "event: ping" 类注释流）忽略
     }
   }
-  return { events, rest };
+  return { events, rest, sawData };
 }
 
 /**
@@ -197,7 +201,7 @@ export async function streamDirectMessage(config, request, handlers = {}) {
     () => timeoutError('DirectModelClient total timeout'),
     totalTimeoutMs,
   );
-  // 首 token 超时：首个有效事件到达前保持计时，到达即失效
+  // 首 token 超时：首个完整 data 行（含心跳等非 JSON 事件）到达前保持计时，到达即失效
   let gotFirstToken = false;
   const firstTokenTimer = setTimeout(() => {
     if (!gotFirstToken) timeoutError('DirectModelClient first token timeout');
@@ -239,7 +243,7 @@ export async function streamDirectMessage(config, request, handlers = {}) {
           );
         }
 
-        if (parsed.events.length > 0) gotFirstToken = true;
+        if (parsed.sawData) gotFirstToken = true;
 
         for (const event of parsed.events) {
           accumulator.onEvent(event);
