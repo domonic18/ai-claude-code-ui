@@ -160,7 +160,7 @@ export async function queryDirect(command, options = {}, attachments = [], write
     const contextEntries = existingEntries.filter(e => e.provider === 'direct');
 
     const messages = buildMessagesFromEntries(contextEntries);
-    const userContent = await buildDirectUserContent(userId, attachments, command);
+    const userContent = await buildDirectUserContent(userId, attachments, command, { projectName });
     messages.push({ role: 'user', content: userContent });
 
     // 流式调用：转发与 claude-response 内层同构的增量事件

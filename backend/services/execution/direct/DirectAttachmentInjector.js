@@ -39,6 +39,33 @@ const isImagePath = (filePath) =>
   IMAGE_EXTENSIONS.has('.' + (String(filePath).split('.').pop() || '').toLowerCase());
 
 /**
+ * 允许的附件子目录（相对 /workspace/{projectName}/）：
+ * - documents/uploads/：聊天附件统一上传端点（DocumentService，与文档面板同源）
+ * - uploads/：fileUploadHandler 的图片容器上传通道（历史路径）
+ */
+const ALLOWED_ATTACHMENT_SUBDIRS = ['documents/uploads/', 'uploads/'];
+
+/**
+ * 附件容器路径白名单校验
+ *
+ * file.path 来自前端消息，不可信任——越界路径（如 .claude/projects 下的会话
+ * jsonl、配置/密钥文件）被读出后注入 prompt 会经第三方模型端点外泄。
+ * 仅放行当前项目上传目录内的路径，同时防御 .. 穿越。
+ *
+ * @param {string} filePath - 容器内绝对路径
+ * @param {string} projectName - 当前项目名
+ * @returns {boolean} 路径在允许的上传目录内返回 true
+ */
+export function isAllowedAttachmentPath(filePath, projectName) {
+  if (typeof filePath !== 'string' || typeof projectName !== 'string' || !projectName) return false;
+  if (projectName.includes('/') || projectName.includes('\\') || projectName.includes('..')) return false;
+  const base = `/workspace/${projectName}/`;
+  if (!filePath.startsWith(base)) return false;
+  if (filePath.split('/').includes('..')) return false;
+  return ALLOWED_ATTACHMENT_SUBDIRS.some((sub) => filePath.startsWith(base + sub));
+}
+
+/**
  * 构造 Anthropic image block
  * @param {string} dataUrl - data:image/png;base64,xxx 格式
  * @returns {Object|null} image block；解析失败返回 null
@@ -111,12 +138,13 @@ async function readImageFromContainer(userId, filePath) {
  * @param {Array<{name: string, data?: string, path?: string}>} attachments - 前端附件数组
  * @param {string} command - 用户原始命令
  * @param {Object} [options]
+ * @param {string} [options.projectName] - 当前项目名（path 附件白名单锚点；缺失时 fail-closed 全部拒读）
  * @param {number} [options.maxDocChars] - 单文档上限
  * @param {Object} [options.extractor] - 文本提取器（依赖注入，测试用）
  * @returns {Promise<string|Array>} content 字符串或 blocks 数组
  */
 export async function buildDirectUserContent(userId, attachments, command, options = {}) {
-  const { maxDocChars = DIRECT_DOC_MAX_CHARS, extractor } = options;
+  const { maxDocChars = DIRECT_DOC_MAX_CHARS, extractor, projectName } = options;
   const files = Array.isArray(attachments) ? attachments.filter(f => f && (f.data || f.path)) : [];
   if (files.length === 0) return command;
 
@@ -126,6 +154,13 @@ export async function buildDirectUserContent(userId, attachments, command, optio
   let truncatedTotal = false;
 
   for (const file of files) {
+    // 路径白名单：越界路径拒读降级占位（data 附件不涉及容器读取，不受限）
+    if (file.path && !isAllowedAttachmentPath(file.path, projectName)) {
+      logger.warn({ filePath: file.path, projectName }, '[DirectAttachmentInjector] 附件路径不在允许上传目录内，拒读');
+      docSections.push(`[附件路径不在允许上传目录，已跳过: ${escapeFileName(file.name)}]`);
+      continue;
+    }
+
     // 图片：data 直转；仅 path 时从容器读回再转
     if (file.data || isImagePath(file.path)) {
       let dataUrl = file.data;

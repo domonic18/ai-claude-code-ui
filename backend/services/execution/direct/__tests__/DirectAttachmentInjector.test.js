@@ -12,6 +12,7 @@ import {
   escapeFileName,
   buildDocumentSection,
   buildDirectUserContent,
+  isAllowedAttachmentPath,
   DIRECT_DOCS_TOTAL_MAX_CHARS,
 } from '../DirectAttachmentInjector.js';
 
@@ -64,6 +65,39 @@ describe('buildDocumentSection', () => {
   });
 });
 
+describe('isAllowedAttachmentPath', () => {
+  it('should allow paths under documents/uploads of the current project', () => {
+    assert.equal(isAllowedAttachmentPath('/workspace/p/documents/uploads/2026-09-14/a.pdf', 'p'), true);
+  });
+
+  it('should allow paths under legacy uploads channel', () => {
+    assert.equal(isAllowedAttachmentPath('/workspace/p/uploads/2026-09-14/img.png', 'p'), true);
+  });
+
+  it('should reject paths outside upload dirs (session jsonl / project root)', () => {
+    assert.equal(isAllowedAttachmentPath('/workspace/p/.claude/projects/x/s.jsonl', 'p'), false);
+    assert.equal(isAllowedAttachmentPath('/workspace/p/secret.txt', 'p'), false);
+    assert.equal(isAllowedAttachmentPath('/etc/passwd', 'p'), false);
+  });
+
+  it('should reject other projects and non-workspace paths', () => {
+    assert.equal(isAllowedAttachmentPath('/workspace/other/documents/uploads/a.pdf', 'p'), false);
+    assert.equal(isAllowedAttachmentPath('/workspace/p.evil/documents/uploads/a.pdf', 'p'), false);
+  });
+
+  it('should reject traversal segments', () => {
+    assert.equal(isAllowedAttachmentPath('/workspace/p/documents/uploads/../../s.jsonl', 'p'), false);
+    assert.equal(isAllowedAttachmentPath('/workspace/p/../other/uploads/a.pdf', 'p'), false);
+  });
+
+  it('should reject invalid projectName or non-string path', () => {
+    assert.equal(isAllowedAttachmentPath('/workspace/p/documents/uploads/a.pdf', 'p/../q'), false);
+    assert.equal(isAllowedAttachmentPath('/workspace/p/documents/uploads/a.pdf', ''), false);
+    assert.equal(isAllowedAttachmentPath(null, 'p'), false);
+    assert.equal(isAllowedAttachmentPath('/workspace/p/documents/uploads/a.pdf', null), false);
+  });
+});
+
 describe('buildDirectUserContent', () => {
   it('should return plain command when no attachments', async () => {
     const content = await buildDirectUserContent(1, [], '你好', {});
@@ -81,7 +115,7 @@ describe('buildDirectUserContent', () => {
       { name: 'doc.pdf', path: '/workspace/p/documents/uploads/doc.pdf' },
     ];
     const fakeExtractor = { extractText: async () => 'PDF 内容' };
-    const content = await buildDirectUserContent(1, attachments, '总结', { extractor: fakeExtractor });
+    const content = await buildDirectUserContent(1, attachments, '总结', { projectName: 'p', extractor: fakeExtractor });
 
     assert.ok(Array.isArray(content));
     assert.equal(content[0].type, 'image');
@@ -91,9 +125,9 @@ describe('buildDirectUserContent', () => {
   });
 
   it('should inject document text as plain string when no images', async () => {
-    const attachments = [{ name: 'doc.docx', path: '/workspace/x.docx' }];
+    const attachments = [{ name: 'doc.docx', path: '/workspace/proj/documents/uploads/x.docx' }];
     const fakeExtractor = { extractText: async () => 'WORD 内容' };
-    const content = await buildDirectUserContent(1, attachments, '看看', { extractor: fakeExtractor });
+    const content = await buildDirectUserContent(1, attachments, '看看', { projectName: 'proj', extractor: fakeExtractor });
 
     assert.equal(typeof content, 'string');
     assert.match(content, /\[以下是用户引用的文件内容\]/);
@@ -109,19 +143,19 @@ describe('buildDirectUserContent', () => {
         return 'x';
       },
     };
-    const attachments = [{ name: 'a.pdf', path: '/a.pdf' }];
-    await buildDirectUserContent(1, attachments, 'q', { extractor: fakeExtractor, maxDocChars: 12345 });
+    const attachments = [{ name: 'a.pdf', path: '/workspace/p/documents/uploads/a.pdf' }];
+    await buildDirectUserContent(1, attachments, 'q', { projectName: 'p', extractor: fakeExtractor, maxDocChars: 12345 });
     assert.equal(receivedOptions.maxChars, 12345);
   });
 
   it('should truncate total document chars with explicit marker', async () => {
     const bigText = 'x'.repeat(DIRECT_DOCS_TOTAL_MAX_CHARS);
     const attachments = [
-      { name: 'big1.pdf', path: '/big1.pdf' },
-      { name: 'big2.pdf', path: '/big2.pdf' },
+      { name: 'big1.pdf', path: '/workspace/p/documents/uploads/big1.pdf' },
+      { name: 'big2.pdf', path: '/workspace/p/documents/uploads/big2.pdf' },
     ];
     const fakeExtractor = { extractText: async () => bigText };
-    const content = await buildDirectUserContent(1, attachments, 'q', { extractor: fakeExtractor });
+    const content = await buildDirectUserContent(1, attachments, 'q', { projectName: 'p', extractor: fakeExtractor });
 
     assert.ok(content.length <= DIRECT_DOCS_TOTAL_MAX_CHARS + 500);
     assert.match(content, /\[文件内容总长超限，已截断\]/);
@@ -133,5 +167,32 @@ describe('buildDirectUserContent', () => {
     const content = await buildDirectUserContent(1, attachments, 'q', {});
     assert.equal(typeof content, 'string');
     assert.match(content, /\[图片读取失败: 坏图.png\]/);
+  });
+
+  it('should reject doc attachment outside allowed dirs without calling extractor', async () => {
+    let extractorCalls = 0;
+    const fakeExtractor = { extractText: async () => { extractorCalls += 1; return 'x'; } };
+    const attachments = [{ name: '会话记录.jsonl', path: '/workspace/p/.claude/projects/s/s.jsonl' }];
+    const content = await buildDirectUserContent(1, attachments, 'q', { projectName: 'p', extractor: fakeExtractor });
+
+    assert.equal(extractorCalls, 0);
+    assert.match(content, /\[附件路径不在允许上传目录，已跳过: 会话记录.jsonl\]/);
+  });
+
+  it('should reject image attachment outside allowed dirs (no container read)', async () => {
+    const attachments = [{ name: '凭据.png', path: '/workspace/p/creds.png' }];
+    const content = await buildDirectUserContent(1, attachments, 'q', { projectName: 'p' });
+
+    assert.match(content, /\[附件路径不在允许上传目录，已跳过: 凭据.png\]/);
+  });
+
+  it('should fail-closed on path attachments when projectName missing', async () => {
+    let extractorCalls = 0;
+    const fakeExtractor = { extractText: async () => { extractorCalls += 1; return 'x'; } };
+    const attachments = [{ name: 'a.pdf', path: '/workspace/p/documents/uploads/a.pdf' }];
+    const content = await buildDirectUserContent(1, attachments, 'q', { extractor: fakeExtractor });
+
+    assert.equal(extractorCalls, 0);
+    assert.match(content, /\[附件路径不在允许上传目录，已跳过: a.pdf\]/);
   });
 });
