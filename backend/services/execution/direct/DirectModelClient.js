@@ -24,6 +24,13 @@ export const TOTAL_TIMEOUT_MS = 600_000;
 const MAX_SSE_DATA_LENGTH = 2 * 1024 * 1024;
 
 /**
+ * SSE 接收缓冲上限（字符）：未形成完整事件（无空行边界）的残片缓冲兜底。
+ * MAX_SSE_DATA_LENGTH 只限制完整事件的载荷，异常端点持续推送无边界的文本时
+ * 残片会无限累积，此处超限即中止，防止单个异常 baseURL 撑爆后端进程内存。
+ */
+export const MAX_SSE_BUFFER_LENGTH = 8 * 1024 * 1024;
+
+/**
  * 解析 SSE 接收缓冲区，取出完整事件的 data 载荷
  *
  * 规则：按 \n 分行（容忍 \r\n），聚合连续 data: 行，空行界分事件；
@@ -151,7 +158,8 @@ export function buildDirectHeaders({ authToken, apiKey } = {}) {
  * @param {number} [handlers.firstTokenTimeoutMs] - 首 token 超时，默认 30s
  * @param {number} [handlers.totalTimeoutMs] - 总超时，默认 600s
  * @returns {Promise<DirectStreamResult>} 累积结果（contentBlocks/usage/stopReason）
- * @throws {Error} name='DirectTimeoutError' 超时；AbortError 用户中止；其余为 HTTP/网络错误
+ * @throws {Error} name='DirectTimeoutError' 超时；AbortError 用户中止；
+ *   name='DirectProtocolError' SSE 流异常（接收缓冲超限）；其余为 HTTP/网络错误
  */
 export async function streamDirectMessage(config, request, handlers = {}) {
   const {
@@ -223,6 +231,13 @@ export async function streamDirectMessage(config, request, handlers = {}) {
         rest += decoder.decode(value, { stream: true });
         const parsed = parseSSEBuffer(rest);
         rest = parsed.rest;
+
+        if (rest.length > MAX_SSE_BUFFER_LENGTH) {
+          throw Object.assign(
+            new Error(`模型端点 SSE 流异常：接收缓冲超过 ${MAX_SSE_BUFFER_LENGTH} 字符（疑似无事件边界的异常响应）`),
+            { name: 'DirectProtocolError' },
+          );
+        }
 
         if (parsed.events.length > 0) gotFirstToken = true;
 

@@ -1,16 +1,18 @@
 /**
  * DirectModelClient.test.js
  *
- * 直连模型客户端纯函数单元测试（SSE 解析 / 流累积器 / 请求头）。
- * streamDirectMessage 涉及真实网络 IO，留集成验收（方案第七节实测清单）。
+ * 直连模型客户端单元测试：纯函数（SSE 解析 / 流累积器 / 请求头）+
+ * streamDirectMessage 的接收缓冲上限（stub 全局 fetch，无真实网络）。
  */
 
-import { describe, it } from 'node:test';
+import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseSSEBuffer,
   createStreamAccumulator,
   buildDirectHeaders,
+  streamDirectMessage,
+  MAX_SSE_BUFFER_LENGTH,
 } from '../DirectModelClient.js';
 
 describe('parseSSEBuffer', () => {
@@ -156,5 +158,57 @@ describe('buildDirectHeaders', () => {
     const headers = buildDirectHeaders({});
     assert.equal(headers['Content-Type'], 'application/json');
     assert.equal(headers['anthropic-version'], '2023-06-01');
+  });
+});
+
+describe('streamDirectMessage 接收缓冲防护', () => {
+  const realFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+  });
+
+  /** 构造 SSE Response：chunks 依次入流 */
+  function sseResponse(chunks) {
+    const encoder = new TextEncoder();
+    const body = new ReadableStream({
+      start(controller) {
+        for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+        controller.close();
+      },
+    });
+    return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+  }
+
+  it('无事件边界的超长数据应抛 DirectProtocolError（防 OOM）', async () => {
+    globalThis.fetch = async () => sseResponse(['x'.repeat(MAX_SSE_BUFFER_LENGTH + 1)]);
+    await assert.rejects(
+      streamDirectMessage({ baseURL: 'https://unit.test' }, { model: 'm', messages: [], maxTokens: 1 }, {}),
+      (err) => err.name === 'DirectProtocolError',
+    );
+  });
+
+  it('正常 SSE 流应完整累积并返回结果', async () => {
+    globalThis.fetch = async () => sseResponse([
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"text"}}\n\n',
+      'data: {"type":"content_block_delta","index":0,"delta":{"text":"你好"}}\n\n',
+    ]);
+    const result = await streamDirectMessage(
+      { baseURL: 'https://unit.test' }, { model: 'm', messages: [], maxTokens: 1 }, {},
+    );
+    assert.deepEqual(result.contentBlocks, [{ type: 'text', text: '你好' }]);
+  });
+
+  it('大体积但边界完整的合法事件不应触发缓冲上限', async () => {
+    // 单事件载荷 < MAX_SSE_DATA_LENGTH（2MB），事件间有空行边界 → rest 每轮被清空
+    const bigText = 'y'.repeat(1024 * 1024);
+    globalThis.fetch = async () => sseResponse([
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"text"}}\n\n',
+      `data: {"type":"content_block_delta","index":0,"delta":{"text":"${bigText}"}}\n\n`,
+    ]);
+    const result = await streamDirectMessage(
+      { baseURL: 'https://unit.test' }, { model: 'm', messages: [], maxTokens: 1 }, {},
+    );
+    assert.equal(result.contentBlocks[0].text, bigText);
   });
 });
