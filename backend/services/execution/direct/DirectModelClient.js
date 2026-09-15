@@ -72,11 +72,13 @@ export function parseSSEBuffer(buffer) {
  *
  * 处理 content_block_start/delta/message_start/message_delta，
  * 产出与 jsonl assistant 条目 message.content 同构的 blocks 数组。
+ * tool_use 块（直连文档工具回路）以 input_json_delta 增量拼接，
+ * getResult 时统一 JSON.parse 定形。
  *
  * @returns {{ onEvent: (event: Object) => void, getResult: () => DirectStreamResult }}
  */
 export function createStreamAccumulator() {
-  /** @type {Array<{type: string, text?: string, thinking?: string}>} */
+  /** @type {Array<{type: string, text?: string, thinking?: string, id?: string, name?: string, input?: Object|string}>} */
   const contentBlocks = [];
   const usage = {
     input_tokens: 0,
@@ -94,12 +96,17 @@ export function createStreamAccumulator() {
         const block = event.content_block;
         if (block.type === 'text') contentBlocks.push({ type: 'text', text: '' });
         else if (block.type === 'thinking') contentBlocks.push({ type: 'thinking', thinking: '' });
-        // tool_use 等块直连模式不会请求，忽略
+        else if (block.type === 'tool_use') {
+          contentBlocks.push({ type: 'tool_use', id: block.id, name: block.name, input: '' });
+        }
       } else if (event.type === 'content_block_delta' && typeof event.index === 'number') {
         const block = contentBlocks[event.index];
         if (!block) return;
         if (typeof event.delta?.text === 'string') block.text += event.delta.text;
         else if (typeof event.delta?.thinking === 'string') block.thinking += event.delta.thinking;
+        else if (typeof event.delta?.partial_json === 'string' && block.type === 'tool_use') {
+          block.input += event.delta.partial_json;
+        }
       } else if (event.type === 'message_start') {
         // message_start 的 usage 只含 input 侧
         const u = event.message?.usage;
@@ -114,6 +121,13 @@ export function createStreamAccumulator() {
       }
     },
     getResult() {
+      // tool_use input 定形：增量拼接的 JSON 文本 → 对象（残缺/非对象降级 {}，
+      // 执行层按缺参校验拒写并经 tool_result 反馈模型）
+      for (const block of contentBlocks) {
+        if (block.type === 'tool_use' && typeof block.input === 'string') {
+          block.input = parseToolInputJson(block.input);
+        }
+      }
       return {
         contentBlocks,
         usage: { ...usage },
@@ -121,6 +135,21 @@ export function createStreamAccumulator() {
       };
     },
   };
+}
+
+/**
+ * 解析 tool_use input 的增量 JSON 文本
+ * @param {string} raw - input_json_delta 拼接出的完整 JSON 文本
+ * @returns {Object} 解析结果；空/残缺/非对象一律降级 {}
+ */
+function parseToolInputJson(raw) {
+  if (typeof raw !== 'string' || raw.trim() === '') return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
 }
 
 /**
@@ -155,6 +184,7 @@ export function buildDirectHeaders({ authToken, apiKey } = {}) {
  * @param {string} request.model - 模型名
  * @param {Array} request.messages - Anthropic Messages 格式消息数组
  * @param {number} request.maxTokens - max_tokens
+ * @param {Array} [request.tools] - 工具定义数组（直连文档工具回路）；不传则不携带 tools 字段
  * @param {string} [request.system] - 可选 system prompt（默认不传）
  * @param {Object} handlers
  * @param {(event: Object) => void} handlers.onEvent - 每个已解析 SSE 事件的回调
@@ -183,6 +213,7 @@ export async function streamDirectMessage(config, request, handlers = {}) {
     stream: true,
   };
   if (request.system) body.system = request.system;
+  if (request.tools) body.tools = request.tools;
 
   // 总超时与首 token 超时合成到一个 controller；signal 链接外部中止（用户停止）
   const timeoutController = new AbortController();
@@ -276,7 +307,8 @@ export async function streamDirectMessage(config, request, handlers = {}) {
 
 /**
  * @typedef {Object} DirectStreamResult
- * @property {Array<{type: string, text?: string, thinking?: string}>} contentBlocks
+ * @property {Array<{type: string, text?: string, thinking?: string, id?: string, name?: string, input?: Object}>} contentBlocks
+ *   text/thinking/tool_use 块；tool_use 的 input 在 getResult 时已定形为对象
  * @property {{input_tokens: number, output_tokens: number, cache_creation_input_tokens: number, cache_read_input_tokens: number}} usage
  * @property {string|null} stopReason
  */

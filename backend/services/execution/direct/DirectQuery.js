@@ -3,7 +3,8 @@
  *
  * 直连模型编排器：绕过 Claude Agent SDK，宿主机直接调用厂商 Anthropic 兼容端点。
  * 一轮流程：sessionId 解析 → 并发守卫 → 容器拉起 → 上下文重建 → 附件注入 →
- * 流式调用（SSE → direct-response）→ 落盘 → direct-complete。
+ * 受限工具回路（流式调用 → write_generated_doc 执行 → tool_result 回填，见
+ * DirectToolLoop）→ 落盘 → direct-complete。
  *
  * 停止：AbortController（用户 abort / ws 断线 / 超时统一走 controller.abort）。
  * 断线不续传（方案 4.7）；流中断则本轮不落盘。
@@ -15,7 +16,8 @@ import { randomUUID } from 'crypto';
 import containerManager from '../../container/core/index.js';
 import { getModelProviderConfig } from '../../../config/modelConfig.js';
 import { createLogger, sanitizePreview } from '../../../utils/logger.js';
-import { streamDirectMessage } from './DirectModelClient.js';
+import { runDirectConversation } from './DirectToolLoop.js';
+import { writeGeneratedDoc, WRITE_GENERATED_DOC_TOOL } from './DirectDocTool.js';
 import {
   readDirectSessionEntries,
   appendDirectTurn,
@@ -186,56 +188,96 @@ export async function queryDirect(command, options = {}, attachments = [], write
     const userContent = await buildDirectUserContent(userId, attachments, command, { projectName });
     messages.push({ role: 'user', content: userContent });
 
-    // 流式调用：转发与 claude-response 内层同构的增量事件
-    const result = await streamDirectMessage(
+    // 受限工具回路：转发与 claude-response 内层同构的增量事件；
+    // 模型调用 write_generated_doc 时执行写入并回填 tool_result，最多 3 轮
+    const { hops } = await runDirectConversation({
       config,
-      { model, messages, maxTokens: DIRECT_MAX_TOKENS },
-      {
-        signal: controller.signal,
-        onEvent: (event) => {
-          if (event.type === 'content_block_delta' && event.delta) {
-            if (typeof event.delta.text === 'string') {
-              send(writer, {
-                type: 'direct-response', sessionId,
-                data: { type: 'content_block_delta', delta: { text: event.delta.text } },
-              });
-            } else if (typeof event.delta.thinking === 'string') {
-              send(writer, {
-                type: 'direct-response', sessionId,
-                data: { type: 'content_block_delta', delta: { thinking: event.delta.thinking } },
-              });
-            }
-          } else if (event.type === 'content_block_stop') {
-            send(writer, { type: 'direct-response', sessionId, data: { type: 'content_block_stop' } });
-          }
-        },
-      },
-    );
-
-    // 双路径渲染修复：流结束后补发完整 assistant 消息（前端 onAddMessage 落消息列表）
-    if (result.contentBlocks.length > 0) {
-      send(writer, {
-        type: 'direct-response', sessionId,
-        data: { type: 'assistant', content: result.contentBlocks },
-      });
-    }
-
-    // 落盘本轮 user + assistant 两条（中断不落盘——中断走 catch 分支）
-    // 守卫命中时 sessionId 已是新 ID、contextEntries 为空 → parentUuid=null 独立成会
-    const parentUuid = getLastEntryUuid(contextEntries);
-    const userEntry = buildUserEntry({ sessionId, parentUuid, content: userContent, projectName });
-    const assistantEntry = buildAssistantEntry({
-      sessionId,
-      parentUuid: userEntry.uuid,
-      contentBlocks: result.contentBlocks,
       model,
-      usage: result.usage,
+      messages,
+      maxTokens: DIRECT_MAX_TOKENS,
+      signal: controller.signal,
+      onEvent: (event) => {
+        if (event.type === 'content_block_delta' && event.delta) {
+          if (typeof event.delta.text === 'string') {
+            send(writer, {
+              type: 'direct-response', sessionId,
+              data: { type: 'content_block_delta', delta: { text: event.delta.text } },
+            });
+          } else if (typeof event.delta.thinking === 'string') {
+            send(writer, {
+              type: 'direct-response', sessionId,
+              data: { type: 'content_block_delta', delta: { thinking: event.delta.thinking } },
+            });
+          }
+        } else if (event.type === 'content_block_stop') {
+          send(writer, { type: 'direct-response', sessionId, data: { type: 'content_block_stop' } });
+        }
+      },
+      // 双路径渲染修复：每跳流结束补发完整 assistant 消息（前端 onAddMessage 落消息列表）
+      onAssistant: (contentBlocks) => {
+        send(writer, {
+          type: 'direct-response', sessionId,
+          data: { type: 'assistant', content: contentBlocks },
+        });
+      },
+      onToolResult: (toolUse, result) => {
+        send(writer, { type: 'direct-tool-result', sessionId, data: { tool: toolUse.name, ...result } });
+      },
+      execTool: (toolUse) => {
+        if (toolUse.name !== WRITE_GENERATED_DOC_TOOL.name) {
+          return Promise.resolve({ ok: false, error: `未知工具：${toolUse.name}` });
+        }
+        return writeGeneratedDoc(userId, projectName, toolUse.input);
+      },
+    });
+
+    // 落盘本轮条目链：user → [assistant(+tool_use) + user(tool_result)]×轮 → assistant（中断不落盘——中断走 catch 分支）
+    // 守卫命中时 sessionId 已是新 ID、contextEntries 为空 → parentUuid=null 独立成会
+    const newEntries = [];
+    const userEntry = buildUserEntry({
+      sessionId,
+      parentUuid: getLastEntryUuid(contextEntries),
+      content: userContent,
       projectName,
     });
-    await appendDirectTurn(userId, projectName, sessionId, [userEntry, assistantEntry]);
+    newEntries.push(userEntry);
+    let parentUuid = userEntry.uuid;
+    for (const hop of hops) {
+      if (hop.contentBlocks.length === 0) continue;
+      const assistantEntry = buildAssistantEntry({
+        sessionId,
+        parentUuid,
+        contentBlocks: hop.contentBlocks,
+        model,
+        usage: hop.usage,
+        projectName,
+      });
+      newEntries.push(assistantEntry);
+      parentUuid = assistantEntry.uuid;
+      if (hop.toolResults.length > 0) {
+        const toolUserEntry = buildUserEntry({
+          sessionId,
+          parentUuid,
+          content: hop.toolResults.map(({ toolUseId, result }) => ({
+            type: 'tool_result',
+            tool_use_id: toolUseId,
+            content: JSON.stringify(result),
+          })),
+          projectName,
+        });
+        newEntries.push(toolUserEntry);
+        parentUuid = toolUserEntry.uuid;
+      }
+    }
+    await appendDirectTurn(userId, projectName, sessionId, newEntries);
 
     send(writer, { type: 'direct-complete', sessionId, provider: 'direct', exitCode: 0 });
-    logger.info({ sessionId, durationMs: Date.now() - Date.parse(startedAt) }, '[DirectQuery] 直连请求完成');
+    logger.info({
+      sessionId,
+      durationMs: Date.now() - Date.parse(startedAt),
+      hops: hops.length,
+      toolRounds: hops.filter(h => h.toolResults.length > 0).length,
+    }, '[DirectQuery] 直连请求完成');
   } catch (err) {
     if (sessionRecord.userAborted) {
       // 用户主动停止：前端 session-aborted 已复位 UI，后端静默（不弹 error）

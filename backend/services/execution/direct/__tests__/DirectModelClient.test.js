@@ -123,6 +123,41 @@ describe('createStreamAccumulator', () => {
     assert.equal(acc.getResult().contentBlocks.length, 0);
   });
 
+  it('should accumulate tool_use input_json_delta into parsed input object', () => {
+    const acc = createStreamAccumulator();
+    acc.onEvent({
+      type: 'content_block_start', index: 0,
+      content_block: { type: 'tool_use', id: 'toolu_1', name: 'write_generated_doc', input: {} },
+    });
+    acc.onEvent({ type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: '{"file_name":"报告' } });
+    acc.onEvent({ type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: '.md","content":"# x"}' } });
+
+    const result = acc.getResult();
+    assert.deepEqual(result.contentBlocks, [{
+      type: 'tool_use',
+      id: 'toolu_1',
+      name: 'write_generated_doc',
+      input: { file_name: '报告.md', content: '# x' },
+    }]);
+  });
+
+  it('should degrade malformed or empty tool_use input JSON to empty object', () => {
+    const acc = createStreamAccumulator();
+    acc.onEvent({
+      type: 'content_block_start', index: 0,
+      content_block: { type: 'tool_use', id: 't1', name: 'n', input: {} },
+    });
+    acc.onEvent({ type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: '{"broken' } });
+    assert.deepEqual(acc.getResult().contentBlocks[0].input, {});
+
+    const acc2 = createStreamAccumulator();
+    acc2.onEvent({
+      type: 'content_block_start', index: 0,
+      content_block: { type: 'tool_use', id: 't2', name: 'n', input: {} },
+    });
+    assert.deepEqual(acc2.getResult().contentBlocks[0].input, {});
+  });
+
   it('should merge usage from message_start and message_delta', () => {
     const acc = createStreamAccumulator();
     acc.onEvent({
@@ -227,5 +262,48 @@ describe('streamDirectMessage 接收缓冲防护', () => {
       { baseURL: 'https://unit.test' }, { model: 'm', messages: [], maxTokens: 1 }, {},
     );
     assert.equal(result.contentBlocks[0].text, bigText);
+  });
+});
+
+describe('streamDirectMessage tools 透传', () => {
+  const realFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+  });
+
+  /** 构造 SSE Response 并捕获请求体 */
+  function capturingSseResponse(chunks, capture) {
+    return async (url, init) => {
+      capture.body = JSON.parse(init.body);
+      const encoder = new TextEncoder();
+      const body = new ReadableStream({
+        start(controller) {
+          for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+          controller.close();
+        },
+      });
+      return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+    };
+  }
+
+  it('request.tools 应写入请求体（文档工具回路的载体）', async () => {
+    const capture = {};
+    globalThis.fetch = capturingSseResponse(['data: {"type":"message_stop"}\n\n'], capture);
+    await streamDirectMessage(
+      { baseURL: 'https://unit.test' },
+      { model: 'm', messages: [], maxTokens: 1, tools: [{ name: 'write_generated_doc' }] },
+      {},
+    );
+    assert.deepEqual(capture.body.tools, [{ name: 'write_generated_doc' }]);
+  });
+
+  it('未传 tools 时请求体不含 tools 字段（保持既有直连请求形状）', async () => {
+    const capture = {};
+    globalThis.fetch = capturingSseResponse(['data: {"type":"message_stop"}\n\n'], capture);
+    await streamDirectMessage(
+      { baseURL: 'https://unit.test' }, { model: 'm', messages: [], maxTokens: 1 }, {},
+    );
+    assert.equal('tools' in capture.body, false);
   });
 });
