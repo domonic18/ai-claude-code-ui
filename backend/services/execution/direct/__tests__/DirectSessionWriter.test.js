@@ -12,8 +12,27 @@ import {
   buildAssistantEntry,
   normalizeUsage,
   getLastEntryUuid,
+  isSessionFileNotFound,
   DIRECT_ENTRY_VERSION,
 } from '../DirectSessionWriter.js';
+
+describe('isSessionFileNotFound', () => {
+  it('应识别文件不存在错误（readFileFromContainer 固定消息形态）', () => {
+    assert.equal(isSessionFileNotFound(new Error('File not found: /workspace/x/s.jsonl')), true);
+  });
+
+  it('应放行其他读取异常（超时/流错误），驱动上抛而非按空会话覆盖', () => {
+    assert.equal(isSessionFileNotFound(new Error('Docker exec timed out after 30000ms while reading: /x/s.jsonl')), false);
+    assert.equal(isSessionFileNotFound(new Error('Failed to read file: socket hang up')), false);
+  });
+
+  it('应容忍空值与非 Error 入参', () => {
+    assert.equal(isSessionFileNotFound(null), false);
+    assert.equal(isSessionFileNotFound(undefined), false);
+    assert.equal(isSessionFileNotFound({}), false);
+    assert.equal(isSessionFileNotFound('File not found: x'), false);
+  });
+});
 
 describe('buildUserEntry', () => {
   it('should satisfy grouping four-condition for first entry', () => {
