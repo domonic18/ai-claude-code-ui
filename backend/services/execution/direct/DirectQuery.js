@@ -163,6 +163,16 @@ export async function queryDirect(command, options = {}, attachments = [], write
     return;
   }
 
+  // projectName 形态校验（边界加固）：projectName 是附件白名单/doc 工具写入/jsonl cwd
+  // 的共同锚点，入口统一拦截穿越形态，防未来新增代码路径绕过各自的内部校验
+  if (typeof projectName !== 'string'
+    || projectName.length === 0
+    || projectName.includes('/') || projectName.includes('\\') || projectName.includes('..')) {
+    logger.warn({ userId, projectName }, '[DirectQuery] 非法项目名，拒绝请求');
+    send(writer, { type: 'direct-error', sessionId: incomingSessionId, error: '非法项目名' });
+    return;
+  }
+
   // jsonl 读写依赖容器存活（写会话通道是 Docker API），先拉起。
   // 提前到 sessionId 分配前：跨 provider 守卫需要读文件判定归属。
   await containerManager.getOrCreateContainer(userId);

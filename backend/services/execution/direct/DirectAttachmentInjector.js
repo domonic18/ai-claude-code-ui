@@ -4,6 +4,7 @@
  * 直连模式附件注入器：把上传附件转换为 /v1/messages 请求的 content。
  * - 图片（base64 data URL / 容器路径）→ Anthropic image block
  * - word/pdf 等文档 → 用户容器内解析文本（DocumentTextExtractor）后注入文本前缀
+ * - path 附件双重校验：白名单字符串校验 + 容器内 realpath 复检（防 symlink 越界逃逸）
  *
  * 纯函数（buildImageBlock / escapeFileName / buildDocumentSection）可单测；
  * buildDirectUserContent 是唯一 IO 入口。
@@ -52,6 +53,10 @@ const ALLOWED_ATTACHMENT_SUBDIRS = ['documents/uploads/', 'uploads/'];
  * jsonl、配置/密钥文件）被读出后注入 prompt 会经第三方模型端点外泄。
  * 仅放行当前项目上传目录内的路径，同时防御 .. 穿越。
  *
+ * 注意：本函数是纯字符串校验；符号链接可使"白名单匹配的路径"与"内核实际
+ * 打开的路径"不一致（uploads 内 symlink 指向白名单外文件），调用方须先经
+ * resolveRealPathInContainer 解析并以解析结果复检（见 buildDirectUserContent）。
+ *
  * @param {string} filePath - 容器内绝对路径
  * @param {string} projectName - 当前项目名
  * @returns {boolean} 路径在允许的上传目录内返回 true
@@ -63,6 +68,30 @@ export function isAllowedAttachmentPath(filePath, projectName) {
   if (!filePath.startsWith(base)) return false;
   if (filePath.split('/').includes('..')) return false;
   return ALLOWED_ATTACHMENT_SUBDIRS.some((sub) => filePath.startsWith(base + sub));
+}
+
+/**
+ * 容器内解析真实路径（跟随符号链接）
+ *
+ * realpath -m：解析路径中已存在部分的符号链接，不存在的尾部原样保留。
+ * 解析失败（exec 异常/空输出）返回 null，由调用方 fail-closed 拒读。
+ *
+ * @param {number} userId - 用户 ID
+ * @param {string} filePath - 容器内绝对路径
+ * @returns {Promise<string|null>} 解析后的绝对路径；失败返回 null
+ */
+async function resolveRealPathInContainer(userId, filePath) {
+  const { stream } = await containerManager.execInContainer(userId, ['realpath', '-m', filePath]);
+  const stdout = new PassThrough();
+  containerManager.docker.modem.demuxStream(stream, stdout, new PassThrough());
+  const output = await new Promise((resolve, reject) => {
+    let data = '';
+    stdout.on('data', (chunk) => { data += chunk.toString(); });
+    stream.on('error', reject);
+    stream.on('end', () => resolve(data));
+  });
+  const resolved = output.trim();
+  return resolved || null;
 }
 
 /**
@@ -149,10 +178,17 @@ async function readImageFromContainer(userId, filePath) {
  * @param {string} [options.projectName] - 当前项目名（path 附件白名单锚点；缺失时 fail-closed 全部拒读）
  * @param {number} [options.maxDocChars] - 单文档上限
  * @param {Object} [options.extractor] - 文本提取器（依赖注入，测试用）
+ * @param {(userId: number, filePath: string) => Promise<string|null>} [options.realpathResolver] -
+ *   真实路径解析器（依赖注入，测试用；默认容器内 realpath -m）
  * @returns {Promise<string|Array>} content 字符串或 blocks 数组
  */
 export async function buildDirectUserContent(userId, attachments, command, options = {}) {
-  const { maxDocChars = DIRECT_DOC_MAX_CHARS, extractor, projectName } = options;
+  const {
+    maxDocChars = DIRECT_DOC_MAX_CHARS,
+    extractor,
+    projectName,
+    realpathResolver = resolveRealPathInContainer,
+  } = options;
   const files = Array.isArray(attachments) ? attachments.filter(f => f && (f.data || f.path)) : [];
   if (files.length === 0) return command;
 
@@ -162,11 +198,26 @@ export async function buildDirectUserContent(userId, attachments, command, optio
   let truncatedTotal = false;
 
   for (const file of files) {
-    // 路径白名单：越界路径拒读降级占位（data 附件不涉及容器读取，不受限）
-    if (file.path && !isAllowedAttachmentPath(file.path, projectName)) {
-      logger.warn({ filePath: file.path, projectName }, '[DirectAttachmentInjector] 附件路径不在允许上传目录内，拒读');
-      docSections.push(`[附件路径不在允许上传目录，已跳过: ${escapeFileName(file.name)}]`);
-      continue;
+    // 路径白名单 + realpath 复检：越界路径拒读降级占位（data 附件不涉及容器读取，不受限）。
+    // 白名单匹配的是字符串，而内核 open() 跟随符号链接——上传目录内的 symlink 可指向
+    // 白名单外敏感文件（如 .claude 密钥），故原始校验通过后再以 realpath 解析结果复检；
+    // 解析失败同样拒读（fail-closed，防止 realpath 不可用时静默退化回字符串校验）
+    if (file.path) {
+      let allowed = isAllowedAttachmentPath(file.path, projectName);
+      if (allowed) {
+        let resolved = null;
+        try {
+          resolved = await realpathResolver(userId, file.path);
+        } catch (err) {
+          logger.warn({ err, filePath: file.path }, '[DirectAttachmentInjector] realpath 解析失败，fail-closed 拒读');
+        }
+        allowed = resolved !== null && isAllowedAttachmentPath(resolved, projectName);
+      }
+      if (!allowed) {
+        logger.warn({ filePath: file.path, projectName }, '[DirectAttachmentInjector] 附件路径不在允许上传目录内（或经符号链接越界），拒读');
+        docSections.push(`[附件路径不在允许上传目录，已跳过: ${escapeFileName(file.name)}]`);
+        continue;
+      }
     }
 
     // 图片：data 直转；仅 path 时从容器读回再转

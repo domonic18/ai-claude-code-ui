@@ -55,3 +55,16 @@ describe('queryDirect sessionId 边界拦截', () => {
     assert.match(sent[0].error, /非法会话 ID/);
   });
 });
+
+describe('queryDirect projectName 边界拦截', () => {
+  it('非法项目名应 direct-error 拒绝且不进入编排（容器拉起前返回）', async () => {
+    for (const bad of ['../evil', 'a/b', 'a\\b', '', null, undefined]) {
+      const sent = [];
+      const fakeWriter = { send: (msg) => sent.push(msg) };
+      await queryDirect('hi', { userId: 1, projectPath: bad, model: 'm' }, [], fakeWriter);
+      assert.equal(sent.length, 1, `项目名 ${bad} 应只收到一条消息`);
+      assert.equal(sent[0].type, 'direct-error');
+      assert.match(sent[0].error, /非法项目名/);
+    }
+  });
+});

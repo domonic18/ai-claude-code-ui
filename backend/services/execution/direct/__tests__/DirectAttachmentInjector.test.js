@@ -16,6 +16,9 @@ import {
   DIRECT_DOCS_TOTAL_MAX_CHARS,
 } from '../DirectAttachmentInjector.js';
 
+/** 恒等 realpath 解析器（路径真实存在、无 symlink 的默认情形） */
+const identityRealpath = async (userId, filePath) => filePath;
+
 describe('buildImageBlock', () => {
   it('should parse valid png data URL', () => {
     const block = buildImageBlock('data:image/png;base64,aGVsbG8=');
@@ -129,7 +132,7 @@ describe('buildDirectUserContent', () => {
       { name: 'doc.pdf', path: '/workspace/p/documents/uploads/doc.pdf' },
     ];
     const fakeExtractor = { extractText: async () => 'PDF 内容' };
-    const content = await buildDirectUserContent(1, attachments, '总结', { projectName: 'p', extractor: fakeExtractor });
+    const content = await buildDirectUserContent(1, attachments, '总结', { projectName: 'p', extractor: fakeExtractor, realpathResolver: identityRealpath });
 
     assert.ok(Array.isArray(content));
     assert.equal(content[0].type, 'image');
@@ -141,7 +144,7 @@ describe('buildDirectUserContent', () => {
   it('should inject document text as plain string when no images', async () => {
     const attachments = [{ name: 'doc.docx', path: '/workspace/proj/documents/uploads/x.docx' }];
     const fakeExtractor = { extractText: async () => 'WORD 内容' };
-    const content = await buildDirectUserContent(1, attachments, '看看', { projectName: 'proj', extractor: fakeExtractor });
+    const content = await buildDirectUserContent(1, attachments, '看看', { projectName: 'proj', extractor: fakeExtractor, realpathResolver: identityRealpath });
 
     assert.equal(typeof content, 'string');
     assert.match(content, /\[以下是用户引用的文件内容\]/);
@@ -158,7 +161,7 @@ describe('buildDirectUserContent', () => {
       },
     };
     const attachments = [{ name: 'a.pdf', path: '/workspace/p/documents/uploads/a.pdf' }];
-    await buildDirectUserContent(1, attachments, 'q', { projectName: 'p', extractor: fakeExtractor, maxDocChars: 12345 });
+    await buildDirectUserContent(1, attachments, 'q', { projectName: 'p', extractor: fakeExtractor, maxDocChars: 12345, realpathResolver: identityRealpath });
     assert.equal(receivedOptions.maxChars, 12345);
   });
 
@@ -169,7 +172,7 @@ describe('buildDirectUserContent', () => {
       { name: 'big2.pdf', path: '/workspace/p/documents/uploads/big2.pdf' },
     ];
     const fakeExtractor = { extractText: async () => bigText };
-    const content = await buildDirectUserContent(1, attachments, 'q', { projectName: 'p', extractor: fakeExtractor });
+    const content = await buildDirectUserContent(1, attachments, 'q', { projectName: 'p', extractor: fakeExtractor, realpathResolver: identityRealpath });
 
     assert.ok(content.length <= DIRECT_DOCS_TOTAL_MAX_CHARS + 500);
     assert.match(content, /\[文件内容总长超限，已截断\]/);
@@ -207,6 +210,57 @@ describe('buildDirectUserContent', () => {
     const content = await buildDirectUserContent(1, attachments, 'q', { extractor: fakeExtractor });
 
     assert.equal(extractorCalls, 0);
+    assert.match(content, /\[附件路径不在允许上传目录，已跳过: a.pdf\]/);
+  });
+
+  it('should reject attachment whose realpath escapes whitelist via symlink (no extractor call)', async () => {
+    // symlink 逃逸：白名单内路径经 realpath 解析指向白名单外（如 .claude 密钥）→ 拒读
+    let extractorCalls = 0;
+    const fakeExtractor = { extractText: async () => { extractorCalls += 1; return 'x'; } };
+    const attachments = [{ name: 'k.txt', path: '/workspace/p/documents/uploads/k.txt' }];
+    const content = await buildDirectUserContent(1, attachments, 'q', {
+      projectName: 'p',
+      extractor: fakeExtractor,
+      realpathResolver: async () => '/workspace/my-workspace/.claude/api_keys.json',
+    });
+
+    assert.equal(extractorCalls, 0);
+    assert.match(content, /\[附件路径不在允许上传目录，已跳过: k.txt\]/);
+  });
+
+  it('should allow attachment whose realpath stays inside whitelist (symlink to another upload)', async () => {
+    const fakeExtractor = { extractText: async () => 'REAL 内容' };
+    const attachments = [{ name: 'alias.pdf', path: '/workspace/p/documents/uploads/alias.pdf' }];
+    const content = await buildDirectUserContent(1, attachments, 'q', {
+      projectName: 'p',
+      extractor: fakeExtractor,
+      realpathResolver: async () => '/workspace/p/documents/uploads/2026-09-15/real.pdf',
+    });
+
+    assert.match(content, /REAL 内容/);
+  });
+
+  it('should fail-closed when realpath resolution throws', async () => {
+    let extractorCalls = 0;
+    const fakeExtractor = { extractText: async () => { extractorCalls += 1; return 'x'; } };
+    const attachments = [{ name: 'a.pdf', path: '/workspace/p/documents/uploads/a.pdf' }];
+    const content = await buildDirectUserContent(1, attachments, 'q', {
+      projectName: 'p',
+      extractor: fakeExtractor,
+      realpathResolver: async () => { throw new Error('exec failed'); },
+    });
+
+    assert.equal(extractorCalls, 0);
+    assert.match(content, /\[附件路径不在允许上传目录，已跳过: a.pdf\]/);
+  });
+
+  it('should fail-closed when realpath returns empty (null)', async () => {
+    const attachments = [{ name: 'a.pdf', path: '/workspace/p/documents/uploads/a.pdf' }];
+    const content = await buildDirectUserContent(1, attachments, 'q', {
+      projectName: 'p',
+      realpathResolver: async () => null,
+    });
+
     assert.match(content, /\[附件路径不在允许上传目录，已跳过: a.pdf\]/);
   });
 });
