@@ -77,7 +77,13 @@ const MESSAGE_HANDLERS: Record<string, (message: WebSocketMessage, callbacks: Me
   'codex-complete': (msg, cbs, sid) => handleCodexComplete(msg, cbs, sid),
   // 直连模型：SSE 事件与 claude 链同构，全部委托 claude 处理链（directHandler 归口）
   'direct-response': (msg, cbs) => handleDirectResponse(msg, cbs),
-  'direct-complete': (msg, cbs, sid) => handleDirectComplete(msg, cbs, sid),
+  'direct-complete': (msg, cbs, sid) => {
+    const handled = handleDirectComplete(msg, cbs, sid);
+    // 会话结束：触发文档面板兜底刷新（对齐 claude-complete——document-created
+    // 丢失或 recordAIDocument 失败时，靠目录扫描兜底发现直连生成的文件）
+    emitConversationComplete();
+    return handled;
+  },
   'direct-error': (msg, cbs) => handleDirectError(msg, cbs),
   'session-aborted': (msg, cbs, sid) => handleSessionAborted(msg, cbs, sid),
   // 刷新续传控制消息：由 useStreamingResume 独立读取 wsMessages 处理响应，

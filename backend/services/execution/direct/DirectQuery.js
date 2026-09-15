@@ -16,6 +16,7 @@ import { randomUUID } from 'crypto';
 import containerManager from '../../container/core/index.js';
 import { getModelProviderConfig } from '../../../config/modelConfig.js';
 import { createLogger, sanitizePreview } from '../../../utils/logger.js';
+import { documentService } from '../../documents/DocumentService.js';
 import { runDirectConversation } from './DirectToolLoop.js';
 import { writeGeneratedDoc, WRITE_GENERATED_DOC_TOOL } from './DirectDocTool.js';
 import {
@@ -66,6 +67,40 @@ function send(writer, payload) {
   } catch (err) {
     logger.debug({ err }, '[DirectQuery] writer 发送失败（连接可能已关闭）');
   }
+}
+
+/**
+ * 文档写入成功后通知前端并记录 manifest（对齐 SDK 链 _trackAIDocument 语义）
+ *
+ * 立即发 document-created（前端乐观层即时上屏，形状与 SDK 完全同构、
+ * 不带顶层 sessionId 故不被会话过滤）；recordAIDocument 涉及 Docker IO
+ * 可能数秒，fire-and-forget 不阻塞工具回路，完成后由前端 refetch 确认。
+ *
+ * @param {number} userId - 用户 ID
+ * @param {string} projectName - 项目名
+ * @param {string} sessionId - 会话 ID
+ * @param {{id: string}} toolUse - 触发写入的 tool_use 块（id 作 message_id）
+ * @param {{path: string, file_name: string}} writeResult - writeGeneratedDoc 成功结果
+ * @param {Object} writer - WebSocketWriter
+ */
+function notifyDocCreatedAndRecord(userId, projectName, sessionId, toolUse, writeResult, writer) {
+  send(writer, {
+    type: 'document-created',
+    data: {
+      file_path: writeResult.path,
+      file_name: writeResult.file_name,
+      conversation_id: sessionId,
+      message_id: toolUse.id,
+      type: 'ai_generated',
+    },
+  });
+  documentService.recordAIDocument(userId, projectName, {
+    file_path: writeResult.path,
+    conversation_id: sessionId,
+    message_id: toolUse.id,
+  }).catch(err => {
+    logger.warn({ err, sessionId, filePath: writeResult.path }, '[DirectQuery] 直连文档 manifest 记录失败');
+  });
 }
 
 /**
@@ -223,11 +258,13 @@ export async function queryDirect(command, options = {}, attachments = [], write
       onToolResult: (toolUse, result) => {
         send(writer, { type: 'direct-tool-result', sessionId, data: { tool: toolUse.name, ...result } });
       },
-      execTool: (toolUse) => {
+      execTool: async (toolUse) => {
         if (toolUse.name !== WRITE_GENERATED_DOC_TOOL.name) {
-          return Promise.resolve({ ok: false, error: `未知工具：${toolUse.name}` });
+          return { ok: false, error: `未知工具：${toolUse.name}` };
         }
-        return writeGeneratedDoc(userId, projectName, toolUse.input);
+        const result = await writeGeneratedDoc(userId, projectName, toolUse.input);
+        if (result.ok) notifyDocCreatedAndRecord(userId, projectName, sessionId, toolUse, result, writer);
+        return result;
       },
     });
 
