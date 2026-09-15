@@ -119,10 +119,16 @@ export function getLastEntryUuid(entries) {
 
 /**
  * 读取直连会话的全部 jsonl 条目
+ *
+ * 文件不存在（新会话）返回 []；其余读取异常（exec 超时/流错误）上抛——
+ * 若降级为空，appendDirectTurn 的 read-modify-write 会用本轮条目
+ * 静默覆盖整个会话文件（历史丢失，不可逆），必须中止本轮。
+ *
  * @param {number} userId - 用户 ID
  * @param {string} projectName - 项目名
  * @param {string} sessionId - 会话 ID
  * @returns {Promise<Array>} 条目数组；文件不存在返回 []
+ * @throws {Error} 读取异常（非文件不存在）
  */
 export async function readDirectSessionEntries(userId, projectName, sessionId) {
   const filePath = `${getProjectDir(projectName)}/${sessionId}.jsonl`;
@@ -130,10 +136,23 @@ export async function readDirectSessionEntries(userId, projectName, sessionId) {
     const content = await readFileFromContainer(userId, filePath);
     return parseJsonlLines(content);
   } catch (error) {
-    // 新会话文件不存在是正常路径；其余读取错误也降级为空（按新会话处理）
-    logger.warn({ err: error, sessionId, filePath }, '[DirectSessionWriter] 读取会话条目失败，按空会话处理');
-    return [];
+    if (isSessionFileNotFound(error)) return [];
+    logger.error({ err: error, sessionId, filePath }, '[DirectSessionWriter] 会话文件读取异常，上抛中止本轮');
+    throw error;
   }
+}
+
+/**
+ * 判定读取异常是否为"会话文件不存在"（新会话的正常路径）
+ *
+ * readFileFromContainer 对不存在文件固定抛 'File not found: <path>'
+ * （stderr 含 No such file / cannot access 时），以此与超时/流错误区分。
+ *
+ * @param {Error} error - readFileFromContainer 抛出的错误
+ * @returns {boolean} 文件不存在返回 true
+ */
+export function isSessionFileNotFound(error) {
+  return typeof error?.message === 'string' && error.message.startsWith('File not found');
 }
 
 /**
