@@ -12,9 +12,8 @@
  * @module services/execution/direct/DirectAttachmentInjector
  */
 
-import { PassThrough } from 'stream';
-import containerManager from '../../container/core/index.js';
 import { DocumentTextExtractor } from '../../documents/DocumentTextExtractor.js';
+import { execAndCollectOutput } from '../../sessions/container/containerFileReader.js';
 import { createLogger } from '../../../utils/logger.js';
 
 const logger = createLogger('services/execution/direct/DirectAttachmentInjector');
@@ -81,17 +80,8 @@ export function isAllowedAttachmentPath(filePath, projectName) {
  * @returns {Promise<string|null>} 解析后的绝对路径；失败返回 null
  */
 async function resolveRealPathInContainer(userId, filePath) {
-  const { stream } = await containerManager.execInContainer(userId, ['realpath', '-m', filePath]);
-  const stdout = new PassThrough();
-  containerManager.docker.modem.demuxStream(stream, stdout, new PassThrough());
-  const output = await new Promise((resolve, reject) => {
-    let data = '';
-    stdout.on('data', (chunk) => { data += chunk.toString(); });
-    stream.on('error', reject);
-    stream.on('end', () => resolve(data));
-  });
-  const resolved = output.trim();
-  return resolved || null;
+  const output = await execAndCollectOutput(userId, ['realpath', '-m', filePath]);
+  return output.trim() || null;
 }
 
 /**
@@ -138,8 +128,10 @@ export function buildDocumentSection(fileName, extractedText) {
 /**
  * 从容器读取图片文件并转 base64 data URL
  *
- * 复刻 chat.js readImageFromContainer 逻辑（不从 websocket handler 导入，
- * 避免 service 层反向依赖 handler 层）。
+ * 复用 containerFileReader 的 execAndCollectOutput（原先复刻 chat.js 的
+ * demux 逻辑，与 realpath/listDir 三处雷同，统一收敛）。
+ * 读取失败（流错误/文件不存在）输出为空 → data URL 无有效数据 →
+ * buildImageBlock 返回 null → 调用方降级占位。
  *
  * @param {number} userId - 用户 ID
  * @param {string} filePath - 容器内绝对路径
@@ -150,16 +142,7 @@ async function readImageFromContainer(userId, filePath) {
   const ext = '.' + (String(filePath).split('.').pop() || '').toLowerCase();
   const mimeType = IMAGE_MIME_MAP[ext] || 'image/octet-stream';
 
-  const { stream } = await containerManager.execInContainer(userId, ['base64', filePath]);
-  const output = await new Promise((resolve, reject) => {
-    const stdout = new PassThrough();
-    containerManager.docker.modem.demuxStream(stream, stdout, new PassThrough());
-    let data = '';
-    stdout.on('data', (chunk) => { data += chunk.toString(); });
-    stream.on('error', reject);
-    stream.on('end', () => resolve(data));
-  });
-
+  const output = await execAndCollectOutput(userId, ['base64', filePath], { logLabel: 'DirectAttachmentInjector' });
   const base64Data = output.replace(/\s/g, '');
   return `data:${mimeType};base64,${base64Data}`;
 }

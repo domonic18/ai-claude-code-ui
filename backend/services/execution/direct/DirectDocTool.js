@@ -15,9 +15,9 @@
  * @module services/execution/direct/DirectDocTool
  */
 
-import { PassThrough } from 'stream';
 import containerManager from '../../container/core/index.js';
 import { writeFileViaPutArchive } from '../../container/utils/containerFileWriter.js';
+import { execAndCollectOutput } from '../../sessions/container/containerFileReader.js';
 import { GENERATED_DIR_NAME } from '../../../config/containerConfig.js';
 import { createLogger } from '../../../utils/logger.js';
 
@@ -124,15 +124,7 @@ function isValidProjectName(projectName) {
  * @returns {Promise<string[]>} 文件名数组
  */
 async function listGeneratedDocs(userId, docsDir) {
-  const { stream } = await containerManager.execInContainer(userId, ['ls', '-1', docsDir]);
-  const stdout = new PassThrough();
-  containerManager.docker.modem.demuxStream(stream, stdout, new PassThrough());
-  const output = await new Promise((resolve) => {
-    let data = '';
-    stdout.on('data', (chunk) => { data += chunk.toString(); });
-    stream.on('error', () => resolve(''));
-    stream.on('end', () => resolve(data));
-  });
+  const output = await execAndCollectOutput(userId, ['ls', '-1', docsDir]);
   return output.split('\n').map(s => s.trim()).filter(Boolean);
 }
 
