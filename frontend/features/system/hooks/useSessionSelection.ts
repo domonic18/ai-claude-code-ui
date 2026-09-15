@@ -60,6 +60,9 @@ export function useSessionSelection(config: ProjectManagerConfig = {}) {
     // Update localStorage for session persistence (refresh recovery)
     if (session.id) {
       localStorage.setItem('lastSessionId', session.id);
+      // 用户主动进入了某会话：一次性"新建未聊"标记失效（刷新恢复应回到本会话，
+      // 而非上一次点 + 留下的空白新建意图）
+      localStorage.removeItem('new-session-mode');
     }
     if (currentProjectName) {
       localStorage.setItem('lastProjectName', currentProjectName);

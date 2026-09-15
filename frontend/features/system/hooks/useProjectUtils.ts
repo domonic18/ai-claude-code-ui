@@ -37,17 +37,20 @@ export function hasProjectsChanged(
 }
 
 /**
- * Find a session by ID across all providers in projects
+ * Find a session by ID across all providers in projects.
+ * 直连会话与 Claude 会话同在 project.sessions（jsonl 同目录自动发现），
+ * 靠后端透传的 session.provider 字段区分。
  */
 export function findSessionInProjects(
   projects: Project[],
   sessionId: string
-): { project: Project; session: any; provider: 'claude' | 'cursor' | 'codex' } | null {
+): { project: Project; session: any; provider: 'claude' | 'direct' | 'cursor' | 'codex' } | null {
   for (const project of projects) {
-    // Search in Claude sessions
+    // Search in Claude/Direct sessions (same array, distinguished by provider field)
     const claudeSession = project.sessions?.find(s => s.id === sessionId);
     if (claudeSession) {
-      return { project, session: claudeSession, provider: 'claude' };
+      const provider = (claudeSession as any).provider === 'direct' ? 'direct' : 'claude';
+      return { project, session: claudeSession, provider };
     }
 
     // Search in Cursor sessions

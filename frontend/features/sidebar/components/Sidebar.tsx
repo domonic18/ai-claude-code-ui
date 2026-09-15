@@ -58,7 +58,7 @@ export const Sidebar = memo(function Sidebar({
 
   const { t } = useTranslation();
 
-  const handleNewSessionWithPlaceholder = useCallback((projectName: string) => {
+  const handleNewSessionWithPlaceholder = useCallback((projectName: string, mode?: 'claude' | 'direct') => {
     const placeholder: Session = {
       id: `__placeholder__${Date.now()}`,
       summary: '',
@@ -66,7 +66,7 @@ export const Sidebar = memo(function Sidebar({
       __projectName: projectName,
     };
     state.setPlaceholderSession(placeholder);
-    onNewSession?.(projectName);
+    onNewSession?.(projectName, mode);
   }, [onNewSession, state.setPlaceholderSession]);
 
   return (

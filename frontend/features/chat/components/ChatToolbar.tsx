@@ -50,6 +50,8 @@ export interface ChatToolbarProps {
   onSkillsRetry?: () => void;
   /** 当前案件名（生成摘要用） */
   projectName?: string | null;
+  /** 直连模式标识（会话归属，只读——由新建会话时的二选一决定，运行时不可切换） */
+  isDirectMode?: boolean;
 }
 
 /**
@@ -77,6 +79,7 @@ export function ChatToolbar({
   skillsError,
   onSkillsRetry,
   projectName,
+  isDirectMode = false,
 }: ChatToolbarProps) {
   const { t } = useTranslation();
 
@@ -84,7 +87,7 @@ export function ChatToolbar({
     sendMessage?.({
       type: 'abort-session',
       sessionId: currentSessionId,
-      provider: 'claude',
+      provider: isDirectMode ? 'direct' : 'claude',
     });
     onSetLoading(false);
     onResetStream();
@@ -92,8 +95,8 @@ export function ChatToolbar({
 
   return (
     <div className="flex items-center justify-center gap-3 max-w-4xl mx-auto px-4 py-3">
-      {/* Skill Selector */}
-      {onSkillSelect && groupedSkills && (
+      {/* Skill Selector（直连模式无 agent/技能能力，隐藏） */}
+      {!isDirectMode && onSkillSelect && groupedSkills && (
         <SkillSelector
           selectedSkill={selectedSkill || null}
           onSkillSelect={onSkillSelect}
@@ -105,13 +108,16 @@ export function ChatToolbar({
         />
       )}
 
-      {/* Permission Mode Selector */}
-      {onPermissionModeChange && (
+      {/* Permission Mode Selector（直连模式无 agent 能力，隐藏） */}
+      {!isDirectMode && onPermissionModeChange && (
         <PermissionModeSelector
           mode={permissionMode}
           onModeChange={onPermissionModeChange}
         />
       )}
+
+      {/* 直连模式工具栏 = 生成摘要 + 模型选择（+加载时停止按钮）。
+          会话归属标识由侧栏闪电 logo 承担，工具栏不再放徽标 */}
 
       {/* 生成摘要（当前会话，调模型生成案件概览） */}
       <GenerateOverviewButton projectName={projectName} sessionId={currentSessionId} selectedModel={selectedModel} />

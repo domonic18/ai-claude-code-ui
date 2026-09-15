@@ -104,6 +104,7 @@ export function ChatInterfaceRenderer({
         categoryMeta={hook.categoryMeta}
         skillsError={hook.skillsError}
         onSkillsRetry={hook.skillsRetry}
+        isDirectMode={hook.isDirectMode}
       />
     </div>
   );

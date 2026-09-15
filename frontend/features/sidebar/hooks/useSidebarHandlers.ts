@@ -29,7 +29,7 @@ export interface UseSidebarHandlersOptions {
   /** Optional session select callback */
   onSessionSelect?: (session: Session, projectName: string) => void;
   /** Optional new session callback */
-  onNewSession?: (projectName: string) => void;
+  onNewSession?: (projectName: string, mode?: 'claude' | 'direct') => void;
   /** Internal refresh projects function */
   refreshProjects: () => Promise<void>;
   /** Rename project function */

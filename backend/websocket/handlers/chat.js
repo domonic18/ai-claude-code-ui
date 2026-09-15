@@ -8,6 +8,7 @@
  * - claude-command       — 执行 Claude 命令（通过容器内 SDK）
  * - cursor-command       — 执行 Cursor 命令（启动 cursor-agent 进程）
  * - codex-command        — 执行 Codex 命令
+ * - direct-command       — 执行直连模型命令（宿主机直接调厂商 Anthropic 兼容端点）
  * - cursor-resume        — 恢复 Cursor 会话
  * - abort-session        — 中止指定提供商的活跃会话
  * - cursor-abort         — 中止 Cursor 会话
@@ -20,6 +21,7 @@
 import { queryClaudeSDKInContainer, abortClaudeSDKSessionInContainer, isClaudeSDKSessionActiveInContainer, getSessionStdin, scheduleSessionCleanup, cancelSessionCleanup, setSessionWriter, getSessionForUser } from '../../services/container/claude/index.js';
 import { spawnCursor, abortCursorSession, isCursorSessionActive, getActiveCursorSessions } from '../../services/execution/cursor/index.js';
 import { queryCodex, abortCodexSession, isCodexSessionActive, getActiveCodexSessions } from '../../services/execution/codex/index.js';
+import { queryDirect, abortDirectSession, isDirectSessionActive, getActiveDirectSessions } from '../../services/execution/direct/index.js';
 import { WebSocketWriter } from '../writer.js';
 import { formatReadInstructions } from '../../services/files/FileDocumentReader.js';
 import { readmeService } from '../../services/documents/ReadmeService.js';
@@ -223,6 +225,7 @@ function abortSession(data, writer) {
   let success;
   if (provider === 'cursor') success = abortCursorSession(data.sessionId);
   else if (provider === 'codex') success = abortCodexSession(data.sessionId);
+  else if (provider === 'direct') success = abortDirectSession(data.sessionId);
   else success = abortClaudeSDKSessionInContainer(data.sessionId);
   return { type: 'session-aborted', sessionId: data.sessionId, provider, success };
 }
@@ -243,6 +246,7 @@ function checkSessionStatus(data, writer) {
   let isActive;
   if (provider === 'cursor') isActive = isCursorSessionActive(sessionId);
   else if (provider === 'codex') isActive = isCodexSessionActive(sessionId);
+  else if (provider === 'direct') isActive = isDirectSessionActive(sessionId);
   else isActive = isClaudeSDKSessionActiveInContainer(sessionId);
   return { type: 'session-status', sessionId, provider, isProcessing: isActive };
 }
@@ -297,6 +301,26 @@ const COMMAND_HANDLERS = {
       recordActivity(userId);
     }
   },
+  'direct-command': async (data, ws, writer) => {
+    const userId = ws.user?.userId;
+    recordActivity(userId);
+    logger.info({
+      userId,
+      preview: sanitizePreview(data.command),
+      totalLength: data.command?.length || 0,
+      provider: 'direct',
+    }, '[Chat] User message received');
+    // 标记活跃会话：ws 断线时 close 处理器据此立即中止直连流（直连无宽限续传）
+    ws.activeSessionId = data.options?.sessionId || null;
+    ws.activeSessionProvider = 'direct';
+    try {
+      await queryDirect(data.command, { ...data.options, userId }, data.attachments || [], writer);
+    } finally {
+      recordActivity(userId);
+      ws.activeSessionId = null;
+      ws.activeSessionProvider = null;
+    }
+  },
   'cursor-resume': async (data, ws, writer) => {
     const userId = ws.user?.userId;
     recordActivity(userId);
@@ -338,7 +362,7 @@ const COMMAND_HANDLERS = {
     }
   },
   'get-active-sessions': async (data, ws, writer) => {
-    writer.send({ type: 'active-sessions', sessions: { cursor: getActiveCursorSessions(), codex: getActiveCodexSessions() } });
+    writer.send({ type: 'active-sessions', sessions: { cursor: getActiveCursorSessions(), codex: getActiveCodexSessions(), direct: getActiveDirectSessions() } });
   },
   /**
    * 处理前端用户对 Agent 提问的回答
@@ -406,7 +430,7 @@ export function handleChatConnection(ws, connectedClients) {
       if (!handler) return;
 
       // 为需要链路追踪的消息类型注入 traceId/spanId
-      const needsTrace = ['claude-command', 'cursor-command', 'codex-command', 'user-answer'].includes(data.type);
+      const needsTrace = ['claude-command', 'cursor-command', 'codex-command', 'direct-command', 'user-answer'].includes(data.type);
       if (needsTrace) {
         const traceId = generateTraceId();
         const spanId = generateSpanId();
@@ -430,6 +454,12 @@ export function handleChatConnection(ws, connectedClients) {
   ws.on('close', () => {
     logger.info('Chat client disconnected');
     connectedClients.delete(ws);
+    // 直连会话：无宽限续传（方案 4.7），断线立即中止流，防孤儿流持续烧 token
+    if (ws.activeSessionId && ws.activeSessionProvider === 'direct') {
+      abortDirectSession(ws.activeSessionId);
+      logger.info({ sessionId: ws.activeSessionId }, '[WebSocket] Direct session aborted on disconnect (no grace period)');
+      return;
+    }
     // 不再立即 abort：改为启动宽限期清理，支持刷新重连续传。
     // 期间若有新连接 subscribe 该会话则取消清理；超时未重连才 abort 释放资源。
     if (ws.activeSessionId) {
@@ -441,6 +471,12 @@ export function handleChatConnection(ws, connectedClients) {
   ws.on('error', (err) => {
     logger.error({ err }, '[WebSocket] Chat connection error');
     connectedClients.delete(ws);
+    // 直连会话：与 close 一致，立即中止
+    if (ws.activeSessionId && ws.activeSessionProvider === 'direct') {
+      abortDirectSession(ws.activeSessionId);
+      logger.info({ sessionId: ws.activeSessionId }, '[WebSocket] Direct session aborted on error');
+      return;
+    }
     // 连接出错同样进入宽限期（与 close 一致），保留重连续传可能
     if (ws.activeSessionId) {
       scheduleSessionCleanup(ws.activeSessionId, CLAUDE_GRACE_MS);

@@ -56,6 +56,10 @@ export interface UseMessageSenderOptions {
   selectedSkill?: { name: string; title: string } | null;
   /** Clear skill selection after send */
   onClearSkillSelection?: () => void;
+  /** Direct model mode (send direct-command instead of claude-command) */
+  isDirectMode?: boolean;
+  /** currentSessionId 的 provider 归属（'claude'|'direct'）；与当前模式不符时按新会话发 */
+  currentSessionProvider?: 'claude' | 'direct';
 }
 
 export interface UseMessageSenderResult {
@@ -93,6 +97,33 @@ function buildUserMessage(content: string, files: FileAttachment[]): ChatMessage
 }
 
 /**
+ * 校验 currentSessionId 与发送模式的归属一致性
+ *
+ * 会话生来单 provider（+ 号二选一）：Claude 模式不得带着 direct 会话的 ID 发送
+ * （后端会跨 provider resume 或触发降级守卫），反之亦然。不符时返回 null，
+ * 调用方按新会话发送（temp-*），由后端分配全新 sessionId。
+ *
+ * @param currentSessionId - 当前会话 ID
+ * @param isDirectMode - 本次发送的模式
+ * @param currentSessionProvider - currentSessionId 的 provider 归属
+ * @returns 校验通过的 sessionId；不符返回 null
+ */
+function validateSessionIdForMode(
+  currentSessionId: string | null,
+  isDirectMode: boolean | undefined,
+  currentSessionProvider: 'claude' | 'direct' | undefined,
+): string | null {
+  if (!currentSessionId) return null;
+  if (!currentSessionProvider) return currentSessionId; // 归属未知（旧会话/异常态）放行
+  const modeProvider = isDirectMode ? 'direct' : 'claude';
+  if (currentSessionProvider !== modeProvider) {
+    // 模式与会话归属不符：丢弃旧 ID，按新会话发（后端守卫也会兜底，此处前端先行）
+    return null;
+  }
+  return currentSessionId;
+}
+
+/**
  * Send WebSocket message with command and attachments
  * @param sendMessage - WebSocket send function
  * @param content - Message content
@@ -103,6 +134,7 @@ function buildUserMessage(content: string, files: FileAttachment[]): ChatMessage
  * @param permissionMode - Permission mode
  * @param onSessionProcessing - Session processing callback
  * @param skillName - Selected skill name (optional)
+ * @param isDirectMode - Direct model mode (bypass agent SDK)
  */
 function sendWebSocketMessage(
   sendMessage: (message: any) => void,
@@ -115,9 +147,30 @@ function sendWebSocketMessage(
   extendedThinking?: boolean,
   onSessionProcessing?: (sessionId: string) => void,
   skillName?: string,
+  isDirectMode?: boolean,
+  currentSessionProvider?: 'claude' | 'direct',
 ) {
-  // Create temporary session ID if needed
-  const sessionId = currentSessionId || `temp-${Date.now()}`;
+  // 发送口守卫：模式与会话归属不符时按新会话发（temp-*）
+  const validSessionId = validateSessionIdForMode(currentSessionId, isDirectMode, currentSessionProvider);
+  const sessionId = validSessionId || `temp-${Date.now()}`;
+
+  // 直连模式：发送 direct-command，仅携带直连语义的选项
+  //（无 agent 能力——permissionMode/extendedThinking/skill 不适用）
+  if (isDirectMode) {
+    sendMessage({
+      type: 'direct-command',
+      command: content,
+      attachments: files.length > 0 ? files : undefined,
+      options: {
+        projectPath: selectedProject?.name,
+        sessionId,
+        model: selectedModel,
+        resume: !!validSessionId,
+      },
+    });
+    onSessionProcessing?.(sessionId);
+    return;
+  }
 
   // Send message in the format expected by the backend
   sendMessage({
@@ -128,7 +181,7 @@ function sendWebSocketMessage(
       projectPath: selectedProject?.name,
       sessionId,
       model: selectedModel,
-      resume: !!currentSessionId,
+      resume: !!validSessionId,
       permissionMode,
       extendedThinking,
       skill: skillName || undefined,
@@ -209,6 +262,8 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
     consumePendingQuestion,
     selectedSkill,
     onClearSkillSelection,
+    isDirectMode,
+    currentSessionProvider,
   } = options;
 
   // 消息发送处理器：处理用户点击发送按钮或按 Ctrl+Enter 的逻辑
@@ -241,7 +296,7 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
     prepareMessageSending(currentSessionId, onSessionActive, onSetLoading, onStartStream);
 
     // 第五步：通过 WebSocket 发送消息到后端
-    // 消息类型：claude-command
+    // 消息类型：claude-command（直连模式下为 direct-command）
     // 携带内容：命令文本、附件、会话 ID、模型名称、权限模式等
     if (sendMessage && ws) {
       sendWebSocketMessage(
@@ -255,6 +310,8 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
         extendedThinking,
         onSessionProcessing,
         selectedSkill?.name,
+        isDirectMode,
+        currentSessionProvider,
       );
 
       // 发送成功后清除 skill 选择（一次性）；发送失败（ws 不存在）时保留以便重试
@@ -281,6 +338,8 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
     consumePendingQuestion,
     selectedSkill,
     onClearSkillSelection,
+    isDirectMode,
+    currentSessionProvider,
   ]);
 
   return { handleSend };

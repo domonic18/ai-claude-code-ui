@@ -30,6 +30,7 @@ import { handleSessionCreated, handleUserPromptContext, handleTodoWrite, handleC
 import { handleClaudeResponse, handleClaudeOutput, handleClaudeInteractivePrompt, handleAgentQuestion, handleClaudeError, handleAgentAnswerDropped, handleAgentQuestionAutoAnswered, handleBackendError } from './claudeHandler';
 import { handleCursorSystem, handleCursorToolUse, handleCursorError, handleCursorResult, handleCursorOutput } from './cursorHandler';
 import { handleCodexResponse, handleCodexComplete } from './codexHandler';
+import { handleDirectResponse, handleDirectComplete, handleDirectError } from './directHandler';
 import { emitConversationComplete } from '@/features/documents/services/documentEvents';
 
 // Import callbacks type
@@ -74,6 +75,16 @@ const MESSAGE_HANDLERS: Record<string, (message: WebSocketMessage, callbacks: Me
   },
   'codex-response': (msg, cbs) => handleCodexResponse(msg, cbs),
   'codex-complete': (msg, cbs, sid) => handleCodexComplete(msg, cbs, sid),
+  // 直连模型：SSE 事件与 claude 链同构，全部委托 claude 处理链（directHandler 归口）
+  'direct-response': (msg, cbs) => handleDirectResponse(msg, cbs),
+  'direct-complete': (msg, cbs, sid) => {
+    const handled = handleDirectComplete(msg, cbs, sid);
+    // 会话结束：触发文档面板兜底刷新（对齐 claude-complete——document-created
+    // 丢失或 recordAIDocument 失败时，靠目录扫描兜底发现直连生成的文件）
+    emitConversationComplete();
+    return handled;
+  },
+  'direct-error': (msg, cbs) => handleDirectError(msg, cbs),
   'session-aborted': (msg, cbs, sid) => handleSessionAborted(msg, cbs, sid),
   // 刷新续传控制消息：由 useStreamingResume 独立读取 wsMessages 处理响应，
   // 此处仅占位避免 "Unknown message type" 日志噪音
@@ -99,7 +110,7 @@ const MESSAGE_HANDLERS: Record<string, (message: WebSocketMessage, callbacks: Me
  * @returns true if message should be filtered (skipped)
  */
 function shouldFilterBySession(message: WebSocketMessage, currentSessionId: string | null): boolean {
-  const globalMessageTypes = ['projects_updated', 'session-created', 'claude-complete', 'codex-complete', 'session-resumed', 'session-status'];
+  const globalMessageTypes = ['projects_updated', 'session-created', 'claude-complete', 'codex-complete', 'direct-complete', 'session-resumed', 'session-status'];
   const isGlobalMessage = globalMessageTypes.includes(message.type);
 
   // For new sessions (currentSessionId is null), allow messages through
