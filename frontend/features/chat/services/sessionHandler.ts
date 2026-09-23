@@ -151,7 +151,37 @@ export function handleClaudeComplete(
   // Clear chat messages cache
   clearChatMessagesCache(message.exitCode, callbacks.getSelectedProjectName);
 
+  // 会话完成后刷新项目列表：最近活动排序依赖最新的会话时间戳，而唯一的
+  // 列表刷新时机是发消息时（此时新回复还没落盘）——不补这次刷新，刚聊过
+  // 的项目不会上浮（projects_updated 事件源已不存在，轮询默认关闭）。
+  // 用静默版本（refreshProjectsSilent，isRetry=true 不置 loading）：
+  // 发送瞬间已本地置顶，这次只是数据对齐，侧边栏不应闪 loading skeleton
+  scheduleProjectsRefresh();
+
   return true;
+}
+
+/**
+ * 会话完成后延迟刷新项目列表
+ *
+ * 延迟 1s：给后端 jsonl 落盘与 mtime 更新留出时间，立即拉可能仍读到旧值。
+ * 多次完成（连续多轮）共享一个定时器，避免重复请求。window.refreshProjects
+ * 不存在时静默跳过（测试环境/未登录）。
+ */
+const PENDING_REFRESH_KEY = '__projectsRefreshTimer';
+function scheduleProjectsRefresh(): void {
+  if (typeof window === 'undefined') return;
+  const w = window as typeof window & { [PENDING_REFRESH_KEY]?: ReturnType<typeof setTimeout> };
+  if (w[PENDING_REFRESH_KEY]) clearTimeout(w[PENDING_REFRESH_KEY]);
+  w[PENDING_REFRESH_KEY] = setTimeout(() => {
+    w[PENDING_REFRESH_KEY] = undefined;
+    try {
+      // 静默版优先；旧部署窗口无挂载时回退普通版
+      ((window as any).refreshProjectsSilent ?? (window as any).refreshProjects)?.();
+    } catch (e) {
+      logger.warn('[WS] Post-complete projects refresh failed:', e);
+    }
+  }, 1000);
 }
 
 /**

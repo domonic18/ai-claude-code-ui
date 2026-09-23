@@ -54,6 +54,55 @@ function WizardHeader({ onClose, isCreating, title }: {
 }
 
 /**
+ * Project Name Input Component (IME-safe, uncontrolled)
+ *
+ * 中文拼音等 IME 输入期间（组合态），受控组件每次 onChange 都会重设
+ * input.value，浏览器据此强制终止组合——拼音被打断成半截英文直接进框
+ * （如打 ceshi 中途变成框内 "ces" + 输入法只剩 "hi"）。
+ *
+ * 方案：完全非受控。React 在任何路径下都不写 DOM value——不传 value、
+ * 不传 defaultValue、没有同步 effect。上一次"effect 镜像同步"方案仍有
+ * 竞态：组合结束瞬间 input 事件携带的可能是替换前的旧 DOM 值（'cs'），
+ * state 停在旧值，随后 effect 发现 DOM（已上屏'测试'）与 state（'cs'）
+ * 不一致就把 DOM 写回 'cs'，刚上屏的中文被清掉，后续按键以普通字符
+ * 进入（用户实测：选词后框内是 "cs1"）。
+ *
+ * state 镜像允许短暂落后于 DOM，下一次 input 事件自然对齐；两个方向
+ * 的值都源自用户输入，永远不会互相覆盖丢字。重置场景（重开弹窗）由
+ * 父组件 key 重建输入框实现，同样不需要写 value。
+ */
+function ProjectNameInput({
+  onChange,
+  placeholder,
+  disabled,
+  availabilityIndicator,
+}: {
+  onChange: (value: string) => void;
+  placeholder: string;
+  disabled: boolean;
+  availabilityIndicator: React.ReactNode;
+}) {
+  return (
+    <div className="relative">
+      <Input
+        id="project-name"
+        type="text"
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full pr-24"
+        disabled={disabled}
+        autoFocus
+        autoComplete="off"
+      />
+      {/* Availability Status Indicator */}
+      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+        {availabilityIndicator}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Wizard Content Component
  *
  * Displays the main content area including error display, project name input,
@@ -111,23 +160,12 @@ function WizardContent({
         <label htmlFor="project-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           {projectNameLabel}
         </label>
-        <div className="relative">
-          <Input
-            id="project-name"
-            type="text"
-            value={projectName}
-            onChange={(e) => onNameChange(e.target.value)}
-            placeholder={projectNamePlaceholder}
-            className="w-full pr-24"
-            disabled={isCreating}
-            autoFocus
-            autoComplete="off"
-          />
-          {/* Availability Status Indicator */}
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            {availabilityIndicator}
-          </div>
-        </div>
+        <ProjectNameInput
+          onChange={onNameChange}
+          placeholder={projectNamePlaceholder}
+          disabled={isCreating}
+          availabilityIndicator={availabilityIndicator}
+        />
         <p className="text-xs text-gray-500 dark:text-gray-400">
           {projectNameHint}
         </p>
@@ -224,11 +262,11 @@ function WizardFooter({
  * @param {Function} props.onProjectCreated - Callback on successful project creation
  */
 const ProjectCreationWizard = ({
+  isOpen,
   onClose,
   onProjectCreated
 }: ProjectCreationWizardProps) => {
   const { t } = useTranslation();
-  const defaultProjectName = t('projectCreation.defaultName');
 
   const {
     projectName,
@@ -238,10 +276,12 @@ const ProjectCreationWizard = ({
     handleCreateProject,
     getAvailabilityStatusIndicator,
     shouldDisableCreateButton,
-  } = useProjectCreationWizard(defaultProjectName, onProjectCreated, onClose);
+  } = useProjectCreationWizard(onProjectCreated, onClose);
 
   return (
-    <div className="fixed top-0 left-0 right-0 bottom-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-0 sm:p-4">
+    // isOpen 变化（弹窗重开）时 key 重建整棵子树：非受控输入框随之重置为空，
+    // 这是唯一需要的"外部重置"路径，替代任何运行时写 value 的方案（IME 安全）
+    <div key={isOpen ? 'open' : 'closed'} className="fixed top-0 left-0 right-0 bottom-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-0 sm:p-4">
       <div className="bg-white dark:bg-gray-800 rounded-none sm:rounded-lg shadow-xl w-full h-full sm:h-auto sm:max-w-md border-0 sm:border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
         <WizardHeader
           onClose={onClose}

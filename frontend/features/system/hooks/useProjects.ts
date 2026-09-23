@@ -80,6 +80,18 @@ export function useProjects(
 
   useEffect(() => {
     (window as any).refreshProjects = fetchProjects;
+    // 静默刷新：会话完成后的后台对齐用。与 refreshProjects 唯一差异是
+    // isRetry=true 分支——不置 isLoadingProjects，侧边栏不闪 loading
+    // skeleton，数据到了悄悄替换
+    (window as any).refreshProjectsSilent = () => fetchProjects(true);
+    // 即时置顶：发消息瞬间本地把该项目 lastActivity 置为 now（不发请求、
+    // 不闪 loading），最近活动排序随重渲染立即把它移到顶部；会话完成后
+    // 的静默刷新拿到真实数据自然对齐
+    (window as any).touchProjectLocally = (projectName: string) => {
+      setProjects(prev => prev.map(p =>
+        p.name === projectName ? { ...p, lastActivity: new Date().toISOString() } : p
+      ));
+    };
   }, [fetchProjects]);
 
   return {

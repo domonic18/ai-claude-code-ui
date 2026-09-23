@@ -9,7 +9,7 @@
 services:
   # 主应用服务
   app:
-    image: ccr.ccs.tencentyun.com/patent/claude-code-ui:cfa80c1
+    image: ccr.ccs.tencentyun.com/patent/claude-code-ui:f312874
     container_name: claude-code-app
     ports:
       - "3001:3001"

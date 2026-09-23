@@ -352,9 +352,8 @@
   "projectCreation": {
     "title": "Create New Project",
     "projectName": "Project Name",
-    "projectNamePlaceholder": "Enter project name",
+    "projectNamePlaceholder": "e.g. patent-research-2026",
     "projectNameHint": "Use letters, numbers, hyphens, and underscores only",
-    "defaultName": "my-workspace",
     "infoCard": "A new folder will be created in your workspace with this name. You can start coding with Claude right away!",
     "pathPreview": "Project will be created at:",
     "status": {

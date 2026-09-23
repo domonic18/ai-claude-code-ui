@@ -7,7 +7,19 @@
 import type { Project } from '../types';
 import type { ProjectSortOrder, StarredProjects } from '../types';
 import { STORAGE_KEYS } from '../constants';
+import { getProjectLastActivity } from '../utils/projectActivityUtils';
 import { logger } from '@/shared/utils/logger';
+
+/**
+ * 项目最近活动时间（毫秒时间戳）
+ *
+ * 取项目级 lastActivity（后端目录 mtime 兜底）与最新会话时间的较大值：
+ * 聊过的项目以最新会话时间排序，没聊过的新项目以创建时间置顶。
+ */
+function _getProjectActivityMs(project: Project): number {
+  const aggregated = getProjectLastActivity(project);
+  return aggregated ? aggregated.getTime() : 0;
+}
 
 /**
  * Sort projects by specified order
@@ -33,8 +45,10 @@ export function sortProjectsByOrder(
       const bName = b.displayName || b.name;
       return aName.localeCompare(bName);
     } else if (sortOrder === 'recent') {
-      const aTime = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
-      const bTime = b.lastActivity ? new Date(b.lastActivity).getTime() : 0;
+      // 聚合时间：max(目录 mtime, 最新会话时间)——直读 project.lastActivity
+      // 在容器模式下恒为 undefined，会导致排序退化为按名字
+      const aTime = _getProjectActivityMs(a);
+      const bTime = _getProjectActivityMs(b);
       if (aTime !== bTime) {
         return bTime - aTime;
       }
@@ -57,12 +71,12 @@ export function loadSortOrder(): ProjectSortOrder {
     const savedSettings = localStorage.getItem(STORAGE_KEYS.CLAUDE_SETTINGS);
     if (savedSettings) {
       const settings = JSON.parse(savedSettings);
-      return settings.projectSortOrder || 'name';
+      return settings.projectSortOrder || 'recent';
     }
   } catch (error) {
     logger.error('Error loading sort order:', error);
   }
-  return 'name';
+  return 'recent';
 }
 
 /**

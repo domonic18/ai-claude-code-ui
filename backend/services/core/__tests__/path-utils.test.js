@@ -19,6 +19,18 @@ describe('PathUtils', () => {
       const result = PathUtils.encodeProjectName('my/nested/workspace');
       assert.equal(result, '-workspace-my-nested-workspace');
     });
+
+    it('should encode underscore and non-ASCII chars like SDK does (regression: 23df而w--__)', () => {
+      // SDK 写容器目录用 [^a-zA-Z0-9-] → - 规则；读路径必须一致，
+      // 否则含下划线的项目名（如 23df而w--__）会话目录对不上号，会话列表永远为空
+      const result = PathUtils.encodeProjectName('23df而w--__');
+      assert.equal(result, '-workspace-23df-w----');
+    });
+
+    it('should encode chinese-only project name', () => {
+      const result = PathUtils.encodeProjectName('我的工作区-5');
+      assert.equal(result, '-workspace-------5');
+    });
   });
 
   describe('decodeProjectName', () => {

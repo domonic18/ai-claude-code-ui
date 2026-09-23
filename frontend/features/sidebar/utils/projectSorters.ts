@@ -35,6 +35,10 @@ export function sortByName(projects: Project[], starredProjects: StarredProjects
 /**
  * Sort projects by recent activity
  *
+ * 与 helpers/projectSortHelpers.sortProjectsByOrder 的 recent 分支保持一致：
+ * 使用聚合时间 max(目录 mtime, 最新会话时间)，而非直读 project.lastActivity
+ * （容器模式下该字段来自目录 mtime 兜底，无会话新项目也能正确参与排序）。
+ *
  * @param projects - The projects to sort
  * @param starredProjects - Set of starred project names (for tie-breaking)
  * @returns Projects sorted by recent activity
@@ -48,9 +52,9 @@ export function sortByRecent(projects: Project[], starredProjects: StarredProjec
     if (aStarred && !bStarred) return -1;
     if (!aStarred && bStarred) return 1;
 
-    // Then by last activity
-    const aTime = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
-    const bTime = b.lastActivity ? new Date(b.lastActivity).getTime() : 0;
+    // Then by aggregated last activity
+    const aTime = getProjectLastActivity(a)?.getTime() ?? 0;
+    const bTime = getProjectLastActivity(b)?.getTime() ?? 0;
 
     if (aTime !== bTime) {
       return bTime - aTime; // Most recent first

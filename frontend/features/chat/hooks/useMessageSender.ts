@@ -283,6 +283,18 @@ export function useMessageSender(options: UseMessageSenderOptions): UseMessageSe
     const userMessage = buildUserMessage(content, files);
     onAddMessage(userMessage);
 
+    // 即时置顶（新消息与 user-answer 两条路径共用）：发送瞬间本地把当前
+    // 项目顶到列表最前（recent 排序）。不等后端——发消息此刻本项目即全场
+    // 最新；回复完成后的静默刷新会用真实数据对齐。touchProjectLocally 由
+    // useProjects 挂载，不存在时静默跳过（测试环境）
+    if (selectedProject?.name) {
+      try {
+        (window as any).touchProjectLocally?.(selectedProject.name);
+      } catch {
+        // 本地置顶失败不影响发送
+      }
+    }
+
     // 第三步：检查是否有 Agent 的待回答提问
     // 如果有，将用户消息作为回答发送（user-answer 类型），不再发送新的 claude-command
     if (consumePendingQuestion?.(content)) {

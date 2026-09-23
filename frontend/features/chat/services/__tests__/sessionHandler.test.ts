@@ -108,6 +108,63 @@ describe('sessionHandler - handleClaudeComplete', () => {
     expect(callbacks.clearPendingQuestion).toHaveBeenCalledWith('session-A');
   });
 
+  it('会话完成后延迟刷新项目列表（最近活动排序依赖最新数据）', () => {
+    vi.useFakeTimers();
+    try {
+      const refreshProjects = vi.fn();
+      (window as any).refreshProjects = refreshProjects;
+      const message = { type: 'claude-complete', sessionId: 'session-A', exitCode: 0 };
+
+      handleClaudeComplete(message as any, callbacks, 'session-A');
+
+      // 立即不刷：给后端 jsonl 落盘/mtime 更新留时间
+      expect(refreshProjects).not.toHaveBeenCalled();
+
+      // 1s 后触发一次
+      vi.advanceTimersByTime(1100);
+      expect(refreshProjects).toHaveBeenCalledTimes(1);
+
+      delete (window as any).refreshProjects;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('连续多次会话完成共享一个刷新定时器（不重复请求）', () => {
+    vi.useFakeTimers();
+    try {
+      const refreshProjects = vi.fn();
+      (window as any).refreshProjects = refreshProjects;
+      const message = { type: 'claude-complete', sessionId: 'session-A', exitCode: 0 };
+
+      handleClaudeComplete(message as any, callbacks, 'session-A');
+      vi.advanceTimersByTime(500); // 半途又完成一轮
+      handleClaudeComplete(message as any, callbacks, 'session-A');
+      vi.advanceTimersByTime(1100);
+
+      expect(refreshProjects).toHaveBeenCalledTimes(1);
+
+      delete (window as any).refreshProjects;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('window.refreshProjects 不存在时静默跳过（测试环境/未登录不报错）', () => {
+    vi.useFakeTimers();
+    try {
+      delete (window as any).refreshProjects;
+      const message = { type: 'claude-complete', sessionId: 'session-A', exitCode: 0 };
+
+      expect(() => {
+        handleClaudeComplete(message as any, callbacks, 'session-A');
+        vi.advanceTimersByTime(1100);
+      }).not.toThrow();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('跨视图结束时同样清空结束会话的 pendingQuestion', () => {
     const message = { type: 'claude-complete', sessionId: 'session-A' };
 
