@@ -31,6 +31,26 @@ const MAX_SSE_DATA_LENGTH = 2 * 1024 * 1024;
 export const MAX_SSE_BUFFER_LENGTH = 8 * 1024 * 1024;
 
 /**
+ * 解析直连 thinking 配置（env DIRECT_THINKING）
+ *
+ * 取值（大小写不敏感）：
+ * - 'disabled'（默认）→ { type: 'disabled' }：显式关闭思考，混合推理模型
+ *   （kimi/MiniMax/glm/deepseek 等）不产出 thinking 块，响应更快、token 更省
+ * - 'off' / '' / 未设 → null：不带 thinking 字段，跟随端点自身默认
+ * - 其他值（如 'adaptive'）→ { type: <值> }：原样透传给厂商端点
+ *
+ * 每次调用现读 env：与项目其他 config 常量行为一致（进程内不会变，但便于测试注入）。
+ *
+ * @returns {Object|null} thinking 参数对象；null 表示不携带该字段
+ */
+export function resolveDirectThinking() {
+  const raw = (process.env.DIRECT_THINKING ?? 'disabled').trim().toLowerCase();
+  if (raw === 'off' || raw === '') return null;
+  if (raw === 'disabled') return { type: 'disabled' };
+  return { type: raw };
+}
+
+/**
  * 解析 SSE 接收缓冲区，取出完整事件的 data 载荷
  *
  * 规则：按 \n 分行（容忍 \r\n），聚合连续 data: 行，空行界分事件；
@@ -214,6 +234,11 @@ export async function streamDirectMessage(config, request, handlers = {}) {
   };
   if (request.system) body.system = request.system;
   if (request.tools) body.tools = request.tools;
+  // thinking 开关：直连请求默认显式关闭思考（省时省 token）。env 可改（enabled/adaptive
+  // 等按厂商支持传入），传 'off' 或空值则不带该字段（跟随端点默认）。
+  // 注意：Laozhang 等代理的 -thinking 后缀变体是路由层定死，参数无法关闭。
+  const thinking = resolveDirectThinking();
+  if (thinking) body.thinking = thinking;
 
   // 总超时与首 token 超时合成到一个 controller；signal 链接外部中止（用户停止）
   const timeoutController = new AbortController();

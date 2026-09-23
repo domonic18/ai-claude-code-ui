@@ -12,6 +12,7 @@ import {
   createStreamAccumulator,
   buildDirectHeaders,
   streamDirectMessage,
+  resolveDirectThinking,
   MAX_SSE_BUFFER_LENGTH,
 } from '../DirectModelClient.js';
 
@@ -305,5 +306,83 @@ describe('streamDirectMessage tools 透传', () => {
       { baseURL: 'https://unit.test' }, { model: 'm', messages: [], maxTokens: 1 }, {},
     );
     assert.equal('tools' in capture.body, false);
+  });
+});
+
+describe('streamDirectMessage thinking 开关', () => {
+  const realFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    delete process.env.DIRECT_THINKING;
+  });
+
+  /** 构造捕获请求体的最小 SSE Response */
+  function capturingSseResponse(capture) {
+    return async (url, init) => {
+      capture.body = JSON.parse(init.body);
+      const encoder = new TextEncoder();
+      const body = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode('data: {"type":"message_stop"}\n\n'));
+          controller.close();
+        },
+      });
+      return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+    };
+  }
+
+  it('默认（env 未设）请求体携带 thinking:{type:"disabled"}', async () => {
+    delete process.env.DIRECT_THINKING;
+    const capture = {};
+    globalThis.fetch = capturingSseResponse(capture);
+    await streamDirectMessage(
+      { baseURL: 'https://unit.test' }, { model: 'm', messages: [], maxTokens: 1 }, {},
+    );
+    assert.deepEqual(capture.body.thinking, { type: 'disabled' });
+  });
+
+  it('DIRECT_THINKING=off 时不带 thinking 字段（跟随端点默认）', async () => {
+    process.env.DIRECT_THINKING = 'off';
+    const capture = {};
+    globalThis.fetch = capturingSseResponse(capture);
+    await streamDirectMessage(
+      { baseURL: 'https://unit.test' }, { model: 'm', messages: [], maxTokens: 1 }, {},
+    );
+    assert.equal('thinking' in capture.body, false);
+  });
+
+  it('DIRECT_THINKING=adaptive 时原样透传（大小写归一）', async () => {
+    process.env.DIRECT_THINKING = 'Adaptive';
+    const capture = {};
+    globalThis.fetch = capturingSseResponse(capture);
+    await streamDirectMessage(
+      { baseURL: 'https://unit.test' }, { model: 'm', messages: [], maxTokens: 1 }, {},
+    );
+    assert.deepEqual(capture.body.thinking, { type: 'adaptive' });
+  });
+});
+
+describe('resolveDirectThinking 配置解析', () => {
+  const REAL = process.env.DIRECT_THINKING;
+
+  afterEach(() => {
+    if (REAL === undefined) delete process.env.DIRECT_THINKING;
+    else process.env.DIRECT_THINKING = REAL;
+  });
+
+  it('未设 → disabled（默认关闭思考）', () => {
+    delete process.env.DIRECT_THINKING;
+    assert.deepEqual(resolveDirectThinking(), { type: 'disabled' });
+  });
+
+  it('空串 / 纯空白 → null（不带字段）', () => {
+    process.env.DIRECT_THINKING = '   ';
+    assert.equal(resolveDirectThinking(), null);
+  });
+
+  it('非法值原样透传（厂商报错可发现，不在网关层吞掉）', () => {
+    process.env.DIRECT_THINKING = 'banana';
+    assert.deepEqual(resolveDirectThinking(), { type: 'banana' });
   });
 });
