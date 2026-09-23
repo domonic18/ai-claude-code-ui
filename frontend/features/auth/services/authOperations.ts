@@ -1,7 +1,7 @@
 /**
  * 认证操作模块
  *
- * 处理认证相关的 API 调用：登录、注册、登出、密码管理和用户资料操作。
+ * 处理认证相关的 API 调用：登出和用户资料操作（登录/注册/密码管理已随 SSO-only 改造移除）。
  *
  * @module features/auth/services/authOperations
  */
@@ -9,19 +9,12 @@
 // 国际化翻译工具
 import { t as translate } from '@/shared/i18n';
 // 类型定义
-import type {
-  User,
-  LoginCredentials,
-  RegistrationData,
-  AuthResponse,
-} from '../types';
+import type { User } from '../types';
 // 日志记录工具
 import { logger } from '@/shared/utils/logger';
 
 // 常量定义：API 端点路径
 const API_ENDPOINTS = {
-  LOGIN: '/login',
-  REGISTER: '/register',
   LOGOUT: '/logout',
   ME: '/me',
   VALIDATE: '/validate'
@@ -33,154 +26,6 @@ const HTTP_METHODS = {
   GET: 'GET',
   PATCH: 'PATCH'
 } as const;
-
-/**
- * 执行登录操作
- *
- * 发送用户凭据到后端进行认证，成功后存储会话信息。
- *
- * @param {string} baseUrl - 基础 API URL
- * @param {LoginCredentials} credentials - 用户凭据（用户名和密码）
- * @param {Function} storeSession - 会话存储函数
- * @returns {Promise<AuthResponse>} 登录响应，包含用户信息、token 或错误消息
- */
-export async function executeLogin(
-  baseUrl: string,
-  credentials: LoginCredentials,
-  storeSession: (session: any) => void
-): Promise<AuthResponse> {
-  try {
-    // 使用 fetch API 发送登录请求到后端
-    // 发送登录请求到后端 API
-    const response = await fetch(`${baseUrl}${API_ENDPOINTS.LOGIN}`, {
-      method: HTTP_METHODS.POST,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(credentials), // 将凭据对象序列化为 JSON 字符串
-    });
-
-    // 检查 HTTP 响应状态码
-    // 检查响应是否成功
-    if (!response.ok) {
-      // 尝试从响应体解析错误消息，如果失败则使用默认消息
-      // 尝试解析错误消息
-      const error = await response.json().catch(() => ({ message: translate('auth.error.loginFailed') }));
-      return {
-        success: false,
-        error: error.message || translate('auth.error.loginFailed'),
-      };
-    }
-
-    // 登录成功，解析响应数据
-    // 解析响应数据
-    const data = await response.json();
-    // 构造类型化的认证响应对象
-    const authResponse: AuthResponse = {
-      success: true,
-      user: data.user,
-      token: data.token,
-      message: data.message,
-    };
-
-    // 如果登录成功，将会话信息存储到本地（包含 token、用户信息和认证状态）
-    // 如果登录成功，将会话信息存储到本地
-    if (authResponse.token) {
-      storeSession({
-        token: authResponse.token,
-        user: authResponse.user,
-        isAuthenticated: true,
-      });
-    }
-
-    return authResponse;
-  } catch (error) {
-    // 捕获网络错误或其他异常
-    // 记录错误日志
-    logger.error('Login error:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : translate('auth.error.networkError'),
-    };
-  }
-}
-
-// 常量定义：默认错误消息
-const DEFAULT_ERROR_MESSAGES = {
-  LOGIN_FAILED: 'auth.error.loginFailed',
-  REGISTRATION_FAILED: 'auth.error.registrationFailed',
-  NETWORK_ERROR: 'auth.error.networkError'
-} as const;
-
-/**
- * 执行注册操作
- *
- * 发送用户注册信息到后端，成功后自动登录并存储会话。
- *
- * @param {string} baseUrl - 基础 API URL
- * @param {RegistrationData} data - 注册数据（用户名和密码）
- * @param {Function} storeSession - 会话存储函数
- * @returns {Promise<AuthResponse>} 注册响应，包含用户信息、token 或错误消息
- */
-export async function executeRegister(
-  baseUrl: string,
-  data: RegistrationData,
-  storeSession: (session: any) => void
-): Promise<AuthResponse> {
-  try {
-    // 使用 fetch API 发送注册请求到后端
-    // 发送注册请求到后端 API
-    const response = await fetch(`${baseUrl}${API_ENDPOINTS.REGISTER}`, {
-      method: HTTP_METHODS.POST,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data), // 将注册数据序列化为 JSON 字符串
-    });
-
-    // 检查 HTTP 响应状态码
-    // 检查响应是否成功
-    if (!response.ok) {
-      // 尝试从响应体解析错误消息
-      // 尝试解析错误消息
-      const error = await response.json().catch(() => ({ message: translate(DEFAULT_ERROR_MESSAGES.REGISTRATION_FAILED) }));
-      return {
-        success: false,
-        error: error.message || translate(DEFAULT_ERROR_MESSAGES.REGISTRATION_FAILED),
-      };
-    }
-
-    // 注册成功，解析响应数据
-    // 解析响应数据
-    const responseData = await response.json();
-    // 构造类型化的认证响应对象
-    const authResponse: AuthResponse = {
-      success: true,
-      user: responseData.user,
-      token: responseData.token,
-      message: responseData.message,
-    };
-
-    // 如果注册成功，将会话信息存储到本地（实现自动登录）
-    // 如果注册成功，将会话信息存储到本地（自动登录）
-    if (authResponse.token) {
-      storeSession({
-        token: authResponse.token,
-        user: authResponse.user,
-        isAuthenticated: true,
-      });
-    }
-
-    return authResponse;
-  } catch (error) {
-    // 记录错误日志
-    logger.error('Registration error:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : translate(DEFAULT_ERROR_MESSAGES.NETWORK_ERROR),
-    };
-  }
-}
 
 /**
  * 执行登出操作
@@ -220,12 +65,6 @@ export async function executeLogout(
   }
 }
 
-// 重新导出密码操作函数（从 authPasswordOperations 模块）
-export {
-  changePassword,
-  requestPasswordReset,
-  confirmPasswordReset,
-} from './authPasswordOperations';
 
 /**
  * 从服务器刷新用户数据

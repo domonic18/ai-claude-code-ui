@@ -37,8 +37,6 @@ export const HTTP_STATUS = {
  */
 export const API_ENDPOINTS = {
   // Auth
-  AUTH_LOGIN: '/api/auth/login',
-  AUTH_REGISTER: '/api/auth/register',
   AUTH_LOGOUT: '/api/auth/logout',
   AUTH_STATUS: '/api/auth/status',
   AUTH_WS_TOKEN: '/api/auth/ws-token',

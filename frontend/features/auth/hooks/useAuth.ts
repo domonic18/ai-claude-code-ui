@@ -12,27 +12,20 @@ import { useAuth as useSharedAuth } from '@/shared/contexts/AuthContext';
 // 认证服务
 import { getAuthService } from '../services';
 // 类型定义
-import type {
-  User,
-  LoginCredentials,
-  RegistrationData,
-  AuthResponse,
-} from '../types';
+import type { User } from '../types';
 
 /**
  * 认证功能 Hook 返回值类型定义
  * 扩展共享认证上下文，提供额外的认证方法
  */
-// LoginModal、SetupForm 和各个需要认证信息的页面组件调用此 hook 获取用户状态
+// 各个需要认证信息的页面组件调用此 hook 获取用户状态
 export interface UseAuthReturn {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   needsSetup: boolean;
   error: string | null;
-  login: (credentials: LoginCredentials) => Promise<AuthResponse>;
   logout: () => Promise<void>;
-  register: (data: RegistrationData) => Promise<AuthResponse>;
   updateUser: (updates: Partial<User>) => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -42,7 +35,7 @@ const AUTH_STORAGE_KEYS = {
   ERROR: 'authError'
 } as const;
 
-// LoginModal、SetupForm 和各个需要认证信息的页面组件调用此 hook 获取用户状态
+// 各个需要认证信息的页面组件调用此 hook 获取用户状态
 /**
  * Hook for managing authentication state
  * Wraps the shared AuthContext with auth-specific types
@@ -52,29 +45,6 @@ export function useAuth(): UseAuthReturn {
   const sharedAuth = useSharedAuth();
   // 获取认证服务实例
   const authService = getAuthService();
-  // 使用 useCallback 缓存登录函数，避免不必要的重新渲染
-
-  // Convert shared auth to our auth-specific format
-  // 封装登录方法，返回统一的 AuthResponse 格式
-  const login = useCallback(async (credentials: LoginCredentials): Promise<AuthResponse> => {
-    const result = await sharedAuth.login(credentials.username, credentials.password);
-    return {
-      success: result.success,
-      user: sharedAuth.user,
-      error: result.error,
-    };
-  }, [sharedAuth]);
-
-  // 使用 useCallback 缓存注册函数
-  // 封装注册方法，返回统一的 AuthResponse 格式
-  const register = useCallback(async (data: RegistrationData): Promise<AuthResponse> => {
-    const result = await sharedAuth.register(data.username, data.password);
-    return {
-      success: result.success,
-      user: sharedAuth.user,
-      error: result.error,
-    };
-  }, [sharedAuth]);
 
   // 使用 useCallback 缓存更新用户函数
   // 更新用户信息方法
@@ -82,7 +52,7 @@ export function useAuth(): UseAuthReturn {
     await authService.updateUser(updates);
     // Refresh user from shared context after update
     // 更新后从共享上下文刷新用户数据
-    await sharedAuth.login(sharedAuth.user?.username || '', '');
+    await sharedAuth.checkAuthStatus(true);
   }, [authService, sharedAuth]);
 
   // 使用 useCallback 缓存刷新用户函数
@@ -99,9 +69,7 @@ export function useAuth(): UseAuthReturn {
     isLoading: sharedAuth.isLoading,
     needsSetup: sharedAuth.needsSetup,
     error: sharedAuth.error,
-    login,
     logout: sharedAuth.logout,
-    register,
     updateUser,
     refreshUser,
   };

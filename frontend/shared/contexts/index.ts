@@ -3,7 +3,7 @@ export { ThemeProvider, useTheme } from './ThemeContext';
 export type { ThemeContextValue, ThemeProviderProps } from './ThemeContext';
 
 export { AuthProvider, useAuth } from './AuthContext';
-export type { AuthContextValue, AuthProviderProps, AuthResult } from './AuthContext';
+export type { AuthContextValue, AuthProviderProps } from './AuthContext';
 
 export { WebSocketProvider, useWebSocketContext } from './WebSocketContext';
 export type { WebSocketContextValue, WebSocketProviderProps } from './WebSocketContext';

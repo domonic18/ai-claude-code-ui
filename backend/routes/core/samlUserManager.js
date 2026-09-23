@@ -10,6 +10,7 @@ import { repositories } from '../../database/db.js';
 import { generateToken } from '../../middleware/auth.middleware.js';
 import containerManager from '../../services/container/core/index.js';
 import { createLogger } from '../../utils/logger.js';
+import { authModeConfig } from '../../config/authMode.config.js';
 
 const logger = createLogger('routes/core/samlUserManager');
 const { User } = repositories;
@@ -65,6 +66,23 @@ function extractUserInfo(spResponse) {
 
 // 定义 HTTP 路由处理器
 /**
+ * 若用户的 SAML NameID（用户名）命中 SSO_ADMIN_USERS 白名单则提升为 admin（幂等）
+ * 注：当前 IdP 的 NameID 是用户姓名（如 YuFangMing），不含 email 属性，故按用户名匹配
+ * @param {Object} user - 用户对象（含 id/username）
+ * @param {string} externalId - SAML NameID
+ */
+function promoteToAdminIfAllowlisted(user, externalId) {
+  const normalizedName = (externalId || user.username || '').toLowerCase();
+  if (!normalizedName || !authModeConfig.ssoAdminUsers.includes(normalizedName)) return;
+
+  const current = User.getById(user.id);
+  if (current && current.role !== 'admin') {
+    User.updateRole(user.id, 'admin');
+    logger.info({ userId: user.id, username: user.username }, 'SSO user promoted to admin via username allowlist');
+  }
+}
+
+/**
  * 查找或创建 SAML 用户
  * @param {string} externalId - SAML NameID
  * @param {Object} profile - 用户属性
@@ -83,11 +101,12 @@ async function findOrCreateUser(externalId, profile) {
       });
     }
     User.updateLastLogin(user.id);
+    promoteToAdminIfAllowlisted(user, externalId);
     return user;
   }
 
   try {
-    return User.createWithSSO({
+    const created = User.createWithSSO({
       username: profile.email,
       email: profile.email,
       identity_provider: 'saml',
@@ -96,6 +115,8 @@ async function findOrCreateUser(externalId, profile) {
       last_name: profile.lastName,
       display_name: profile.displayName,
     });
+    promoteToAdminIfAllowlisted(created, externalId);
+    return created;
   } catch (dbError) {
     logger.error('[SAML] Failed to create user:', dbError);
     throw Object.assign(new Error('Failed to create user'), {
@@ -154,6 +175,7 @@ function redirectToFrontend(res) {
 export {
   extractUserInfo,
   findOrCreateUser,
+  promoteToAdminIfAllowlisted,
   setAuthCookie,
   initiateContainerCreation,
   redirectToFrontend,

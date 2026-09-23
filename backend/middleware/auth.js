@@ -91,6 +91,27 @@ const authenticateToken = async (req, res, next) => {
 };
 
 /**
+ * 管理员角色校验中间件：必须在 authenticateToken 之后使用
+ * 平台模式放行（单用户即管理员）；否则校验数据库中的 role === 'admin'
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ */
+const requireAdmin = (req, res, next) => {
+  // 平台模式：单用户即管理员（与 authenticateToken 的放行口径一致）
+  if (SERVER.isPlatform) {
+    return next();
+  }
+
+  const role = req.user?.role;
+  if (role !== 'admin') {
+    logger.warn({ userId: req.user?.id, username: req.user?.username }, 'Admin access denied');
+    return res.status(403).json({ error: 'Admin privileges required', code: 'ADMIN_REQUIRED' });
+  }
+  next();
+};
+
+/**
  * 生成永不过期的 JWT 令牌，payload 包含 userId 和 username
  * @param {{id: number, username: string}} user - 数据库用户对象
  * @returns {string} 签名后的 JWT 字符串
@@ -153,6 +174,7 @@ const authenticateWebSocket = (token) => {
 export {
   validateApiKey,
   authenticateToken,
+  requireAdmin,
   generateToken,
   authenticateWebSocket
 };

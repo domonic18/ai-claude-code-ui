@@ -19,13 +19,13 @@ import { AuthProvider, useAuth } from '@/shared/contexts/AuthContext';
 import { WebSocketProvider, useWebSocketContext } from '@/shared/contexts/WebSocketContext';
 import { TourContext } from '@/shared/contexts/TourContext';
 import { QueryClientProvider, queryClient } from '@/shared/libs/query';
-import { ProtectedRoute } from '@/router';
+import { ProtectedRoute, AdminRoute } from '@/router';
 import { useProductTour } from '@/shared/hooks/useProductTour';
 import { ProductTour } from '@/shared/components/tour';
 import { ConnectionBanner } from '@/shared/components/common/ConnectionBanner';
 import { APP_NAME } from '@/shared/constants/app.constants';
 import { Homepage, SettingsPage, AdminPage, UserPromptPage, NotFoundPage } from '@/pages';
-import { LoginForm, SetupForm } from '@/features/auth';
+import { LoginForm } from '@/features/auth';
 
 import '@/shared/i18n';
 import type { Session as SidebarSession } from './features/sidebar/types/sidebar.types';
@@ -170,12 +170,13 @@ function App() {
               <Routes>
                 <Route path="/homepage" element={<Homepage />} />
                 <Route path="/login" element={<LoginForm />} />
-                <Route path="/register" element={<SetupForm />} />
                 <Route path="/" element={<RootRedirect />} />
                 <Route element={<ProtectedRoute />}>
                   <Route path="/chat" element={<AppContent />} />
                   <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="/admin" element={<AdminPage />} />
+                  <Route element={<AdminRoute />}>
+                    <Route path="/admin" element={<AdminPage />} />
+                  </Route>
                   <Route path="/user-prompt" element={<UserPromptPage />} />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />
