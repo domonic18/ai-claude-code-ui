@@ -46,14 +46,17 @@ export class PathUtils {
    * 编码项目名称为容器内存储格式
    * SDK 使用绝对路径编码：/workspace/my-workspace → -workspace-my-workspace
    *
+   * 编码规则与 SDK 对齐：所有非 [a-zA-Z0-9-] 字符（含下划线、非 ASCII）→ -。
+   * 此前只替换 /，导致含下划线的项目名读路径与 SDK 写路径不一致。
+   *
    * @param {string} projectName - 项目名称（如：my-workspace）
    * @returns {string} 编码后的名称（如：-workspace-my-workspace）
    */
   static encodeProjectName(projectName) {
-    // SDK 编码的是完整路径 "workspace/my-workspace"
-    // 所以我们需要添加 SDK 前缀后再编码
-    const fullPath = `${SDK_PATH_PREFIX}/${projectName}`;
-    return fullPath.replace(/\//g, '-').replace(/^/, '-');
+    // SDK 编码的是完整路径 "/workspace/{projectName}"（含前导斜杠，
+    // 前导 / 同样被替换为 -，与 SDK 输出的 -workspace- 前缀一致）
+    const fullPath = `/${SDK_PATH_PREFIX}/${projectName}`;
+    return fullPath.replace(/[^a-zA-Z0-9-]/g, '-');
   }
 
   /**

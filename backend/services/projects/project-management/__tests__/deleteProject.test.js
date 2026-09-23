@@ -51,11 +51,18 @@ describe('deleteProject 会话目录路径契约 (Bug2 回归)', () => {
     const name = '我的项目';
     const sessionDir = getProjectDir(name);
 
-    // 编码规则：非 ASCII → -，/ → -
-    // /workspace/我的项目 → (非ASCII→-) /workspace/---- → ( /→-) -workspace-----
+    // 编码规则（与 SDK 一致）：所有非 [a-zA-Z0-9-] 字符（含中文、下划线）→ -
+    // /workspace/我的项目 → -workspace-----
     assert.equal(sessionDir, '/workspace/.claude/projects/-workspace-----');
     // 命令中不应残留原始中文（否则 rm 路径与读取路径不一致 → 漏删 → 复活）
     assert.ok(!/[^\x00-\x7f]/.test(sessionDir), '会话目录路径不应残留非 ASCII 字符');
+  });
+
+  it('含下划线的混合项目名（编码回归：23df而w--__）必须与 SDK 写入的目录一致', () => {
+    // SDK 在容器内实际创建的目录是 -workspace-23df-w----（下划线也替换为 -）。
+    // 旧实现只替换非 ASCII 字符保留 _，导致读路径 -workspace-23df-w--__ 与
+    // 写路径不一致：会话列表永远为空（表现为新会话"丢失"、排序不上浮）。
+    assert.equal(getProjectDir('23df而w--__'), '/workspace/.claude/projects/-workspace-23df-w----');
   });
 
   it('deleteProject 删除的会话目录必须与读取会话的目录完全一致（同源）', () => {
