@@ -324,7 +324,8 @@ export async function queryDirect(command, options = {}, attachments = [], write
     }
     await appendDirectTurn(userId, projectName, sessionId, newEntries);
 
-    send(writer, { type: 'direct-complete', sessionId, provider: 'direct', exitCode: 0 });
+    // durationMs：本轮整段耗时（请求开始→落盘完成），与下方完成日志同口径；前端在助手消息旁展示
+    send(writer, { type: 'direct-complete', sessionId, provider: 'direct', exitCode: 0, durationMs: Date.now() - Date.parse(startedAt) });
     logger.info({
       sessionId,
       durationMs: Date.now() - Date.parse(startedAt),

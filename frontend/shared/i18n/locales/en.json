@@ -110,6 +110,7 @@
       "responding": "AI is responding",
       "complete": "Response complete"
     },
+    "durationTooltip": "Total duration of this turn",
     "emptyState": {
       "title": "Start a conversation",
       "description": "Send a message to begin working with AI assistance."

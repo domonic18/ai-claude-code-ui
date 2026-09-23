@@ -43,7 +43,11 @@ export function processOutputLine(line, writer, sessionId, state) {
     writer.send({
       type: 'claude-complete',
       sessionId: jsonData.sessionId || sessionId,
-      exitCode: 0
+      exitCode: 0,
+      // 整轮耗时（毫秒）：SDK result 消息自带的 duration_ms，经 handleResultMessage
+      // 存入 state 后在此随完成消息下发，前端据此在助手消息旁展示本轮耗时。
+      // 旧容器脚本无 result 消息时为 undefined，展开为空对象，前端静默跳过
+      ...(typeof state.resultDurationMs === 'number' && { durationMs: state.resultDurationMs }),
     });
     // 主动通知流处理层：SDK 已输出 done，可以立即结束 docker exec stream。
     // 否则 SDK 进程不主动退出，stream.on('end') 永远不来，导致空挂。

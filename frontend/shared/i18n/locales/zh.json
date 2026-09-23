@@ -110,6 +110,7 @@
       "responding": "AI 正在响应",
       "complete": "响应完成"
     },
+    "durationTooltip": "本轮总耗时",
     "emptyState": {
       "title": "开始对话",
       "description": "发送消息以开始使用 AI 助手。"

@@ -215,7 +215,7 @@ export function handleAssistantMessage(sdkMessage, writer, sessionId, state) {
  * @param {Object} writer - Message writer
  * @param {string} sessionId - Session ID
  */
-export function handleResultMessage(sdkMessage, writer, sessionId, _state) {
+export function handleResultMessage(sdkMessage, writer, sessionId, state) {
   const tokenBudget = extractTokenBudget(sdkMessage);
   if (tokenBudget) {
     logger.info(
@@ -223,6 +223,12 @@ export function handleResultMessage(sdkMessage, writer, sessionId, _state) {
       '[MessageTransformer] Token budget update'
     );
     writer.send({ type: 'token-budget', data: tokenBudget });
+  }
+
+  // 捕获 SDK result 消息自带的整轮耗时（毫秒），供 MessageTransformer done 分支
+  // 随 claude-complete 下发前端展示。result 消息每轮一条，直接覆盖即为最新值。
+  if (state && typeof sdkMessage.duration_ms === 'number') {
+    state.resultDurationMs = sdkMessage.duration_ms;
   }
 
   if (isResultError(sdkMessage)) {
@@ -233,7 +239,7 @@ export function handleResultMessage(sdkMessage, writer, sessionId, _state) {
     writer.send({ type: 'claude-error', error: sdkMessage.result });
   } else {
     logger.info(
-      { sessionId, resultPreview: sdkMessage.result?.substring(0, 120) },
+      { sessionId, durationMs: sdkMessage.duration_ms ?? null, resultPreview: sdkMessage.result?.substring(0, 120) },
       '[MessageTransformer] Sending claude-response, type: result'
     );
   }

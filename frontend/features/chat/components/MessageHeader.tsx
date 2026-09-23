@@ -14,7 +14,24 @@ export interface MessageHeaderProps {
   provider?: string;
   displayName?: string;
   isGrouped: boolean;
+  /** 本轮整轮耗时（毫秒），存在时展示在名称旁（如 "3.2s"） */
+  durationMs?: number;
   onShowSettings?: () => void;
+}
+
+/**
+ * 格式化耗时展示：≥60s 用分秒（1m 5s），≥1s 用一位小数秒（3.2s），否则毫秒（850ms）
+ * @param durationMs - 耗时（毫秒）
+ * @returns 格式化后的耗时文本
+ */
+function formatDuration(durationMs: number): string {
+  if (durationMs >= 60_000) {
+    const minutes = Math.floor(durationMs / 60_000);
+    const seconds = Math.round((durationMs % 60_000) / 1000);
+    return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+  }
+  if (durationMs >= 1000) return `${(durationMs / 1000).toFixed(1)}s`;
+  return `${Math.round(durationMs)}ms`;
 }
 
 /**
@@ -27,6 +44,7 @@ export function MessageHeader({
   provider = 'claude',
   displayName,
   isGrouped,
+  durationMs,
   onShowSettings,
 }: MessageHeaderProps) {
   const { t, i18n } = useTranslation();
@@ -68,6 +86,16 @@ export function MessageHeader({
       <div className="text-sm font-medium text-foreground">
         {displayLabel}
       </div>
+
+      {/* 整轮耗时：仅 assistant 消息且有值时展示，次要视觉不抢内容焦点 */}
+      {type === 'assistant' && typeof durationMs === 'number' && durationMs >= 0 && (
+        <span
+          className="text-xs text-muted-foreground flex-shrink-0"
+          title={t('chat.durationTooltip')}
+        >
+          {formatDuration(durationMs)}
+        </span>
+      )}
     </div>
   );
 }
