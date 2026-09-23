@@ -154,7 +154,8 @@ export function handleClaudeComplete(
   // 会话完成后刷新项目列表：最近活动排序依赖最新的会话时间戳，而唯一的
   // 列表刷新时机是发消息时（此时新回复还没落盘）——不补这次刷新，刚聊过
   // 的项目不会上浮（projects_updated 事件源已不存在，轮询默认关闭）。
-  // refreshProjects 由 useProjects 挂载在 window 上（见 useProjects.ts）
+  // 用静默版本（refreshProjectsSilent，isRetry=true 不置 loading）：
+  // 发送瞬间已本地置顶，这次只是数据对齐，侧边栏不应闪 loading skeleton
   scheduleProjectsRefresh();
 
   return true;
@@ -175,7 +176,8 @@ function scheduleProjectsRefresh(): void {
   w[PENDING_REFRESH_KEY] = setTimeout(() => {
     w[PENDING_REFRESH_KEY] = undefined;
     try {
-      (window as any).refreshProjects?.();
+      // 静默版优先；旧部署窗口无挂载时回退普通版
+      ((window as any).refreshProjectsSilent ?? (window as any).refreshProjects)?.();
     } catch (e) {
       logger.warn('[WS] Post-complete projects refresh failed:', e);
     }
