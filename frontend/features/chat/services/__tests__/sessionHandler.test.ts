@@ -109,11 +109,49 @@ describe('sessionHandler - handleClaudeComplete', () => {
   });
 
   it('跨视图结束时同样清空结束会话的 pendingQuestion', () => {
-    const message = { type: 'claude-complete', sessionId: 'session-A', exitCode: 0 };
+    const message = { type: 'claude-complete', sessionId: 'session-A' };
 
     handleClaudeComplete(message as any, callbacks, 'session-B');
 
     expect(callbacks.clearPendingQuestion).toHaveBeenCalledWith('session-A');
+  });
+
+  it('携带 durationMs 时：回填到末条非工具 assistant 消息', () => {
+    const lastAssistant = {
+      id: 'm3', type: 'assistant', content: '最终回复', timestamp: Date.now(),
+    };
+    (callbacks.onSetMessages as ReturnType<typeof vi.fn>).mockImplementation((updater: (prev: any[]) => any[]) =>
+      updater([
+        { id: 'm1', type: 'user', content: '问题', timestamp: Date.now() },
+        { id: 'm2', type: 'assistant', isToolUse: true, content: '', toolName: 'Bash', timestamp: Date.now() },
+        lastAssistant,
+      ]));
+    const message = { type: 'claude-complete', sessionId: 'session-A', exitCode: 0, durationMs: 3210 };
+
+    handleClaudeComplete(message as any, callbacks, 'session-A');
+
+    expect(callbacks.onSetMessages).toHaveBeenCalledTimes(1);
+    // updater 返回的数组中，末条 assistant（跳过工具消息）携带 durationMs
+    const updated = (callbacks.onSetMessages as ReturnType<typeof vi.fn>).mock.results[0].value;
+    expect(updated[1].durationMs).toBeUndefined();   // 工具消息不被回填
+    expect(updated[2].durationMs).toBe(3210);        // 最终回复被回填
+    expect(updated[2].content).toBe('最终回复');      // 其余字段保留
+  });
+
+  it('跨视图时即使携带 durationMs 也不回填（不污染当前视图消息列表）', () => {
+    const message = { type: 'claude-complete', sessionId: 'session-A', exitCode: 0, durationMs: 3210 };
+
+    handleClaudeComplete(message as any, callbacks, 'session-B');
+
+    expect(callbacks.onSetMessages).not.toHaveBeenCalled();
+  });
+
+  it('未携带 durationMs 时不调用 onSetMessages（旧后端兼容）', () => {
+    const message = { type: 'claude-complete', sessionId: 'session-A', exitCode: 0 };
+
+    handleClaudeComplete(message as any, callbacks, 'session-A');
+
+    expect(callbacks.onSetMessages).not.toHaveBeenCalled();
   });
 });
 

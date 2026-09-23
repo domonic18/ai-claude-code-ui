@@ -14,7 +14,9 @@ import {
   buildThinkingMessage,
   buildToolUseMessage,
   buildTextPart,
-  buildToolUsePart
+  buildToolUsePart,
+  historyDurationMs,
+  parseTimestampMs
 } from './messageBuilders';
 
 /**
@@ -109,7 +111,11 @@ export function processAssistantMessage(
       id: msg.id || `msg-${Date.now()}-${Math.random()}`,
       type: 'assistant',
       content: content,
-      timestamp: msg.timestamp || new Date().toISOString()
+      timestamp: msg.timestamp || new Date().toISOString(),
+      ...(() => {
+        const d = historyDurationMs(msg, parseTimestampMs(converted.findLast(m => m.type === 'user')?.timestamp));
+        return typeof d === 'number' ? { durationMs: d } : {};
+      })()
     });
     return;
   }
@@ -121,8 +127,8 @@ export function processAssistantMessage(
   const textParts = content.filter((part: any) => part.type === 'text');
   const toolUseParts = content.filter((part: any) => part.type === 'tool_use');
 
-  // 将每个文本部分转换为独立的消息对象
-  textParts.forEach((part: any) => converted.push(buildTextPart(part, msg)));
+  // 将每个文本部分转换为独立的消息对象（传 converted 供历史耗时计算定位本轮 user 起点）
+  textParts.forEach((part: any) => converted.push(buildTextPart(part, msg, converted)));
   // 将每个工具调用部分转换为独立的消息对象，并关联对应的执行结果
   toolUseParts.forEach((part: any) => converted.push(buildToolUsePart(part, msg, toolResults)));
 }

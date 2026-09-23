@@ -14,7 +14,7 @@ export interface MessageHandlerCallbacks {
   // Message state updates
   onAddMessage: (message: ChatMessage) => void;
   onUpdateMessage: (messageId: string, updates: Partial<ChatMessage>) => void;
-  onSetMessages: (messages: ChatMessage[]) => void;
+  onSetMessages: (messages: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
 
   // Session state updates
   onSetLoading: (loading: boolean) => void;
