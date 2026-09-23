@@ -261,7 +261,9 @@ function handleStreamProcessing(stream, stdout, stderr, writer, sessionId) {
   const stdoutChunks = [];
   const stderrChunks = [];
   let dataCount = 0;
-  const state = { sessionCreatedSent: false, toolSeq: 0, toolTimers: new Map(), onDone: null, apiCallSeq: 0, lastEventTime: null, deltas: [] };
+  // resultDurationMs：SDK result 消息的整轮耗时（由 handleResultMessage 写入，
+  // done 时随 claude-complete 下发前端）；toolNames：toolUseId → 工具名（日志用）
+  const state = { sessionCreatedSent: false, toolSeq: 0, toolTimers: new Map(), toolNames: new Map(), resultDurationMs: null, onDone: null, apiCallSeq: 0, lastEventTime: null, deltas: [] };
 
   // TTFT (Time To First Token) 计时：从流处理开始到首个有效 stdout chunk
   const ttftTimer = startTimer('claude/first_token');

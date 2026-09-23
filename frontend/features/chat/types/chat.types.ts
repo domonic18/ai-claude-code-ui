@@ -128,6 +128,8 @@ export interface ChatMessage {
   taskListRawEvents?: TaskListRawEvent[];
   /** Exit code for command execution */
   exitCode?: number;
+  /** 整轮耗时（毫秒）：本轮完成时由 claude-complete/direct-complete 下发，回填到末条 assistant 消息；历史直连会话取条目 timestamp 差值 */
+  durationMs?: number;
 }
 
 // FileAttachment 的类型定义

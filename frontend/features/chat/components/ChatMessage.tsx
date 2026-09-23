@@ -132,6 +132,7 @@ function renderNonUserMessage(
             displayName={displayName}
             provider={provider}
             isGrouped={isGrouped}
+            durationMs={message.durationMs}
           />
         )}
         <div className="w-full">
