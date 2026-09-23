@@ -44,15 +44,19 @@ function _collectStreamOutput(stream) {
  * 创建项目条目对象
  * @param {string} projectName - 项目名称
  * @param {string} displayName - 显示名称
+ * @param {string|null} mtimeEpoch - 目录 mtime（epoch 秒，find -printf '%T@' 输出）；
+ *   无会话的新项目以此作为 lastActivity 兜底，支撑"最近活动排序 + 新项目置顶"
  * @returns {Object} 项目对象
  */
-function createProjectEntry(projectName, displayName) {
+function createProjectEntry(projectName, displayName, mtimeEpoch = null) {
+  const mtimeMs = mtimeEpoch ? Math.round(parseFloat(mtimeEpoch) * 1000) : null;
   return {
     name: projectName,
     path: projectName.replace(/-/g, '/'),
     displayName: displayName || projectName,
     fullPath: projectName,
     isContainerProject: true,
+    lastActivity: mtimeMs ? new Date(mtimeMs).toISOString() : null,
     sessions: [],
     sessionMeta: { hasMore: false, total: 0 },
     cursorSessions: [],
@@ -62,7 +66,11 @@ function createProjectEntry(projectName, displayName) {
 
 // ContainerProjectManager.js 功能函数
 /**
- * 从 ls 输出解析项目列表
+ * 从 find 输出解析项目列表
+ *
+ * 输出格式为 `mtime\t名称`（find -printf '%T@\t%f\n'），按首个制表符切分；
+ * 对不含制表符的行（旧格式/异常行）按无 mtime 处理，保持向后兼容。
+ *
  * @param {string} output - 命令输出
  * @param {Object} projectConfig - 项目配置
  * @returns {Array} 项目列表
@@ -72,11 +80,17 @@ function parseProjectList(output, projectConfig) {
   const lines = output.trim().split('\n');
 
   for (const line of lines) {
-    let projectName = line.replace(/[\x00-\x1f\x7f]/g, '').trim();
+    if (!line.trim()) continue;
+
+    const tabIdx = line.indexOf('\t');
+    const namePart = tabIdx === -1 ? line : line.slice(tabIdx + 1);
+    const mtimePart = tabIdx === -1 ? null : line.slice(0, tabIdx).trim();
+    const projectName = namePart.replace(/[\x00-\x1f\x7f]/g, '').trim();
     if (!projectName || projectName.startsWith('.')) continue;
 
+    const mtimeEpoch = mtimePart && /^\d+(\.\d+)?$/.test(mtimePart) ? mtimePart : null;
     const customDisplayName = projectConfig[projectName]?.displayName;
-    projectList.push(createProjectEntry(projectName, customDisplayName));
+    projectList.push(createProjectEntry(projectName, customDisplayName, mtimeEpoch));
   }
 
   return projectList;
@@ -131,9 +145,10 @@ export async function getProjectsInContainer(userId) {
         .join(' | ');
       // 只列出目录（-type d），避免把 /workspace 下的普通文件（如镜像残留的 =10 垃圾文件）
       // 误识别为项目，进而触发 SDK chdir 到文件路径报 spawn ENOTDIR。
-      // -printf '%f\n' 输出目录 basename（不含父路径），与原 ls -1 的解析逻辑兼容。
+      // -printf '%T@\t%f\n' 同时输出目录 mtime（epoch 秒.纳秒）与 basename（不含父路径），
+      // mtime 作为项目级 lastActivity 兜底：无会话的新项目按创建时间置顶，最近活动排序依赖它。
       // sandbox 镜像为 GNU findutils，-printf 已验证可用（参见 DocumentService 目录扫描）。
-      const lsCmd = `find "$1" -maxdepth 1 -mindepth 1 -type d -printf '%f\\n' 2>/dev/null | ${excludePattern} | sort || echo ""`;
+      const lsCmd = `find "$1" -maxdepth 1 -mindepth 1 -type d -printf '%T@\\t%f\\n' 2>/dev/null | ${excludePattern} | sort || echo ""`;
 
       const { stream } = await containerManager.execInContainer(
         userId,
