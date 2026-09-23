@@ -4,12 +4,11 @@
  * Custom hooks and handlers for Project Creation Wizard functionality.
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, AlertCircle, Loader2 } from 'lucide-react';
 import { logger } from '@/shared/utils/logger';
 import {
-  useProjectNameInitialization,
   useProjectNameAvailabilityCheck,
   createDebouncedChecker,
   sanitizeProjectName,
@@ -44,38 +43,35 @@ export interface UseProjectCreationWizardReturn {
 /**
  * Custom hook to manage project creation wizard state and logic
  *
- * @param {string} defaultProjectName - Default project name from translation
+ * 输入框以空值起步（GitHub/Slack 式"先名后建"），placeholder 提供格式示例，
+ * 引导用户主动命名而非无脑接受默认名（线上曾出现默认名连建 -1..-29 的垃圾项目）。
+ *
  * @param {Function} onProjectCreated - Callback on successful creation
  * @param {Function} onClose - Callback to close modal
  * @returns {Object} Wizard state and handlers
  */
 export function useProjectCreationWizard(
-  defaultProjectName: string,
   onProjectCreated?: (project: any) => void,
   onClose?: () => void
 ) {
   // i18n：重名冲突时复用既有文案，避免直接展示后端原始 message
   const { t } = useTranslation();
 
-  // Form state
-  const [projectName, setProjectName] = useState<string>(defaultProjectName);
+  // Form state：空值起步，名字由用户第一手确定，天然去重
+  const [projectName, setProjectName] = useState<string>('');
 
   // UI state
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [availabilityStatus, setAvailabilityStatus] = useState<NameAvailabilityStatus>('idle');
 
-  // Track initial load to skip check for the auto-generated name
-  const isInitialLoad = useRef(true);
-
   const checkAvailability = useCallback(
     createDebouncedChecker(setAvailabilityStatus),
     []
   );
 
-  // Initialize project name and availability checking
-  useProjectNameInitialization(defaultProjectName, setProjectName, isInitialLoad);
-  useProjectNameAvailabilityCheck(projectName, isInitialLoad, checkAvailability);
+  // 输入变化时防抖检查可用性
+  useProjectNameAvailabilityCheck(projectName, checkAvailability);
 
   /**
    * Handle project name input change
@@ -192,8 +188,8 @@ export function useProjectCreationWizard(
       projectName.trim().length === 0 ||
       availabilityStatus === 'unavailable' ||
       availabilityStatus === 'checking' ||
-      // 初始加载/自动取名未完成期间禁用：此时输入框可能是未去重的陈旧标题，
-      // 提交会触发重名 409（线上 user 8 连建 my-workspace-1..-22 的根因）
+      // 输入未通过可用性检查前禁用（idle = 尚未检查），防止提交重名触发 409；
+      // 检查由输入防抖触发（300ms），完成即转 available/unavailable
       availabilityStatus === 'idle'
     );
   };

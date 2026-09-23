@@ -351,9 +351,8 @@
   "projectCreation": {
     "title": "创建新项目",
     "projectName": "项目名称",
-    "projectNamePlaceholder": "请输入项目名称",
+    "projectNamePlaceholder": "例如: 输入项目名称",
     "projectNameHint": "仅使用字母、数字、连字符和下划线",
-    "defaultName": "我的工作区",
     "infoCard": "将在您的工作区中创建一个以此命名的新文件夹。您可以立即开始使用 Claude 编程！",
     "pathPreview": "项目将创建于：",
     "status": {

@@ -228,7 +228,6 @@ const ProjectCreationWizard = ({
   onProjectCreated
 }: ProjectCreationWizardProps) => {
   const { t } = useTranslation();
-  const defaultProjectName = t('projectCreation.defaultName');
 
   const {
     projectName,
@@ -238,7 +237,7 @@ const ProjectCreationWizard = ({
     handleCreateProject,
     getAvailabilityStatusIndicator,
     shouldDisableCreateButton,
-  } = useProjectCreationWizard(defaultProjectName, onProjectCreated, onClose);
+  } = useProjectCreationWizard(onProjectCreated, onClose);
 
   return (
     <div className="fixed top-0 left-0 right-0 bottom-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-0 sm:p-4">

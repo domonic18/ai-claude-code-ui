@@ -66,32 +66,6 @@ export async function checkNameAvailability(projectName: string): Promise<NameAv
 }
 
 /**
- * Generate next available project name with numbering
- *
- * @param {string} baseName - Base project name
- * @returns {Promise<string>} Available project name with numbering if needed
- */
-export async function generateAvailableName(baseName: string): Promise<string> {
-  let counter = 1;
-  let suggestedName = baseName;
-
-  while (counter <= 100) {
-    const status = await checkNameAvailability(suggestedName);
-    if (status === 'available') {
-      return suggestedName;
-    }
-    if (status === 'idle' || status === 'error') {
-      // Can't determine, return the suggested name anyway
-      return suggestedName;
-    }
-    suggestedName = `${baseName}-${counter}`;
-    counter++;
-  }
-
-  return `${baseName}-${Date.now()}`;
-}
-
-/**
  * Simple debounce utility function
  *
  * @param {Function} func - Function to debounce

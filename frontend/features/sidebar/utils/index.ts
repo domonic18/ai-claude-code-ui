@@ -31,7 +31,6 @@ export {
 
 export {
   checkNameAvailability,
-  generateAvailableName,
   debounce,
 } from './projectNameUtils';
 

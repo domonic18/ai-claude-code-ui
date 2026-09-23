@@ -13,55 +13,26 @@ import { api } from '@/shared/services';
 import { logger } from '@/shared/utils/logger';
 import {
   checkNameAvailability,
-  generateAvailableName,
   debounce,
   CHECK_DEBOUNCE_MS,
   type NameAvailabilityStatus,
 } from '../utils/projectNameUtils';
 
 /**
- * Custom hook to initialize project name on mount
- *
- * @param {string} baseProjectName - Base project name from translation
- * @param {Function} setProjectName - State setter for project name
- * @param {React.MutableRefObject<boolean>} isInitialLoad - Ref to track initial load
- */
-export function useProjectNameInitialization(
-  baseProjectName: string,
-  setProjectName: (name: string) => void,
-  isInitialLoad: React.MutableRefObject<boolean>
-): void {
-  useEffect(() => {
-    const initializeName = async () => {
-      const availableName = await generateAvailableName(baseProjectName);
-      setProjectName(availableName);
-      // Mark initial load as complete after setting the name
-      isInitialLoad.current = false;
-    };
-
-    initializeName();
-  }, [baseProjectName, setProjectName, isInitialLoad]);
-}
-
-/**
  * Custom hook to check project name availability
  *
+ * 空值时检查器内部会将状态置回 idle，无需跳过逻辑。
+ *
  * @param {string} projectName - Current project name
- * @param {React.MutableRefObject<boolean>} isInitialLoad - Ref to track initial load
  * @param {Function} checkAvailability - Debounced availability check function
  */
 export function useProjectNameAvailabilityCheck(
   projectName: string,
-  isInitialLoad: React.MutableRefObject<boolean>,
   checkAvailability: (name: string) => void
 ): void {
   useEffect(() => {
-    if (isInitialLoad.current) {
-      // Skip check during initial load
-      return;
-    }
     checkAvailability(projectName);
-  }, [projectName, checkAvailability, isInitialLoad]);
+  }, [projectName, checkAvailability]);
 }
 
 /**
