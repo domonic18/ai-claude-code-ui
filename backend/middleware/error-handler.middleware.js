@@ -178,6 +178,22 @@ class UnauthorizedError extends AppError {
   }
 }
 
+/**
+ * 禁止访问错误类（已认证但无权限，或功能被禁用）
+ */
+class ForbiddenError extends AppError {
+// 中间件函数，在请求处理链中执行
+  /**
+   * 构造函数
+   * @param {string} message - 错误消息
+   * @param {string} code - 业务错误码
+   */
+  constructor(message = 'Forbidden', code = ErrorCode.INSUFFICIENT_PERMISSIONS) {
+    super(message, code, 403);
+    this.name = 'ForbiddenError';
+  }
+}
+
 // 中间件函数，在请求处理链中执行
 /**
  * 错误处理中间件
@@ -336,6 +352,7 @@ export {
   NotFoundError,
   ConflictError,
   UnauthorizedError,
+  ForbiddenError,
   errorHandler,
   notFoundHandler,
   asyncHandler

@@ -13,15 +13,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
 // Mock AuthContext before importing hooks
-const mockLogin = vi.fn();
-const mockRegister = vi.fn();
 const mockLogout = vi.fn();
+const mockCheckAuthStatus = vi.fn();
 const mockSharedAuth = {
   user: null as any,
-  login: mockLogin,
-  register: mockRegister,
   logout: mockLogout,
-  checkAuthStatus: vi.fn(),
+  checkAuthStatus: mockCheckAuthStatus,
   isLoading: false,
   needsSetup: false,
   error: null as string | null,
@@ -65,8 +62,6 @@ describe('useAuth', () => {
     mockSharedAuth.isLoading = false;
     mockSharedAuth.needsSetup = false;
     mockSharedAuth.error = null;
-    mockLogin.mockResolvedValue({ success: true });
-    mockRegister.mockResolvedValue({ success: true });
     mockLogout.mockResolvedValue(undefined);
   });
 
@@ -109,62 +104,6 @@ describe('useAuth', () => {
     const { result } = renderHook(() => useAuth());
 
     expect(result.current.error).toBe('Session expired');
-  });
-
-  it('should delegate login to shared auth', async () => {
-    mockLogin.mockResolvedValue({ success: true });
-
-    const { result } = renderHook(() => useAuth());
-
-    const response = await result.current.login({
-      username: 'user1',
-      password: 'pass1',
-    });
-
-    expect(mockLogin).toHaveBeenCalledWith('user1', 'pass1');
-    expect(response.success).toBe(true);
-  });
-
-  it('should handle login error', async () => {
-    mockLogin.mockResolvedValue({ success: false, error: 'Invalid credentials' });
-
-    const { result } = renderHook(() => useAuth());
-
-    const response = await result.current.login({
-      username: 'user1',
-      password: 'wrong',
-    });
-
-    expect(response.success).toBe(false);
-    expect(response.error).toBe('Invalid credentials');
-  });
-
-  it('should delegate register to shared auth', async () => {
-    mockRegister.mockResolvedValue({ success: true });
-
-    const { result } = renderHook(() => useAuth());
-
-    const response = await result.current.register({
-      username: 'newuser',
-      password: 'pass123',
-    });
-
-    expect(mockRegister).toHaveBeenCalledWith('newuser', 'pass123');
-    expect(response.success).toBe(true);
-  });
-
-  it('should handle register error', async () => {
-    mockRegister.mockResolvedValue({ success: false, error: 'User exists' });
-
-    const { result } = renderHook(() => useAuth());
-
-    const response = await result.current.register({
-      username: 'existing',
-      password: 'pass',
-    });
-
-    expect(response.success).toBe(false);
-    expect(response.error).toBe('User exists');
   });
 
   it('should delegate logout to shared auth', async () => {

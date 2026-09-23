@@ -2,14 +2,14 @@
  * routes/core/auth.js
  *
  * 核心认证路由
- * 使用 AuthController 处理所有认证相关请求
+ * 认证方式：仅 SAML SSO（密码登录已移除，管理员由 SSO_ADMIN_USERS 白名单授予）
  *
  * @module routes/core/auth
  */
 
 import express from 'express';
 import { AuthController } from '../../controllers/core/index.js';
-import { authenticate, validate } from '../../middleware/index.js';
+import { authenticate } from '../../middleware/index.js';
 
 const router = express.Router();
 const authController = new AuthController();
@@ -27,43 +27,10 @@ router.get('/status', authController._asyncHandler(authController.getStatus));
 router.get('/ws-token', authenticate(), authController._asyncHandler(authController.getWebSocketToken));
 
 /**
- * POST /api/auth/register
- * 用户注册（设置）- 仅在没有用户存在时才允许
- */
-router.post('/register', validate({
-  body: {
-    username: { required: true, type: 'string', minLength: 3 },
-    password: { required: true, type: 'string', minLength: 6 }
-  }
-}), authController._asyncHandler(authController.register));
-
-/**
- * POST /api/auth/login
- * 用户登录
- */
-router.post('/login', validate({
-  body: {
-    username: { required: true, type: 'string' },
-    password: { required: true, type: 'string' }
-  }
-}), authController._asyncHandler(authController.login));
-
-/**
  * GET /api/auth/user
  * 获取当前用户（受保护的路由）
  */
 router.get('/user', authenticate(), authController._asyncHandler(authController.getCurrentUser));
-
-/**
- * PUT /api/auth/password
- * 修改密码（受保护的路由）
- */
-router.put('/password', authenticate(), validate({
-  body: {
-    currentPassword: { required: true, type: 'string' },
-    newPassword: { required: true, type: 'string', minLength: 6 }
-  }
-}), authController._asyncHandler(authController.changePassword));
 
 /**
  * POST /api/auth/logout

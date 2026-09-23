@@ -2,20 +2,17 @@
  * AuthController.js
  *
  * 认证控制器
- * 处理用户认证相关的请求
+ * 认证方式：仅 SAML SSO（密码注册/登录/改密已移除，管理员由 SSO_ADMIN_USERS 白名单授予）
  *
  * @module controllers/AuthController
  */
 
-import bcrypt from 'bcrypt';
 import { BaseController } from './BaseController.js';
-import { repositories, db } from '../../database/db.js';
-import { generateToken } from '../../middleware/auth.middleware.js';
-import containerManager from '../../services/container/core/index.js';
-import { NotFoundError, UnauthorizedError, ValidationError } from '../../middleware/error-handler.middleware.js';
+import { repositories } from '../../database/db.js';
+import { UnauthorizedError, NotFoundError } from '../../middleware/error-handler.middleware.js';
 import { createLogger } from '../../utils/logger.js';
-import { getCookieOptions, validateCredentials, validatePasswordChange, buildUserResponse } from './authHelpers.js';
-import { createUserContainerInBackground } from './transactionHelpers.js';
+import { samlConfig } from '../../config/saml.config.js';
+import { getCookieOptions, buildUserResponse } from './authHelpers.js';
 
 const logger = createLogger('controllers/core/AuthController');
 
@@ -50,116 +47,9 @@ export class AuthController extends BaseController {
 
       this._success(res, {
         needsSetup: !hasUsers,
-        isAuthenticated: false
+        isAuthenticated: false,
+        samlEnabled: samlConfig.enabled
       });
-    } catch (error) {
-      this._handleError(error, req, res, next);
-    }
-  }
-
-// 处理业务逻辑，供路由层调用
-  /**
-   * 用户注册（仅在没有用户存在时）
-   * @param {Object} req - Express 请求对象
-   * @param {Object} res - Express 响应对象
-   * @param {Function} next - 下一个中间件
-   */
-  async register(req, res, next) {
-    try {
-      const { username, password } = req.body;
-
-      // 验证输入
-      validateCredentials(username, password);
-
-      // 检查用户名是否已存在（多用户支持）
-      const existingUser = User.getByUsername(username);
-      if (existingUser) {
-        throw new ValidationError('Username already exists. Please choose a different username.');
-      }
-
-      // 哈希密码（耗时操作放在事务外，避免长时间持有锁）
-      const saltRounds = 12;
-      const passwordHash = await bcrypt.hash(password, saltRounds);
-
-      // 使用 better-sqlite3 的事务 API，自动处理 COMMIT/ROLLBACK
-      const registerUser = db().transaction(() => {
-        // 第一个注册的用户自动成为管理员
-        const hasUsers = User.hasUsers();
-        const role = hasUsers ? 'user' : 'admin';
-
-        // 创建用户
-        const user = User.create(username, passwordHash, role);
-
-        // 生成令牌
-        const token = generateToken(user);
-
-        // 更新最后登录时间
-        User.updateLastLogin(user.id);
-
-        return { user, role, token };
-      });
-
-      const { user, role, token } = registerUser();
-
-      // 在后台为用户创建容器
-      createUserContainerInBackground(user.id, containerManager);
-
-      // 设置 httpOnly cookie（行业最佳实践）
-      res.cookie('auth_token', token, getCookieOptions());
-
-      logger.info({ userId: user.id, username: user.username, role, ip: getClientIp(req) }, 'User registered');
-      this._success(res, buildUserResponse(user), 'Registration successful', 201);
-    } catch (error) {
-      this._handleError(error, req, res, next);
-    }
-  }
-
-// 处理业务逻辑，供路由层调用
-  /**
-   * 用户登录
-   * @param {Object} req - Express 请求对象
-   * @param {Object} res - Express 响应对象
-   * @param {Function} next - 下一个中间件
-   */
-  async login(req, res, next) {
-    try {
-      const { username, password } = req.body;
-
-      // 验证输入
-      if (!username || !password) {
-        throw new ValidationError('Username and password are required');
-      }
-
-      // 获取用户
-      const user = User.getByUsername(username);
-
-      if (!user) {
-        logger.warn({ username, ip: getClientIp(req) }, 'Login failed: user not found');
-        throw new UnauthorizedError('Invalid username or password');
-      }
-
-      // 验证密码
-      const isValidPassword = await bcrypt.compare(password, user.password_hash);
-
-      if (!isValidPassword) {
-        logger.warn({ userId: user.id, username, ip: getClientIp(req) }, 'Login failed: wrong password');
-        throw new UnauthorizedError('Invalid username or password');
-      }
-
-      // 生成令牌
-      const token = generateToken(user);
-
-      // 更新最后登录时间
-      User.updateLastLogin(user.id);
-
-      // 为用户创建容器（如果不存在）
-      createUserContainerInBackground(user.id, containerManager);
-
-      // 设置 httpOnly cookie（行业最佳实践）
-      res.cookie('auth_token', token, getCookieOptions());
-
-      logger.info({ userId: user.id, username, ip: getClientIp(req) }, 'User logged in');
-      this._success(res, buildUserResponse(user), 'Login successful');
     } catch (error) {
       this._handleError(error, req, res, next);
     }
@@ -182,48 +72,6 @@ export class AuthController extends BaseController {
       }
 
       this._success(res, buildUserResponse(user));
-    } catch (error) {
-      this._handleError(error, req, res, next);
-    }
-  }
-
-// 处理业务逻辑，供路由层调用
-  /**
-   * 修改密码
-   * @param {Object} req - Express 请求对象
-   * @param {Object} res - Express 响应对象
-   * @param {Function} next - 下一个中间件
-   */
-  async changePassword(req, res, next) {
-    try {
-      const userId = this._getUserId(req);
-      const { currentPassword, newPassword } = req.body;
-
-      // 验证输入
-      validatePasswordChange(currentPassword, newPassword);
-
-      // 获取用户
-      const user = User.getById(userId);
-
-      if (!user) {
-        throw new NotFoundError('User', userId);
-      }
-
-      // 验证当前密码
-      const isValidPassword = await bcrypt.compare(currentPassword, user.password_hash);
-
-      if (!isValidPassword) {
-        throw new UnauthorizedError('Current password is incorrect');
-      }
-
-      // 哈希新密码
-      const saltRounds = 12;
-      const passwordHash = await bcrypt.hash(newPassword, saltRounds);
-
-      // 更新密码
-      User.updatePassword(userId, passwordHash);
-
-      this._success(res, null, 'Password changed successfully');
     } catch (error) {
       this._handleError(error, req, res, next);
     }
@@ -276,4 +124,3 @@ export class AuthController extends BaseController {
 }
 
 export default AuthController;
-

@@ -9,7 +9,7 @@
 
 import express from 'express';
 import { syncExtensions, syncToAllUsers, getAllExtensions } from '../../services/extensions/extension-sync.js';
-import { authenticateToken } from '../../middleware/auth.js';
+import { authenticateToken, requireAdmin } from '../../middleware/auth.js';
 import { getWorkspaceDir } from '../../config/config.js';
 import { createLogger } from '../../utils/logger.js';
 const logger = createLogger('routes/api/extensions');
@@ -47,7 +47,7 @@ router.get('/', authenticateToken, async (req, res) => {
  * Authentication required
  * Body: { overwriteUserFiles?: boolean }
  */
-router.post('/sync-all', authenticateToken, async (req, res) => {
+router.post('/sync-all', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { overwriteUserFiles = false } = req.body;
     const results = await syncToAllUsers({ overwriteUserFiles });
@@ -75,7 +75,7 @@ router.post('/sync-all', authenticateToken, async (req, res) => {
  * Authentication required
  * Body: { userId: number, overwriteUserFiles?: boolean }
  */
-router.post('/sync-user', authenticateToken, async (req, res) => {
+router.post('/sync-user', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { userId, overwriteUserFiles = false } = req.body;
 

@@ -267,6 +267,17 @@ export const User = {
 
 // 数据库操作函数，供控制器调用
     /**
+     * 更新用户角色
+     * @param {number} userId - 用户 ID
+     * @param {string} role - 目标角色（'admin' | 'user' | 'guest'）
+     */
+    updateRole(userId, role) {
+        const stmt = db().prepare('UPDATE users SET role = ? WHERE id = ?');
+        stmt.run(role, userId);
+    },
+
+// 数据库操作函数，供控制器调用
+    /**
      * 根据身份提供者和外部 ID 获取用户
      * @param {string} identityProvider - 身份提供者
      * @param {string} externalId - 外部用户 ID

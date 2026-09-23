@@ -16,18 +16,6 @@ export const api = {
   auth: {
     status: () => fetch('/api/auth/status'),
     wsToken: () => authenticatedFetch('/api/auth/ws-token'),
-    login: (username: string, password: string) => fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-      credentials: 'include', // 必须包含以接收 cookie
-    }),
-    register: (username: string, password: string) => fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-      credentials: 'include', // 必须包含以接收 cookie
-    }),
     user: () => authenticatedFetch('/api/auth/user'),
     logout: () => authenticatedFetch('/api/auth/logout', { method: 'POST' }),
   },

@@ -1,10 +1,11 @@
 /**
  * Auth Operations
  *
- * 提取的认证操作逻辑（登录、注册、登出、状态检查）。
+ * 提取的认证操作逻辑（登出、状态检查）。
+ * 认证方式：仅 SAML SSO（密码登录/注册操作已移除）。
  *
  * ## 包含内容
- * - 登录、注册、登出操作
+ * - 登出操作
  * - 认证状态检查
  * - Platform 模式检测辅助函数
  */
@@ -14,7 +15,6 @@ import { api } from '@/shared/services';
 import { requestDeduplicator } from '@/shared/utils';
 import type { User } from '@/shared/types';
 import { logger } from '@/shared/utils/logger';
-import type { AuthResult } from './AuthContext';
 
 /**
  * 检查是否为 Platform 模式
@@ -126,84 +126,6 @@ export const useAuthStatusCheck = (
   }, [setIsLoading, setError, setUser, setNeedsSetup]);
 
   return checkAuthStatus;
-};
-
-/**
- * 创建登录操作
- *
- * @param {React.Dispatch<React.SetStateAction<User | null>>} setUser - 设置用户状态
- * @param {React.Dispatch<React.SetStateAction<string | null>>} setError - 设置错误状态
- * @returns {(username: string, password: string) => Promise<AuthResult>} login 函数
- */
-export const createLoginOperation = (
-  setUser: React.Dispatch<React.SetStateAction<User | null>>,
-  setError: React.Dispatch<React.SetStateAction<string | null>>
-): ((username: string, password: string) => Promise<AuthResult>) => {
-  return useCallback(async (username: string, password: string): Promise<AuthResult> => {
-    try {
-      setError(null);
-      const response = await api.auth.login(username, password);
-
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const errorMessage = 'Server error. Please check the server logs.';
-        setError(errorMessage);
-        return { success: false, error: errorMessage };
-      }
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setUser(data.data);
-        return { success: true };
-      } else {
-        setError(data.error || 'Login failed');
-        return { success: false, error: data.error || 'Login failed' };
-      }
-    } catch (err) {
-      logger.error('Login error:', err);
-      const errorMessage = 'Network error. Please try again.';
-      setError(errorMessage);
-      return { success: false, error: errorMessage };
-    }
-  }, [setUser, setError]);
-};
-
-/**
- * 创建注册操作
- *
- * @param {React.Dispatch<React.SetStateAction<User | null>>} setUser - 设置用户状态
- * @param {React.Dispatch<React.SetStateAction<boolean>>} setNeedsSetup - 设置是否需要初始化
- * @param {React.Dispatch<React.SetStateAction<string | null>>} setError - 设置错误状态
- * @returns {(username: string, password: string) => Promise<AuthResult>} register 函数
- */
-export const createRegisterOperation = (
-  setUser: React.Dispatch<React.SetStateAction<User | null>>,
-  setNeedsSetup: React.Dispatch<React.SetStateAction<boolean>>,
-  setError: React.Dispatch<React.SetStateAction<string | null>>
-): ((username: string, password: string) => Promise<AuthResult>) => {
-  return useCallback(async (username: string, password: string): Promise<AuthResult> => {
-    try {
-      setError(null);
-      const response = await api.auth.register(username, password);
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setUser(data.data);
-        setNeedsSetup(false);
-        return { success: true };
-      } else {
-        setError(data.error || 'Registration failed');
-        return { success: false, error: data.error || 'Registration failed' };
-      }
-    } catch (err) {
-      logger.error('Registration error:', err);
-      const errorMessage = 'Network error. Please try again.';
-      setError(errorMessage);
-      return { success: false, error: errorMessage };
-    }
-  }, [setUser, setNeedsSetup, setError]);
 };
 
 /**

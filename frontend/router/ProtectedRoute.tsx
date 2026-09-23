@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/shared/contexts/AuthContext';
-import { SetupForm, LoginForm } from '@/features/auth';
+import { LoginForm } from '@/features/auth';
 import { MessageSquare } from 'lucide-react';
 import { Outlet } from 'react-router-dom';
 import { APP_NAME } from '@/shared/constants/app.constants';
@@ -103,7 +103,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }
 
   if (needsSetup) {
-    return <SetupForm />;
+    // SSO-only：系统零用户时没有本地注册流程，仍显示登录页（首个用户经 SSO JIT 创建）
+    return <LoginForm />;
   }
 
   if (!user) {

@@ -1,7 +1,8 @@
 /**
  * Auth Context
  *
- * 提供全局认证状态和方法（登录、注册、登出、状态检查）。
+ * 提供全局认证状态和方法（登出、状态检查）。
+ * 认证方式：仅 SAML SSO（密码登录已移除）。
  *
  * ## 调用时序
  * 1. App 启动 → AuthProvider 挂载
@@ -15,22 +16,10 @@
 
 import React, { createContext, useContext, useState } from 'react';
 import type { User } from '@/shared/types';
-import {
-  useAuthStatusCheck,
-  createLoginOperation,
-  createRegisterOperation,
-  createLogoutOperation
-} from './authOperations';
-
-export interface AuthResult {
-  success: boolean;
-  error?: string;
-}
+import { useAuthStatusCheck, createLogoutOperation } from './authOperations';
 
 export interface AuthContextValue {
   user: User | null;
-  login: (username: string, password: string) => Promise<AuthResult>;
-  register: (username: string, password: string) => Promise<AuthResult>;
   logout: () => Promise<void>;
   checkAuthStatus: (force?: boolean) => Promise<void>;
   isLoading: boolean;
@@ -60,14 +49,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // 使用提取的钩子和操作创建器
   const checkAuthStatus = useAuthStatusCheck(setUser, setIsLoading, setNeedsSetup, setError);
-  const login = createLoginOperation(setUser, setError);
-  const register = createRegisterOperation(setUser, setNeedsSetup, setError);
   const logout = createLogoutOperation(setUser);
 
   const value: AuthContextValue = {
     user,
-    login,
-    register,
     logout,
     checkAuthStatus,
     isLoading,

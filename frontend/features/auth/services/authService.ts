@@ -3,23 +3,14 @@
  *
  * Main authentication service that composes operations and token management.
  * Provides a clean API for authentication operations.
+ * 认证方式：仅 SAML SSO（登录/注册由 IdP 回调完成，此处仅保留会话与用户资料操作）。
  *
  * @module features/auth/services/authService
  */
 
-import type {
-  User,
-  LoginCredentials,
-  RegistrationData,
-  AuthResponse,
-} from '../types';
+import type { User } from '../types';
 import {
-  executeLogin,
-  executeRegister,
   executeLogout,
-  changePassword,
-  requestPasswordReset,
-  confirmPasswordReset,
   refreshUser,
   updateUser,
   validateToken,
@@ -37,20 +28,6 @@ export class AuthService {
   constructor(baseUrl: string = '/api/auth') {
     this.baseUrl = baseUrl;
     this.tokenManager = createTokenManager(this.storageKey);
-  }
-
-  /**
-   * Login with credentials
-   */
-  async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    return executeLogin(this.baseUrl, credentials, this.tokenManager.storeSession);
-  }
-
-  /**
-   * Register new user
-   */
-  async register(data: RegistrationData): Promise<AuthResponse> {
-    return executeRegister(this.baseUrl, data, this.tokenManager.storeSession);
   }
 
   /**
@@ -89,27 +66,6 @@ export class AuthService {
       this.tokenManager.updateSessionUser,
       updates
     );
-  }
-
-  /**
-   * Change password
-   */
-  async changePassword(oldPassword: string, newPassword: string): Promise<boolean> {
-    return changePassword(this.baseUrl, this.tokenManager.getToken, oldPassword, newPassword);
-  }
-
-  /**
-   * Reset password request
-   */
-  async requestPasswordReset(email: string): Promise<boolean> {
-    return requestPasswordReset(this.baseUrl, email);
-  }
-
-  /**
-   * Confirm password reset
-   */
-  async confirmPasswordReset(token: string, newPassword: string): Promise<boolean> {
-    return confirmPasswordReset(this.baseUrl, token, newPassword);
   }
 
   /**
