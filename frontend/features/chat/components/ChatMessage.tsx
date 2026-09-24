@@ -117,6 +117,17 @@ function renderNonUserMessage(
   showThinking = true,
   messageRef?: React.RefObject<HTMLDivElement>,
 ): JSX.Element {
+  // 思考段消息（isThinking）：无 header 的内嵌折叠块，紧贴其后的 tool 卡/回复
+  if (message.isThinking) {
+    return (
+      <div ref={messageRef} className="chat-message thinking px-3 sm:px-0">
+        <div className="w-full">
+          {renderToolContent(message, onFileOpen, onShowSettings, showThinking)}
+        </div>
+      </div>
+    );
+  }
+
   const provider = getProvider();
   const displayName = getMessageDisplayName(message.type, provider);
 

@@ -6,8 +6,8 @@
 
 // 导入 React 核心依赖
 import React from 'react';
-// 导入聊天消息列表组件、流式指示器和思考过程组件
-import { ChatMessageList, StreamingIndicator, ThinkingProcess } from './index';
+// 导入聊天消息列表组件、流式指示器和流式思考折叠块
+import { ChatMessageList, StreamingIndicator, StreamingThinkingBlock } from './index';
 
 interface ChatInterfaceMainAreaProps {
   // 聊天消息列表，包含用户消息、助手消息和工具调用消息
@@ -16,8 +16,10 @@ interface ChatInterfaceMainAreaProps {
   isStreaming: boolean;
   // 流式接收的内容片段（未完成的响应文本）
   streamingContent: string | null;
-  // 流式接收的思考过程（AI 的推理链）
+  // 流式接收的思考过程（当前段的思考内容）
   streamingThinking: string | null;
+  // 当前思考段是否已封段（text/tool_use 已开始）
+  thinkingCollapsed: boolean;
   // 是否自动展开工具调用的详细参数和结果
   autoExpandTools: boolean;
   // 是否显示工具调用的原始 JSON 参数
@@ -41,6 +43,7 @@ export function ChatInterfaceMainArea({
   isStreaming,
   streamingContent,
   streamingThinking,
+  thinkingCollapsed,
   autoExpandTools,
   showRawParameters,
   showThinking,
@@ -67,11 +70,10 @@ export function ChatInterfaceMainArea({
         autoScrollToBottom={autoScrollToBottom}
       />
 
-      {/* AI 思考过程展示 */}
-      {/* 仅当启用思考模式且存在流式思考内容时显示 */}
+      {/* AI 思考过程：内嵌流式折叠块（WorkBuddy 式） */}
       {showThinking && streamingThinking && (
         <div className="px-4 pb-2">
-          <ThinkingProcess thinking={streamingThinking} show />
+          <StreamingThinkingBlock thinking={streamingThinking} collapsed={thinkingCollapsed} />
         </div>
       )}
 

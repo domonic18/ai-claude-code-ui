@@ -15,6 +15,7 @@ import { MinimizedToolMessage } from './MinimizedToolMessage';
 import { SimplifiedToolIndicator } from './SimplifiedToolIndicator';
 import { QuestionCard } from './QuestionCard';
 import { TaskListCard, TaskToolFallback } from './TaskListCard';
+import { ThinkingBlock } from './ThinkingBlock';
 import { isTaskTool } from '../utils/taskListAggregator';
 import { MINIMIZED_TOOLS } from '../constants';
 
@@ -49,8 +50,19 @@ export function renderToolContent(
   if (message.taskListSnapshot) {
     return <TaskListCard items={message.taskListSnapshot} rawEvents={message.taskListRawEvents} />;
   }
+  // 思考段消息（isThinking）：渲染为独立内嵌折叠块，位于其后的 tool 卡/回复上方
+  if (message.isThinking && message.thinking) {
+    return <ThinkingBlock thinking={message.thinking} thinkingDurationMs={message.thinkingDurationMs} />;
+  }
   if (!message.isToolUse || !message.toolName) {
-    return <AssistantMessage content={message.content} showThinking={showThinking} thinking={message.thinking} />;
+    return (
+      <AssistantMessage
+        content={message.content}
+        showThinking={showThinking}
+        thinking={message.thinking}
+        thinkingDurationMs={message.thinkingDurationMs}
+      />
+    );
   }
   if (MINIMIZED_TOOLS.includes(message.toolName as any)) {
     return <MinimizedToolMessage message={message} />;

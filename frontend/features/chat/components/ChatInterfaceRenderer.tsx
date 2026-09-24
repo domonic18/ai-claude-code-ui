@@ -65,6 +65,7 @@ export function ChatInterfaceRenderer({
         isStreaming={showStream ? hook.isStreaming : false}
         streamingContent={showStream ? hook.streamingContent : ''}
         streamingThinking={showStream ? hook.streamingThinking : ''}
+        thinkingCollapsed={showStream ? hook.thinkingCollapsed : true}
         autoExpandTools={autoExpandTools}
         showRawParameters={showRawParameters}
         showThinking={showThinking}
