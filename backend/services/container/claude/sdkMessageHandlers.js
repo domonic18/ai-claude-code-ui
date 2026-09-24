@@ -499,6 +499,14 @@ export function handleStreamEvent(event, writer, state) {
     return;
   }
 
+  if (event.type === 'content_block_start') {
+    writer.send({
+      type: 'claude-response',
+      data: { type: 'content_block_start', content_block: event.content_block }
+    });
+    return;
+  }
+
   if (event.type === 'content_block_delta' && event.delta) {
     const now = Date.now();
     // 注意：用独立的 lastDeltaTime，不碰 state.lastEventTime（供 [API #seq] 的 sinceLastMs）
