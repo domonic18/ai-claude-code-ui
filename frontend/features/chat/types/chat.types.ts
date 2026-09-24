@@ -77,6 +77,8 @@ export interface ChatMessage {
   files?: Array<FileAttachment>;
   /** Thinking process content */
   thinking?: string;
+  /** Thinking process duration in milliseconds */
+  thinkingDurationMs?: number;
   /** Whether this is a thinking message */
   isThinking?: boolean;
   /** Whether this message is currently streaming */

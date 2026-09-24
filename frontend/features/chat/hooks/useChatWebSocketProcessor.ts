@@ -53,6 +53,8 @@ interface UseChatWebSocketProcessorOptions {
   updateStreamContent: (content: string) => void;
   /** Update stream thinking callback */
   updateStreamThinking: (thinking: string) => void;
+  /** Content block start callback */
+  onBlockStart?: (blockType: string) => void;
   /** Set pending question from Agent */
   setPendingQuestion?: (toolUseID: string, sessionId: string) => void;
   /** Clear pending question when its session ends/aborts/errors (stale question would misroute the next user message) */
@@ -116,6 +118,9 @@ export function useChatWebSocketProcessor(options: UseChatWebSocketProcessorOpti
         },
         updateStreamThinking: (thinking) => {
           options.updateStreamThinking(thinking);
+        },
+        onBlockStart: (blockType) => {
+          options.onBlockStart?.(blockType);
         },
         onUserPromptContext: (content, sessionId) => {
           // User prompt context is received but not displayed in chat

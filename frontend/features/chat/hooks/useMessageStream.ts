@@ -14,15 +14,17 @@ interface UseMessageStreamOptions {
   /** Throttle interval for stream updates (ms) */
   throttleInterval?: number;
   /** Callback when stream completes */
-  onStreamComplete?: (content: string, thinking?: string) => void;
+  onStreamComplete?: (content: string, thinking?: string, thinkingDurationMs?: number) => void;
   /** Callback when stream updates */
   onStreamUpdate?: (content: string, thinking?: string) => void;
+  /** Callback when a thinking segment is sealed (text/tool_use block started after thinking) */
+  onThinkingSegment?: (segment: { thinking: string; durationMs: number | null }) => void;
 }
 
 interface UseMessageStreamReturn {
   /** Current streaming content */
   streamingContent: string;
-  /** Current streaming thinking content */
+  /** Current streaming thinking content (current segment only) */
   streamingThinking: string;
   /** Whether currently streaming */
   isStreaming: boolean;
@@ -36,6 +38,12 @@ interface UseMessageStreamReturn {
   completeStream: () => void;
   /** Reset stream state, discards any unflushed buffered content */
   resetStream: () => void;
+  /** Duration of the last thinking segment in milliseconds */
+  thinkingDurationMs: number | null;
+  /** Whether the current thinking segment is sealed (text/tool_use started) */
+  thinkingCollapsed: boolean;
+  /** Notify that a content block has started */
+  onBlockStart: (blockType: string) => void;
 }
 
 interface UseStreamBufferOptions {
@@ -45,13 +53,19 @@ interface UseStreamBufferOptions {
   onStreamUpdate?: (content: string, thinking?: string) => void;
   /** Callback when content is first added */
   onHasContent?: () => void;
+  /** Callback when a content block starts (thinking/text/tool_use) */
+  onBlockStart?: (blockType: string) => void;
+  /** Callback when a thinking segment is sealed (text/tool_use block started after thinking) */
+  onThinkingSegment?: (segment: { thinking: string; durationMs: number | null }) => void;
 }
 
 interface UseStreamBufferReturn {
   /** Current streaming content */
   streamingContent: string;
-  /** Current streaming thinking content */
+  /** Current streaming thinking content (current segment only) */
   streamingThinking: string;
+  /** Whether the current thinking segment is sealed */
+  thinkingCollapsed: boolean;
   /** Clear the stream timer */
   clearStreamTimer: () => void;
   /** Flush buffered content to state */
@@ -68,6 +82,10 @@ interface UseStreamBufferReturn {
   resetAll: () => void;
   /** Reset content buffers/ref/state only, keep thinking（思考框会话期间持续累积） */
   resetContent: () => void;
+  /** Notify that a content block has started */
+  onBlockStart: (blockType: string) => void;
+  /** Ref to the last thinking segment duration (ms) */
+  thinkingDurationMsRef: React.MutableRefObject<number | null>;
 }
 
 /**
@@ -77,12 +95,14 @@ interface UseStreamBufferReturn {
  * @returns Buffer state and control functions
  */
 function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn {
-  const { throttleInterval, onStreamUpdate, onHasContent } = options;
+  const { throttleInterval, onStreamUpdate, onHasContent, onBlockStart, onThinkingSegment } = options;
 
   // 当前显示的流式内容（已从缓冲区刷新到状态）
   const [streamingContent, setStreamingContent] = useState('');
-  // 当前显示的思考过程内容（已从缓冲区刷新到状态）
+  // 当前显示的思考过程内容（当前段，封段后清空）
   const [streamingThinking, setStreamingThinking] = useState('');
+  // 当前思考段是否已封段（text/tool_use 已开始）：控制流式折叠块展开/收起
+  const [thinkingCollapsed, setThinkingCollapsed] = useState(false);
   // 内容缓冲区：临时存储接收到的流式内容片段
   const streamBufferRef = useRef('');
   // 思考过程缓冲区：临时存储接收到的思考内容片段
@@ -95,6 +115,10 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
   // a render triggered by flushBuffer() would overwrite the ref with stale state.
   const streamingContentRef = useRef('');
   const streamingThinkingRef = useRef('');
+  // thinking 段计时：记录当前 thinking 块的开始时间
+  const thinkingStartTimeRef = useRef<number | null>(null);
+  // thinking 段时长：上一段 thinking 的耗时（毫秒）
+  const thinkingDurationMsRef = useRef<number | null>(null);
 
   const clearStreamTimer = useCallback(() => {
     if (streamTimerRef.current) {
@@ -169,6 +193,8 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
     thinkingBufferRef.current = '';
     streamingContentRef.current = '';
     streamingThinkingRef.current = '';
+    thinkingStartTimeRef.current = null;
+    thinkingDurationMsRef.current = null;
     setStreamingContent('');
     setStreamingThinking('');
   }, []);
@@ -181,9 +207,38 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
     setStreamingContent('');
   }, []);
 
+  const handleBlockStart = useCallback((blockType: string) => {
+    if (blockType === 'thinking') {
+      if (thinkingStartTimeRef.current !== null) {
+        thinkingDurationMsRef.current = Date.now() - thinkingStartTimeRef.current;
+      }
+      thinkingStartTimeRef.current = Date.now();
+      setThinkingCollapsed(false);
+    } else if (blockType === 'text' || blockType === 'tool_use') {
+      // text/tool_use 块开始：封段当前 thinking —— 计算时长、回调封存、清空当前段
+      if (thinkingStartTimeRef.current !== null) {
+        const durationMs = Date.now() - thinkingStartTimeRef.current;
+        thinkingDurationMsRef.current = durationMs;
+        thinkingStartTimeRef.current = null;
+        // 先 flush 再读，确保封存的是完整内容（含未刷新的 buffer 尾巴）
+        flushBuffer();
+        const segmentThinking = streamingThinkingRef.current;
+        if (segmentThinking) {
+          onThinkingSegment?.({ thinking: segmentThinking, durationMs });
+          // 段已落消息：清空当前段，下一段 thinking 从零开始
+          streamingThinkingRef.current = '';
+          setStreamingThinking('');
+        }
+      }
+      setThinkingCollapsed(true);
+    }
+    onBlockStart?.(blockType);
+  }, [onBlockStart, onThinkingSegment, flushBuffer]);
+
   return {
     streamingContent,
     streamingThinking,
+    thinkingCollapsed,
     clearStreamTimer,
     flushBuffer,
     updateStreamContent,
@@ -192,6 +247,8 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
     resetBuffers,
     resetAll,
     resetContent,
+    onBlockStart: handleBlockStart,
+    thinkingDurationMsRef,
   };
 }
 
@@ -206,12 +263,15 @@ export function useMessageStream(options: UseMessageStreamOptions = {}): UseMess
     throttleInterval = 20,
     onStreamComplete,
     onStreamUpdate,
+    onThinkingSegment,
   } = options;
 
   // 是否正在流式传输：true 表示正在接收 AI 响应
   const [isStreaming, setIsStreaming] = useState(false);
   // 内容标志：用于检测是否有实际内容（避免空响应触发回调）
   const hasContentRef = useRef(false);
+  // 上一段 thinking 的耗时（毫秒），供 UI 展示「已深度思考（用时 Xs）」
+  const [thinkingDurationMs, setThinkingDurationMs] = useState<number | null>(null);
 
   const setHasContent = useCallback(() => {
     hasContentRef.current = true;
@@ -220,12 +280,14 @@ export function useMessageStream(options: UseMessageStreamOptions = {}): UseMess
   const buffer = useStreamBuffer({
     throttleInterval,
     onStreamUpdate,
-    onHasContent: setHasContent
+    onHasContent: setHasContent,
+    onThinkingSegment,
   });
 
   const startStream = useCallback(() => {
     setIsStreaming(true);
     hasContentRef.current = false;
+    setThinkingDurationMs(null);
     buffer.resetAll();
     buffer.clearStreamTimer();
   }, [buffer]);
@@ -237,9 +299,13 @@ export function useMessageStream(options: UseMessageStreamOptions = {}): UseMess
     setIsStreaming(false);
 
     const finalContent = buffer.getBufferContent();
+    const duration = buffer.thinkingDurationMsRef.current;
+    if (duration !== null) {
+      setThinkingDurationMs(duration);
+    }
 
     if (hasContentRef.current) {
-      onStreamComplete?.(finalContent.content, finalContent.thinking);
+      onStreamComplete?.(finalContent.content, finalContent.thinking, duration ?? undefined);
     }
     // 正文 complete 后清空（已变消息）；思考保留——黄框在会话期间持续累积显示，
     // 避免 agentic 多轮每轮 content_block_stop 清空导致思考框闪烁（仅 startStream/刷新清思考）
@@ -253,6 +319,7 @@ export function useMessageStream(options: UseMessageStreamOptions = {}): UseMess
   const resetStream = useCallback(() => {
     buffer.clearStreamTimer();
     setIsStreaming(false);
+    setThinkingDurationMs(null);
     buffer.resetAll();
     hasContentRef.current = false;
   }, [buffer]);
@@ -266,11 +333,14 @@ export function useMessageStream(options: UseMessageStreamOptions = {}): UseMess
   return {
     streamingContent: buffer.streamingContent,
     streamingThinking: buffer.streamingThinking,
+    thinkingCollapsed: buffer.thinkingCollapsed,
     isStreaming,
     startStream,
     updateStreamContent: buffer.updateStreamContent,
     updateStreamThinking: buffer.updateStreamThinking,
     completeStream,
     resetStream,
+    thinkingDurationMs,
+    onBlockStart: buffer.onBlockStart,
   };
 }

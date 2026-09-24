@@ -113,6 +113,8 @@ export interface UseChatInterfaceResult {
   streamingThinking: string | null;
   isStreaming: boolean;
   resetStream: () => void;
+  thinkingDurationMs: number | null;
+  thinkingCollapsed: boolean;
   modelSwitchNotification: { show: boolean; message: string };
   // Command system
   filteredCommands: any[];
@@ -256,8 +258,22 @@ export function useChatInterface({
   directModeRef.current = isDirectMode;
   // 消息管理：加载、添加、更新、删除聊天消息，支持 LocalStorage 持久化
   const { messages, addMessage, updateMessage, setMessages } = useChatMessages({ projectName: selectedProject?.name, externalMessages });
+  // 思考段封存：text/tool_use 块开始时当前思考段落成 isThinking 消息插入列表，
+  // 位置在随后到达的 tool 卡/回复上方（WorkBuddy 式分段内嵌）
+  const handleThinkingSegment = useCallback((segment: { thinking: string; durationMs: number | null }) => {
+    if (isCrossView()) return;
+    addMessage({
+      id: `thinking-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      type: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+      isThinking: true,
+      thinking: segment.thinking,
+      ...(typeof segment.durationMs === 'number' ? { thinkingDurationMs: segment.durationMs } : {}),
+    });
+  }, [addMessage, isCrossView]);
   // 流式内容管理：处理 AI 响应的流式输出（打字机效果）
-  const stream = useMessageStream();
+  const stream = useMessageStream({ onThinkingSegment: handleThinkingSegment });
 
   /**
    * 开始流式：reset buffer 并记录归属 project。sessionId 的归属在 handleSessionProcessing
@@ -537,7 +553,7 @@ export function useChatInterface({
     tasks, setTasks, permissionMode, setPermissionMode,
     isDirectMode, setDirectMode,
     availableModels, selectedModel, handleModelSelect, messages, setMessages,
-    streamingContent: stream.streamingContent, streamingThinking: stream.streamingThinking, isStreaming: stream.isStreaming, resetStream: stream.resetStream,
+    streamingContent: stream.streamingContent, streamingThinking: stream.streamingThinking, isStreaming: stream.isStreaming, resetStream: stream.resetStream, thinkingDurationMs: stream.thinkingDurationMs, thinkingCollapsed: stream.thinkingCollapsed,
     modelSwitchNotification, ...menu, handleSend, handleInputChangeWithCommands: menu.handleInputChangeWithCommands,
     handleAddFile, handleRemoveFile: useCallback((id: string) => setAttachedFiles(prev => prev.filter(f => f.id !== id)), []),
     handleInputFocusChange: useCallback((f: boolean) => onInputFocusChange?.(f), [onInputFocusChange]),

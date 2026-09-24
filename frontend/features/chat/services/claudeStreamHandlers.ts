@@ -21,6 +21,10 @@ import { generateMessageId, decodeHtmlEntities } from './wsUtils';
  * @returns 是否匹配到流式增量或停止事件
  */
 export function handleStreamingDelta(messageData: any, callbacks: MessageHandlerCallbacks): boolean {
+  if (messageData.type === 'content_block_start') {
+    callbacks.onBlockStart?.(messageData.content_block?.type);
+    return true;
+  }
   if (messageData.type === 'content_block_delta' && messageData.delta) {
     if (messageData.delta.text) {
       callbacks.updateStreamContent?.(decodeHtmlEntities(messageData.delta.text));
@@ -54,11 +58,15 @@ export function processTextBlocks(content: any[], callbacks: MessageHandlerCallb
     .map((block: any) => decodeHtmlEntities(block.text));
   if (textBlocks.length === 0) return false;
 
+  const thinkingBlocks = content.filter((block: any) => block?.type === 'thinking');
+  const thinking = thinkingBlocks.map((block: any) => block.thinking).join('\n');
+
   const fullText = textBlocks.join('\n');
   callbacks.updateStreamContent?.(fullText);
   callbacks.onAddMessage({
     id: generateMessageId('assistant'), type: 'assistant', content: fullText,
     timestamp: Date.now(), isStreaming: true,
+    ...(thinking ? { thinking } : {}),
   });
   return true;
 }
@@ -77,11 +85,15 @@ export function processToolUseBlocks(content: any[], callbacks: MessageHandlerCa
   const toolBlocks = content.filter((b: any) => b?.type === 'tool_use');
   if (toolBlocks.length === 0) return false;
 
+  const thinkingBlocks = content.filter((block: any) => block?.type === 'thinking');
+  const thinking = thinkingBlocks.map((block: any) => block.thinking).join('\n');
+
   for (const toolBlock of toolBlocks) {
     callbacks.onAddMessage({
       id: generateMessageId('tool'), type: 'assistant', content: '',
       timestamp: Date.now(), isToolUse: true, toolName: toolBlock.name,
       toolInput: toolBlock.input ? JSON.stringify(toolBlock.input, null, 2) : undefined,
+      ...(thinking ? { thinking } : {}),
     });
   }
   return true;

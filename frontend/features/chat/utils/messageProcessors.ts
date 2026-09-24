@@ -123,12 +123,22 @@ export function processAssistantMessage(
   // content 不是数组则无法处理，直接返回
   if (!Array.isArray(content)) return;
 
-  // 从 content 数组中筛选出文本部分和工具调用部分
+  // 从 content 数组中筛选出文本部分、工具调用部分和思考部分
   const textParts = content.filter((part: any) => part.type === 'text');
   const toolUseParts = content.filter((part: any) => part.type === 'tool_use');
+  const thinkingParts = content.filter((part: any) => part.type === 'thinking');
+  const thinking = thinkingParts.map((p: any) => p.thinking).join('\n');
 
   // 将每个文本部分转换为独立的消息对象（传 converted 供历史耗时计算定位本轮 user 起点）
-  textParts.forEach((part: any) => converted.push(buildTextPart(part, msg, converted)));
+  textParts.forEach((part: any) => {
+    const m = buildTextPart(part, msg, converted);
+    if (thinking) m.thinking = thinking;
+    converted.push(m);
+  });
   // 将每个工具调用部分转换为独立的消息对象，并关联对应的执行结果
-  toolUseParts.forEach((part: any) => converted.push(buildToolUsePart(part, msg, toolResults)));
+  toolUseParts.forEach((part: any) => {
+    const m = buildToolUsePart(part, msg, toolResults);
+    if (thinking) m.thinking = thinking;
+    converted.push(m);
+  });
 }

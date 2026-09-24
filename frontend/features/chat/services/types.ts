@@ -36,6 +36,7 @@ export interface MessageHandlerCallbacks {
   resetStream?: () => void;
   updateStreamContent?: (content: string) => void;
   updateStreamThinking?: (thinking: string) => void;
+  onBlockStart?: (blockType: string) => void;
 
   // User prompt context
   onUserPromptContext?: (content: string, sessionId: string) => void;
