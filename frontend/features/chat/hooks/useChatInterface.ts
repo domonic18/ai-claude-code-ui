@@ -114,7 +114,6 @@ export interface UseChatInterfaceResult {
   isStreaming: boolean;
   resetStream: () => void;
   thinkingDurationMs: number | null;
-  thinkingCollapsed: boolean;
   modelSwitchNotification: { show: boolean; message: string };
   // Command system
   filteredCommands: any[];
@@ -258,22 +257,61 @@ export function useChatInterface({
   directModeRef.current = isDirectMode;
   // 消息管理：加载、添加、更新、删除聊天消息，支持 LocalStorage 持久化
   const { messages, addMessage, updateMessage, setMessages } = useChatMessages({ projectName: selectedProject?.name, externalMessages });
-  // 思考段封存：text/tool_use 块开始时当前思考段落成 isThinking 消息插入列表，
-  // 位置在随后到达的 tool 卡/回复上方（WorkBuddy 式分段内嵌）
-  const handleThinkingSegment = useCallback((segment: { thinking: string; durationMs: number | null }) => {
+  // 思考段消息生命周期（对话流内实时展示）：
+  // 开始 → 插入进行中的 isThinking 消息；delta → 追加更新内容；封段 → 写入时长、清进行中标记
+  const activeThinkingMsgIdRef = useRef<string | null>(null);
+  const handleThinkingStart = useCallback(() => {
     if (isCrossView()) return;
+    const id = `thinking-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    activeThinkingMsgIdRef.current = id;
     addMessage({
-      id: `thinking-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id,
       type: 'assistant',
       content: '',
       timestamp: Date.now(),
       isThinking: true,
-      thinking: segment.thinking,
-      ...(typeof segment.durationMs === 'number' ? { thinkingDurationMs: segment.durationMs } : {}),
+      thinking: '',
+      thinkingInProgress: true,
     });
   }, [addMessage, isCrossView]);
+  const handleThinkingDelta = useCallback((delta: string) => {
+    if (isCrossView()) return;
+    const id = activeThinkingMsgIdRef.current;
+    if (!id) return;
+    // 函数式读取当前值追加，避免闭包持有过期内容
+    setMessages(prev => {
+      const idx = prev.findIndex(m => m.id === id);
+      if (idx < 0) return prev;
+      const next = [...prev];
+      next[idx] = { ...next[idx], thinking: (next[idx].thinking || '') + delta };
+      return next;
+    });
+  }, [setMessages, isCrossView]);
+  const handleThinkingSeal = useCallback((segment: { thinking: string; durationMs: number | null }) => {
+    if (isCrossView()) return;
+    const id = activeThinkingMsgIdRef.current;
+    activeThinkingMsgIdRef.current = null;
+    if (!id) {
+      // 无进行中消息（如刷新续传）：退回封段时一次性落消息
+      addMessage({
+        id: `thinking-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        type: 'assistant',
+        content: '',
+        timestamp: Date.now(),
+        isThinking: true,
+        thinking: segment.thinking,
+        ...(typeof segment.durationMs === 'number' ? { thinkingDurationMs: segment.durationMs } : {}),
+      });
+      return;
+    }
+    updateMessage(id, {
+      thinking: segment.thinking,
+      thinkingInProgress: false,
+      ...(typeof segment.durationMs === 'number' ? { thinkingDurationMs: segment.durationMs } : {}),
+    });
+  }, [addMessage, updateMessage, isCrossView]);
   // 流式内容管理：处理 AI 响应的流式输出（打字机效果）
-  const stream = useMessageStream({ onThinkingSegment: handleThinkingSegment });
+  const stream = useMessageStream({ onThinkingStart: handleThinkingStart, onThinkingDelta: handleThinkingDelta, onThinkingSeal: handleThinkingSeal });
 
   /**
    * 开始流式：reset buffer 并记录归属 project。sessionId 的归属在 handleSessionProcessing
@@ -553,7 +591,7 @@ export function useChatInterface({
     tasks, setTasks, permissionMode, setPermissionMode,
     isDirectMode, setDirectMode,
     availableModels, selectedModel, handleModelSelect, messages, setMessages,
-    streamingContent: stream.streamingContent, streamingThinking: stream.streamingThinking, isStreaming: stream.isStreaming, resetStream: stream.resetStream, thinkingDurationMs: stream.thinkingDurationMs, thinkingCollapsed: stream.thinkingCollapsed,
+    streamingContent: stream.streamingContent, streamingThinking: stream.streamingThinking, isStreaming: stream.isStreaming, resetStream: stream.resetStream, thinkingDurationMs: stream.thinkingDurationMs,
     modelSwitchNotification, ...menu, handleSend, handleInputChangeWithCommands: menu.handleInputChangeWithCommands,
     handleAddFile, handleRemoveFile: useCallback((id: string) => setAttachedFiles(prev => prev.filter(f => f.id !== id)), []),
     handleInputFocusChange: useCallback((f: boolean) => onInputFocusChange?.(f), [onInputFocusChange]),

@@ -79,6 +79,8 @@ export interface ChatMessage {
   thinking?: string;
   /** Thinking process duration in milliseconds */
   thinkingDurationMs?: number;
+  /** Whether this thinking message is still streaming (in-progress segment) */
+  thinkingInProgress?: boolean;
   /** Whether this is a thinking message */
   isThinking?: boolean;
   /** Whether this message is currently streaming */
@@ -128,6 +130,8 @@ export interface ChatMessage {
   taskListSnapshot?: TaskItem[];
   /** Raw task tool events backing the snapshot (for collapsed raw-calls view) */
   taskListRawEvents?: TaskListRawEvent[];
+  /** Aggregated phase snapshot (synthetic message injected by phaseAggregator) */
+  phaseSnapshot?: import('../utils/phaseAggregator').PhaseSnapshot;
   /** Exit code for command execution */
   exitCode?: number;
   /** 整轮耗时（毫秒）：本轮完成时由 claude-complete/direct-complete 下发，回填到末条 assistant 消息；历史直连会话取条目 timestamp 差值 */

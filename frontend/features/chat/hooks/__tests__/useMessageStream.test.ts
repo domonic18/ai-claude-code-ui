@@ -102,7 +102,7 @@ describe('useMessageStream', () => {
         result.current.completeStream();
       });
 
-      expect(onStreamComplete).toHaveBeenCalledWith('Previous content', '');
+      expect(onStreamComplete).toHaveBeenCalledWith('Previous content', '', undefined);
 
       // Start new stream - should reset
       act(() => {
@@ -358,7 +358,7 @@ describe('useMessageStream', () => {
       expect(result.current.isStreaming).toBe(false);
       expect(result.current.streamingContent).toBe('');
       expect(result.current.streamingThinking).toBe('');
-      expect(onStreamComplete).toHaveBeenCalledWith('Buffered', '');
+      expect(onStreamComplete).toHaveBeenCalledWith('Buffered', '', undefined);
     });
 
     it('should call onStreamComplete with final content and thinking', () => {
@@ -391,7 +391,8 @@ describe('useMessageStream', () => {
 
       expect(onStreamComplete).toHaveBeenCalledWith(
         'Final content more',
-        'Final thinking'
+        'Final thinking',
+        undefined
       );
     });
 
@@ -456,7 +457,7 @@ describe('useMessageStream', () => {
         result.current.completeStream();
       });
 
-      expect(onStreamComplete).toHaveBeenCalledWith('Content', 'Thinking');
+      expect(onStreamComplete).toHaveBeenCalledWith('Content', 'Thinking', undefined);
 
       // Start a new stream and reset
       act(() => {
@@ -582,7 +583,8 @@ describe('useMessageStream', () => {
 
       expect(onStreamComplete).toHaveBeenCalledWith(
         'Part 1 Part 2 Part 3',
-        ''
+        '',
+        undefined
       );
     });
   });
@@ -690,7 +692,7 @@ describe('useMessageStream', () => {
         result.current.completeStream();
       });
 
-      expect(onStreamComplete).toHaveBeenCalledWith('First', '');
+      expect(onStreamComplete).toHaveBeenCalledWith('First', '', undefined);
       expect(result.current.streamingContent).toBe('');
 
       act(() => {
@@ -705,7 +707,7 @@ describe('useMessageStream', () => {
         result.current.completeStream();
       });
 
-      expect(onStreamComplete).toHaveBeenCalledWith('Second', '');
+      expect(onStreamComplete).toHaveBeenCalledWith('Second', '', undefined);
       expect(result.current.streamingContent).toBe('');
       expect(result.current.isStreaming).toBe(false);
     });

@@ -17,8 +17,12 @@ interface UseMessageStreamOptions {
   onStreamComplete?: (content: string, thinking?: string, thinkingDurationMs?: number) => void;
   /** Callback when stream updates */
   onStreamUpdate?: (content: string, thinking?: string) => void;
-  /** Callback when a thinking segment is sealed (text/tool_use block started after thinking) */
-  onThinkingSegment?: (segment: { thinking: string; durationMs: number | null }) => void;
+  /** Callback when a thinking block starts (insert in-progress thinking message) */
+  onThinkingStart?: () => void;
+  /** Callback when thinking delta arrives (update in-progress thinking message content) */
+  onThinkingDelta?: (thinking: string) => void;
+  /** Callback when a thinking segment is sealed (mark message done with duration) */
+  onThinkingSeal?: (segment: { thinking: string; durationMs: number | null }) => void;
 }
 
 interface UseMessageStreamReturn {
@@ -40,8 +44,6 @@ interface UseMessageStreamReturn {
   resetStream: () => void;
   /** Duration of the last thinking segment in milliseconds */
   thinkingDurationMs: number | null;
-  /** Whether the current thinking segment is sealed (text/tool_use started) */
-  thinkingCollapsed: boolean;
   /** Notify that a content block has started */
   onBlockStart: (blockType: string) => void;
 }
@@ -55,8 +57,12 @@ interface UseStreamBufferOptions {
   onHasContent?: () => void;
   /** Callback when a content block starts (thinking/text/tool_use) */
   onBlockStart?: (blockType: string) => void;
-  /** Callback when a thinking segment is sealed (text/tool_use block started after thinking) */
-  onThinkingSegment?: (segment: { thinking: string; durationMs: number | null }) => void;
+  /** Callback when a thinking block starts (insert in-progress thinking message) */
+  onThinkingStart?: () => void;
+  /** Callback when thinking delta arrives (update in-progress thinking message content) */
+  onThinkingDelta?: (thinking: string) => void;
+  /** Callback when a thinking segment is sealed (mark message done with duration) */
+  onThinkingSeal?: (segment: { thinking: string; durationMs: number | null }) => void;
 }
 
 interface UseStreamBufferReturn {
@@ -64,8 +70,6 @@ interface UseStreamBufferReturn {
   streamingContent: string;
   /** Current streaming thinking content (current segment only) */
   streamingThinking: string;
-  /** Whether the current thinking segment is sealed */
-  thinkingCollapsed: boolean;
   /** Clear the stream timer */
   clearStreamTimer: () => void;
   /** Flush buffered content to state */
@@ -95,14 +99,12 @@ interface UseStreamBufferReturn {
  * @returns Buffer state and control functions
  */
 function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn {
-  const { throttleInterval, onStreamUpdate, onHasContent, onBlockStart, onThinkingSegment } = options;
+  const { throttleInterval, onStreamUpdate, onHasContent, onBlockStart, onThinkingStart, onThinkingDelta, onThinkingSeal } = options;
 
   // 当前显示的流式内容（已从缓冲区刷新到状态）
   const [streamingContent, setStreamingContent] = useState('');
   // 当前显示的思考过程内容（当前段，封段后清空）
   const [streamingThinking, setStreamingThinking] = useState('');
-  // 当前思考段是否已封段（text/tool_use 已开始）：控制流式折叠块展开/收起
-  const [thinkingCollapsed, setThinkingCollapsed] = useState(false);
   // 内容缓冲区：临时存储接收到的流式内容片段
   const streamBufferRef = useRef('');
   // 思考过程缓冲区：临时存储接收到的思考内容片段
@@ -167,13 +169,14 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
     if (!thinking) return;
 
     thinkingBufferRef.current += thinking;
+    onThinkingDelta?.(thinking);
     clearStreamTimer();
 
     streamTimerRef.current = setTimeout(() => {
       flushBuffer();
       onStreamUpdate?.(streamingContentRef.current + streamBufferRef.current, streamingThinkingRef.current + thinkingBufferRef.current);
     }, throttleInterval);
-  }, [flushBuffer, clearStreamTimer, throttleInterval, onStreamUpdate]);
+  }, [flushBuffer, clearStreamTimer, throttleInterval, onStreamUpdate, onThinkingDelta]);
 
   // 空依赖数组：内部只读 ref，不依赖任何 state，避免 stale closure
   const getBufferContent = useCallback(() => {
@@ -213,7 +216,8 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
         thinkingDurationMsRef.current = Date.now() - thinkingStartTimeRef.current;
       }
       thinkingStartTimeRef.current = Date.now();
-      setThinkingCollapsed(false);
+      // 思考块开始：立即在消息列表插入进行中的思考消息（对话流内实时展示）
+      onThinkingStart?.();
     } else if (blockType === 'text' || blockType === 'tool_use') {
       // text/tool_use 块开始：封段当前 thinking —— 计算时长、回调封存、清空当前段
       if (thinkingStartTimeRef.current !== null) {
@@ -224,21 +228,19 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
         flushBuffer();
         const segmentThinking = streamingThinkingRef.current;
         if (segmentThinking) {
-          onThinkingSegment?.({ thinking: segmentThinking, durationMs });
+          onThinkingSeal?.({ thinking: segmentThinking, durationMs });
           // 段已落消息：清空当前段，下一段 thinking 从零开始
           streamingThinkingRef.current = '';
           setStreamingThinking('');
         }
       }
-      setThinkingCollapsed(true);
     }
     onBlockStart?.(blockType);
-  }, [onBlockStart, onThinkingSegment, flushBuffer]);
+  }, [onBlockStart, onThinkingStart, onThinkingSeal, flushBuffer]);
 
   return {
     streamingContent,
     streamingThinking,
-    thinkingCollapsed,
     clearStreamTimer,
     flushBuffer,
     updateStreamContent,
@@ -263,7 +265,9 @@ export function useMessageStream(options: UseMessageStreamOptions = {}): UseMess
     throttleInterval = 20,
     onStreamComplete,
     onStreamUpdate,
-    onThinkingSegment,
+    onThinkingStart,
+    onThinkingDelta,
+    onThinkingSeal,
   } = options;
 
   // 是否正在流式传输：true 表示正在接收 AI 响应
@@ -281,7 +285,9 @@ export function useMessageStream(options: UseMessageStreamOptions = {}): UseMess
     throttleInterval,
     onStreamUpdate,
     onHasContent: setHasContent,
-    onThinkingSegment,
+    onThinkingStart,
+    onThinkingDelta,
+    onThinkingSeal,
   });
 
   const startStream = useCallback(() => {
@@ -333,7 +339,6 @@ export function useMessageStream(options: UseMessageStreamOptions = {}): UseMess
   return {
     streamingContent: buffer.streamingContent,
     streamingThinking: buffer.streamingThinking,
-    thinkingCollapsed: buffer.thinkingCollapsed,
     isStreaming,
     startStream,
     updateStreamContent: buffer.updateStreamContent,
