@@ -16,6 +16,7 @@ import { SimplifiedToolIndicator } from './SimplifiedToolIndicator';
 import { QuestionCard } from './QuestionCard';
 import { TaskListCard, TaskToolFallback } from './TaskListCard';
 import { ThinkingBlock } from './ThinkingBlock';
+import { PhaseBlock } from './PhaseBlock';
 import { isTaskTool } from '../utils/taskListAggregator';
 import { MINIMIZED_TOOLS } from '../constants';
 
@@ -50,9 +51,17 @@ export function renderToolContent(
   if (message.taskListSnapshot) {
     return <TaskListCard items={message.taskListSnapshot} rawEvents={message.taskListRawEvents} />;
   }
-  // 思考段消息（isThinking）：渲染为独立内嵌折叠块，位于其后的 tool 卡/回复上方
+  // 阶段聚合卡：由 phaseAggregator 注入的合成消息（环境准备/自检/检索聚合）
+  if (message.phaseSnapshot) {
+    return <PhaseBlock snapshot={message.phaseSnapshot} />;
+  }
+  // 思考段消息（isThinking）：渲染为对话流内折叠块，进行中展开滚动、完成折叠
   if (message.isThinking && message.thinking) {
-    return <ThinkingBlock thinking={message.thinking} thinkingDurationMs={message.thinkingDurationMs} />;
+    return <ThinkingBlock thinking={message.thinking} thinkingDurationMs={message.thinkingDurationMs} inProgress={message.thinkingInProgress} />;
+  }
+  // 思考段消息但内容为空且仍在进行（首片 delta 未到）：占位显示进行中块
+  if (message.isThinking && message.thinkingInProgress) {
+    return <ThinkingBlock thinking="" inProgress />;
   }
   if (!message.isToolUse || !message.toolName) {
     return (
