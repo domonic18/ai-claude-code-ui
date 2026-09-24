@@ -62,6 +62,7 @@ export function ChatInterfaceRenderer({
       {/* 包含消息列表、思考过程和流式指示器 */}
       <ChatInterfaceMainArea
         messages={hook.messages}
+        isLoading={showStream ? hook.isLoading : false}
         isStreaming={showStream ? hook.isStreaming : false}
         streamingContent={showStream ? hook.streamingContent : ''}
         autoExpandTools={autoExpandTools}

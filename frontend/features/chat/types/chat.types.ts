@@ -318,4 +318,6 @@ export interface StreamingIndicatorProps {
   content: string;
   /** Thinking content */
   thinking?: string;
+  /** Stage-aware status label (thinking/tool-running/analyzing), overrides default */
+  stageLabel?: string;
 }

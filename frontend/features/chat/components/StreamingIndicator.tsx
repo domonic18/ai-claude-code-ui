@@ -2,9 +2,9 @@
  * StreamingIndicator Component
  *
  * Displays streaming status for AI responses including:
+ * - Stage-aware status line (thinking / tool-running / analyzing with time escalation)
  * - Animated loading indicator
- * - Thinking process preview
- * - Token usage display
+ * - Streaming content preview
  */
 
 import React from 'react';
@@ -21,6 +21,7 @@ export function StreamingIndicator({
   isStreaming = false,
   content = '',
   thinking,
+  stageLabel,
 }: StreamingIndicatorProps) {
   const { t } = useTranslation();
   if (!isStreaming && !content) {
@@ -38,9 +39,9 @@ export function StreamingIndicator({
         </div>
       )}
 
-      {/* Status text */}
+      {/* Status text: stage label (specific) > default responding/complete */}
       <span className="text-sm text-gray-600 dark:text-gray-400 flex-shrink-0">
-        {isStreaming ? t('chat.streaming.responding') : t('chat.streaming.complete')}
+        {isStreaming ? (stageLabel || t('chat.streaming.responding')) : t('chat.streaming.complete')}
       </span>
 
       {/* Preview of streaming content */}
