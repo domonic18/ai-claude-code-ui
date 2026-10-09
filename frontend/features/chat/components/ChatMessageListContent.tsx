@@ -10,7 +10,7 @@ import { useMemo } from 'react';
 import { ChatMessage } from './ChatMessage';
 import type { ChatMessage as ChatMessageType } from '../types';
 import { withAggregatedTaskList } from '../utils/taskListAggregator';
-import { withAggregatedPhases } from '../utils/phaseAggregator';
+import { withReplyProcess } from '../utils/replyProcessAggregator';
 
 interface ChatMessageListContentProps {
   messages: ChatMessageType[];
@@ -39,15 +39,15 @@ export function ChatMessageListContent({
   onShowSettings,
 }: ChatMessageListContentProps) {
   // Limit visible messages for performance.
-  // 注意顺序：必须先对全量消息做聚合（任务清单 → 阶段）、再截断 —— 若先截断，
-  // 开头的 TaskCreate/轻量事件可能被切掉，导致 taskId/阶段边界无法对应（走兜底降级）。
+  // 注意顺序：必须先对全量消息做聚合（任务清单 → 回复过程组）、再截断 —— 若先截断，
+  // 开头的 TaskCreate/组头可能被切掉，导致 taskId/组边界无法对应（走兜底降级）。
   const displayMessages = useMemo(() => {
     const taskAggregated = withAggregatedTaskList(messages);
-    const phased = withAggregatedPhases(taskAggregated);
-    if (phased.length <= visibleMessageCount) {
-      return phased;
+    const processed = withReplyProcess(taskAggregated);
+    if (processed.length <= visibleMessageCount) {
+      return processed;
     }
-    return phased.slice(-visibleMessageCount);
+    return processed.slice(-visibleMessageCount);
   }, [messages, visibleMessageCount]);
 
   return (

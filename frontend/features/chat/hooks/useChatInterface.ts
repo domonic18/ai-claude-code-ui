@@ -546,8 +546,9 @@ export function useChatInterface({
     wsMessages, currentSessionId,
     // 跨视图时作用于发起项目，修复 clearChatMessagesCache 删错项目缓存
     getSelectedProjectName: () => (isCrossView() ? activeStreamProjectRef.current : selectedProject?.name),
-    // 跨视图时跳过会污染当前视图(B)的回调——消息不会丢，切回 A 时由 useSessionLoader 从后端重新抓取
-    addMessage: (msg) => { if (isCrossView()) return; addMessage(msg); },
+    // 跨视图时跳过会污染当前视图(B)的回调——消息不会丢，切回 A 时由 useSessionLoader 从后端重新抓取。
+    // 工具卡上屏前冲刷待折叠的思考段：用户能看到下一个内容了，此刻折叠思考
+    addMessage: (msg) => { if (isCrossView()) return; stream.flushPendingThinkingSeal(); addMessage(msg); },
     updateMessage, setMessages,
     setIsLoading,
     setCurrentSessionId,

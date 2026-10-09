@@ -23,6 +23,7 @@ import React from 'react';
 import { parseToolInput, extractFilename } from './toolUtils';
 import { CollapsiblePanel } from './CollapsiblePanel';
 import { DiffViewer } from './DiffViewer';
+import { shortenCommandPaths } from '../utils/commandPath';
 
 export interface ToolInputRendererProps {
   toolName: string;
@@ -69,11 +70,18 @@ export function ToolInputRenderer({ toolName, toolInput, onFileOpen }: ToolInput
 function BashInput({ input }: { input: any }) {
   if (!input?.command) return null;
 
+  // 长路径中段省略（tooltip 保留原命令），缓解横向拥挤；多行命令限高滚动
+  const display = shortenCommandPaths(input.command);
+  const isMultiline = input.command.includes('\n');
+
   return (
     <div className="my-2">
-      <div className="bg-gray-900 dark:bg-gray-950 rounded-md px-3 py-2 font-mono text-sm">
+      <div
+        className={`bg-gray-900 dark:bg-gray-950 rounded-md px-3 py-2 font-mono text-sm ${isMultiline ? 'max-h-40 overflow-auto' : 'overflow-x-auto whitespace-nowrap'}`}
+        title={input.command}
+      >
         <span className="text-green-400">$</span>
-        <span className="text-gray-100 ml-2">{input.command}</span>
+        <span className="text-gray-100 ml-2">{display}</span>
       </div>
       {input.description && (
         <div className="mt-1 text-xs text-muted-foreground italic ml-1">

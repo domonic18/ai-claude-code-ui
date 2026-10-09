@@ -10,7 +10,7 @@ export { default as ChatInput } from './ChatInput';
 export { default as MarkdownRenderer } from './MarkdownRenderer';
 export { default as StreamingIndicator, ThinkingProcess } from './StreamingIndicator';
 export { ThinkingBlock } from './ThinkingBlock';
-export { PhaseBlock } from './PhaseBlock';
+export { ReplyProcessGroup } from './ReplyProcessGroup';
 export { CommandAutocomplete } from './CommandAutocomplete';
 export { FileReferenceMenu } from './FileReferenceMenu';
 export { ModelSelector } from './ModelSelector';

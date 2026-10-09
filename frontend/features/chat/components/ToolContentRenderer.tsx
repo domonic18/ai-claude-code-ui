@@ -16,7 +16,7 @@ import { SimplifiedToolIndicator } from './SimplifiedToolIndicator';
 import { QuestionCard } from './QuestionCard';
 import { TaskListCard, TaskToolFallback } from './TaskListCard';
 import { ThinkingBlock } from './ThinkingBlock';
-import { PhaseBlock } from './PhaseBlock';
+import { ReplyProcessGroup } from './ReplyProcessGroup';
 import { isTaskTool } from '../utils/taskListAggregator';
 import { MINIMIZED_TOOLS } from '../constants';
 
@@ -42,6 +42,16 @@ export function renderToolContent(
   onShowSettings?: () => void,
   showThinking = true
 ): JSX.Element {
+  return renderToolContentInner(message, onFileOpen, onShowSettings, showThinking);
+}
+
+/** 内部分发（原 renderToolContent 主体） */
+function renderToolContentInner(
+  message: any,
+  onFileOpen?: (path: string) => void,
+  onShowSettings?: () => void,
+  showThinking = true
+): JSX.Element {
   // AskUserQuestion 结构化提问：渲染交互卡片（选项/自由文本/跳过），
   // 提交动作经 questionEvents 桥接由 useChatInterface 处理（无需跨层 props）
   if (message.interactiveQuestion) {
@@ -51,13 +61,19 @@ export function renderToolContent(
   if (message.taskListSnapshot) {
     return <TaskListCard items={message.taskListSnapshot} rawEvents={message.taskListRawEvents} />;
   }
-  // 阶段聚合卡：由 phaseAggregator 注入的合成消息（环境准备/自检/检索聚合）
-  if (message.phaseSnapshot) {
-    return <PhaseBlock snapshot={message.phaseSnapshot} />;
+  // 回复过程组：由 replyProcessAggregator 注入的合成消息（思考/工具/过渡句收纳为组头抽屉）
+  if (message.replyProcess) {
+    return <ReplyProcessGroup snapshot={message.replyProcess} />;
   }
   // 思考段消息（isThinking）：渲染为对话流内折叠块，进行中展开滚动、完成折叠
   if (message.isThinking && message.thinking) {
-    return <ThinkingBlock thinking={message.thinking} thinkingDurationMs={message.thinkingDurationMs} inProgress={message.thinkingInProgress} />;
+    return (
+      <ThinkingBlock
+        thinking={message.thinking}
+        thinkingDurationMs={message.thinkingDurationMs}
+        inProgress={message.thinkingInProgress}
+      />
+    );
   }
   // 思考段消息但内容为空且仍在进行（首片 delta 未到）：占位显示进行中块
   if (message.isThinking && message.thinkingInProgress) {

@@ -130,8 +130,8 @@ export interface ChatMessage {
   taskListSnapshot?: TaskItem[];
   /** Raw task tool events backing the snapshot (for collapsed raw-calls view) */
   taskListRawEvents?: TaskListRawEvent[];
-  /** Aggregated phase snapshot (synthetic message injected by phaseAggregator) */
-  phaseSnapshot?: import('../utils/phaseAggregator').PhaseSnapshot;
+  /** Reply-level process group snapshot (synthetic message injected by replyProcessAggregator) */
+  replyProcess?: import('../utils/replyProcessAggregator').ReplyProcessSnapshot;
   /** Exit code for command execution */
   exitCode?: number;
   /** 整轮耗时（毫秒）：本轮完成时由 claude-complete/direct-complete 下发，回填到末条 assistant 消息；历史直连会话取条目 timestamp 差值 */

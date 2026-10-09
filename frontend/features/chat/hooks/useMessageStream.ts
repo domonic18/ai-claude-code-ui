@@ -46,6 +46,8 @@ interface UseMessageStreamReturn {
   thinkingDurationMs: number | null;
   /** Notify that a content block has started */
   onBlockStart: (blockType: string) => void;
+  /** Flush pending thinking seal (called when next visible content appears) */
+  flushPendingThinkingSeal: () => void;
 }
 
 interface UseStreamBufferOptions {
@@ -88,6 +90,8 @@ interface UseStreamBufferReturn {
   resetContent: () => void;
   /** Notify that a content block has started */
   onBlockStart: (blockType: string) => void;
+  /** Flush pending thinking seal (called when next visible content appears) */
+  flushPendingThinkingSeal: () => void;
   /** Ref to the last thinking segment duration (ms) */
   thinkingDurationMsRef: React.MutableRefObject<number | null>;
 }
@@ -121,6 +125,10 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
   const thinkingStartTimeRef = useRef<number | null>(null);
   // thinking 段时长：上一段 thinking 的耗时（毫秒）
   const thinkingDurationMsRef = useRef<number | null>(null);
+  // 待折叠的思考段：块已结束（text/tool_use 已开始）但下一个可见内容尚未上屏。
+  // 折叠延迟到正文首字/工具卡渲染时（flushPendingThinkingSeal），避免思考在
+  // 用户看不到的地方结束——期间思考块保持展开态
+  const pendingSealRef = useRef<{ thinking: string; durationMs: number | null } | null>(null);
 
   const clearStreamTimer = useCallback(() => {
     if (streamTimerRef.current) {
@@ -151,8 +159,20 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
     }
   }, []);
 
+  /** 冲刷待折叠的思考段：由「下一个可见内容上屏」触发（正文首字/工具卡）。
+   * 定义先于 updateStreamContent/addMessage 路径，避免声明顺序问题 */
+  const flushPendingThinkingSeal = useCallback(() => {
+    const pending = pendingSealRef.current;
+    if (!pending) return;
+    pendingSealRef.current = null;
+    onThinkingSeal?.(pending);
+  }, [onThinkingSeal]);
+
   const updateStreamContent = useCallback((content: string) => {
     if (!content) return;
+
+    // 正文首字上屏：冲刷待折叠的思考段（用户能看到下一个内容了，此刻折叠）
+    flushPendingThinkingSeal();
 
     onHasContent?.();
 
@@ -163,7 +183,7 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
       flushBuffer();
       onStreamUpdate?.(streamingContentRef.current + streamBufferRef.current, streamingThinkingRef.current + thinkingBufferRef.current);
     }, throttleInterval);
-  }, [flushBuffer, clearStreamTimer, throttleInterval, onStreamUpdate, onHasContent]);
+  }, [flushBuffer, clearStreamTimer, throttleInterval, onStreamUpdate, onHasContent, flushPendingThinkingSeal]);
 
   const updateStreamThinking = useCallback((thinking: string) => {
     if (!thinking) return;
@@ -198,6 +218,7 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
     streamingThinkingRef.current = '';
     thinkingStartTimeRef.current = null;
     thinkingDurationMsRef.current = null;
+    pendingSealRef.current = null;
     setStreamingContent('');
     setStreamingThinking('');
   }, []);
@@ -219,7 +240,10 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
       // 思考块开始：立即在消息列表插入进行中的思考消息（对话流内实时展示）
       onThinkingStart?.();
     } else if (blockType === 'text' || blockType === 'tool_use') {
-      // text/tool_use 块开始：封段当前 thinking —— 计算时长、回调封存、清空当前段
+      // text/tool_use 块开始：思考块本体已结束——结束计时、暂存待折叠。
+      // 不立即回调折叠（onThinkingSeal）：延迟到下一个可见内容上屏时
+      // （正文首字 updateStreamContent / 工具卡 onAddMessage），
+      // 保证用户全程看到思考内容，不在盲区结束思考
       if (thinkingStartTimeRef.current !== null) {
         const durationMs = Date.now() - thinkingStartTimeRef.current;
         thinkingDurationMsRef.current = durationMs;
@@ -228,15 +252,15 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
         flushBuffer();
         const segmentThinking = streamingThinkingRef.current;
         if (segmentThinking) {
-          onThinkingSeal?.({ thinking: segmentThinking, durationMs });
-          // 段已落消息：清空当前段，下一段 thinking 从零开始
+          pendingSealRef.current = { thinking: segmentThinking, durationMs };
+          // 段内容已暂存：清空当前段，下一段 thinking 从零开始
           streamingThinkingRef.current = '';
           setStreamingThinking('');
         }
       }
     }
     onBlockStart?.(blockType);
-  }, [onBlockStart, onThinkingStart, onThinkingSeal, flushBuffer]);
+  }, [onBlockStart, onThinkingStart, flushBuffer]);
 
   return {
     streamingContent,
@@ -250,6 +274,7 @@ function useStreamBuffer(options: UseStreamBufferOptions): UseStreamBufferReturn
     resetAll,
     resetContent,
     onBlockStart: handleBlockStart,
+    flushPendingThinkingSeal,
     thinkingDurationMsRef,
   };
 }
@@ -347,5 +372,6 @@ export function useMessageStream(options: UseMessageStreamOptions = {}): UseMess
     resetStream,
     thinkingDurationMs,
     onBlockStart: buffer.onBlockStart,
+    flushPendingThinkingSeal: buffer.flushPendingThinkingSeal,
   };
 }
